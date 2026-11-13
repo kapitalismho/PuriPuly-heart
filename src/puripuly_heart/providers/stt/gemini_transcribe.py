@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import contextlib
 import logging
 import math
 from dataclasses import dataclass, field, replace
@@ -28,7 +27,10 @@ from puripuly_heart.core.stt.backend import (
     STTRecognitionUnit,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.core.stt.stream_input import STTStreamInputMap
 from puripuly_heart.domain.recognition import (
@@ -97,9 +99,8 @@ def _create_transports_sync() -> tuple[Any, Any]:
         async_transport = network_clients.external_async_client(
             tls=tls, policy=policy, timeout=None, follow_redirects=True
         )
-    except BaseException:
-        with contextlib.suppress(Exception):
-            sync_transport.close()
+    except BaseException as primary:
+        _close_failed_preparation(primary, (sync_transport.close,))
         raise
     return sync_transport, async_transport
 
@@ -132,11 +133,11 @@ def _prepare_gemini_resources_sync(
     try:
         http_options = _build_http_options_sync(sync_transport, async_transport)
         client = _create_genai_client_sync(api_key, http_options)
-    except BaseException:
-        with contextlib.suppress(Exception):
-            sync_transport.close()
-        with contextlib.suppress(Exception):
-            asyncio.run(async_transport.aclose())
+    except BaseException as primary:
+        _close_failed_preparation(
+            primary,
+            (sync_transport.close, lambda: asyncio.run(async_transport.aclose())),
+        )
         raise
     return _GeminiClientResources(
         client=client,
@@ -144,6 +145,34 @@ def _prepare_gemini_resources_sync(
         async_transport=async_transport,
         config=config,
     )
+
+def _close_failed_preparation(
+    primary: BaseException, closers: tuple[Callable[[], Any], ...]
+) -> None:
+    diagnostics = recognition_failure_diagnostics(
+        primary,
+        provider="gemini_transcribe",
+        channel=None,
+        operation="readiness",
+        reason="provider_not_ready",
+    )
+    failed = []
+    secondary = []
+    for close in closers:
+        try:
+            close()
+        except Exception as exc:
+            failed.append(close)
+            secondary.append(
+                recognition_cleanup_failure(
+                    exc, provider="gemini_transcribe", channel=None, primary=diagnostics
+                )
+            )
+    primary._gemini_cleanup_retry = tuple(failed)
+    primary.failure_diagnostics = replace(
+        diagnostics, causes=(*diagnostics.causes, *secondary)
+    )
+
 
 
 def gemini_transcribe_language_codes(source_language: str | None) -> list[str]:
@@ -253,6 +282,7 @@ class GeminiTranscribeSTTBackend(STTBackend):
     connect_timeout_s: float = 10.0
     drain_timeout_s: float = GEMINI_TRANSCRIBE_DRAIN_TIMEOUT_S
     live_connect_factory: Callable[[str, Any], Any] | None = None
+    _starting_sessions: list[STTBackendSession] = field(init=False, default_factory=list, repr=False)
 
     async def open_session(
         self,
@@ -269,6 +299,8 @@ class GeminiTranscribeSTTBackend(STTBackend):
             raise ValueError("connect_timeout_s must be > 0")
         if self.drain_timeout_s <= 0:
             raise ValueError("drain_timeout_s must be > 0")
+        if self._starting_sessions:
+            await self.close()
         session = _GeminiTranscribeLiveSession(
             api_key=self.api_key,
             language_codes=list(self.language_codes),
@@ -282,11 +314,35 @@ class GeminiTranscribeSTTBackend(STTBackend):
         )
         try:
             await session.start()
-        except BaseException:
-            with contextlib.suppress(BaseException):
+        except BaseException as primary:
+            try:
                 await session.close()
+            except (Exception, asyncio.CancelledError) as cleanup:
+                if not session._teardown_done:
+                    self._starting_sessions.append(session)
+                diagnostics = getattr(primary, "failure_diagnostics", None)
+                secondary = getattr(cleanup, "failure_diagnostics", None)
+                if isinstance(secondary, ErrorDiagnostics):
+                    primary.failure_diagnostics = (
+                        replace(diagnostics, causes=(*diagnostics.causes, secondary))
+                        if isinstance(diagnostics, ErrorDiagnostics)
+                        else secondary
+                    )
+                if isinstance(cleanup, asyncio.CancelledError) and not isinstance(
+                    primary, asyncio.CancelledError
+                ):
+                    if isinstance(diagnostics, ErrorDiagnostics) and not isinstance(
+                        secondary, ErrorDiagnostics
+                    ):
+                        cleanup.failure_diagnostics = diagnostics
+                    raise cleanup from primary
             raise
         return session
+
+    async def close(self) -> None:
+        for session in tuple(self._starting_sessions):
+            await session.close()
+            self._starting_sessions.remove(session)
 
     @staticmethod
     async def verify_api_key(api_key: str) -> bool:
@@ -344,6 +400,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     _handshake_task: asyncio.Task[Any] | None = field(init=False, default=None, repr=False)
     _teardown_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _teardown_done: bool = field(init=False, default=False)
+    _cleanup_retry: list[Callable[[], Any]] = field(init=False, default_factory=list, repr=False)
+    _cleanup_errors: list[Exception] = field(init=False, default_factory=list, repr=False)
     _scoped_request: STTProviderTurnRequest | None = field(init=False, default=None, repr=False)
     _sealing: bool = field(init=False, default=False)
     allows_sealed_turn_overlap: ClassVar[bool] = True
@@ -436,7 +494,9 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._recv_task = asyncio.create_task(self._recv_loop())
 
     def _start_teardown(self) -> asyncio.Task[None] | None:
-        if self._teardown_task is None and not self._teardown_done:
+        if not self._teardown_done and (
+            self._teardown_task is None or self._teardown_task.done()
+        ):
             self._teardown_task = asyncio.create_task(self._teardown_body())
         return self._teardown_task
 
@@ -449,9 +509,23 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 await asyncio.shield(task)
             except asyncio.CancelledError:
                 continue
+        task.result()
+        if self._cleanup_errors:
+            failure = ExceptionGroup("Gemini resource cleanup incomplete", tuple(self._cleanup_errors))
+            failure.failure_diagnostics = recognition_cleanup_failure(
+                failure,
+                provider="gemini_transcribe",
+                channel=self._event_projection.channel,
+                primary=self._failure_diagnostics,
+            )
+            raise failure
 
     async def _teardown_body(self) -> None:
         self._cancel_go_away_timer()
+        retry, self._cleanup_retry = self._cleanup_retry, []
+        self._cleanup_errors = []
+        for close in retry:
+            await self._best_effort_close(close)
         raw = self._setup_future
         if raw is not None and not raw.done():
             try:
@@ -466,10 +540,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if raw is not None and raw.done():
             try:
                 outcome = raw.result()
-            except BaseException:
+            except BaseException as exc:
+                for close in getattr(exc, "_gemini_cleanup_retry", ()):
+                    await self._best_effort_close(lambda close=close: asyncio.to_thread(close))
+                exc._gemini_cleanup_retry = ()
                 outcome = None
         if outcome is not None and outcome is not self._client_resources:
             await self._close_resources(outcome)
+        self._setup_future = None
         executor, self._setup_executor = self._setup_executor, None
         if executor is not None:
             executor.shutdown(wait=False)
@@ -496,17 +574,17 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         live_context, self._live_context = self._live_context, None
         live_session, self._live_session = self._live_session, None
         if live_context is not None:
-            await self._best_effort_close(live_context.__aexit__(None, None, None))
+            await self._best_effort_close(lambda: live_context.__aexit__(None, None, None))
         elif live_session is not None:
-            await self._best_effort_close(live_session.close())
+            await self._best_effort_close(live_session.close)
         await self._release_client_resources()
-        self._teardown_done = True
+        self._teardown_done = not self._cleanup_retry
 
     async def _close_resources(self, resources: _GeminiClientResources) -> None:
-        await self._best_effort_close(resources.client.aio.aclose())
-        await self._best_effort_close(asyncio.to_thread(resources.client.close))
-        await self._best_effort_close(resources.async_transport.aclose())
-        await self._best_effort_close(asyncio.to_thread(resources.sync_transport.close))
+        await self._best_effort_close(resources.client.aio.aclose)
+        await self._best_effort_close(lambda: asyncio.to_thread(resources.client.close))
+        await self._best_effort_close(resources.async_transport.aclose)
+        await self._best_effort_close(lambda: asyncio.to_thread(resources.sync_transport.close))
 
     def _retain_startup_cause(self, exception: BaseException) -> None:
         if isinstance(exception, asyncio.CancelledError):
@@ -521,28 +599,21 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._failure_diagnostics = diagnostics
         exception.failure_diagnostics = diagnostics
 
-    async def _best_effort_close(self, awaitable) -> None:
+    async def _best_effort_close(self, close: Callable[[], Any]) -> None:
         try:
-            await awaitable
+            await close()
         except Exception as exc:
-            diagnostics = recognition_failure_diagnostics(
+            self._cleanup_retry.append(close)
+            self._cleanup_errors.append(exc)
+            diagnostics = recognition_cleanup_failure(
                 exc,
                 provider="gemini_transcribe",
                 channel=self._stream.channel if self._stream else self._event_projection.channel,
-                operation="cleanup",
-                reason="provider_cleanup_failed",
+                primary=self._failure_diagnostics,
             )
             emit_failure(
                 logger,
-                replace(
-                    diagnostics,
-                    cause_id=(
-                        self._failure_diagnostics.diagnostic_id
-                        if self._failure_diagnostics
-                        else None
-                    ),
-                    fields={**diagnostics.fields, "cleanup_confirmed": False},
-                ),
+                diagnostics,
                 severity="warning",
                 disposition="degraded",
                 stage="cleanup",
@@ -1046,9 +1117,21 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         current_task = asyncio.current_task()
         try:
             await self._teardown()
-        except asyncio.CancelledError, Exception:
-            pass
-        self._event_projection.close()
+        except Exception as cleanup:
+            if current_task is not None and current_task.cancelling():
+                cancelled = asyncio.CancelledError()
+                cancelled.failure_diagnostics = getattr(
+                    cleanup, "failure_diagnostics", None
+                ) or recognition_cleanup_failure(
+                    cleanup,
+                    provider="gemini_transcribe",
+                    channel=self._event_projection.channel,
+                    primary=self._failure_diagnostics,
+                )
+                raise cancelled from cleanup
+            raise
+        finally:
+            self._event_projection.close()
         if current_task is not None and current_task.cancelling():
             raise asyncio.CancelledError
 

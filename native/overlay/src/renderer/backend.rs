@@ -102,6 +102,7 @@ enum GpuReadinessProbe {
     Ready,
     Pending,
     Failed,
+    NativeFailed(crate::runtime_diagnostics::NativeFailure),
 }
 
 async fn resolve_bounded_gpu_readiness(
@@ -116,6 +117,7 @@ async fn resolve_bounded_gpu_readiness(
         match poll() {
             GpuReadinessProbe::Ready => return ReadinessOutcome::Ready,
             GpuReadinessProbe::Failed => return ReadinessOutcome::Failed,
+            GpuReadinessProbe::NativeFailed(failure) => return ReadinessOutcome::NativeFailed(failure),
             GpuReadinessProbe::Pending if timed_out() => return ReadinessOutcome::TimedOut,
             GpuReadinessProbe::Pending => tokio::task::yield_now().await,
         }
@@ -410,7 +412,7 @@ impl CaptionRenderer {
                 .prepare_frame_for_submission(cancellation)
                 .await
         };
-        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed) {
+        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed | ReadinessOutcome::NativeFailed(_)) {
             self.test_incomplete_producer.set(false);
         }
         outcome
@@ -723,12 +725,12 @@ impl WindowsCaptionRenderer {
         let dwrite_factory = create_dwrite_factory()?;
         let factory2: IDWriteFactory2 = dwrite_factory
             .cast()
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
         let system_font_collection = get_system_font_collection(&dwrite_factory)?;
         let system_font_fallback = unsafe {
             factory2
                 .GetSystemFontFallback()
-                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
         };
         let (font_resolver, bundled_font_collection) =
             initialize_bundled_font_collection(&dwrite_factory);
@@ -753,7 +755,7 @@ impl WindowsCaptionRenderer {
         let cache_outline_brush = unsafe {
             d2d_context
                 .CreateSolidColorBrush(&d2d_color(TEXT_OUTLINE_COLOR), None)
-                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
         };
         let cache_self_text_brush = unsafe {
             d2d_context
@@ -764,7 +766,7 @@ impl WindowsCaptionRenderer {
                     )),
                     None,
                 )
-                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
         };
         let mut cache_peer_text_brushes =
             Vec::with_capacity(super::types::PEER_TEXT_FILL_COLORS.len());
@@ -772,13 +774,13 @@ impl WindowsCaptionRenderer {
             cache_peer_text_brushes.push(unsafe {
                 d2d_context
                     .CreateSolidColorBrush(&d2d_color(color), None)
-                    .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+                    .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
             });
         }
         let speaker_divider_fill_brush = unsafe {
             d2d_context
                 .CreateSolidColorBrush(&d2d_color(SPEAKER_DIVIDER_FILL_COLOR), None)
-                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
         };
         let mut renderer = Self {
             d2d_factory,
@@ -830,8 +832,10 @@ impl WindowsCaptionRenderer {
                 MiscFlags: 0,
             };
             let mut query: Option<ID3D11Query> = None;
-            if unsafe { self._d3d_device.CreateQuery(&description, Some(&mut query)) }.is_err() {
-                return ReadinessOutcome::Failed;
+            if let Err(error) = unsafe { self._d3d_device.CreateQuery(&description, Some(&mut query)) } {
+                return ReadinessOutcome::NativeFailed(crate::runtime_diagnostics::NativeFailure::new(
+                    "gpu_query_create", Some(error.code().0),
+                ));
             }
             let Some(query) = query else {
                 return ReadinessOutcome::Failed;
@@ -864,8 +868,10 @@ impl WindowsCaptionRenderer {
                         D3D11_ASYNC_GETDATA_DONOTFLUSH.0 as u32,
                     )
                 };
-                if result.is_err() {
-                    return GpuReadinessProbe::Failed;
+                if let Err(error) = result {
+                    return GpuReadinessProbe::NativeFailed(crate::runtime_diagnostics::NativeFailure::new(
+                        "gpu_query_poll", Some(error.code().0),
+                    ));
                 }
                 if ready.as_bool() {
                     return GpuReadinessProbe::Ready;
@@ -874,7 +880,7 @@ impl WindowsCaptionRenderer {
             },
         )
         .await;
-        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed) {
+        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed | ReadinessOutcome::NativeFailed(_)) {
             self.outstanding_query.replace(None);
         }
         outcome
@@ -921,20 +927,20 @@ impl WindowsCaptionRenderer {
         let text_layout = unsafe {
             self.dwrite_factory
                 .CreateTextLayout(&utf16, &text_format, 512.0, font_size_px * 1.5)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?
         };
         if let Ok(text_layout_2) = text_layout.cast::<IDWriteTextLayout2>() {
             unsafe {
                 text_layout_2
                     .SetFontFallback(&self.system_font_fallback)
-                    .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                    .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             }
         }
         let mut metrics = windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS::default();
         unsafe {
             text_layout
                 .GetMetrics(&mut metrics)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
         }
         Ok(())
     }
@@ -1010,7 +1016,7 @@ impl WindowsCaptionRenderer {
                     let layer = self
                         .d2d_context
                         .CreateLayer(None)
-                        .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                        .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
                     let layer_parameters = D2D1_LAYER_PARAMETERS1 {
                         contentBounds: D2D_RECT_F {
                             left: 0.0,
@@ -1126,7 +1132,7 @@ impl WindowsCaptionRenderer {
         let command_list = unsafe {
             self.d2d_context
                 .CreateCommandList()
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?
         };
         unsafe {
             self.d2d_context.SetTarget(&command_list);
@@ -1158,7 +1164,7 @@ impl WindowsCaptionRenderer {
         let end_draw_result = unsafe {
             self.d2d_context
                 .EndDraw(None, None)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))
         };
         unsafe {
             self.d2d_context.SetTarget(previous_target.as_ref());
@@ -1171,7 +1177,7 @@ impl WindowsCaptionRenderer {
                 unsafe {
                     command_list
                         .Close()
-                        .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                        .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
                 }
                 Ok(command_list)
             }
@@ -1510,7 +1516,7 @@ impl WindowsCaptionRenderer {
         let end_draw_result = unsafe {
             self.d2d_context
                 .EndDraw(None, None)
-                .map_err(|error| CaptionRenderError::Draw(format!("frame_compose: {}", error)))
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))
         };
 
         match (render_result, end_draw_result) {
@@ -1672,19 +1678,19 @@ impl WindowsCaptionRenderer {
                     word_wrapping,
                 );
             }
-            Err(error) => return Err(CaptionRenderError::Draw(error.to_string())),
+            Err(error) => return Err(CaptionRenderError::from_windows("draw", error)),
         };
         unsafe {
             text_format
                 .SetWordWrapping(word_wrapping)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             text_format
                 .SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             if let Ok(text_format_1) = text_format.cast::<IDWriteTextFormat1>() {
                 text_format_1
                     .SetFontFallback(&self.system_font_fallback)
-                    .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                    .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             }
         }
         Ok((text_format, resolved_style.style_key))
@@ -1703,13 +1709,13 @@ impl WindowsCaptionRenderer {
         let text_layout = unsafe {
             self.dwrite_factory
                 .CreateTextLayout(&utf16, &text_format, max_width_px, max_height_px)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?
         };
         if let Ok(text_layout_2) = text_layout.cast::<IDWriteTextLayout2>() {
             unsafe {
                 text_layout_2
                     .SetFontFallback(&self.system_font_fallback)
-                    .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                    .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             }
         }
         Ok(text_layout)
@@ -1728,13 +1734,13 @@ impl WindowsCaptionRenderer {
         let text_layout = unsafe {
             self.dwrite_factory
                 .CreateTextLayout(&utf16, &text_format, max_width_px, max_height_px)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?
         };
         if let Ok(text_layout_2) = text_layout.cast::<IDWriteTextLayout2>() {
             unsafe {
                 text_layout_2
                     .SetFontFallback(&self.system_font_fallback)
-                    .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                    .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             }
         }
         Ok(text_layout)
@@ -1856,14 +1862,14 @@ impl WindowsCaptionRenderer {
                     &mut index,
                     &mut exists,
                 )
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?;
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?;
             if !exists.as_bool() {
                 return Ok(None);
             }
             self.system_font_collection
                 .GetFontFamily(index)
                 .map(Some)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))
         }
     }
 }
@@ -1882,7 +1888,7 @@ fn d2d_color(color: (f32, f32, f32, f32)) -> D2D1_COLOR_F {
 fn create_dwrite_factory() -> Result<IDWriteFactory, CaptionRenderError> {
     unsafe {
         DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))
     }
 }
 
@@ -2012,7 +2018,7 @@ fn get_system_font_collection(
     unsafe {
         factory
             .GetSystemFontCollection(&mut collection, false)
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     }
     collection.ok_or_else(|| CaptionRenderError::Init("system font collection missing".into()))
 }
@@ -2021,7 +2027,7 @@ fn get_system_font_collection(
 fn create_d2d_factory() -> Result<ID2D1Factory1, CaptionRenderError> {
     unsafe {
         D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, None)
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))
     }
 }
 
@@ -2067,7 +2073,7 @@ fn create_d3d_device_for_driver(
             None,
             Some(&mut context),
         )
-        .map_err(|_| CaptionRenderError::HardwareDevice("D3D11 device creation failed".into()))?;
+        .map_err(|error| CaptionRenderError::from_windows("hardware_device", error))?;
     }
 
     let device =
@@ -2081,11 +2087,11 @@ fn create_d3d_device_for_driver(
 fn renderer_adapter_identity(device: &ID3D11Device) -> Result<AdapterIdentity, CaptionRenderError> {
     let dxgi_device: IDXGIDevice = device
         .cast()
-        .map_err(|_| CaptionRenderError::Init("renderer adapter identity unavailable".into()))?;
+        .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     let adapter = unsafe { dxgi_device.GetAdapter() }
-        .map_err(|_| CaptionRenderError::Init("renderer adapter identity unavailable".into()))?;
+        .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     let description = unsafe { adapter.GetDesc() }
-        .map_err(|_| CaptionRenderError::Init("renderer adapter identity unavailable".into()))?;
+        .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     Ok(AdapterIdentity::DxgiLuid {
         high: description.AdapterLuid.HighPart,
         low: description.AdapterLuid.LowPart,
@@ -2118,7 +2124,7 @@ fn create_target_texture(
     unsafe {
         device
             .CreateTexture2D(&description, None, Some(&mut texture))
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     }
 
     texture.ok_or_else(|| CaptionRenderError::Init("renderer texture missing".into()))
@@ -2131,7 +2137,7 @@ fn create_target_bitmap(
 ) -> Result<ID2D1Bitmap1, CaptionRenderError> {
     let dxgi_surface: IDXGISurface = texture
         .cast()
-        .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+        .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     let bitmap_properties = D2D1_BITMAP_PROPERTIES1 {
         pixelFormat: D2D1_PIXEL_FORMAT {
             format: DXGI_FORMAT_B8G8R8A8_UNORM,
@@ -2145,7 +2151,7 @@ fn create_target_bitmap(
     unsafe {
         context
             .CreateBitmapFromDxgiSurface(&dxgi_surface, Some(&bitmap_properties))
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))
     }
 }
 
@@ -2156,16 +2162,16 @@ fn create_d2d_context(
 ) -> Result<ID2D1DeviceContext, CaptionRenderError> {
     let dxgi_device: IDXGIDevice = device
         .cast()
-        .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+        .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?;
     let d2d_device = unsafe {
         factory
             .CreateDevice(&dxgi_device)
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
     };
     let d2d_context = unsafe {
         d2d_device
             .CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE)
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?
+            .map_err(|error| CaptionRenderError::from_windows("renderer_init", error))?
     };
     Ok(d2d_context)
 }
@@ -2199,6 +2205,7 @@ fn prefix_render_error(stage: &str, error: CaptionRenderError) -> CaptionRenderE
         CaptionRenderError::Draw(message) => {
             CaptionRenderError::Draw(format!("{stage}: {message}"))
         }
+        CaptionRenderError::Native(failure) => CaptionRenderError::Native(failure),
     }
 }
 
@@ -3128,7 +3135,7 @@ fn resolve_family_weight(
         let font = unsafe {
             family
                 .GetFirstMatchingFont(weight, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL)
-                .map_err(|error| CaptionRenderError::Draw(error.to_string()))?
+                .map_err(|error| CaptionRenderError::from_windows("draw", error))?
         };
         if unsafe { font.GetWeight() } == weight {
             return Ok(Some(weight));

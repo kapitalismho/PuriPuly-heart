@@ -6,7 +6,7 @@ import json
 from collections import Counter
 from contextlib import aclosing
 from copy import deepcopy
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
@@ -22,6 +22,7 @@ from puripuly_heart.app.ports.agent_chat import (
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.services.agent_chat.modules import MODULE_DESCRIPTIONS
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.ui.components.agent_secure_entry import AgentSecureEntryController
 from puripuly_heart.ui.i18n import t_for_locale
@@ -532,7 +533,11 @@ async def run_attempt(
                     break
                 messages += 1
                 turn_result = await owner.send(action["text"])
-                actions[-1]["result"] = asdict(turn_result)
+                actions[-1]["result"] = asdict(replace(turn_result, diagnostics=None))
+                if turn_result.diagnostics is not None:
+                    actions[-1]["result"]["diagnostics"] = serialize_diagnostics(
+                        turn_result.diagnostics
+                    )
                 if turn_result.status in {"failed", "service_unavailable", "unavailable"}:
                     result.update(
                         status="blocked", error=transport.last_error or turn_result.status

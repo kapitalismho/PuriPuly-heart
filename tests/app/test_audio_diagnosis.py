@@ -821,3 +821,33 @@ async def test_shutdown_does_not_discard_real_native_capture_cleanup_debt():
     finally:
         release.set()
         await asyncio.gather(task, closing, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_optional_opened_metadata_failure_stays_secondary_to_successful_capture():
+    from puripuly_heart.app.services.agent_chat.tools import project_operation_receipt
+
+    class Source(FeedSource):
+        def opened_input_metadata(self):
+            raise OSError(5, "PRIVATE-METADATA-PATH")
+
+    harness = Harness()
+    source = Source()
+    source.feed(0.5, chunks=4)
+    result = await diagnose(
+        harness,
+        (candidate(0, current=True),),
+        {0: _microphone(_route(), lambda **kwargs: source)},
+    )
+    assert result["status"] == "applied"
+    observed = result["diagnosis"]["candidates"][0]
+    assert observed["speech_detected"] and observed["cleanup_complete"]
+    assert observed["failure_code"] is None and observed["diagnostics"] is None
+    assert observed["device_metadata_availability"] == "unavailable"
+    (diagnostic,) = observed["secondary_diagnostics"]
+    assert diagnostic["code"] == "capture.self.device_metadata_failed"
+    assert diagnostic["operation"] == "device_metadata"
+    assert diagnostic["fields"]["errno"] == 5
+    projected = project_operation_receipt(result, "diagnose_microphone")
+    assert projected["diagnosis"]["candidates"][0]["secondary_diagnostics"][0]["code"] == diagnostic["code"]
+    assert "PRIVATE" not in json.dumps([result, projected])

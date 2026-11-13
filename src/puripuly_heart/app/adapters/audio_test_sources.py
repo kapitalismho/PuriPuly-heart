@@ -7,6 +7,8 @@ from puripuly_heart.app.ports.audio_test import (
     AudioTestOpenedSource,
     AudioTestSourceUnavailable,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.audio.source import (
     AudioSourceOpenFailure,
     MicrophoneTestRouteObservation,
@@ -51,7 +53,11 @@ class MicrophoneAudioTestSourceOpener:
             if not observation.should_attempt_open:
                 raise AudioTestSourceUnavailable(
                     "input_route_unavailable",
-                    observation.resolution_exception_class or "unavailable",
+                    (
+                        observation.failure_diagnostics.fields.get("exception_class")
+                        if observation.failure_diagnostics is not None else None
+                    ),
+                    failure_diagnostics=observation.failure_diagnostics,
                 )
             if (
                 self.expected_device_name is not None
@@ -63,11 +69,14 @@ class MicrophoneAudioTestSourceOpener:
                 internal_channels=self.internal_channels,
             )
             try:
-                source = self._open(observation, decision.preferred_capture_channels)
+                source, recovery = self._open(observation, decision.preferred_capture_channels)
             except AudioSourceOpenFailure as exc:
                 source = exc.source
                 raise
-            return AudioTestOpenedSource(source=source, device=self._device(source, observation))
+            return AudioTestOpenedSource(
+                source=source, device=self._device(source, observation),
+                recovery_diagnostics=recovery,
+            )
 
         try:
             return await run_owned_thread_call(open_sync)
@@ -75,7 +84,9 @@ class MicrophoneAudioTestSourceOpener:
             if source is not None:
                 on_acquired(source)
 
-    def _open(self, observation: MicrophoneTestRouteObservation, channels: int) -> object:
+    def _open(
+        self, observation: MicrophoneTestRouteObservation, channels: int
+    ) -> tuple[object, tuple[ErrorDiagnostics, ...]]:
         def open_channels(count: int) -> object:
             return self.source_factory(
                 sample_rate_hz=None,
@@ -86,31 +97,63 @@ class MicrophoneAudioTestSourceOpener:
             )
 
         try:
-            return open_channels(channels)
+            return open_channels(channels), ()
         except AudioSourceOpenFailure:
             raise
         except Exception as exc:
             if not self.allow_channel_fallback or channels <= self.internal_channels:
                 raise
-            self.log_sink(
-                "[AudioTest] channel=self capture channel fallback "
-                f"requested={channels} cause={type(exc).__name__}"
+            try:
+                self.log_sink(
+                    "[AudioTest] channel=self capture channel fallback "
+                    f"requested={channels} cause={type(exc).__name__}"
+                )
+            except Exception:
+                pass
+            recovery = exception_diagnostics(
+                exc, component="audio_test", operation="audio.test", code="source_open_failed"
             )
-            return open_channels(self.internal_channels)
+            try:
+                return open_channels(self.internal_channels), (recovery,)
+            except AudioSourceOpenFailure as failure:
+                failure.failure_diagnostics = exception_diagnostics(
+                    ExceptionGroup("Audio test source attempts failed", [exc, failure]),
+                    component="audio_test", operation="audio.test", code="source_open_failed",
+                )
+                raise
+            except Exception as failure:
+                raise ExceptionGroup("Audio test source attempts failed", [exc, failure]) from None
 
     @staticmethod
     def _device(source: object, observation: MicrophoneTestRouteObservation) -> dict[str, object]:
         metadata = getattr(source, "opened_input_metadata", None)
-        try:
-            opened = dict(metadata()) if callable(metadata) else {}
-        except Exception:
-            opened = {}
-        return {
+        result: dict[str, object] = {
             "kind": "input_device",
-            "name": opened.get("name") or observation.resolved_device_name,
-            "host_api": opened.get("host_api") or observation.actual_host_api or None,
+            "name": None,
+            "host_api": None,
             "default_fallback": False,
+            "metadata_availability": "unavailable",
         }
+        if not callable(metadata):
+            return result
+        try:
+            opened = dict(metadata())
+        except Exception as exc:
+            result["diagnostics"] = serialize_diagnostics(
+                exception_diagnostics(
+                    exc,
+                    component="capture.self",
+                    operation="device_metadata",
+                    code="capture.self.device_metadata_failed",
+                )
+            )
+        else:
+            result.update(
+                name=opened.get("name"),
+                host_api=opened.get("host_api"),
+                metadata_availability="observed",
+            )
+        return result
 
 
 @dataclass(frozen=True, slots=True)

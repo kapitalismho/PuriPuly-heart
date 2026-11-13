@@ -2261,3 +2261,27 @@ async def test_partial_source_open_failure_keeps_cleanup_owner_and_blocks_reacti
     assert len(calls) == 2 and owner.snapshot.cleanup_debt == 0
     assert owner.snapshot.state is SelfCaptureSessionState.RUNNING
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_capture_fault_tears_down_and_retains_primary_when_observers_fail():
+    owner, _admission, provider, sources, _loop, _sink = build_owner()
+    await owner.apply_intent(config(), enabled=True)
+
+    def fail_observer(*args):
+        raise OSError(5, "private observer detail")
+
+    owner._diagnostic_sink = fail_observer
+    owner._state_changed = fail_observer
+    owner.note_recognition_failure("session_failed")
+    await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
+    await wait_until(lambda: not owner._fault_tasks)
+    snapshot = owner.snapshot
+    assert snapshot.failure_diagnostics.code == "capture.self.session_failed"
+    assert snapshot.failure_diagnostics.causes
+    assert sources[0].close_calls == 1
+    assert provider.release_calls[-1] == ("abort", None)
+    assert snapshot.desired_active is False
+    assert snapshot.has_source is False
+    assert "private" not in repr(snapshot.failure_diagnostics)
+    await owner.close()

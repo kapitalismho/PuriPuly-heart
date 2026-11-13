@@ -244,6 +244,11 @@ async def test_discord_issue_transport_error_preserves_operation_for_resume() ->
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert result.message_key == "discord_auth.error.recovery_pending"
+    assert result.diagnostics.failure_diagnostics is not None
+    assert (
+        result.diagnostics.failure_diagnostics.causes[0].diagnostic_id
+        == transport_error.failure_diagnostics.diagnostic_id
+    )
     operation_id = settings.managed_identity.pending_managed_operation_id
     assert operation_id is not None
     assert secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET) is not None
@@ -251,3 +256,204 @@ async def test_discord_issue_transport_error_preserves_operation_for_resume() ->
     assert len(issue_calls) == 1
     assert issue_calls[0]["operation_id"] == operation_id
     assert "resume_token" in issue_calls[0]
+
+
+@pytest.mark.asyncio
+async def test_pending_token_read_failure_retains_cause_and_same_operation(monkeypatch):
+    service, settings, secrets, client, _harness = _make_discord_service()
+    operation_id, token = _seed_operation(service, secrets)
+    original_get = secrets.get
+
+    def fail_token_read(key):
+        if key == MANAGED_OPERATION_RESUME_TOKEN_SECRET:
+            raise PermissionError(13, "synthetic-private-token-path")
+        return original_get(key)
+
+    monkeypatch.setattr(type(secrets), "get", lambda _self, key: fail_token_read(key))
+    result = await service.prepare_for_translation()
+
+    assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+    assert result.diagnostics.code == "managed_operation_token_read_failed"
+    assert result.diagnostics.failure_diagnostics.fields["errno"] == 13
+    assert settings.managed_identity.pending_managed_operation_id == operation_id
+    assert secrets._items[MANAGED_OPERATION_RESUME_TOKEN_SECRET] == token
+    assert client.calls == []
+    assert "synthetic-private" not in str(result.diagnostics)
+
+
+def test_release_failure_keeps_cleanup_cause_through_provider_error():
+    from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterReleaseDiagnostics,
+        ManagedOpenRouterUserFacingError,
+    )
+
+    primary = exception_diagnostics(
+        PermissionError(13, "synthetic-private-write-path"),
+        component="managed_openrouter_release",
+        operation="managed_delivery_store",
+        code="managed_release_failed",
+    )
+    cleanup = exception_diagnostics(
+        OSError(5, "synthetic-private-cleanup-path"),
+        component="managed_openrouter_release",
+        operation="managed_operation_clear",
+        code="managed_release_failed",
+    )
+    error = ManagedOpenRouterUserFacingError(
+        message_key="managed_release.retry",
+        diagnostics=ManagedOpenRouterReleaseDiagnostics(failure_diagnostics=primary),
+        secondary_diagnostics=(cleanup,),
+        secondary_omitted_count=1,
+    )
+    assert error.failure_diagnostics.diagnostic_id == primary.diagnostic_id
+    assert error.failure_diagnostics.causes[0].diagnostic_id == cleanup.diagnostic_id
+    assert error.failure_diagnostics.causes_truncated is True
+    assert "synthetic-private" not in str(serialize_diagnostics(error.failure_diagnostics))
+
+
+@pytest.mark.asyncio
+async def test_ready_release_cleanup_evidence_survives_successful_translation_once():
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterLLMProvider,
+        ManagedOpenRouterReleaseResult,
+    )
+    from puripuly_heart.domain.models import Translation
+
+    cleanup = exception_diagnostics(
+        PermissionError(13, "synthetic-private-cleanup"),
+        component="managed_openrouter_release",
+        operation="managed_operation_clear",
+        code="managed_release_failed",
+    )
+    recovered = serialize_diagnostics(
+        exception_diagnostics(
+            TimeoutError("synthetic-private-provider"),
+            component="managed_openrouter_release",
+            operation="managed_operation_recovery",
+            code="managed_release_failed",
+        )
+    )
+
+    async def ready():
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            api_key="synthetic-key",
+            secondary_diagnostics=(cleanup,),
+            secondary_omitted_count=1,
+        )
+
+    delegate_results = []
+    async def translated(**kwargs):
+        translation = Translation(
+            utterance_id=kwargs["utterance_id"], text="translated", recovered_failures=(recovered,)
+        )
+        delegate_results.append(translation)
+        return translation
+
+    provider = ManagedOpenRouterLLMProvider(
+        release_service=SimpleNamespace(ensure_key_for_llm_start=ready),
+        delegate_factory=lambda _key: SimpleNamespace(translate=translated),
+    )
+    result = await provider.translate(
+        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+    )
+    assert result.text == "translated"
+    assert result.recovered_failures == delegate_results[0].recovered_failures
+    assert result.secondary_diagnostics[0]["diagnostic_id"] == cleanup.diagnostic_id
+    assert result.secondary_diagnostics_truncated is True
+    assert "synthetic-private" not in str(result.secondary_diagnostics)
+    following = await provider.translate(
+        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+    )
+    assert following.secondary_diagnostics == ()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancelled", [False, True])
+@pytest.mark.parametrize("readiness", [False, True])
+async def test_ready_release_evidence_transfers_to_first_terminal_exception_without_replay(cancelled, readiness):
+    import asyncio
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from puripuly_heart.core.diagnostics import exception_diagnostics, serialize_diagnostics
+    from puripuly_heart.core.openrouter.managed_openrouter_release import (
+        ManagedOpenRouterLLMProvider,
+        ManagedOpenRouterReleaseResult,
+    )
+    from puripuly_heart.domain.models import Translation
+
+    cleanup = exception_diagnostics(
+        PermissionError(13, "synthetic-private-cleanup"),
+        component="managed_openrouter_release",
+        operation="managed_operation_clear",
+        code="managed_release_failed",
+    )
+    entered = asyncio.Event()
+    calls = 0
+    original = RuntimeError("synthetic-private-provider")
+    notifications = []
+
+    async def pending_notification():
+        await asyncio.Event().wait()
+
+    def notify_ready():
+        notifications.append("ready")
+        entered.set()
+        if cancelled:
+            return pending_notification()
+        raise original
+
+    async def ready():
+        return ManagedOpenRouterReleaseResult(
+            ManagedOpenRouterReleaseBehavior.READY,
+            api_key="synthetic-key",
+            secondary_diagnostics=(cleanup,),
+            secondary_omitted_count=1,
+        )
+
+    async def translated(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1 and not readiness:
+            entered.set()
+            if cancelled:
+                await asyncio.Event().wait()
+            raise original
+        return Translation(utterance_id=kwargs["utterance_id"], text="translated")
+
+    provider = ManagedOpenRouterLLMProvider(
+        SimpleNamespace(ensure_key_for_llm_start=ready),
+        lambda _key: SimpleNamespace(translate=translated),
+        on_delegate_ready=notify_ready if readiness else None,
+    )
+    kwargs = dict(
+        utterance_id=uuid4(), text="input", system_prompt="", source_language="en", target_language="ko"
+    )
+    work = asyncio.create_task(provider.translate(**kwargs))
+    await entered.wait()
+    if cancelled:
+        work.cancel()
+    with pytest.raises(asyncio.CancelledError if cancelled else RuntimeError) as raised:
+        await work
+    terminal = raised.value
+    if not cancelled:
+        assert terminal is original
+        assert terminal.failure_diagnostics.causes[-1].diagnostic_id == cleanup.diagnostic_id
+    else:
+        assert getattr(terminal, "failure_diagnostics", None) is None
+    assert terminal.secondary_diagnostics[0].diagnostic_id == cleanup.diagnostic_id
+    assert terminal.secondary_omitted_count == 1
+    assert "synthetic-private" not in str(serialize_diagnostics(terminal.secondary_diagnostics[0]))
+    assert calls == (0 if readiness else 1)
+    assert notifications == (["ready"] if readiness else [])
+    following = await provider.translate(**kwargs)
+    assert following.text == "translated"
+    assert following.secondary_diagnostics == ()
+    assert calls == (1 if readiness else 2)
+    assert notifications == (["ready"] if readiness else [])

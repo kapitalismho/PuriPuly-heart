@@ -64,6 +64,12 @@ struct StartedDecode<T> {
     decode_seconds: f64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct NativeCause {
+    pub native_reason: &'static str,
+    pub native_status: i32,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
     #[error("unsupported_capability")]
@@ -92,6 +98,15 @@ pub enum EngineError {
     ChannelRejected,
     #[error("strict_cpu_rejected")]
     StrictCpuRejected,
+    #[error("worker_operation_panicked")]
+    OperationPanicked,
+    #[error("worker_operation_cancelled")]
+    OperationCancelled,
+    #[error("{classification}")]
+    Native {
+        classification: &'static str,
+        cause: NativeCause,
+    },
 }
 
 impl EngineError {
@@ -110,6 +125,46 @@ impl EngineError {
             Self::DecodeFailure => "decode_failure",
             Self::ChannelRejected => "channel_rejected",
             Self::StrictCpuRejected => "strict_cpu_rejected",
+            Self::OperationPanicked => "worker_operation_panicked",
+            Self::OperationCancelled => "worker_operation_cancelled",
+            Self::Native { classification, .. } => classification,
+        }
+    }
+
+    pub fn native_cause(&self) -> Option<NativeCause> {
+        match self {
+            Self::Native { cause, .. } => Some(*cause),
+            _ => None,
+        }
+    }
+
+    fn with_native_cause(self, error: &Error) -> Self {
+        let native_reason = match error {
+            Error::InvalidArgument(_) => "invalid_argument",
+            Error::NotImplemented(_) => "not_implemented",
+            Error::ModelFileNotFound(_) => "model_file_not_found",
+            Error::ModelLoad(_) => "model_load",
+            Error::OutOfMemory(_) => "out_of_memory",
+            Error::Backend(_) => "backend",
+            Error::Unsupported(_) => "unsupported",
+            Error::BadStructSize(_) => "bad_struct_size",
+            Error::InputTooLong(_) => "input_too_long",
+            Error::Aborted { .. } => "aborted",
+            Error::OutputTruncated { .. } => "output_truncated",
+            Error::OutputRepetition { .. } => "output_repetition",
+            Error::UnsupportedRole(_) => "unsupported_role",
+            Error::InputTooShort(_) => "input_too_short",
+            Error::VersionMismatch(_) => "version_mismatch",
+            Error::Nul(_) => "nul",
+            Error::Busy(_) => "busy",
+            _ => "other",
+        };
+        Self::Native {
+            classification: self.code(),
+            cause: NativeCause {
+                native_reason,
+                native_status: error.raw_status(),
+            },
         }
     }
 }
@@ -374,50 +429,42 @@ fn read_wav(path: &Path) -> Result<Vec<f32>, EngineError> {
 }
 
 fn map_model_load_error(error: Error) -> EngineError {
-    report_native_error("model_load", &error);
-    match error {
+    match &error {
         Error::ModelFileNotFound(_) => EngineError::ModelMissing,
         Error::ModelLoad(_) => EngineError::ModelInvalid,
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
         Error::Backend(_) => EngineError::BackendFailure,
         _ => EngineError::ModelInvalid,
     }
+    .with_native_cause(&error)
 }
 
 fn map_warmup_error(error: Error) -> EngineError {
-    report_native_error("warmup", &error);
-    match error {
+    match &error {
         Error::Aborted { .. } => EngineError::Cancelled,
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
         Error::Backend(_) => EngineError::BackendFailure,
         _ => EngineError::WarmupFailed,
     }
+    .with_native_cause(&error)
 }
 
 fn map_decode_error(error: Error) -> EngineError {
-    report_native_error("decode", &error);
-    match error {
+    match &error {
         Error::Aborted { .. } => EngineError::Cancelled,
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
         Error::Backend(_) => EngineError::BackendFailure,
         _ => EngineError::DecodeFailure,
     }
+    .with_native_cause(&error)
 }
 
 fn map_backend_error(error: Error) -> EngineError {
-    report_native_error("backend", &error);
-    match error {
+    match &error {
         Error::OutOfMemory(_) => EngineError::OutOfMemory,
-        Error::Backend(_) => EngineError::BackendFailure,
         _ => EngineError::BackendFailure,
     }
-}
-
-fn report_native_error(stage: &str, error: &Error) {
-    eprintln!(
-        "[ASRWorker][Native] stage={stage} raw_status={} error={error}",
-        error.raw_status()
-    );
+    .with_native_cause(&error)
 }
 
 fn enumerate_vulkan_devices() -> Vec<VulkanDevice> {
@@ -491,6 +538,21 @@ mod tests {
     use std::path::Path;
     use std::time::Duration;
     use transcribe_cpp::CancelToken;
+
+    #[test]
+    fn native_mapping_retains_typed_reason_without_prose() {
+        let error = super::map_decode_error(transcribe_cpp::Error::InputTooLong(
+            "PRIVATE_NATIVE_AUDIO_OR_PATH".to_string(),
+        ));
+        assert_eq!(error.code(), "decode_failure");
+        let cause = error.native_cause().expect("native cause");
+        assert_eq!(cause.native_reason, "input_too_long");
+        assert_eq!(
+            cause.native_status,
+            transcribe_cpp::Error::InputTooLong(String::new()).raw_status()
+        );
+        assert!(!serde_json::to_string(&cause).unwrap().contains("PRIVATE"));
+    }
 
     fn sample_device(device_id: &str) -> VulkanDevice {
         VulkanDevice {

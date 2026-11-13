@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import logging
 from collections.abc import Awaitable
 from typing import Callable
 
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
-from puripuly_heart.core.error_messages import openrouter_auth_failure_report
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.error_messages import (
+    openrouter_auth_failure_report,
+    provider_failure_report,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 
 SaveHandler = Callable[[str, str], object]
@@ -18,7 +24,9 @@ VerifyHandler = Callable[
 ]
 StatusHandler = Callable[[str], None]
 MessageHandler = Callable[[str, str], None]
-CompletionHandler = Callable[[str, bool, str | None], None]
+CompletionHandler = Callable[[str, bool, str | None, ErrorDiagnostics | None], None]
+
+logger = logging.getLogger(__name__)
 
 
 class ApiKeyVerificationController:
@@ -178,15 +186,29 @@ class ApiKeyVerificationController:
                 return
             self._set_status("error")
             self._last_verified_hash = ""
+            report = (
+                openrouter_auth_failure_report(exc, stage="key_verification")
+                if self._provider == "openrouter"
+                else provider_failure_report(
+                    exc, provider=self._provider, operation="key_verification"
+                )
+            )
+            emit_failure(logger, report.diagnostics, stage="key_verification")
             self._emit_message(
                 "snackbar.verification_error",
-                message=(
-                    openrouter_auth_failure_report(exc, stage="key_verification").message.key
-                    if self._provider == "openrouter"
-                    else self.translate_error(str(exc))
-                ),
+                message=self._failure_message(ProviderCredentialVerificationOutcome(
+                    status="error", provider=self._provider, diagnostics=report.diagnostics
+                )),
             )
-            self._emit_completion(False, exc)
+            self._emit_completion(
+                False,
+                code=(
+                    report.diagnostics.code
+                    if isinstance(exc, OpenRouterAuthenticationError)
+                    else "verification_failed"
+                ),
+                diagnostics=report.diagnostics,
+            )
             return
 
         if self.current_value() != key:
@@ -201,11 +223,9 @@ class ApiKeyVerificationController:
             self._last_verified_hash = ""
             self._emit_message(
                 "snackbar.verification_failed",
-                message=self.translate_error(result.error_text or ""),
+                message=self._failure_message(result),
             )
-        self._emit_completion(
-            success, code=result.diagnostics.code if result.diagnostics is not None else None
-        )
+        self._emit_completion(success, diagnostics=result.diagnostics)
 
     def current_value(self) -> str:
         return self._value_getter()
@@ -217,21 +237,29 @@ class ApiKeyVerificationController:
         self._value_dirty = True
         self._set_status("error")
         self._last_verified_hash = ""
-        self._emit_completion(False, error)
+        diagnostics = exception_diagnostics(
+            error if error is not None else RuntimeError("secret_save_rejected"),
+            component="api_key_verification",
+            operation="secret_save",
+            code="verification_save_failed",
+            category="transaction",
+        )
+        emit_failure(logger, diagnostics, stage="secret_save")
+        self._emit_completion(False, code="verification_failed", diagnostics=diagnostics)
 
     def _emit_completion(
-        self, success: bool, error: Exception | None = None, *, code: str | None = None
+        self,
+        success: bool,
+        *,
+        code: str | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         if success:
             code = None
         elif code is None:
-            code = (
-                f"openrouter.auth.{error.reason}"
-                if isinstance(error, OpenRouterAuthenticationError)
-                else "verification_failed"
-            )
+            code = diagnostics.code if diagnostics is not None else "verification_failed"
         if self._on_complete:
-            self._on_complete(self._provider, success, code)
+            self._on_complete(self._provider, success, code, diagnostics)
 
     def _set_status(self, status: str) -> None:
         self._current_status = status
@@ -242,20 +270,29 @@ class ApiKeyVerificationController:
         if self._on_message:
             self._on_message(message_key, message)
 
-    def translate_error(self, msg: str) -> str:
-        """Translate common error messages to translatable message keys."""
-        if self._provider == "openrouter" and msg.startswith("error.openrouter_auth."):
-            return msg
-        msg_lower = msg.lower()
-        if msg_lower.startswith("qwen_model_unavailable:"):
-            model = msg.split(":", 1)[1].strip() if ":" in msg else ""
-            return f"error.qwen_model_unavailable:{model or 'unknown'}"
-        if "401" in msg or "unauthorized" in msg_lower:
-            return "error.api_key_invalid"
-        if "403" in msg or "forbidden" in msg_lower:
-            return "error.api_key_invalid"
-        if "timeout" in msg_lower or "timed out" in msg_lower:
-            return "error.network_timeout"
-        if "connection" in msg_lower or "network" in msg_lower:
-            return "error.network_error"
-        return msg
+    def _failure_message(self, result: ProviderCredentialVerificationOutcome) -> str:
+        diagnostics = result.diagnostics
+        if diagnostics is None:
+            return (
+                "error.openrouter_auth.credential_rejected"
+                if self._provider == "openrouter"
+                else "error.api_key_invalid"
+            )
+        if diagnostics.component == "provider.openrouter.auth":
+            reason = (diagnostics.code or "").removeprefix("openrouter.auth.")
+            try:
+                return OpenRouterAuthenticationError(
+                    stage="key_verification", reason=reason
+                ).message_key
+            except (KeyError, ValueError):
+                return "error.openrouter_auth.unknown"
+        report = provider_failure_report(
+            diagnostics, provider=self._provider, operation="key_verification"
+        )
+        if report.message.key.startswith("error."):
+            return report.message.key
+        return {
+            "auth": "error.api_key_invalid",
+            "timeout": "error.network_timeout",
+            "network": "error.network_error",
+        }.get(diagnostics.category, "error.unknown")

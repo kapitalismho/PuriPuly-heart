@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable, Mapping
 from copy import deepcopy
 
 from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION, setting_label
+from puripuly_heart.app.services.agent_chat.execution import safe_receipt
 from puripuly_heart.app.services.agent_chat.provider_setup import PROVIDER_SETUPS
 from puripuly_heart.app.services.agent_chat.tools import LANGUAGE_FIELD_PATHS, SETTINGS_FIELD_PATHS
 
@@ -334,27 +335,6 @@ def compact_evidence(value: object) -> object:
             for key, item in value.items()
             if key != "observed_speech_probabilities"
         }
-        if isinstance(result.get("candidates"), list):
-            fields = {
-                "id",
-                "current_route",
-                "input_host_api",
-                "input_device",
-                "opened",
-                "frames_received",
-                "speech_detected",
-                "silence_observed",
-                "peak_level",
-                "speech_probability_min",
-                "speech_probability_max",
-                "speech_threshold",
-                "failure_code",
-                "cleanup_complete",
-            }
-            result["candidates"] = [
-                {key: item for key, item in candidate.items() if key in fields}
-                for candidate in result["candidates"][:4]
-            ]
         if "observed_speech_probabilities" in value:
             result["samples"] = "omitted_from_model"
         return result
@@ -367,6 +347,8 @@ def operation_header(operation: Mapping) -> dict:
     result = _mapping(operation.get("result"))
     receipt = _mapping(result.get("receipt", operation.get("receipt")))
     return {
+        **safe_receipt(result),
+        **safe_receipt(receipt),
         **{
             key: operation[key]
             for key in ("action_id", "tool", "phase", "changed")
@@ -392,9 +374,14 @@ def operation_header(operation: Mapping) -> dict:
                 "cleanup_complete",
                 "cleanup_outcome",
                 "diagnosis",
+                "output",
                 "recognition_result",
                 "recognition_scope",
                 "translation_result",
+                "failure_category",
+                "target_results",
+                "target_languages",
+                "turn_id",
                 "configured_provider",
                 "exercised_provider",
                 "output_delivery",

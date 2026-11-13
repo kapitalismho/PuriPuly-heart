@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import threading
+import json
+from uuid import uuid4
 from dataclasses import replace
 
 import httpx
@@ -12,6 +14,8 @@ from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTr
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
 from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
 from puripuly_heart.core import network_clients
+from puripuly_heart.core import feature_diagnostics
+from puripuly_heart.core.diagnostics import diagnostic_operation, serialize_diagnostics
 from puripuly_heart.core.local_asr import local_stt_runtime_installer as installer
 from puripuly_heart.core.local_asr.local_stt_assets import (
     GRANITE_MODEL_ID,
@@ -26,6 +30,7 @@ from puripuly_heart.core.local_asr.local_stt_download_port import (
 )
 from puripuly_heart.core.local_translation import assets, provisioning
 from puripuly_heart.core.local_translation.public_download import download_public_file
+from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from tests.app.test_managed_gemma_translation import RecordingRuntime, _readiness, _selection
 from tests.core.runtime.test_local_asr_provisioning import (
     MutableProvisioningBackend,
@@ -187,7 +192,11 @@ async def test_typed_source_failures_progress_automatically_but_not_for_explicit
         assert attempts == ["huggingface"]
         assert (install / "previous").read_bytes() == b"preserve"
     else:
-        await provisioning.ensure_gemma_installed(**arguments)
+        installed = await provisioning.ensure_gemma_installed(**arguments)
+        assert len(installed.recovery_diagnostics) == 1
+        recovered = installed.recovery_diagnostics[0]
+        assert recovered.fields["source_kind"] == "huggingface"
+        assert recovered.fields["asset_failure_code"] == failure_code
         assert attempts == ["huggingface", *(["modelscope"] * len(spec.assets))]
         assert updates[-1].state == "ready"
         assets.validate_gemma_install(install, spec=spec)
@@ -309,7 +318,7 @@ async def test_explicit_asset_repair_checks_integrity_and_preserves_cheap_reuse(
         assert calls == []
         model = install / spec.model_filename
         model.write_bytes(b"xxxx")
-        assert owner.install_status(model_id) == "ready"
+        assert owner.install_state(model_id).status == "ready"
         await provisioning.ensure_gemma_installed(spec=spec, downloader=downloader)
         assert calls == []
         assert model.read_bytes() == b"xxxx"
@@ -519,7 +528,7 @@ async def test_asset_conflicts_refuse_prepare_and_delete_then_allow_them_after_s
         assert len(runtime.calls) == 2
         await active.release()
         await owner.delete_assets(spec.model_id)
-        assert owner.install_status(spec.model_id) == "missing"
+        assert owner.install_state(spec.model_id).status == "missing"
     finally:
         release.set()
         await asyncio.gather(task, return_exceptions=True)
@@ -619,3 +628,144 @@ async def test_cancelled_deletion_retains_real_lease_until_worker_settles(
     finally:
         lease.close()
     assert (install / "new").read_bytes() == b"new"
+
+
+@pytest.mark.parametrize("kind", ["asr", "gemma"])
+async def test_source_causes_reach_asset_results_when_optional_sinks_fail(tmp_path, monkeypatch, kind):
+    private = "private-source-body-url-and-credential"
+    operation_id, request_id = uuid4().hex, uuid4().hex
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError(private)
+
+    monkeypatch.setattr(feature_diagnostics, "emit_basic_log", unavailable)
+
+    class Downloader:
+        async def download(self, request, **kwargs):
+            raise LocalSTTDownloadPortError(
+                private,
+                status_code=404 if request.endpoint is not None else 403,
+                cause_type="RuntimeError",
+                worker_exit_code=1,
+            )
+
+    results = []
+    if kind == "asr":
+        from tests.core.test_local_stt_huggingface_xet_adapter import _gpu_manifest
+
+        manifest = _gpu_manifest(b"synthetic-model")
+        backend = MutableProvisioningBackend(_all_states("missing"))
+        owner = LocalASRProvisioningOwner(
+            model_root=tmp_path / "asr-models",
+            cpu_model_inspector=backend.inspect_cpu,
+            gpu_model_inspector=backend.inspect_gpu,
+            gpu_manifest_loader=lambda: manifest,
+            huggingface_downloader=Downloader(),
+            state_changed=unavailable,
+            diagnostic_sink=unavailable,
+        )
+        start_install = owner.start_install
+
+        def observed_start(*args, **kwargs):
+            task = start_install(*args, **kwargs)
+            task.add_done_callback(lambda completed: results.append(completed.result()))
+            return task
+
+        monkeypatch.setattr(owner, "start_install", observed_start)
+        model_id = LOCAL_QWEN_GPU_MODEL_ID
+        application = ModelAssetsApplication(
+            provisioning=lambda: owner,
+            gemma=lambda: None,
+            locale=lambda: "en",
+            model_root=tmp_path / "asr-models",
+            choices=(ModelAssetChoice(model_id, "ASR", "asr", "asr", 4),),
+        )
+        expected_statuses = [403, 404]
+        expected_sources = ["huggingface", "huggingface_mirror"]
+    else:
+        spec, _contents = _small_gemma(monkeypatch, tmp_path)
+        model_id = spec.model_id
+        monkeypatch.setattr(
+            network_clients,
+            "external_client",
+            lambda **kwargs: httpx.Client(
+                transport=httpx.MockTransport(lambda request: httpx.Response(429, content=private)),
+                **kwargs,
+            ),
+        )
+        owner = ManagedGemmaTranslationOwner(
+            runtime=RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"]))),
+            downloader=Downloader(),
+        )
+        application = _asset_application(owner, spec)
+        expected_statuses = [403, 429, 404]
+        expected_sources = ["huggingface", "modelscope", "huggingface_mirror"]
+    try:
+        with diagnostic_operation(str(uuid4()), operation_id, request_id):
+            with pytest.raises(ModelAssetsError) as caught:
+                await application.download(model_id)
+        diagnostics = caught.value.failure_diagnostics
+        assert diagnostics is application.entry(model_id).failure_diagnostics
+        assert diagnostics.operation_id == operation_id
+        assert diagnostics.request_id == request_id
+        assert diagnostics.status_code is None
+        assert [cause.status_code for cause in diagnostics.causes] == expected_statuses, (
+            serialize_diagnostics(diagnostics)
+        )
+        assert [cause.fields["source_kind"] for cause in diagnostics.causes] == expected_sources
+        assert [cause.fields["source_attempt"] for cause in diagnostics.causes] == list(
+            range(1, len(expected_sources) + 1)
+        )
+        if kind == "asr":
+            assert results[0].failure_diagnostics is diagnostics
+            assert owner.snapshot.state_for(model_id).failure_diagnostics is diagnostics
+            assert any(item.event == "diagnostic_delivery" for item in owner.diagnostics)
+        else:
+            assert owner.diagnostics[-1] is diagnostics
+        serialized = serialize_diagnostics(diagnostics)
+        assert serialized["diagnostic_id"] == diagnostics.diagnostic_id
+        assert serialized == application.entry(model_id).to_dict()["failure_diagnostics"]
+        assert private not in json.dumps(application.entry(model_id).to_dict())
+        assert str(tmp_path) not in json.dumps(serialized)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.parametrize("kind", ["asr", "gemma"])
+async def test_cancelled_provisioning_keeps_prior_source_cause_without_advancing(tmp_path, monkeypatch, kind):
+    from tests.core.test_local_stt_huggingface_xet_adapter import _gpu_manifest
+
+    cancellation = threading.Event()
+    requests = []
+
+    class Downloader:
+        async def download(self, request, **kwargs):
+            requests.append(request)
+            cancellation.set()
+            raise LocalSTTDownloadPortError("private-source-detail", status_code=403)
+
+    if kind == "asr":
+        with pytest.raises(installer.LocalSTTRuntimeInstallCancelled) as caught:
+            await installer.ensure_local_stt_installed(
+                manifest=_gpu_manifest(b"synthetic-model"),
+                model_root=tmp_path / "models",
+                huggingface_downloader=Downloader(),
+                cancel_event=cancellation,
+            )
+    else:
+        spec, _contents = _small_gemma(monkeypatch, tmp_path)
+        with pytest.raises(provisioning.GemmaProvisioningCancelled) as caught:
+            await provisioning.ensure_gemma_installed(
+                spec=spec,
+                install_dir=tmp_path / "gemma",
+                downloader=Downloader(),
+                cancel_event=cancellation,
+            )
+    assert len(requests) == 1
+    assert len(caught.value.secondary_diagnostics) == 1
+    diagnostics = caught.value.secondary_diagnostics[0]
+    assert diagnostics.status_code == 403
+    assert diagnostics.fields["source_kind"] == "huggingface"
+    assert diagnostics.fields["source_attempt"] == 1
+    assert "private-source-detail" not in str(serialize_diagnostics(diagnostics))
+    assert not tuple(tmp_path.rglob("*.staging-*"))

@@ -414,3 +414,38 @@ async def test_desktop_loopback_source_uses_output_channel_count_when_input_chan
     assert source.resolved_device_name == "Speakers (Loopback)"
     assert stream_ref["stream"].kwargs["channels"] == 6
     await source.close()
+
+
+@pytest.mark.asyncio
+async def test_desktop_cleanup_retains_all_causes_and_failed_handles_for_retry():
+    import janus
+
+    source = object.__new__(DesktopLoopbackAudioSource)
+    source._closed = False
+    source._queue = janus.Queue()
+    calls = []
+    failing = True
+
+    def close_step(name, errno):
+        calls.append(name)
+        if failing:
+            raise OSError(errno, "private native detail")
+
+    stream = SimpleNamespace(
+        stop_stream=lambda: close_step("stop", 5),
+        close=lambda: close_step("stream", 13),
+    )
+    manager = SimpleNamespace(terminate=lambda: close_step("manager", 6))
+    source._stream = stream
+    source._manager = manager
+    with pytest.raises(ExceptionGroup) as raised:
+        await source.close()
+    diagnostics = raised.value.failure_diagnostics
+    assert [cause.fields["errno"] for cause in diagnostics.causes] == [5, 13, 6]
+    assert diagnostics.fields["cleanup_confirmed"] is False
+    assert source._stream is stream and source._manager is manager
+    assert "private" not in repr(diagnostics)
+    failing = False
+    await source.close()
+    assert source._stream is None and source._manager is None
+    assert calls == ["stop", "stream", "manager"] * 2

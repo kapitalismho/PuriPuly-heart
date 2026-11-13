@@ -178,3 +178,60 @@ def test_partial_native_open_cleanup_debt_prevents_mono_and_route_fallbacks():
     assert raised.value is failure
     assert len(calls) == 1 and calls[0]["channels"] == 2
     assert harness.wrapped == []
+
+
+def test_all_microphone_causes_survive_mono_routes_and_failed_logging() -> None:
+    from dataclasses import replace
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+
+    calls = []
+
+    def fail_source(**kwargs):
+        calls.append(kwargs)
+        raise OSError(len(calls), "private microphone detail")
+
+    def fail_log(*args, **kwargs):
+        raise RuntimeError("private log detail")
+
+    harness = AdapterHarness(
+        resolve_device=lambda **kwargs: 7,
+        source_factory=fail_source,
+        preferred_channels=2,
+    )
+    adapter = replace(harness.adapter(), log_diagnostic=fail_log)
+    with pytest.raises(RuntimeError, match="All microphone attempts failed") as raised:
+        adapter(_config())
+    diagnostics = raised.value.failure_diagnostics
+    assert len(calls) == 6
+    assert [cause.fields["errno"] for cause in diagnostics.causes] == list(range(1, 7))
+    assert [cause.fields["capture_attempt"] for cause in diagnostics.causes] == [
+        "primary", "primary_mono_retry", "name_fallback", "name_fallback_mono_retry",
+        "system_default", "system_default_mono_retry",
+    ]
+    assert "private" not in repr(serialize_diagnostics(diagnostics))
+
+
+def test_successful_microphone_fallback_remains_success_when_logging_fails() -> None:
+    from dataclasses import replace
+
+    calls = []
+    source = object()
+
+    def create_source(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise OSError(13, "private open detail")
+        return source
+
+    def fail_log(*args, **kwargs):
+        raise RuntimeError("private log detail")
+
+    adapter = AdapterHarness(
+        resolve_device=lambda **kwargs: 7, source_factory=create_source,
+        preferred_channels=2,
+    ).adapter()
+    adapter = replace(adapter, log_diagnostic=fail_log)
+    assert adapter(_config()) == ("wrapped", source)
+    assert len(calls) == 2
+    assert adapter.last_open_recovered is True
+    assert adapter.last_open_diagnostics.causes[0].fields["errno"] == 13

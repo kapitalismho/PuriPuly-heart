@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.application_shutdown import application_shutdown_callback
 from puripuly_heart.composition.application_runtime import compose_application_runtime
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
@@ -81,6 +84,7 @@ class HeadlessApplicationPresentation:
         self.tasks: set[asyncio.Task] = set()
         self.dashboard = _HeadlessDashboard()
         self.projections: dict[str, object] = {}
+        self.failure_diagnostics: ErrorDiagnostics | None = None
 
     def _remember(self, key: str, value: object) -> None:
         self.projections[key] = value
@@ -124,12 +128,21 @@ class HeadlessApplicationPresentation:
         return True
 
     def _on_task_done(self, task: asyncio.Task) -> None:
+        if task not in self.tasks:
+            return
         self.tasks.discard(task)
         if not task.cancelled():
             try:
                 task.result()
-            except Exception:
-                logger.exception("Headless application scheduled task failed")
+            except Exception as exc:
+                diagnostics = exception_diagnostics(
+                    exc,
+                    component="headless.presentation",
+                    operation="page_task",
+                    code="ui_task_failed",
+                )
+                self.failure_diagnostics = diagnostics
+                emit_failure(logger, diagnostics)
 
     def create_ui_event_bridge(
         self, *, event_queue: object, runtime_logging: object
@@ -234,16 +247,16 @@ class HeadlessApplicationPresentation:
         overlay: object,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
-    ) -> bool:
+    ) -> SettingsRenderResult:
         self._remember("settings", (provider, general, prompt, overlay))
-        return True
+        return SettingsRenderResult(True)
 
     def refresh_settings_after_openrouter_pkce_success(
         self, *, provider: object, prompt: object, config_path: Path
-    ) -> bool:
+    ) -> SettingsRenderResult:
         self._remember("provider", provider)
         self._remember("prompt", prompt)
-        return True
+        return SettingsRenderResult(True)
 
     def set_settings_overlay_calibration(self, calibration: object) -> None:
         self._remember("calibration", calibration)
@@ -313,6 +326,8 @@ class HeadlessApplicationPresentation:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+            for task in tasks:
+                self._on_task_done(task)
 
     async def close_github_star_prompt_runtime(self) -> None:
         app = self.application

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
@@ -61,6 +62,7 @@ from puripuly_heart.app.services.managed.managed_operation import (
 )
 from puripuly_heart.core.diagnostics import (
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
     sanitize_diagnostics,
 )
@@ -97,6 +99,20 @@ from puripuly_heart.core.qq_auth_diagnostics import (
 )
 
 
+_operation_evidence: ContextVar[tuple[ErrorDiagnostics, ...]] = ContextVar(
+    "qq_managed_evidence", default=()
+)
+_operation_omitted: ContextVar[int] = ContextVar("qq_managed_omitted", default=0)
+
+
+def _retain_secondary(diagnostics: ErrorDiagnostics) -> None:
+    retained = _operation_evidence.get()
+    if len(retained) < 4:
+        _operation_evidence.set((*retained, diagnostics))
+    else:
+        _operation_omitted.set(_operation_omitted.get() + 1)
+
+
 class QqManagedAuthFailure(RuntimeError):
     def __init__(self, diagnostics: ErrorDiagnostics) -> None:
         self.diagnostics = diagnostics
@@ -131,16 +147,32 @@ def _qq_exception_diagnostics(
             )
         ),
         fields=fields,
+        cause=exception_diagnostics(
+            exception,
+            component="qq_managed_auth",
+            operation=phase,
+            code=f"broker_{kind}" if phase == "broker_issue" and transport else code,
+            category=(
+                "timeout" if kind == "timeout"
+                else "network" if transport
+                else "unknown" if isinstance(exception, (TypeError, ValueError, KeyError, RuntimeError))
+                else DIAGNOSTIC_CATEGORY_TRANSACTION
+            ),
+            fields=fields,
+        ),
     )
 
 
-def _observe_qq_failure(phase: str, exception: BaseException) -> None:
+def _observe_qq_failure(phase: str, exception: BaseException) -> ErrorDiagnostics:
+    diagnostics = _qq_exception_diagnostics(phase, exception)
+    _retain_secondary(diagnostics)
     emit_failure(
         logging.getLogger(__name__),
-        _qq_exception_diagnostics(phase, exception),
+        diagnostics,
         severity="warning",
         disposition="degraded",
     )
+    return diagnostics
 
 
 QQ_MANAGED_AUTH_FAILURE_MESSAGE_KEYS = (
@@ -191,6 +223,31 @@ class QqManagedAuthService:
     )
 
     async def authenticate(self, request: QqManagedAuthRequest) -> TransactionResult:
+        token = _operation_evidence.set(())
+        omitted_token = _operation_omitted.set(0)
+        try:
+            result = await self._authenticate_observed(request)
+            return replace(
+                result,
+                secondary_diagnostics=(
+                    *result.secondary_diagnostics,
+                    *(
+                        cause for cause in _operation_evidence.get()
+                        if cause.diagnostic_id not in {
+                            value.diagnostic_id for value in (
+                                *((result.diagnostics,) if result.diagnostics is not None else ()),
+                                *result.secondary_diagnostics,
+                            )
+                        }
+                    ),
+                ),
+                secondary_omitted_count=result.secondary_omitted_count + _operation_omitted.get(),
+            )
+        finally:
+            _operation_evidence.reset(token)
+            _operation_omitted.reset(omitted_token)
+
+    async def _authenticate_observed(self, request: QqManagedAuthRequest) -> TransactionResult:
         try:
             result = await self._authenticate(request)
         except Exception as exc:
@@ -373,6 +430,9 @@ class QqManagedAuthService:
                     secondary_omitted_count=getattr(exc, "secondary_omitted_count", 0),
                 )
             ack_result = await self._delivery_ack_service().retry_pending()
+            for cause in ack_result.secondary_diagnostics:
+                _retain_secondary(cause)
+            _operation_omitted.set(_operation_omitted.get() + ack_result.secondary_omitted_count)
             self._consume_ack_result(ack_result.ack_result)
             if not ack_result.succeeded:
                 return _delivery_ack_pending_result(
@@ -409,7 +469,10 @@ class QqManagedAuthService:
     async def _preflight_claim_source(self) -> TransactionResult | None:
         if self.claim_guard is None:
             return None
-        return await self.claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+        result = await self.claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+        for diagnostics in self.claim_guard.observation_diagnostics:
+            _retain_secondary(diagnostics)
+        return result
 
     def _delivery_ack_service(self) -> ManagedKeyDeliveryAckService:
         if self.delivery_ack_service is not None:
@@ -427,6 +490,9 @@ class QqManagedAuthService:
             source=ACK_SOURCE_QQ,
             managed_secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
         )
+        for cause in result.secondary_diagnostics:
+            _retain_secondary(cause)
+        _operation_omitted.set(_operation_omitted.get() + result.secondary_omitted_count)
         self._consume_ack_result(result.ack_result)
         if not result.succeeded:
             if (
@@ -574,6 +640,7 @@ class QqManagedAuthService:
                     ),
                 )
         for cause in causes:
+            _retain_secondary(cause)
             emit_failure(
                 logging.getLogger(__name__), cause, severity="warning", disposition="degraded"
             )
@@ -695,6 +762,8 @@ class QqManagedAuthService:
         resume_token: str,
     ) -> TransactionResult:
         unknown = _assertion_failure_unknown_outcome(assertion)
+        if assertion.diagnostics is not None:
+            _retain_secondary(assertion.diagnostics)
         if assertion.diagnostics is not None and (
             assertion.diagnostics.fields.get("dispatch_certainty") == "not_dispatched"
         ):
@@ -707,8 +776,12 @@ class QqManagedAuthService:
                 operation.installation_id,
             )
         except Exception as exc:
-            _observe_qq_failure("managed_recovery", exc)
-            first_probe = None
+            first_probe = ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=_observe_qq_failure("managed_recovery", exc),
+            )
         if first_probe is not None and (
             first_probe.operation_status == "FAILED"
             or first_probe.client_action == "action_required"
@@ -894,9 +967,9 @@ class QqManagedAuthService:
             try:
                 self.managed_state.persist()
             except Exception as exc:
-                _observe_qq_failure("managed_recovery", exc)
+                cause = _observe_qq_failure("managed_recovery", exc)
                 return _qq_operation_recovery_pending_result(
-                    request, operation=operation, polls=polls
+                    request, operation=operation, polls=polls, cause=cause
                 )
             if probe.operation_status == "FAILED":
                 await self._clear_qq_operation()
@@ -1005,8 +1078,10 @@ class QqManagedAuthService:
             try:
                 self.claim_guard.managed_state.persist()
             except Exception as exc:
-                _observe_qq_failure("managed_recovery", exc)
-                return _qq_operation_recovery_pending_result(request, operation=operation, polls=0)
+                cause = _observe_qq_failure("managed_recovery", exc)
+                return _qq_operation_recovery_pending_result(
+                    request, operation=operation, polls=0, cause=cause
+                )
         await self._clear_qq_operation(preserve_active_credential=True)
         return _qq_operation_active_recovered_result(request, operation=operation, probe=probe)
 
@@ -1027,6 +1102,9 @@ class QqManagedAuthService:
             )
         recovered = await service.recover_operation_delivery(ACK_SOURCE_QQ, probe)
         if recovered is not None:
+            for cause in recovered.secondary_diagnostics:
+                _retain_secondary(cause)
+            _operation_omitted.set(_operation_omitted.get() + recovered.secondary_omitted_count)
             self._consume_ack_result(recovered.ack_result)
             if recovered.succeeded:
                 if self.claim_guard is not None:
@@ -1034,9 +1112,9 @@ class QqManagedAuthService:
                     try:
                         self.claim_guard.managed_state.persist()
                     except Exception as exc:
-                        _observe_qq_failure("managed_recovery", exc)
+                        cause = _observe_qq_failure("managed_recovery", exc)
                         return _qq_operation_recovery_pending_result(
-                            request, operation=operation, polls=0
+                            request, operation=operation, polls=0, cause=cause
                         )
                 await self._clear_qq_operation(preserve_active_credential=True)
                 return TransactionResult(
@@ -1156,6 +1234,9 @@ class QqManagedAuthService:
                 upstream_omitted_count=getattr(exc, "secondary_omitted_count", 0),
             )
         ack_result = await self._delivery_ack_service().retry_pending()
+        for cause in ack_result.secondary_diagnostics:
+            _retain_secondary(cause)
+        _operation_omitted.set(_operation_omitted.get() + ack_result.secondary_omitted_count)
         self._consume_ack_result(ack_result.ack_result)
         if not ack_result.succeeded:
             return _delivery_ack_pending_result(

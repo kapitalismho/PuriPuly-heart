@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -137,6 +139,14 @@ class Transcript:
                 raise ValueError("invalid Peer publication identity")
 
 
+def _freeze_diagnostic_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_diagnostic_value(item) for key, item in value.items()})
+    if isinstance(value, (tuple, list)):
+        return tuple(_freeze_diagnostic_value(item) for item in value)
+    return value
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class Translation:
     utterance_id: UUID
@@ -153,6 +163,10 @@ class Translation:
     source_text_len: int | None
     logical_turn_key: str | None
     speaker_assignment: SpeakerAssignment | None
+    recovered_failures: tuple[Mapping[str, object], ...]
+    secondary_diagnostics: tuple[Mapping[str, object], ...]
+    recovered_failures_truncated: bool
+    secondary_diagnostics_truncated: bool
 
     def __init__(
         self,
@@ -172,6 +186,10 @@ class Translation:
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
         speaker_assignment: SpeakerAssignment | None = None,
+        recovered_failures: tuple[Mapping[str, object], ...] = (),
+        secondary_diagnostics: tuple[Mapping[str, object], ...] = (),
+        recovered_failures_truncated: bool = False,
+        secondary_diagnostics_truncated: bool = False,
     ) -> None:
         if text is not None and translated_text is not None and text != translated_text:
             raise ValueError("text and translated_text must match when both are set")
@@ -218,6 +236,18 @@ class Translation:
         if speaker_assignment is not None and channel != "peer":
             raise ValueError("speaker attribution is only valid for Peer translations")
         object.__setattr__(self, "speaker_assignment", speaker_assignment)
+        object.__setattr__(
+            self,
+            "recovered_failures",
+            tuple(_freeze_diagnostic_value(value) for value in recovered_failures),
+        )
+        object.__setattr__(
+            self,
+            "secondary_diagnostics",
+            tuple(_freeze_diagnostic_value(value) for value in secondary_diagnostics),
+        )
+        object.__setattr__(self, "recovered_failures_truncated", recovered_failures_truncated)
+        object.__setattr__(self, "secondary_diagnostics_truncated", secondary_diagnostics_truncated)
 
     @property
     def text(self) -> str:

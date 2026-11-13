@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import ctypes
 import logging
 import sys
@@ -8,7 +7,8 @@ import threading
 from collections.abc import Callable
 from ctypes import wintypes
 
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,28 @@ class WindowsClipboardWatcher:
         self._wndproc = None
         self._registered_class_hinstance: int | None = None
         self._start_error: BaseException | None = None
+        self.failure_diagnostics: ErrorDiagnostics | None = None
+        self._failure_sink: Callable[[ErrorDiagnostics], None] | None = None
+
+    def set_failure_sink(self, sink: Callable[[ErrorDiagnostics], None]) -> None:
+        self._failure_sink = sink
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive() and self._hwnd is not None
+
+    def _record_failure(self, exception: BaseException, operation: str) -> None:
+        diagnostics = exception_diagnostics(
+            exception, component="clipboard", operation=operation, code="clipboard_failed"
+        )
+        self.failure_diagnostics = diagnostics
+        exception.failure_diagnostics = diagnostics
+        emit_failure(logger, diagnostics)
+        if self._failure_sink is not None:
+            try:
+                self._failure_sink(diagnostics)
+            except Exception:
+                pass
 
     def start(self) -> None:
         if sys.platform != "win32":
@@ -106,11 +128,7 @@ class WindowsClipboardWatcher:
         if thread.is_alive():
             thread.join(timeout=2.0)
         if thread.is_alive():
-            emit_basic_log(
-                logger,
-                "[Clipboard] The clipboard watcher did not stop before shutdown.",
-                level=logging.WARNING,
-            )
+            self._record_failure(TimeoutError(), "watcher_stop")
             return
         self._clear_thread_refs_if_stopped()
 
@@ -129,13 +147,10 @@ class WindowsClipboardWatcher:
             return
         try:
             self._configure_win32_api()
-            ctypes.windll.user32.PostMessageW(hwnd, _WM_CLIPBOARD_WATCHER_STOP, 0, 0)
-        except Exception:
-            emit_basic_log(
-                logger,
-                "[Clipboard] The clipboard watcher stop request failed.",
-                level=logging.ERROR,
-            )
+            if not ctypes.windll.user32.PostMessageW(hwnd, _WM_CLIPBOARD_WATCHER_STOP, 0, 0):
+                raise ctypes.WinError()
+        except Exception as exc:
+            self._record_failure(exc, "watcher_stop")
 
     def _configure_win32_api(self) -> None:
         user32 = ctypes.windll.user32
@@ -218,18 +233,14 @@ class WindowsClipboardWatcher:
             if msg == _WM_CLIPBOARDUPDATE:
                 try:
                     text = self._read_clipboard_text(hwnd)
-                except Exception:
-                    logger.debug("Failed to read clipboard text", exc_info=True)
+                except Exception as exc:
+                    self._record_failure(exc, "clipboard_read")
                     return 0
                 if text is not None:
                     try:
                         self._on_text(text.strip())
-                    except Exception:
-                        emit_basic_log(
-                            logger,
-                            "[Clipboard] Accepted clipboard text could not be submitted.",
-                            level=logging.ERROR,
-                        )
+                    except Exception as exc:
+                        self._record_failure(exc, "clipboard_callback")
                 return 0
             if msg == _WM_CLIPBOARD_WATCHER_STOP:
                 self._cleanup_window(hwnd)
@@ -245,7 +256,7 @@ class WindowsClipboardWatcher:
             wndclass.hInstance = kernel32.GetModuleHandleW(None)
             wndclass.lpszClassName = self._class_name
             if not user32.RegisterClassW(ctypes.byref(wndclass)):
-                raise ClipboardWatcherError("failed to register clipboard watcher class")
+                raise ClipboardWatcherError("failed to register clipboard watcher class") from ctypes.WinError()
             self._registered_class_hinstance = wndclass.hInstance
 
             hwnd = user32.CreateWindowExW(
@@ -263,33 +274,33 @@ class WindowsClipboardWatcher:
                 None,
             )
             if not hwnd:
-                raise ClipboardWatcherError("failed to create clipboard watcher window")
+                raise ClipboardWatcherError("failed to create clipboard watcher window") from ctypes.WinError()
 
             self._hwnd = hwnd
             if self._stop_requested.is_set():
                 self._cleanup_window(hwnd)
                 return
             if not user32.AddClipboardFormatListener(hwnd):
-                raise ClipboardWatcherError("failed to register clipboard listener")
+                raise ClipboardWatcherError("failed to register clipboard listener") from ctypes.WinError()
             if self._stop_requested.is_set():
                 self._cleanup_window(hwnd)
                 return
 
             self._ready.set()
             msg = wintypes.MSG()
-            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            while True:
+                result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+                if result == -1:
+                    raise ctypes.WinError()
+                if result == 0:
+                    break
                 user32.TranslateMessage(ctypes.byref(msg))
                 user32.DispatchMessageW(ctypes.byref(msg))
         except BaseException as exc:
+            self._record_failure(exc, "clipboard_loop")
             if not self._ready.is_set():
                 self._start_error = exc
                 self._ready.set()
-            else:
-                emit_basic_log(
-                    logger,
-                    "[Clipboard] The clipboard watcher stopped after an internal failure.",
-                    level=logging.ERROR,
-                )
         finally:
             if self._hwnd:
                 self._cleanup_window(self._hwnd)
@@ -300,14 +311,21 @@ class WindowsClipboardWatcher:
     def _cleanup_window(self, hwnd: int) -> None:
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
-        with contextlib.suppress(Exception):
-            user32.RemoveClipboardFormatListener(hwnd)
-        with contextlib.suppress(Exception):
-            user32.DestroyWindow(hwnd)
+        for cleanup in (
+            lambda: user32.RemoveClipboardFormatListener(hwnd),
+            lambda: user32.DestroyWindow(hwnd),
+        ):
+            try:
+                if not cleanup():
+                    raise ctypes.WinError()
+            except Exception as exc:
+                self._record_failure(exc, "clipboard_cleanup")
         hinstance = self._registered_class_hinstance
         if hinstance is None:
-            with contextlib.suppress(Exception):
+            try:
                 hinstance = kernel32.GetModuleHandleW(None)
+            except Exception as exc:
+                self._record_failure(exc, "clipboard_cleanup")
         self._unregister_window_class(hinstance)
         self._hwnd = None
 
@@ -316,8 +334,11 @@ class WindowsClipboardWatcher:
             hinstance = self._registered_class_hinstance
         if hinstance is None:
             return
-        with contextlib.suppress(Exception):
-            ctypes.windll.user32.UnregisterClassW(self._class_name, hinstance)
+        try:
+            if not ctypes.windll.user32.UnregisterClassW(self._class_name, hinstance):
+                raise ctypes.WinError()
+        except Exception as exc:
+            self._record_failure(exc, "clipboard_cleanup")
         if self._registered_class_hinstance == hinstance:
             self._registered_class_hinstance = None
 
@@ -327,20 +348,21 @@ class WindowsClipboardWatcher:
         if not user32.IsClipboardFormatAvailable(_CF_UNICODETEXT):
             return None
         if not user32.OpenClipboard(hwnd):
-            return None
+            raise ctypes.WinError()
         try:
             handle = user32.GetClipboardData(_CF_UNICODETEXT)
             if not handle:
-                return None
+                raise ctypes.WinError()
             ptr = kernel32.GlobalLock(handle)
             if not ptr:
-                return None
+                raise ctypes.WinError()
             try:
                 return ctypes.wstring_at(ptr)
             finally:
                 kernel32.GlobalUnlock(handle)
         finally:
-            user32.CloseClipboard()
+            if not user32.CloseClipboard():
+                self._record_failure(ctypes.WinError(), "clipboard_cleanup")
 
 
 def create_clipboard_watcher(on_text: Callable[[str], None]) -> WindowsClipboardWatcher:

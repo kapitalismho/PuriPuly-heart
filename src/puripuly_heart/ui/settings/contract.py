@@ -20,6 +20,7 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
     ProviderSettingsSnapshot,
 )
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 
 
@@ -110,7 +111,7 @@ class SettingsProviderStateSink(Protocol):
         overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
-    ) -> None: ...
+    ) -> SettingsRenderResult: ...
 
     def refresh_after_openrouter_pkce_success(
         self,
@@ -118,7 +119,7 @@ class SettingsProviderStateSink(Protocol):
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         config_path: Path,
-    ) -> None: ...
+    ) -> SettingsRenderResult: ...
 
     def set_managed_key_state(
         self,

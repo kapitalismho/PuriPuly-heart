@@ -260,6 +260,7 @@ from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
@@ -418,55 +419,25 @@ def _copy_provider_prompt_apply_fields(
     )
 
 
-def _managed_gemma_lifecycle_label(event: DiagnosticEvent, key: str) -> str:
-    value = event.fields.get(key)
-    if not isinstance(value, str):
-        return "none"
-    normalized = "".join(
-        character if character.isalnum() or character in "._:-" else "_"
-        for character in value.strip()
-    )
-    return normalized[:128] or "none"
-
-
 def _emit_managed_gemma_lifecycle_diagnostic(
     event: DiagnosticEvent,
     *,
-    log_basic: Callable[..., object],
-    log_diagnostic: Callable[..., object],
+    record_failure: Callable[[ErrorDiagnostics], object],
 ) -> None:
-    phase = _managed_gemma_lifecycle_label(event, "phase")
-    scope = _managed_gemma_lifecycle_label(event, "scope_name")
-    task = _managed_gemma_lifecycle_label(event, "task_name")
-    callback = _managed_gemma_lifecycle_label(event, "callback_name")
-    exception_class = _managed_gemma_lifecycle_label(event, "exception_class")
-    log_basic(
-        f"[ManagedGemma] lifecycle outcome=failed phase={phase} cause={exception_class}",
-        level=logging.ERROR,
-    )
-    log_diagnostic(
-        "[Diagnostic][ManagedGemma] lifecycle outcome=failed "
-        f"phase={phase} scope={scope} task={task} callback={callback} "
-        f"exception_class={exception_class}",
-        level=logging.ERROR,
-    )
-
-
-def _managed_gemma_failure_diagnostic(snapshot: ManagedGemmaTranslationSnapshot) -> str:
-    fields = [
-        "[Diagnostic][ManagedGemma] prepare outcome=failed",
-        f"backend={snapshot.backend or 'unknown'}",
-        f"phase={snapshot.failure_phase or 'unknown'}",
-        f"failure={snapshot.failure_code or 'unavailable'}",
-        f"cause={snapshot.cause_type or snapshot.error_type or 'unavailable'}",
-    ]
-    if snapshot.worker_exit_code is not None:
-        fields.append(f"worker_exit_code={snapshot.worker_exit_code}")
-    if snapshot.status_code is not None:
-        fields.append(f"status_code={snapshot.status_code}")
-    if snapshot.os_error_code is not None:
-        fields.append(f"os_error_code={snapshot.os_error_code}")
-    return " ".join(fields)
+    diagnostics = event.diagnostics
+    if diagnostics is None:
+        diagnostics = ErrorDiagnostics(
+            component="lifecycle.scope",
+            operation=None,
+            code="lifecycle_exception",
+            category="lifecycle",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields=event.fields,
+        )
+    record_failure(diagnostics)
 
 
 def compose_application_runtime(
@@ -579,24 +550,25 @@ def compose_application_runtime(
 
     def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
         nonlocal managed_gemma_basic_state
-        basic_state = (snapshot.state, snapshot.backend, snapshot.error_type)
+        diagnostics = snapshot.failure_diagnostics
+        basic_state = (
+            snapshot.state, snapshot.backend,
+            diagnostics.diagnostic_id if diagnostics is not None else None,
+        )
         if basic_state != managed_gemma_basic_state:
             managed_gemma_basic_state = basic_state
             if snapshot.state in {"checking", "ready", "failed"}:
                 fields = [f"state={snapshot.state}"]
                 if snapshot.backend is not None:
                     fields.append(f"backend={snapshot.backend}")
-                if snapshot.error_type is not None:
-                    fields.append(f"cause={snapshot.error_type}")
+                if diagnostics is not None and diagnostics.fields.get("exception_class") is not None:
+                    fields.append(f"cause={diagnostics.fields['exception_class']}")
                 log_basic(
                     "[ManagedGemma] " + " ".join(fields),
                     level=logging.ERROR if snapshot.state == "failed" else logging.INFO,
                 )
-        if snapshot.state == "failed":
-            log_diagnostic(
-                _managed_gemma_failure_diagnostic(snapshot),
-                level=logging.ERROR,
-            )
+        if snapshot.state == "failed" and diagnostics is not None:
+            runtime_logging.emit_failure(diagnostics)
         if snapshot.state not in {
             "checking",
             "downloading",
@@ -612,7 +584,20 @@ def compose_application_runtime(
                 backend=snapshot.backend,
                 progress_percent=snapshot.progress_percent,
                 gpu_only=snapshot.model_id == GEMMA_26B_MODEL_ID,
-                failure_phase=snapshot.failure_phase,
+                failure_phase=(
+                    {
+                        "download": "download",
+                        "gemma_install": "provisioning",
+                        "inspection": "provisioning",
+                        "cleanup": "provisioning",
+                        "runtime_version": "runtime_files",
+                        "runtime_files": "runtime_files",
+                        "runtime_startup": "runtime",
+                        "runtime": "runtime",
+                        "prefix": "runtime",
+                    }.get(diagnostics.operation, "runtime")
+                    if diagnostics is not None else None
+                ),
             )
         )
 
@@ -623,8 +608,7 @@ def compose_application_runtime(
         status_sink=managed_gemma_status,
         lifecycle_diagnostic_sink=lambda event: _emit_managed_gemma_lifecycle_diagnostic(
             event,
-            log_basic=log_basic,
-            log_diagnostic=log_diagnostic,
+            record_failure=runtime_logging.emit_failure,
         ),
     )
 
@@ -1566,8 +1550,7 @@ def compose_application_runtime(
         exc: Exception,
     ) -> None:
         log_basic(
-            "[GitHubStar] Failed to persist prompt "
-            f"{failure_context}: exception_class={type(exc).__name__}",
+            "[GitHubStar] Failed to persist prompt state",
             level=logging.WARNING,
         )
 
@@ -1575,10 +1558,14 @@ def compose_application_runtime(
         event: str,
         metadata: Mapping[str, object],
     ) -> None:
-        log_diagnostic(
-            f"[Lifecycle][GithubStarPromptRuntime] event={event} metadata={dict(metadata)}",
-            level=logging.WARNING,
-        )
+        diagnostics = metadata.get("diagnostics")
+        if isinstance(diagnostics, ErrorDiagnostics):
+            runtime_logging.emit_failure(diagnostics, severity="warning", disposition="degraded")
+        else:
+            log_diagnostic(
+                f"[Lifecycle][GithubStarPromptRuntime] event={event}",
+                level=logging.WARNING,
+            )
 
     def require_github_prompt() -> GithubStarPromptOwner:
         nonlocal github_prompt
@@ -1596,10 +1583,9 @@ def compose_application_runtime(
         event: str,
         metadata: Mapping[str, object],
     ) -> None:
-        log_diagnostic(
-            f"[Telemetry] event={event} metadata={dict(metadata)}",
-            level=logging.INFO,
-        )
+        diagnostics = metadata.get("diagnostics")
+        if isinstance(diagnostics, ErrorDiagnostics):
+            runtime_logging.emit_failure(diagnostics, severity="warning", disposition="degraded")
 
     def telemetry_service() -> AppActiveDayTelemetryService:
         return AppActiveDayTelemetryService(

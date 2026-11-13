@@ -30,7 +30,7 @@ from puripuly_heart.app.services.settings.settings_transaction_result import (
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
@@ -71,21 +71,15 @@ logger = logging.getLogger(__name__)
 def _record_managed_account_failure(
     phase: str, exception: BaseException, code: str
 ) -> ErrorDiagnostics:
-    diagnostics = getattr(exception, "diagnostics", None)
-    if not isinstance(diagnostics, ErrorDiagnostics):
-        diagnostics = ErrorDiagnostics(
-            component="managed_account",
-            operation=phase,
-            code=code,
-            category="lifecycle",
-            visibility="basic",
-            content_policy="metadata_only",
-            status_code=None,
-            retry_after_ms=None,
-            fields={"phase": phase, **safe_exception_fields(exception)},
-        )
-        if type(exception).__module__ == "builtins":
-            exception.diagnostics = diagnostics
+    diagnostics = exception_diagnostics(
+        exception,
+        component="managed_account",
+        operation=phase,
+        code=code,
+        fields={"phase": phase},
+    )
+    if type(exception).__module__ == "builtins":
+        exception.diagnostics = diagnostics
     emit_failure(
         logger,
         diagnostics,
@@ -316,15 +310,25 @@ class ManagedUsageRuntimeAdapter:
         try:
             resolution = await run_owned_thread_call(resolve_credentials)
         except Exception as exc:
-            _record_managed_account_failure(
+            diagnostics = _record_managed_account_failure(
                 "secret_observation", exc, "managed_account_observation_failed"
             )
-            return ManagedUsageMetadataResult(key_available=False, metadata=None)
+            return ManagedUsageMetadataResult(
+                key_available=False, metadata=None, diagnostics=diagnostics
+            )
         if self.ingress_provider() or self.settings.canonical is not current:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
         if not resolution.api_key:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
-        metadata = await self.verifier.fetch_openrouter_key_metadata(resolution.api_key)
+        try:
+            metadata = await self.verifier.fetch_openrouter_key_metadata(resolution.api_key)
+        except Exception as exc:
+            diagnostics = _record_managed_account_failure(
+                "managed_usage_refresh", exc, "managed_account_observation_failed"
+            )
+            return ManagedUsageMetadataResult(
+                key_available=True, metadata=None, diagnostics=diagnostics
+            )
         return ManagedUsageMetadataResult(key_available=True, metadata=metadata)
 
     def should_auto_show_founder_letter(self, metadata: object) -> bool:

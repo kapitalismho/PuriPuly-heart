@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from .local_stt_assets import (
     FUN_ASR_MLT_NANO_MODEL_ID,
     FUN_ASR_NANO_MODEL_ID,
@@ -191,7 +192,13 @@ def inspect_local_cpu_model_installs(
                     model_id=model_id,
                     state=LocalSTTInstallState(
                         status="invalid",
-                        error_message="local STT manifest model_id does not match required model identity",
+                        failure_diagnostics=exception_diagnostics(
+                            ValueError("Local STT manifest identity mismatch"),
+                            component="model_assets",
+                            operation="inspection",
+                            code="local_asr.invalid_assets",
+                            fields={"model_id": model_id},
+                        ),
                     ),
                 )
             )

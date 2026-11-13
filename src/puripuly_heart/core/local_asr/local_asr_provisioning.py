@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 LocalASRProvisioningBackend = Literal["cpu", "gpu"]
 LocalASRIntegrityStatus = Literal["ready", "missing", "invalid", "not_requested"]
 LocalASROperationStatus = Literal[
@@ -30,6 +32,7 @@ class LocalASRModelProvisioningState:
     backend: LocalASRProvisioningBackend
     integrity: LocalASRIntegrityStatus
     operation: LocalASROperationStatus = "idle"
+    failure_diagnostics: ErrorDiagnostics | None = None
 
     @property
     def status(self) -> LocalASRProvisioningStatus:
@@ -115,6 +118,9 @@ class LocalASRInstallResult:
     cancelled: bool
     snapshot: LocalASRProvisioningSnapshot
     failure_codes: tuple[str, ...] = ()
+    failure_diagnostics: ErrorDiagnostics | None = None
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 LocalASRInstallResultHandler = Callable[
@@ -132,6 +138,7 @@ class LocalASRProvisioningDiagnostic:
     outcome: str | None = None
     elapsed_seconds: float | None = None
     failure_type: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class LocalASRProvisioningPort(Protocol):

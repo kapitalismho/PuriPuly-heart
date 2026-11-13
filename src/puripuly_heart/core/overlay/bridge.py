@@ -6,7 +6,7 @@ import logging
 import time
 from collections import OrderedDict, deque
 from collections.abc import Coroutine, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import websockets
@@ -14,6 +14,10 @@ from websockets.asyncio.server import Server, ServerConnection
 from websockets.exceptions import ConnectionClosed
 
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation, emit_failure, exception_diagnostics, sanitize_diagnostics,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 from .bridge_mailbox import OverlayBridgeMailbox, OverlayDeliveryReceipt
 from .bridge_session import AuthenticatedSessionHealth
@@ -208,6 +212,7 @@ class OverlayBridge:
     _stop_task: asyncio.Task[None] | None = field(init=False, default=None)
     _stopped: bool = field(init=False, default=False)
     _stopping: bool = field(init=False, default=False)
+    last_failure: ErrorDiagnostics | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         if self.initial_snapshot is None:
@@ -380,7 +385,7 @@ class OverlayBridge:
         self._ensure_writer()
         self._writer_wakeup.set()
         if not self._authenticated_connections and self.diagnostics is not None:
-            self.diagnostics.record_bridge(
+            self._record_bridge(
                 "snapshot_stored_unsent",
                 revision=snapshot.revision,
                 authenticated_connections=0,
@@ -435,7 +440,7 @@ class OverlayBridge:
             self._mailbox.replay_required = True
             authenticated = True
             if self.diagnostics is not None:
-                self.diagnostics.record_bridge(
+                self._record_bridge(
                     "connection_authenticated",
                     connection_id=connection_id,
                     authenticated_connections=len(self._authenticated_connections),
@@ -471,7 +476,7 @@ class OverlayBridge:
             close_code = self._close_code(exc)
             close_reason = self._close_reason(exc)
             if self.diagnostics is not None:
-                self.diagnostics.record_bridge(
+                self._record_bridge(
                     "connection_closed",
                     connection_id=connection_id,
                     authenticated=authenticated,
@@ -489,7 +494,7 @@ class OverlayBridge:
                 if not self._unresolved_connections:
                     self._session_health.token_consumed = False
                 if self.diagnostics is not None:
-                    self.diagnostics.record_bridge(
+                    self._record_bridge(
                         "connection_detached",
                         connection_id=connection_id,
                         authenticated_connections=len(self._authenticated_connections),
@@ -592,6 +597,7 @@ class OverlayBridge:
                             timeout=_CONTROL_WRITE_TIMEOUT_SECONDS,
                             scene_revision=None,
                             payload_type=control.payload_type,
+                            operation_identity=control.operation_identity,
                         )
                         if not written:
                             break
@@ -627,6 +633,7 @@ class OverlayBridge:
                             timeout=_SCENE_WRITE_TIMEOUT_SECONDS,
                             scene_revision=scene.snapshot.revision,
                             payload_type="snapshot",
+                            operation_identity=scene.operation_identity,
                         )
                         if written and self._mailbox.startup_barrier_epoch == epoch:
                             self._mailbox.startup_barrier_epoch = None
@@ -660,12 +667,15 @@ class OverlayBridge:
         timeout: float,
         scene_revision: int | None,
         payload_type: str,
+        operation_identity: Mapping[str, str | None] | None = None,
     ) -> bool:
+        if operation_identity is None:
+            operation_identity = current_diagnostic_operation()
         if self._connection_epochs.get(connection) != epoch:
             return False
         start_time = time.perf_counter()
         if payload_type == "snapshot" and self.diagnostics is not None:
-            self.diagnostics.record_bridge(
+            self._record_bridge(
                 "send_start",
                 revision=scene_revision,
                 authenticated_connections=len(self._authenticated_connections),
@@ -678,7 +688,11 @@ class OverlayBridge:
                 task_factory=self._create_transport_task,
             )
         except TransportWriteCancelled as exc:
-            self._retain_unresolved_task(exc.send_task, connection=connection)
+            self._retain_unresolved_task(
+                exc.send_task, connection=connection, scene_revision=scene_revision,
+                connection_epoch=epoch,
+                operation_identity=operation_identity,
+            )
             if scene_revision is not None:
                 self._mailbox.record_delivery(
                     outcome="ambiguous",
@@ -686,31 +700,53 @@ class OverlayBridge:
                     cause="write_cancelled",
                     connection_epoch=epoch,
                 )
-            await self._retire_connection(connection, epoch, cause="write_cancelled")
+            await self._retire_connection(
+                connection, epoch, cause="write_cancelled", operation_identity=operation_identity,
+            )
             raise
         if result.outcome != "written":
             cause = result.cause or "write_failed"
+            if result.diagnostics is not None:
+                self.last_failure = replace(
+                    result.diagnostics,
+                    fields={
+                        **result.diagnostics.fields,
+                        "overlay_instance_id": self.overlay_instance_id,
+                        "runtime_generation": self.runtime_generation,
+                    },
+                    **operation_identity,
+                )
+                emit_failure(logger, self.last_failure, disposition="degraded")
             if not result.send_task.done():
-                self._retain_unresolved_task(result.send_task, connection=connection)
+                self._retain_unresolved_task(
+                    result.send_task, connection=connection, scene_revision=scene_revision,
+                    connection_epoch=epoch, origin=self.last_failure,
+                    operation_identity=operation_identity,
+                )
             if scene_revision is not None:
                 self._mailbox.record_delivery(
                     outcome="ambiguous",
                     scene_revision=scene_revision,
                     cause=cause,
                     connection_epoch=epoch,
+                    diagnostics=self.last_failure if result.diagnostics is not None else None,
                 )
             if result.outcome == "failed" and self.diagnostics is not None:
-                self.diagnostics.record_bridge(
+                self._record_bridge(
                     "send_failure",
                     connection_id=self._connection_id(connection),
                     revision=scene_revision,
                     exception_type=cause,
                     removed=True,
                 )
-            await self._retire_connection(connection, epoch, cause=cause)
+            await self._retire_connection(
+                connection, epoch, cause=cause,
+                origin=self.last_failure if result.diagnostics is not None else None,
+                operation_identity=operation_identity,
+            )
             elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
             if payload_type == "snapshot" and self.diagnostics is not None:
-                self.diagnostics.record_bridge(
+                self._record_bridge(
                     "send_finish",
                     revision=scene_revision,
                     authenticated_connections=len(self._authenticated_connections),
@@ -729,7 +765,7 @@ class OverlayBridge:
                 self._session_health.record_scene_written(scene_revision)
         elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
         if payload_type == "snapshot" and self.diagnostics is not None:
-            self.diagnostics.record_bridge(
+            self._record_bridge(
                 "send_finish",
                 revision=scene_revision,
                 authenticated_connections=len(self._authenticated_connections),
@@ -744,6 +780,8 @@ class OverlayBridge:
         epoch: int | None,
         *,
         cause: str,
+        origin: ErrorDiagnostics | None = None,
+        operation_identity: Mapping[str, str | None] | None = None,
     ) -> None:
         if epoch is not None and self._connection_epochs.get(connection) != epoch:
             return
@@ -752,14 +790,16 @@ class OverlayBridge:
         self._mailbox.replay_required = True
         if epoch is not None and self._mailbox.startup_barrier_epoch == epoch:
             self._mailbox.startup_barrier_epoch = None
-        failure = await self._bounded_close_connection(connection)
+        failure = await self._bounded_close_connection(
+            connection, origin=origin, operation_identity=operation_identity,
+        )
         if failure is not None:
             self._unresolved_connections.add(connection)
             self._session_health.token_consumed = True
         elif not self._unresolved_connections:
             self._session_health.token_consumed = False
         if self.diagnostics is not None:
-            self.diagnostics.record_bridge(
+            self._record_bridge(
                 "connection_retired",
                 connection_id=self._connection_id(connection),
                 cause=cause,
@@ -769,6 +809,9 @@ class OverlayBridge:
     async def _bounded_close_connection(
         self,
         connection: ServerConnection,
+        *,
+        origin: ErrorDiagnostics | None = None,
+        operation_identity: Mapping[str, str | None] | None = None,
     ) -> Exception | None:
         close_task = self._connection_close_tasks.get(connection)
         if (
@@ -785,9 +828,14 @@ class OverlayBridge:
         )
         self._connection_close_tasks[connection] = result.close_task
         if result.failure is not None:
+            diagnostics = self._retain_transport_failure(
+                result.failure, "cleanup", origin=origin, operation_identity=operation_identity,
+            )
             self._unresolved_connections.add(connection)
             if isinstance(result.failure, TimeoutError):
-                self._retain_unresolved_task(result.close_task, connection=connection)
+                self._retain_unresolved_task(
+                    result.close_task, connection=connection, origin=diagnostics,
+                )
             return result.failure
         self._connection_close_tasks.pop(connection, None)
         if not self._unresolved_tasks_by_connection.get(connection):
@@ -802,6 +850,10 @@ class OverlayBridge:
         task: asyncio.Task[Any],
         *,
         connection: ServerConnection | None = None,
+        scene_revision: int | None = None,
+        connection_epoch: int | None = None,
+        origin: ErrorDiagnostics | None = None,
+        operation_identity: Mapping[str, str | None] | None = None,
     ) -> None:
         if task.done():
             return
@@ -809,16 +861,36 @@ class OverlayBridge:
         if connection is not None:
             self._unresolved_connections.add(connection)
             self._unresolved_tasks_by_connection.setdefault(connection, set()).add(task)
+        if operation_identity is None:
+            operation_identity = current_diagnostic_operation()
         task.add_done_callback(
-            lambda completed: self._resolve_unresolved_task(connection, completed)
+            lambda completed: self._resolve_unresolved_task(
+                connection, completed, scene_revision=scene_revision,
+                connection_epoch=connection_epoch, origin=origin,
+                operation_identity=operation_identity,
+            )
         )
 
     def _resolve_unresolved_task(
         self,
         connection: ServerConnection | None,
         task: asyncio.Task[Any],
+        *,
+        scene_revision: int | None = None,
+        connection_epoch: int | None = None,
+        origin: ErrorDiagnostics | None = None,
+        operation_identity: Mapping[str, str | None] | None = None,
     ) -> None:
         self._unresolved_transport_tasks.discard(task)
+        if not task.cancelled() and (failure := task.exception()) is not None:
+            diagnostics = self._retain_transport_failure(
+                failure, "transport_write", origin=origin, operation_identity=operation_identity,
+            )
+            if scene_revision is not None:
+                self._mailbox.record_delivery(
+                    outcome="ambiguous", scene_revision=scene_revision,
+                    connection_epoch=connection_epoch, cause="write_failed", diagnostics=diagnostics,
+                )
         if connection is None:
             return
         tasks = self._unresolved_tasks_by_connection.get(connection)
@@ -830,6 +902,38 @@ class OverlayBridge:
                 self._connection_close_tasks.pop(connection, None)
                 if not self._authenticated_connections and not self._unresolved_connections:
                     self._session_health.token_consumed = False
+
+    def _retain_transport_failure(
+        self, failure: Exception, operation: str, *, origin: ErrorDiagnostics | None = None,
+        operation_identity: Mapping[str, str | None] | None = None,
+    ) -> ErrorDiagnostics:
+        diagnostics = exception_diagnostics(
+            failure, component="overlay_bridge", operation=operation,
+            code="destination_write_failed" if operation == "transport_write" else "shutdown_cleanup_failed",
+            fields={
+                "overlay_instance_id": self.overlay_instance_id,
+                "runtime_generation": self.runtime_generation,
+            },
+        )
+        if origin is not None:
+            diagnostics = replace(
+                diagnostics, causes=(origin, *diagnostics.causes),
+                cause_id=origin.diagnostic_id,
+                operation_id=origin.operation_id, request_id=origin.request_id,
+            )
+        elif operation_identity is not None:
+            diagnostics = replace(diagnostics, **operation_identity)
+        diagnostics = sanitize_diagnostics(diagnostics)
+        self.last_failure = diagnostics
+        emit_failure(logger, diagnostics, disposition="degraded")
+        return diagnostics
+
+    def _record_bridge(self, event: str, **fields: object) -> None:
+        if self.diagnostics is not None:
+            try:
+                self.diagnostics.record_bridge(event, **fields)
+            except Exception:
+                return
 
     def _request_connection_retirement(self, *, cause: str) -> None:
         task = self._retirement_task

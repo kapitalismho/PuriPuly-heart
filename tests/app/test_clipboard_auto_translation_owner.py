@@ -104,7 +104,7 @@ async def test_owner_contains_or_propagates_start_failure_by_policy() -> None:
     with pytest.raises(RuntimeError, match="start failed"):
         await make_owner().sync(enabled=True, strict_runtime_errors=True)
 
-    assert failures == ["Clipboard watcher failed to start"]
+    assert failures == ["Clipboard watcher failed to start"] * 2
 
 
 @pytest.mark.asyncio
@@ -123,7 +123,9 @@ async def test_owner_contains_submit_failure_and_reports_diagnostic() -> None:
 
     await owner.submit_now("text")
 
-    assert failures == ["Clipboard submit failed: delivery failed"]
+    assert failures == ["Clipboard submit failed"]
+    assert owner.failure_diagnostics.fields["exception_class"] == "OSError"
+    assert "delivery failed" not in repr(owner.failure_diagnostics)
 
 
 @pytest.mark.asyncio
@@ -149,4 +151,35 @@ async def test_owner_shutdown_close_propagates_stop_failure_when_strict() -> Non
     with pytest.raises(RuntimeError, match="stop failed"):
         await owner.close(strict_runtime_errors=True)
 
-    assert failures == ["Clipboard runtime failed to close"]
+    assert failures == ["Clipboard watcher failed to stop"]
+    assert owner.failure_diagnostics.operation == "watcher_stop"
+
+
+@pytest.mark.asyncio
+async def test_owner_retains_original_failure_when_optional_notice_fails() -> None:
+    original = PermissionError(13, "private clipboard content and path")
+
+    class FailingWatcher(FakeClipboardWatcher):
+        def start(self) -> None:
+            raise original
+
+    async def submit(_text: str) -> None:
+        return None
+
+    def unavailable_notice(_message: str) -> None:
+        raise RuntimeError("private notice sink")
+
+    owner = ClipboardAutoTranslationOwner(
+        watcher_factory=FailingWatcher,
+        submit_text=submit,
+        failure_sink=unavailable_notice,
+        platform_provider=lambda: "win32",
+    )
+    await owner.sync(enabled=True)
+    assert owner.failure_diagnostics.fields["errno"] == 13
+    assert owner.runtime.watcher is None
+    with pytest.raises(PermissionError) as caught:
+        await owner.sync(enabled=True, strict_runtime_errors=True)
+    assert caught.value is original
+    assert caught.value.failure_diagnostics is owner.failure_diagnostics
+    assert "private" not in repr(owner.failure_diagnostics)

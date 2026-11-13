@@ -17,10 +17,11 @@ exhaustion or auth failure is skipped instead of silently creating paid usage.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import AsyncIterator
@@ -28,7 +29,7 @@ from typing import AsyncIterator
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import emit_failure, sanitize_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime_logging import emit_basic_log
@@ -150,11 +151,17 @@ class RollingMemberBinding:
     build: Callable[[str], STTBackend]
     backend: STTBackend | None = None
     configured: bool = False
+    _retired_backends: list[STTBackend] = field(init=False, default_factory=list, repr=False)
+    _backend_used: bool = field(init=False, default=False, repr=False)
 
     def apply_key(self, api_key: str) -> None:
         key = (api_key or "").strip()
+        backend = self.build(key) if key else None
+        if self.backend is not None and self._backend_used:
+            self._retired_backends.append(self.backend)
         self.configured = bool(key)
-        self.backend = self.build(key) if self.configured else None
+        self.backend = backend
+        self._backend_used = False
 
     def is_configured(self) -> bool:
         return self.configured
@@ -162,7 +169,28 @@ class RollingMemberBinding:
     def build_backend(self) -> STTBackend:
         if self.backend is None:
             raise RuntimeError(f"rolling provider {self.name.value} was not prepared")
+        self._backend_used = True
         return self.backend
+
+
+    async def prepare_backend(self) -> None:
+        for backend in tuple(self._retired_backends):
+            await _close_backend(backend)
+            self._retired_backends.remove(backend)
+
+    async def close(self) -> None:
+        await self.prepare_backend()
+        if self.backend is not None:
+            await _close_backend(self.backend)
+        self._backend_used = False
+
+
+async def _close_backend(backend: STTBackend) -> None:
+    close = getattr(backend, "close", None)
+    if callable(close):
+        result = close()
+        if inspect.isawaitable(result):
+            await result
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +201,8 @@ class RollingProviderDefinition:
     session_deadline_s: float | None = None
     classify_error: Callable[[BaseException], str] | None = None
     rebind: Callable[[str], None] | None = None
+    prepare_backend: Callable[[], Awaitable[None]] | None = None
+    close_backend: Callable[[], Awaitable[None]] | None = None
 
     def classifier(self) -> Callable[[BaseException], str]:
         if self.classify_error is not None:
@@ -199,6 +229,7 @@ class RollingSTTBackend(STTBackend):
         init=False, default_factory=dict, repr=False
     )
     _fallback_cause: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
+    _member_backends: list[STTBackend] = field(init=False, default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         if not self.providers:
@@ -279,6 +310,36 @@ class RollingSTTBackend(STTBackend):
         self._last_failures.pop(name, None)
         return True
 
+    async def _build_member_backend(self, definition: RollingProviderDefinition) -> STTBackend:
+        if definition.prepare_backend is not None:
+            await definition.prepare_backend()
+        backend = definition.build_backend()
+        if definition.close_backend is None and all(
+            backend is not owned for owned in self._member_backends
+        ):
+            self._member_backends.append(backend)
+        return backend
+
+    async def close(self) -> None:
+        failures: list[Exception] = []
+        for definition in self.providers:
+            if definition.close_backend is not None:
+                try:
+                    await definition.close_backend()
+                except Exception as exc:
+                    failures.append(exc)
+        for backend in tuple(self._member_backends):
+            try:
+                await _close_backend(backend)
+            except Exception as exc:
+                failures.append(exc)
+            else:
+                self._member_backends.remove(backend)
+        if len(failures) == 1:
+            raise failures[0]
+        if failures:
+            raise ExceptionGroup("Rolling member cleanup incomplete", failures)
+
     async def open_probe_session(
         self, *, projection: STTSessionProjection
     ) -> tuple[STTBackendSession, str]:
@@ -287,7 +348,8 @@ class RollingSTTBackend(STTBackend):
                 None,
                 RollingProviderState.AVAILABLE,
             }:
-                session = await definition.build_backend().open_session(projection=projection)
+                backend = await self._build_member_backend(definition)
+                session = await backend.open_session(projection=projection)
                 return session, definition.name.value
         raise RuntimeError("recognition_probe_backend_unavailable")
 
@@ -301,7 +363,7 @@ class RollingSTTBackend(STTBackend):
             if not self._is_eligible(definition):
                 continue
             try:
-                backend = definition.build_backend()
+                backend = await self._build_member_backend(definition)
                 session = await backend.open_session(projection=projection)
             except Exception as exc:
                 kind = definition.classifier()(exc)
@@ -316,6 +378,7 @@ class RollingSTTBackend(STTBackend):
                 _channel=self.channel,
             )
         if last_error is not None:
+            last_error.failure_diagnostics = self._aggregate_failure()
             raise last_error
         if any(definition.is_configured() for definition in self.providers):
             emit_basic_log(
@@ -323,13 +386,27 @@ class RollingSTTBackend(STTBackend):
                 "[Recognition] All configured speech recognition services are unavailable.",
                 level=logging.WARNING,
             )
-            raise RuntimeError(
+            failure = RuntimeError(
                 "All rolling ASR providers are excluded (quota/auth); "
                 "see statuses() for per-provider state"
             )
+            failure.failure_diagnostics = self._aggregate_failure()
+            raise failure
         raise RuntimeError(
             "No rolling ASR provider is configured; configure an ElevenLabs, Gemini, "
             "or Deepgram API key"
+        )
+
+    def _aggregate_failure(self) -> ErrorDiagnostics:
+        diagnostics = recognition_failure_diagnostics(
+            None,
+            provider="rolling_free",
+            channel=self.channel,
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        return sanitize_diagnostics(
+            replace(diagnostics, causes=tuple(self._last_failures.values()))
         )
 
     def _handle_open_error(
@@ -412,7 +489,10 @@ class RollingSTTBackend(STTBackend):
             emit_failure(
                 logger,
                 replace(
-                    recovered, code="stt.recovered", cause_id=self._fallback_cause.diagnostic_id
+                    recovered,
+                    code="stt.recovered",
+                    cause_id=self._fallback_cause.diagnostic_id,
+                    causes=tuple(self._last_failures.values()),
                 ),
                 severity="info",
                 disposition="recovered",

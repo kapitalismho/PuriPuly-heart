@@ -16,7 +16,7 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
     OverlayPeerPresentationState,
 )
-from puripuly_heart.app.ports.ui_presentation import UIEventBridgePort, UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult, UIEventBridgePort, UiPresentationPort
 from puripuly_heart.ui.event_bridge import (
     AppDashboardEventDestination,
     AppHistoryEventDestination,
@@ -380,12 +380,12 @@ class FletUiPresentationAdapter:
         overlay: OverlaySettingsSnapshot,
         config_path: Path,
         preserve_custom_vocab_draft: bool = False,
-    ) -> bool:
+    ) -> SettingsRenderResult:
         settings_view = getattr(self._app, "view_settings", None)
         loader = getattr(settings_view, "load_from_settings", None)
         if not callable(loader):
-            return False
-        loader(
+            return SettingsRenderResult(False)
+        return loader(
             provider=provider,
             general=general,
             prompt=prompt,
@@ -393,7 +393,6 @@ class FletUiPresentationAdapter:
             config_path=config_path,
             preserve_custom_vocab_draft=preserve_custom_vocab_draft,
         )
-        return True
 
     def refresh_settings_after_openrouter_pkce_success(
         self,
@@ -401,13 +400,12 @@ class FletUiPresentationAdapter:
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         config_path: Path,
-    ) -> bool:
+    ) -> SettingsRenderResult:
         settings_view = getattr(self._app, "view_settings", None)
         refresh = getattr(settings_view, "refresh_after_openrouter_pkce_success", None)
         if not callable(refresh):
-            return False
-        refresh(provider=provider, prompt=prompt, config_path=config_path)
-        return True
+            return SettingsRenderResult(False)
+        return refresh(provider=provider, prompt=prompt, config_path=config_path)
 
     def set_settings_overlay_calibration(self, calibration: object) -> None:
         settings_view = getattr(self._app, "view_settings", None)

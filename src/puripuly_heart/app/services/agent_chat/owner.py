@@ -51,7 +51,7 @@ from puripuly_heart.app.services.agent_chat.report import (
     MAX_SUPPORT_BYTES,
     SupportReport,
     build_support_bundle,
-    recent_diagnostic_codes,
+    recent_diagnostics,
 )
 from puripuly_heart.app.services.agent_chat.routing import (
     AgentDecision,
@@ -60,8 +60,14 @@ from puripuly_heart.app.services.agent_chat.routing import (
 )
 from puripuly_heart.app.services.agent_chat.tools import AgentTools, project_operation_receipt
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
+from puripuly_heart.core.diagnostics import (
+    exception_diagnostics,
+    normalize_diagnostic,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +252,7 @@ class AgentChatOwner:
         return await asyncio.shield(task)
 
     async def _send_report(self, report: SupportReport) -> dict:
+        stage = "bundle"
         try:
             ticket = report.ticket
             if ticket is None or self._transport is None:
@@ -253,17 +260,17 @@ class AgentChatOwner:
             if report.bundle is None:
                 log_snapshot = self._support_log_snapshot
                 archive = report.archive
-                if log_snapshot is None or archive is None:
-                    raise RuntimeError("support_log_unavailable")
-                if report.diagnostic_codes is None:
-                    report.diagnostic_codes = await recent_diagnostic_codes(self._control)
-                codes = report.diagnostic_codes
+                if archive is None:
+                    raise RuntimeError("support_archive_unavailable")
+                if report.diagnostics is None:
+                    report.diagnostics = await recent_diagnostics(self._control)
+                diagnostics = report.diagnostics
                 report.bundle = await run_owned_thread_call(
                     lambda: build_support_bundle(
                         ticket=ticket,
                         app_version=__version__,
                         summary=report.summary,
-                        diagnostic_codes=codes,
+                        diagnostics=diagnostics,
                         archive=archive,
                         log_snapshot=log_snapshot,
                     )
@@ -271,6 +278,7 @@ class AgentChatOwner:
                 report.archive = None
             if len(report.bundle) > MAX_SUPPORT_BYTES:
                 raise ValueError("support_bundle_too_large")
+            stage = "upload"
             receipt = await self._transport.upload_support(
                 bundle=report.bundle,
                 ticket=ticket,
@@ -286,12 +294,46 @@ class AgentChatOwner:
         except asyncio.CancelledError:
             report.status = "failed"
             raise
-        except Exception:
+        except Exception as exc:
             report.status = "failed"
-            return {"status": "failed", "ticket": report.ticket}
+            return {
+                "status": "failed",
+                "ticket": report.ticket,
+                "diagnostics": self._failure_evidence(
+                    exc, code="support_report_failed", operation="support_report", stage=stage
+                ),
+            }
         finally:
             self._report_tasks.pop(report.id, None)
             self._publish(self._phase)
+
+    def _failure_evidence(
+        self, exception: Exception, *, code: str, operation: str, stage: str
+    ) -> dict:
+        return normalize_diagnostic(
+            self._failure(exception, code=code, operation=operation),
+            instance_id=getattr(self._control, "instance_id", None),
+            severity="error",
+            disposition="failed",
+            stage=stage,
+            file_evidence="unavailable",
+        )
+
+    def _failure(
+        self, exception: Exception, *, code: str, operation: str
+    ) -> ErrorDiagnostics:
+        return exception_diagnostics(
+            exception,
+            component="application_control",
+            operation=operation,
+            code=code,
+            category="unknown",
+            fields=(
+                {"service_code": exception.code}
+                if isinstance(exception, AgentServiceError)
+                else None
+            ),
+        )
 
     def observe(self, callback: Callable[[AgentChatSnapshot], None]) -> Callable[[], None]:
         self._observers.add(callback)
@@ -449,9 +491,15 @@ class AgentChatOwner:
         self._watched_provider = request.provider
         self._watched_context = self._context_scope
         completed = False
+        failure_diagnostics = None
 
-        def complete(provider: str, success: bool, code: str | None) -> None:
-            nonlocal completed
+        def complete(
+            provider: str,
+            success: bool,
+            code: str | None,
+            diagnostics: ErrorDiagnostics | None = None,
+        ) -> None:
+            nonlocal completed, failure_diagnostics
             current = self._current_secure_request(request.id)
             if (
                 completed
@@ -472,7 +520,8 @@ class AgentChatOwner:
                 available=False if success else current.available,
                 code=None if success else safe_code or "verification_failed",
             )
-            self.key_verification_completed(provider, success, safe_code)
+            failure_diagnostics = diagnostics if not success else None
+            self.key_verification_completed(provider, success, safe_code, diagnostics)
 
         self._publish(self._phase)
         try:
@@ -494,6 +543,8 @@ class AgentChatOwner:
         ):
             self._cancel_secure_request(request.id)
         self._publish(self._phase)
+        if isinstance(failure_diagnostics, ErrorDiagnostics):
+            result = {**result, "diagnostics": serialize_diagnostics(failure_diagnostics)}
         return result
 
     def cancel_secure_entry(self, request_id: str) -> dict:
@@ -550,7 +601,11 @@ class AgentChatOwner:
         )
 
     def key_verification_completed(
-        self, provider: str, success: bool, code: str | None = None
+        self,
+        provider: str,
+        success: bool,
+        code: str | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         if (
             self._closed
@@ -584,6 +639,10 @@ class AgentChatOwner:
         text = f"[app notice] key_verification provider={provider} result={'success' if success else 'failed'}"
         if safe_code is not None:
             text += f" code={safe_code}"
+        if isinstance(diagnostics, ErrorDiagnostics):
+            text += " diagnostics=" + json.dumps(
+                serialize_diagnostics(diagnostics), separators=(",", ":")
+            )
         if success:
             self._accept_notice(
                 text,
@@ -1379,13 +1438,23 @@ class AgentChatOwner:
             elif service_error.code == "service_turn_exhausted":
                 self._prompt_requests = 15
             return self._finish(
-                "service_unavailable", self._localize(f"agent_chat.{service_error.code}")
+                "service_unavailable",
+                self._localize(f"agent_chat.{service_error.code}"),
+                diagnostics=self._failure(
+                    service_error, code="agent_service_failed", operation="agent_chat"
+                ),
             )
-        except AgentTransportError:
+        except AgentTransportError as exc:
             self._require_current(generation)
             if self._pending_user is not None:
                 self._append_user(self._pending_user)
-            return self._finish("failed", self._localize("agent_chat.connection_failed"))
+            return self._finish(
+                "failed",
+                self._localize("agent_chat.connection_failed"),
+                diagnostics=self._failure(
+                    exc, code="agent_transport_failed", operation="agent_chat"
+                ),
+            )
         finally:
             self._observations.append(
                 AgentTurnObservation(decision_seconds, first_useful_seconds, model_calls)
@@ -1483,8 +1552,14 @@ class AgentChatOwner:
                     result = {**result, "controls_staged": True}
                 if isinstance(result.get("context"), dict):
                     self._tools.observe_context(result["context"])
-        except Exception:
-            result = {"status": "unavailable", "code": "tool_unavailable"}
+        except Exception as exc:
+            result = {
+                "status": "unavailable",
+                "code": "tool_unavailable",
+                "diagnostics": self._failure_evidence(
+                    exc, code="agent_tool_failed", operation="agent_tool", stage="tool_dispatch"
+                ),
+            }
         self._require_current(generation)
         projected = model_receipt(result)
         self._record_result(call, topic, projected)
@@ -1579,7 +1654,14 @@ class AgentChatOwner:
         if self._closed or generation != self._generation:
             raise asyncio.CancelledError
 
-    def _finish(self, status: str, text: str, *, model_answer: bool = False) -> AgentTurnResult:
+    def _finish(
+        self,
+        status: str,
+        text: str,
+        *,
+        model_answer: bool = False,
+        diagnostics: ErrorDiagnostics | None = None,
+    ) -> AgentTurnResult:
         index = self._conversation.display("assistant" if model_answer else "notice", text)
         if model_answer:
             response_index = (
@@ -1616,7 +1698,7 @@ class AgentChatOwner:
                     )
         if not model_answer:
             self._conversation.append({"role": "assistant", "content": text})
-        return AgentTurnResult(status, text, tuple(self._results))
+        return AgentTurnResult(status, text, tuple(self._results), diagnostics)
 
     def _valid_calls(self, calls: list[dict]) -> bool:
         ids = [call.get("call_id") for call in calls]

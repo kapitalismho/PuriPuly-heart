@@ -644,6 +644,17 @@ async def test_verify_provider_secret_failure_commits_failed_evidence_without_ra
         _commit_success({"state.provider_verification.openrouter": {}}),
         events=events,
     )
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+
+    secondary = exception_diagnostics(
+        PermissionError(13, "synthetic-private-path"),
+        component="settings_repository",
+        operation="save",
+        code="settings_save_failed",
+        category="transaction",
+    )
+    repository.secondary_diagnostics = (secondary,)
+    repository.secondary_omitted_count = 2
 
     result = await secret_settings.SecretSettingsTransaction(
         secret_store=RecordingSecretStore(events=events),
@@ -665,6 +676,8 @@ async def test_verify_provider_secret_failure_commits_failed_evidence_without_ra
     _assert_no_raw_secret_values(result, label="verification failed result")
     assert result.status == messages.TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED
     assert events == [("verify", "openrouter"), ("save", "api_key_verify")]
+    assert result.secondary_diagnostics == (secondary,)
+    assert result.secondary_omitted_count == 2
     saved_request = _only_item(repository.saved_requests, label="verification settings saves")
     _assert_no_raw_secret_values(saved_request, label="failed verification settings commit request")
     entry = _provider_verification_entry(

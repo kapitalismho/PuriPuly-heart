@@ -586,3 +586,43 @@ async def test_total_deadline_returns_while_owned_storage_drains_and_shutdown_jo
     assert harness.commits == harness.messages == []
     assert harness.owner.allowance_observation is None
     assert harness.settings.canonical.intent.translation.model == "index_translate_35b"
+
+
+@pytest.mark.asyncio
+async def test_optional_diagnostic_failure_cannot_prevent_successful_fallback(tmp_path):
+    async def probe():
+        raise IndexServiceUnavailableError("transport")
+
+    def failed_sink(_diagnostic):
+        raise OSError("private sink content")
+
+    harness = make_owner(tmp_path, probe)
+    harness.owner.diagnostic_sink = failed_sink
+    harness.owner.start()
+    assert await harness.owner.prepare_enable() is True
+    assert harness.commits == ["managed"]
+    assert harness.owner.failure_diagnostics.code == "index_service_unavailable"
+    await harness.owner.close()
+
+
+@pytest.mark.asyncio
+async def test_fallback_commit_failure_is_retained_with_original_native_cause(tmp_path):
+    async def probe():
+        raise IndexServiceUnavailableError("transport")
+
+    original = PermissionError(13, "private fallback storage")
+
+    async def commit(*_args):
+        raise original
+
+    harness = make_owner(tmp_path, probe)
+    harness.owner.commit_fallback = commit
+    harness.owner.start()
+    assert await harness.owner.prepare_enable() is False
+    assert harness.owner.availability == "transition_failed"
+    assert harness.owner.failure_diagnostics.code == "index_fallback_commit_failed"
+    assert harness.owner.failure_diagnostics.fields["errno"] == 13
+    assert harness.owner.failure_diagnostics is harness.diagnostics[-1]
+    assert "private" not in repr(harness.owner.failure_diagnostics)
+    assert harness.messages == []
+    await harness.owner.close()

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import logging
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from typing import Any
+from weakref import WeakSet
+
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
+
+logger = logging.getLogger(__name__)
 
 GithubStarPromptDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
 GithubStarPromptRuntimeStateChanged = Callable[["GithubStarPromptRuntime"], None]
@@ -46,6 +52,8 @@ class GithubStarPromptRuntime:
         self._closing = False
         self._closed = False
         self._close_lock = asyncio.Lock()
+        self.failure_diagnostics: ErrorDiagnostics | None = None
+        self._observed_tasks: WeakSet[asyncio.Task[Any]] = WeakSet()
 
     @property
     def owner_name(self) -> str:
@@ -203,12 +211,6 @@ class GithubStarPromptRuntime:
             result = await run_prompt(generation)
         except asyncio.CancelledError:
             return False
-        except Exception as exc:
-            self._emit(
-                "github_star_prompt_launch_failed",
-                {"error_type": type(exc).__name__},
-            )
-            raise
         if not self.is_current_generation(generation):
             self._emit("github_star_prompt_late_callback_dropped", {})
             return False
@@ -228,15 +230,13 @@ class GithubStarPromptRuntime:
         for completed in done:
             self._observe_task_exception(completed, task_name=task_name)
         if pending:
-            self._emit(
-                "github_star_prompt_task_cancel_timeout",
-                {"task_name": task_name},
+            exception = TimeoutError(
+                f"{self.owner_name} timed out cancelling {task_name} task during close"
             )
-            return [
-                TimeoutError(
-                    f"{self.owner_name} timed out cancelling {task_name} task during close"
-                )
-            ]
+            self.record_failure(
+                exception, task_name, code="github_star_prompt_task_cancel_timeout"
+            )
+            return [exception]
         return []
 
     def _clear_task_reference_if_done(self, task: asyncio.Task[Any] | None) -> None:
@@ -270,6 +270,9 @@ class GithubStarPromptRuntime:
             self._observe_task_exception(task, task_name="translation_success")
 
     def _observe_task_exception(self, task: asyncio.Task[Any], *, task_name: str) -> None:
+        if task in self._observed_tasks:
+            return
+        self._observed_tasks.add(task)
         if task.cancelled():
             return
         try:
@@ -277,23 +280,39 @@ class GithubStarPromptRuntime:
         except asyncio.CancelledError:
             return
         if exception is not None:
-            self._emit(
-                "github_star_prompt_task_failed",
-                {"task_name": task_name, "error_type": type(exception).__name__},
-            )
+            self.record_failure(exception, task_name)
+
+    def record_failure(
+        self, exception: BaseException, operation: str, *, code: str = "github_star_prompt_failed"
+    ) -> ErrorDiagnostics:
+        diagnostics = exception_diagnostics(
+            exception,
+            component="github_star_prompt",
+            operation=operation,
+            code=code,
+        )
+        self.failure_diagnostics = diagnostics
+        exception.failure_diagnostics = diagnostics
+        self._emit(code, {"diagnostics": diagnostics})
+        return diagnostics
 
     def _emit(self, event: str, metadata: Mapping[str, object]) -> None:
-        if self._diagnostics_sink is None:
-            return
-        try:
-            self._diagnostics_sink(event, metadata)
-        except Exception:
-            return
+        diagnostics = metadata.get("diagnostics")
+        if self._diagnostics_sink is not None:
+            try:
+                self._diagnostics_sink(event, metadata)
+                return
+            except Exception:
+                pass
+        if isinstance(diagnostics, ErrorDiagnostics):
+            emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
 
     def _notify_state_changed(self) -> None:
         if self._state_changed is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._state_changed(self)
+            except Exception as exc:
+                self.record_failure(exc, "state_changed")
 
 
 __all__ = ["GithubStarPromptRuntime"]

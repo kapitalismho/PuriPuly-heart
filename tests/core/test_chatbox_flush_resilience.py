@@ -51,7 +51,7 @@ def test_unencodable_tail_page_is_dropped_and_pagination_continues() -> None:
         paginator = ChatboxPaginator(sender=sender, clock=clock)
         statuses: list[tuple[str, str]] = []
         paginator.bind_delivery_observer(
-            lambda message, status: statuses.append((str(message.utterance_id), status))
+            lambda message, status, diagnostics: statuses.append((str(message.utterance_id), status))
         )
 
         bad_id = uuid4()
@@ -135,3 +135,25 @@ def test_send_failures_outside_oserror_are_reported_not_raised() -> None:
 
     paginator.send_typing(True)
     paginator.send_typing(False)
+
+
+def test_queued_send_cause_survives_failing_observer_without_stopping_pagination():
+    paginator = ChatboxPaginator(sender=_RaisingSender(), clock=FakeClock(), max_chars=5)
+    receipts = []
+
+    def observe(message, status, diagnostics):
+        receipts.append((status, diagnostics))
+        raise OSError(5, "private observer detail")
+
+    paginator.bind_delivery_observer(observe)
+    paginator.enqueue(OSCMessage(utterance_id=uuid4(), text="synthetic pages", created_at=0.0))
+    primary = paginator.last_failure_diagnostics
+    assert receipts[0] == ("output_send_failed", primary)
+    assert primary.fields["exception_class"] == "ValueError"
+    assert paginator.delivery_observer_failure.cause_id == primary.diagnostic_id
+    assert paginator.delivery_observer_failure.fields["errno"] == 5
+    paginator.clock.advance(3.0)
+    paginator.process_due()
+    assert len(receipts) == 2
+    assert "private" not in repr((primary, paginator.delivery_observer_failure))
+    paginator.drop_pending()

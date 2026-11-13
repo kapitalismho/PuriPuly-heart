@@ -12,7 +12,7 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
-from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -164,11 +164,7 @@ class AsyncQwenLLMProvider:
     ) -> bool:
         if not api_key:
             return False
-        try:
-            return await AsyncQwenLLMProvider.probe_api_key(api_key, base_url=base_url, model=model)
-        except Exception as exc:
-            record_probe_failure(exc, provider="qwen")
-            return False
+        return await AsyncQwenLLMProvider.probe_api_key(api_key, base_url=base_url, model=model)
 
     @staticmethod
     async def probe_api_key(

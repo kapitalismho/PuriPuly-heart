@@ -15,11 +15,17 @@ from puripuly_heart.core.diagnostics import (
     DiagnosticQueryArgumentsError,
     current_diagnostic_operation,
     diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
     normalize_diagnostic,
+    project_diagnostic_record,
     safe_exception_fields,
     sanitize_diagnostic_fields,
+    sanitize_diagnostics,
+    serialize_diagnostics,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.network_diagnostics import TRANSPORT_ENUM_FIELDS
 
 
 def diagnostic(**changes):
@@ -429,3 +435,203 @@ def test_audio_diagnostic_history_preserves_scalar_metadata_boundary():
         }
     )
     assert fields == {} and rejected == 6
+
+
+def test_common_failure_views_preserve_safe_nested_evidence_and_identity():
+    cause = diagnostic(
+        status_code=403,
+        fields={"errno": 13, "message": "PRIVATE_SECRET C:/Users/private/file"},
+    )
+    original = diagnostic(causes=(cause,), fields={"count": 2})
+    value = serialize_diagnostics(original)
+    history = DiagnosticHistory()
+    history.bind_instance("test-instance")
+    retained, _ = history.retain(original, severity="warning", disposition="recovered")
+    projected = project_diagnostic_record(
+        {**retained, "raw_body": "PRIVATE_SECRET", "file_evidence": ["PRIVATE_SECRET"]}
+    )
+
+    assert value["diagnostic_id"] == original.diagnostic_id
+    assert value["causes"][0]["diagnostic_id"] == cause.diagnostic_id
+    assert value["causes"][0]["fields"] == {"errno": 13}
+    assert value["causes"][0]["rejected_fields"] == 1
+    assert projected["causes"] == value["causes"]
+    assert projected["diagnostic_sequence"] == retained["diagnostic_sequence"]
+    assert projected["disposition"] == "recovered"
+    assert projected["fields"] == {"count": 2}
+    assert projected["file_evidence"] == "unknown"
+    assert "PRIVATE_SECRET" not in json.dumps(projected)
+    assert "PRIVATE_SECRET" not in json.dumps(value)
+    assert serialize_diagnostics(sanitize_diagnostics(original)) == value
+
+
+def test_failure_tree_overflow_keeps_first_meaningful_causes_with_explicit_loss():
+    children = tuple(diagnostic(status_code=403 if index == 0 else 404) for index in range(20))
+    original = diagnostic(causes=children)
+    record = normalize_diagnostic(
+        original, instance_id=None, severity="error", disposition="failed"
+    )
+
+    assert 0 < len(record["causes"]) < len(children)
+    assert record["causes"][0]["diagnostic_id"] == children[0].diagnostic_id
+    assert record["causes"][0]["status_code"] == 403
+    assert record["causes_truncated"] is True
+    assert record["detail"]["state"] == "truncated"
+    assert len(json.dumps(record, separators=(",", ":")).encode()) <= 4096
+    assert len(json.dumps(serialize_diagnostics(original), separators=(",", ":")).encode()) <= 4096
+
+
+def test_failure_projector_bounds_recursive_external_evidence():
+    raw = serialize_diagnostics(diagnostic())
+    raw["causes"] = [raw]
+    raw["fields"]["path"] = "C:/Users/PRIVATE_SECRET"
+    record = project_diagnostic_record(raw)
+
+    assert record["diagnostic_id"] == raw["diagnostic_id"]
+    assert record["detail"]["truncated"] is True
+    assert "PRIVATE_SECRET" not in json.dumps(record)
+    assert len(json.dumps(record, separators=(",", ":")).encode()) <= 4096
+
+
+def test_serialization_preserves_failure_visibility_instead_of_widening_delivery():
+    original = diagnostic(visibility="diagnostic_only")
+    assert serialize_diagnostics(original)["visibility"] == "diagnostic_only"
+    assert sanitize_diagnostics(original).visibility == original.visibility
+
+
+def test_failure_emission_is_independent_of_sink_errors_not_cancellation():
+    class BrokenLogger:
+        def __init__(self, failure):
+            self.failure = failure
+
+        def log(self, *_args, **_kwargs):
+            raise self.failure
+
+    original = diagnostic()
+    emit_failure(BrokenLogger(OSError("PRIVATE_SECRET")), original)
+    assert serialize_diagnostics(original)["diagnostic_id"] == original.diagnostic_id
+    with pytest.raises(asyncio.CancelledError):
+        emit_failure(BrokenLogger(asyncio.CancelledError()), original)
+
+
+def test_exception_builder_retains_attached_causes_and_native_group_evidence():
+    attached = diagnostic(status_code=403, fields={"provider": "openrouter"})
+    provider_error = RuntimeError("PRIVATE_SECRET")
+    provider_error.failure_diagnostics = attached
+    native = PermissionError(13, "PRIVATE_SECRET", "C:/Users/private/file")
+    original = ExceptionGroup("PRIVATE_SECRET", [provider_error, native])
+    value = serialize_diagnostics(
+        exception_diagnostics(
+            original,
+            component="application_control",
+            operation="dispatch",
+            code="application_operation_failed",
+        )
+    )
+
+    assert value["code"] == "application_operation_failed"
+    assert value["causes"][0]["causes"][0]["diagnostic_id"] == attached.diagnostic_id
+    assert value["causes"][0]["causes"][0]["status_code"] == 403
+    assert value["causes"][1]["fields"]["errno"] == 13
+    assert "PRIVATE_SECRET" not in json.dumps(value)
+    assert "C:/Users" not in json.dumps(value)
+
+
+def test_exception_builder_bounds_cyclic_chains_without_reinterpreting_original():
+    original = ValueError("PRIVATE_SECRET")
+    original.__cause__ = original
+    safe = exception_diagnostics(
+        original,
+        component="application_control",
+        operation="dispatch",
+        code="application_operation_failed",
+    )
+    assert safe.causes_truncated is True
+    assert safe.fields["exception_class"] == "ValueError"
+
+
+def test_probe_returns_original_failure_when_diagnostic_sink_raises(monkeypatch):
+    import logging
+
+    from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
+
+    original = LLMResponseError("PRIVATE_SECRET", provider="qwen", status_code=403)
+
+    def reject(*_args, **_kwargs):
+        raise OSError("PRIVATE_SECRET")
+
+    monkeypatch.setattr(
+        logging.getLogger("puripuly_heart.providers.llm.error_details"), "log", reject
+    )
+    retained = record_probe_failure(original, provider="qwen")
+    assert retained.diagnostic_id == original.failure_diagnostics.diagnostic_id
+    assert retained.status_code == 403
+    assert retained.category == "auth"
+    assert "PRIVATE_SECRET" not in repr(retained)
+
+
+@pytest.mark.parametrize("shape", sorted(TRANSPORT_ENUM_FIELDS["response_shape"]))
+def test_canonical_response_shapes_survive_retained_and_projected_failure_views(shape):
+    original = diagnostic(
+        component="provider.llm",
+        operation="probe",
+        code="provider.invalid_response",
+        category="invalid_response",
+        status_code=200,
+        operation_id=uuid4().hex,
+        request_id=uuid4().hex,
+        fields={"response_shape": shape},
+    )
+    history = DiagnosticHistory()
+    history.bind_instance("response-shape-test")
+    history.retain(original, severity="error", disposition="failed", stage="probe")
+    retained = history.query({"diagnostic_id": original.diagnostic_id})["records"][0]
+    projected = project_diagnostic_record(retained)
+    serialized = serialize_diagnostics(original)
+
+    for value in (serialized, retained, projected):
+        assert value["fields"] == {"response_shape": shape}
+        assert value["diagnostic_id"] == original.diagnostic_id
+        assert value["operation_id"] == original.operation_id
+        assert value["request_id"] == original.request_id
+        assert value["status_code"] == 200
+        assert value["code"] == original.code
+    assert serialized["rejected_fields"] == 0
+    for record in (retained, projected):
+        assert record["diagnostic_sequence"] == 1
+        assert record["detail"]["rejected_fields"] == 0
+        assert record["detail"]["state"] == "available"
+        assert record["disposition"] == "failed"
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "PRIVATE_RESPONSE_SHAPE token=synthetic-secret C:/Users/private/file",
+        ["public_error_envelope", "PRIVATE_RESPONSE_SHAPE"],
+        {"shape": "PRIVATE_RESPONSE_SHAPE"},
+        True,
+        403,
+    ],
+)
+def test_unrecognized_response_shapes_are_rejected_without_erasing_failure_identity(shape):
+    original = diagnostic(fields={"response_shape": shape, "errno": 13})
+    history = DiagnosticHistory()
+    history.bind_instance("response-shape-test")
+    history.retain(original, severity="error", disposition="failed")
+    retained = history.query({"diagnostic_id": original.diagnostic_id})["records"][0]
+    projected = project_diagnostic_record(retained)
+    serialized = serialize_diagnostics(original)
+
+    for value in (serialized, retained, projected):
+        assert value["fields"] == {"errno": 13}
+        assert value["diagnostic_id"] == original.diagnostic_id
+        assert value["code"] == original.code
+        text = json.dumps(value)
+        assert "PRIVATE_RESPONSE_SHAPE" not in text
+        assert "synthetic-secret" not in text
+        assert "C:/Users" not in text
+    assert serialized["rejected_fields"] == 1
+    for record in (retained, projected):
+        assert record["detail"]["rejected_fields"] == 1
+        assert record["detail"]["state"] == "rejected"

@@ -67,12 +67,18 @@ def install_response(monkeypatch: pytest.MonkeyPatch, response: httpx.Response) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("status", "expected"), [(200, True), (401, False)])
+@pytest.mark.parametrize("status", [200, 401])
 async def test_manual_verification_accepts_success_and_only_explicit_rejection(
-    monkeypatch: pytest.MonkeyPatch, status: int, expected: bool
+    monkeypatch: pytest.MonkeyPatch, status: int
 ) -> None:
     install_response(monkeypatch, httpx.Response(status, text=UNSAFE))
-    assert await OpenRouterLLMProvider.verify_api_key(SECRET) is expected
+    if status == 200:
+        assert await OpenRouterLLMProvider.verify_api_key(SECRET) is True
+    else:
+        with pytest.raises(OpenRouterAuthenticationError) as caught:
+            await OpenRouterLLMProvider.verify_api_key(SECRET)
+        assert caught.value.reason == "credential_rejected"
+        assert caught.value.status_code == 401
 
 
 @pytest.mark.asyncio

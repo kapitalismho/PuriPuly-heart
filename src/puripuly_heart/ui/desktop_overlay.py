@@ -55,7 +55,11 @@ from puripuly_heart.core.diagnostic_validation import (
     DESKTOP_RENDERER_EVENT_SCHEMA_VERSION,
     validate_desktop_renderer_event,
 )
-from puripuly_heart.core.diagnostics import safe_exception_fields
+from puripuly_heart.core.diagnostics import (
+    exception_diagnostics,
+    safe_exception_fields,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.overlay.child_diagnostics import project_child_failure
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
@@ -2779,6 +2783,7 @@ class DesktopOverlayRenderer:
         self._primary_failure_reason: str | None = None
         self._cleanup_failure_reason: str | None = None
         self._cleanup_failure_fields: dict[str, object] = {}
+        self._cleanup_failures = ()
         self._diagnostic_delivery_failures = 0
         self._window_closed = False
         self._diagnostic_port_closed = False
@@ -3004,12 +3009,21 @@ class DesktopOverlayRenderer:
             self._shutdown_complete = local_cleanup_complete and self._websocket is None
 
     def _note_cleanup_failure(self, stage: str, exception: Exception) -> None:
+        diagnostics = exception_diagnostics(
+            exception, component="overlay_process", operation="process_lifecycle",
+            code="shutdown_cleanup_failed",
+            fields={"cleanup_stage": stage, "overlay_instance_id": self.manifest.overlay_instance_id},
+        )
+        self._cleanup_failures = (*self._cleanup_failures[-7:], diagnostics)
         if self._cleanup_failure_reason is None:
             self._cleanup_failure_reason = "shutdown_cleanup_failed"
             self._cleanup_failure_fields = {
                 "cleanup_stage": stage,
                 **safe_exception_fields(exception),
             }
+        self._cleanup_failure_fields["cleanup_diagnostics"] = serialize_diagnostics(
+            replace(self._cleanup_failures[0], causes=self._cleanup_failures[1:])
+        )
 
     async def _emit_cleanup_failure(self) -> None:
         await self._emit_lifecycle(

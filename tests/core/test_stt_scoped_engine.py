@@ -5234,3 +5234,64 @@ async def test_failed_backend_teardown_remains_owned_and_retryable_until_resourc
     finally:
         fail = False
         await engine.close_backend_and_wait()
+
+
+async def test_readiness_exhaustion_keeps_each_attempt_without_changing_budget() -> None:
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+    from puripuly_heart.core.stt.backend import STTChannelAvailability
+
+    attempts = []
+    delays = []
+    emitted = []
+    failures = []
+
+    async def factory(_settings, _epoch):
+        error = ConnectionError("PRIVATE_READINESS_DETAIL")
+        error.failure_diagnostics = recognition_failure_diagnostics(
+            error,
+            provider="soniox",
+            channel="peer",
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        error.failure_diagnostics = replace(
+            error.failure_diagnostics,
+            fields={
+                **error.failure_diagnostics.fields,
+                "channel_availability": "recovering",
+                "recovery_pending": True,
+            },
+        )
+        attempts.append(error.failure_diagnostics)
+        raise error
+
+    async def sleep(delay):
+        delays.append(delay)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failures.append,
+        watchdog_resolver=lambda _: STTRecognitionWatchdogs(),
+        sleep=sleep,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _, end = segment_events(ledger, start_sample=800, now=8.0)
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+        assert len(attempts) == 3 and delays == [0.8, 1.6]
+        aggregate = failures[0]
+        retained = {aggregate.diagnostic_id, *(cause.diagnostic_id for cause in aggregate.causes)}
+        assert {cause.diagnostic_id for cause in attempts} <= retained
+        terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
+        assert terminal.outcome == "failed"
+        assert terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+        assert terminal.failure_diagnostics.fields["channel_availability"] == "unavailable"
+        assert terminal.failure_diagnostics.fields["recovery_pending"] is False
+        assert aggregate.fields["channel_availability"] == "unavailable"
+        assert aggregate.fields["recovery_pending"] is False
+        assert any(cause.fields.get("recovery_pending") is True for cause in aggregate.causes)
+        assert "PRIVATE" not in repr(terminal.failure_diagnostics)
+    finally:
+        await engine.close()

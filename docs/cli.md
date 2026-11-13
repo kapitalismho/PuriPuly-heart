@@ -187,6 +187,8 @@ Translation captures the requested channel's effective source and target languag
 
 Cold recognition probe success also includes temporary-backend cleanup. Pending or failed cleanup remains runtime-owned and reserves that channel's construction capacity until reclaimed; a cancelled operation does not by itself prove resource release.
 
+A recognition probe can complete recognition but fail during cleanup. `recognition_execution_result` preserves the observed recognition result separately from the aggregate probe outcome; cleanup failure does not certify a successful probe. Expected cancellation remains cancellation even when the receipt retains an earlier failure.
+
 Empty, failed, cancelled, or stale results are not successful tests. Receipts omit recognized/translated text and explicitly mark untested stages: real capture, recognition accuracy, translation after recognition, output delivery, and display as applicable. A successful component check does not certify the whole Self/Listen path. The sample duration is not a completion-time guarantee.
 
 
@@ -364,6 +366,9 @@ puripuly.exe query diagnostics.health
 Use returned identities, not invented placeholders. `capabilities.query_arguments` describes supported history filters and limits.
 
 - Records preserve safe typed causes and known relationships. Missing relationships remain unknown; secondary cleanup failures do not replace the primary cause. Owner state and terminal receipts remain authoritative.
+- Failures share a bounded safe cause value across operation receipts, history, Puri, and support reports. Compound failures retain individual attempts; a missing common HTTP status does not mean the attempts lacked statuses. Inspect nested causes and explicit truncation rather than inferring a cause from the summary category.
+- Successful fallback remains successful and can carry recovered failure evidence. Cancellation is not a failed attempt. Configured provider/model choices do not establish which provider/model actually executed.
+- Failure results do not depend on diagnostic recording succeeding. A diagnostic reference identifies the originating cause; it does not guarantee that history or file delivery retained it.
 - History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. An unfiltered cursor at the current tail returns `no_new_records`: no newer retained diagnostic at that snapshot, not proof of recovery. Missing requested identities remain `not_retained`; neither that nor `foreign_instance` or `invalid_cursor` proves an operation succeeded or never failed.
 - History's `next_after` is a diagnostic cursor. An event's `sequence` is a replay cursor. They are not interchangeable; retain the originating instance with either.
 - `diagnostics.health` reports history/event/file/output delivery health independently of a working file sink. Enqueued is not written; written is not durable. Aggregate counters do not prove persistence of an individual record.
@@ -371,6 +376,8 @@ Use returned identities, not invented placeholders. `capabilities.query_argument
 - Diagnostics cannot establish remote UDP receipt or physical display. They exclude raw exceptions, arbitrary child output, personal paths, credentials, audio, and conversation content.
 
 Exact schemas, bounds, and projections live in [diagnostics](../src/puripuly_heart/core/diagnostics.py), [runtime logging](../src/puripuly_heart/core/runtime_logging.py), and [control events](../src/puripuly_heart/app/services/application_control_events.py).
+
+Support reports still require an explicit user click. They include available safe structured diagnostics and coverage information. Optional runtime-log collection failure does not discard the rest of the bundle; missing material is identified explicitly rather than represented as an empty successful log.
 
 ## Exit Codes
 

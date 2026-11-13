@@ -1010,13 +1010,22 @@ async def test_recovery_activation_failure_discards_new_pending_work() -> None:
     await asyncio.sleep(0)
     activation_gate.set()
 
-    with pytest.raises(GpuASRWorkDiscarded, match="worker_recovery_failed"):
+    with pytest.raises(GpuASRWorkDiscarded, match="worker_recovery_failed") as caught:
         await asyncio.wait_for(pending, timeout=0.5)
     assert runtime.state == GpuASRRuntimeState.FAILED
     assert runtime.last_failure_code == "out_of_memory"
     terminal = [item for item in diagnostics if item.kind == "worker_failed"]
     assert terminal[-1].fields["failure"] == "out_of_memory"
     assert terminal[-1].fields["retry"] == "manual"
+    assert caught.value.failure_diagnostics is replacement.activation_error.failure_diagnostics
+    assert terminal[-1].failure_diagnostics is caught.value.failure_diagnostics
+    assert caught.value.__cause__ is replacement.activation_error
+    assert replacement.activation_error.__cause__ is decode_failure
+    assert caught.value.failure_resource_id
+    assert any(
+        cause.diagnostic_id == decode_failure.failure_diagnostics.diagnostic_id
+        for cause in caught.value.failure_diagnostics.causes
+    )
     await runtime.close()
 
 
@@ -1624,4 +1633,43 @@ async def test_activation_primary_survives_temporary_cleanup_debt(
         assert directories[0].cleanup_complete
     finally:
         denied = False
+        await runtime.close()
+
+
+async def test_diagnostic_sink_failure_cannot_replace_decode_or_block_recovery() -> None:
+    failure = ASRWorkerRequestError(
+        "decode_failure",
+        {"native_reason": "input_too_long", "native_status": 12},
+        attempt_started=True,
+    )
+    recovered = FakeASRWorkerClient()
+
+    async def broken_sink(diagnostic):
+        raise PermissionError(13, "PRIVATE_SINK_PATH")
+
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeASRWorkerFactory(
+            [FakeASRWorkerClient(transcribe_error=failure), recovered]
+        ),
+        diagnostic_sink=broken_sink,
+        clock=FakeClock(_now=10.0),
+    )
+    try:
+        await _activate(runtime)
+        with pytest.raises(GpuASRDecodeDropped) as caught:
+            await asyncio.wait_for(
+                runtime.submit("self", np.zeros(1600, dtype=np.float32), speech_end_at=10.0),
+                timeout=1,
+            )
+        assert caught.value.__cause__ is failure
+        assert caught.value.failure_diagnostics.fields["native_classification"] == "decode_failure"
+        await asyncio.wait_for(recovered.activation_started.wait(), timeout=1)
+        result = await asyncio.wait_for(
+            runtime.submit("self", np.zeros(1600, dtype=np.float32), speech_end_at=10.0),
+            timeout=1,
+        )
+        assert result.text == "self-1"
+        assert runtime._diagnostic_delivery_failure.fields["errno"] == 13
+        assert "PRIVATE" not in repr(runtime._diagnostic_delivery_failure)
+    finally:
         await runtime.close()

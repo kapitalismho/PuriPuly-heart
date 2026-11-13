@@ -898,3 +898,30 @@ async def test_cloud_policy_is_selected_from_immutable_segment_settings() -> Non
     assert harness.events[-1].segment.settings.provider_id == "local_cpu_auto"
     assert harness.events[-1].segment.seal_reason == "delivery_deadline"
     await harness.controller.close()
+
+
+@pytest.mark.asyncio
+async def test_timer_delivery_failure_is_retained_with_segment_identity_and_close_drains():
+    harness = Harness()
+    segment_id = await harness.open()
+
+    def fail_seal(*, reason):
+        raise OSError(5, "private segmentation detail")
+
+    harness.vad.seal_active_for_rollover = fail_seal
+    harness.controller._arm_timers(segment_id, harness.clock() - 10.0)
+    for _ in range(5):
+        await asyncio.sleep(0)
+    failures = harness.controller.failure_diagnostics
+    assert len(failures) == 1
+    assert failures[0].code == "capture.peer.delivery_failed"
+    assert failures[0].turn_id == str(segment_id)
+    assert failures[0].generation == 7
+    assert failures[0].fields["errno"] == 5
+    assert "private" not in repr(failures)
+    await harness.controller.close()
+    assert not harness.controller._timer_tasks
+    assert harness.ledger.snapshots[0].delivery_failure_diagnostics is failures[0]
+    from dataclasses import replace
+    assert not harness.ledger.retain_delivery_failure(replace(failures[0], generation=8))
+    assert harness.ledger.snapshots[0].delivery_failure_diagnostics is failures[0]

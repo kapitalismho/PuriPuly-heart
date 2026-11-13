@@ -6,7 +6,7 @@ import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.osc_control import (
     OSC_PARAMETER_DEFINITIONS,
@@ -25,6 +25,8 @@ from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
 from puripuly_heart.core.diagnostics import (
     current_diagnostic_operation,
     emit_failure,
+    exception_diagnostics,
+    serialize_diagnostics,
     safe_exception_fields,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
@@ -115,6 +117,7 @@ class OscControlIntegrationOwner:
         self._automatic_query_task: asyncio.Task[None] | None = None
         self._scope = LifecycleScope("OscControlIntegrationOwner")
         self._query_failure: str | None = None
+        self._query_diagnostics: ErrorDiagnostics | None = None
         self._publication_failure: ErrorDiagnostics | None = None
         self._publication_pending: set[str] | None = None
         self._resync_operation_identity: dict[str, str | None] = {}
@@ -247,6 +250,27 @@ class OscControlIntegrationOwner:
                 else None
             ),
             "query_failure": self._query_failure,
+            "query_diagnostics": (
+                serialize_diagnostics(self._query_diagnostics)
+                if self._query_diagnostics is not None else None
+            ),
+            "discovery_observation": getattr(query.service, "discovery_observation", "unknown"),
+            "avatar_observation": getattr(query.service, "avatar_observation", "unknown"),
+            "discovery_diagnostics": (
+                serialize_diagnostics(failure)
+                if isinstance(failure := getattr(query.service, "discovery_failure", None), ErrorDiagnostics)
+                else None
+            ),
+            "avatar_diagnostics": (
+                serialize_diagnostics(failure)
+                if isinstance(failure := getattr(query.service, "avatar_failure", None), ErrorDiagnostics)
+                else None
+            ),
+            "runtime_failures": [serialize_diagnostics(failure) for failure in query.failures],
+            "service_failures": [
+                serialize_diagnostics(failure) for failure in getattr(query.service, "failures", ())
+            ],
+            "dispatch_failures": [serialize_diagnostics(failure) for failure in self.router.failures],
             "destination_source": (
                 "off"
                 if self._mode == "off" or self._closed
@@ -441,9 +465,15 @@ class OscControlIntegrationOwner:
                             reason = self._discovery_rejection()
                             if reason is None:
                                 self._query_failure = None
-                                if self._sender_provider() is None:
+                                self._query_diagnostics = None
+                                if getattr(self.query_runtime.service, "discovery_observation", None) == "unavailable":
+                                    reason = "oscquery_unavailable"
+                                    self._query_diagnostics = getattr(
+                                        self.query_runtime.service, "discovery_failure", None
+                                    )
+                                if reason is None and self._sender_provider() is None:
                                     reason = "local_sender_unavailable"
-                                elif not found:
+                                elif reason is None and not found:
                                     reason = "target_not_found"
                                 applied_service = self.query_runtime.service_info
                                 applied_destination = self._effective_destination
@@ -460,14 +490,16 @@ class OscControlIntegrationOwner:
                                         or self._effective_destination != applied_destination
                                     ):
                                         reason = "target_not_found"
-                    except TimeoutError:
+                    except TimeoutError as exc:
+                        self._query_diagnostics = self._discovery_failure(exc, "discovery")
                         reason = "discovery_timeout"
                         self._query_failure = "oscquery_unavailable"
                         if not self.query_runtime.started and current():
                             await self._set_sender_destination(
                                 self._host, VRCHAT_OSC_DEFAULT_INPUT_PORT
                             )
-                    except Exception:
+                    except Exception as exc:
+                        self._query_diagnostics = self._discovery_failure(exc, "discovery")
                         reason = "oscquery_unavailable"
                         self._query_failure = reason
                         if not self.query_runtime.started and current():
@@ -498,6 +530,8 @@ class OscControlIntegrationOwner:
             )
         if reason is not None:
             result["reason"] = reason
+        if self._query_diagnostics is not None and attempted:
+            result["diagnostics"] = serialize_diagnostics(self._query_diagnostics)
         return result
 
     async def _observe_local_listener(self, current: Callable[[], bool]) -> None:
@@ -622,25 +656,10 @@ class OscControlIntegrationOwner:
             if generation != self._automatic_query_generation or not self._query_current():
                 return
             self._query_failure = "oscquery_unavailable"
-            emit_failure(
-                logger,
-                ErrorDiagnostics(
-                    component="osc_control",
-                    operation="discovery",
-                    code="oscquery_unavailable",
-                    category="network",
-                    visibility="basic",
-                    content_policy="metadata_only",
-                    status_code=None,
-                    retry_after_ms=None,
-                    fields={"remote_delivery": "unacknowledged"},
-                    generation=resync_generation,
-                    **self._resync_operation_identity,
-                ),
-                severity="warning",
-                disposition="degraded",
-                stage="automatic_discovery",
-                exception=exc,
+            self._query_diagnostics = replace(
+                self._discovery_failure(exc, "discovery"),
+                generation=resync_generation,
+                **self._resync_operation_identity,
             )
             await self._receiver_owner.ensure_receiver()
             if generation != self._automatic_query_generation or not self._query_current():
@@ -651,6 +670,14 @@ class OscControlIntegrationOwner:
             if self._automatic_query_task is asyncio.current_task():
                 self._automatic_query_task = None
                 self._notify_connection_changed()
+
+    def _discovery_failure(self, exc: Exception, operation: str) -> ErrorDiagnostics:
+        diagnostics = exception_diagnostics(
+            exc, component="osc_control", operation=operation, code="oscquery_unavailable",
+            category="network", fields={"remote_delivery": "unacknowledged"},
+        )
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
+        return diagnostics
 
     async def _cancel_automatic_query_start(self) -> None:
         task = self._automatic_query_task

@@ -4,6 +4,8 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypedDict
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 AGENT_CHAT_PROTOCOL = 7
 
 AgentEffort = Literal["low", "medium", "high"]
@@ -116,6 +118,7 @@ class AgentTurnResult:
     status: str
     text: str
     tool_results: tuple[AgentToolResult, ...] = ()
+    diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,7 +229,11 @@ class AgentChatPort(Protocol):
     def bind_verification_providers(self, providers: frozenset[str]) -> None: ...
 
     def key_verification_completed(
-        self, provider: str, success: bool, code: str | None = None
+        self,
+        provider: str,
+        success: bool,
+        code: str | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None: ...
 
     def bind_setup_actions(self, callback: Callable[[str], dict] | None) -> None: ...

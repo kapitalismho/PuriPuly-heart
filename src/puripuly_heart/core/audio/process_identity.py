@@ -14,6 +14,8 @@ from puripuly_heart.core.audio.windows_process_table import (
     WindowsProcessRecord,
     snapshot_windows_processes,
 )
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 _WATCH_POLL_INTERVAL_S = 0.05
 _WATCH_JOIN_TIMEOUT_S = 0.5
@@ -93,11 +95,13 @@ class PsutilCurrentUserProcessSnapshots:
 class _PsutilProcessIdentityWatch:
     process: object
     identity: ResolvedProcessCaptureIdentity
-    on_terminal: Callable[[], None]
+    on_terminal: Callable[[str, ErrorDiagnostics | None], None]
     psutil: object
     _closed: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
     identity_verified: bool = field(init=False)
+    terminal_reason: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
     def __post_init__(self) -> None:
         self.identity_verified = self._matches_identity()
@@ -115,30 +119,48 @@ class _PsutilProcessIdentityWatch:
         thread = self._thread
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=_WATCH_JOIN_TIMEOUT_S)
+            if thread.is_alive():
+                raise TimeoutError("process identity watch cleanup unconfirmed")
+
+    def _set_terminal(self, reason: str, exception: BaseException | None = None) -> bool:
+        self.terminal_reason = reason
+        if exception is not None:
+            self.failure_diagnostics = exception_diagnostics(
+                exception,
+                component="capture.peer",
+                operation="process_watch",
+                code=f"capture.peer.{reason}",
+            )
+        return False
 
     def _matches_identity(self) -> bool:
         try:
-            return f"{self.process.pid}:{self.process.create_time()}" == self.identity.instance_id
-        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
-            return False
+            if f"{self.process.pid}:{self.process.create_time()}" != self.identity.instance_id:
+                return self._set_terminal("target_identity_mismatch")
+            return True
+        except self.psutil.AccessDenied as exc:
+            return self._set_terminal("identity_unavailable", exc)
+        except (self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+            return self._set_terminal("target_exited")
 
     def _still_matches_running_identity(self) -> bool:
         try:
             if not self._matches_identity():
                 return False
-            return bool(self.process.is_running())
-        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
-            return False
+            if not self.process.is_running():
+                return self._set_terminal("target_exited")
+            return True
+        except self.psutil.AccessDenied as exc:
+            return self._set_terminal("identity_unavailable", exc)
+        except (self.psutil.NoSuchProcess, self.psutil.ZombieProcess):
+            return self._set_terminal("target_exited")
 
     def _wait_for_exit(self) -> None:
-        try:
-            while not self._closed.wait(timeout=_WATCH_POLL_INTERVAL_S):
-                if not self._still_matches_running_identity():
-                    break
-        except self.psutil.AccessDenied, self.psutil.NoSuchProcess, self.psutil.ZombieProcess:
-            pass
+        while not self._closed.wait(timeout=_WATCH_POLL_INTERVAL_S):
+            if not self._still_matches_running_identity():
+                break
         if not self._closed.is_set():
-            self.on_terminal()
+            self.on_terminal(self.terminal_reason or "identity_unavailable", self.failure_diagnostics)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,18 +168,23 @@ class PsutilProcessIdentityWatcher:
     def watch(
         self,
         identity: ResolvedProcessCaptureIdentity,
-        on_terminal: Callable[[], None],
+        on_terminal: Callable[[str, ErrorDiagnostics | None], None],
     ) -> _PsutilProcessIdentityWatch:
         psutil = _import_psutil()
         try:
             process = psutil.Process(identity.pid)
-        except psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess:
-            return _PsutilProcessIdentityWatch(
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess) as exc:
+            watch = _PsutilProcessIdentityWatch(
                 process=_UnavailableProcess(),
                 identity=identity,
                 on_terminal=on_terminal,
                 psutil=psutil,
             )
+            watch._set_terminal(
+                "identity_unavailable" if isinstance(exc, psutil.AccessDenied) else "target_exited",
+                exc if isinstance(exc, psutil.AccessDenied) else None,
+            )
+            return watch
         return _PsutilProcessIdentityWatch(
             process=process,
             identity=identity,

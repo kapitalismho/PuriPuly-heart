@@ -297,3 +297,34 @@ def test_failed_atomic_replace_preserves_contents_and_allows_retry(
     store.set("managed", "new")
     assert store.get("managed") == "new"
     assert store.get("unrelated") == "keep"
+
+
+def test_failed_write_retains_cleanup_cause_without_replacing_primary(tmp_path, monkeypatch):
+    path = tmp_path / "secrets.json"
+    store = EncryptedFileSecretStore(path, passphrase="synthetic")
+    store.set("unrelated", "keep")
+    before = path.read_bytes()
+    original_unlink = Path.unlink
+    write_failure = PermissionError(13, "synthetic-private-path")
+
+    def deny_replace(_source, _target):
+        raise write_failure
+
+    def deny_cleanup(candidate, *args, **kwargs):
+        if candidate.suffix == ".tmp":
+            raise OSError(5, "synthetic-private-cleanup-path")
+        return original_unlink(candidate, *args, **kwargs)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(Path, "replace", deny_replace)
+        scoped.setattr(Path, "unlink", deny_cleanup)
+        with pytest.raises(PermissionError) as raised:
+            store.set("managed", "synthetic-private-key")
+
+    assert raised.value is write_failure
+    assert raised.value.diagnostics.fields["errno"] == 13
+    assert raised.value.diagnostics.causes[-1].fields["errno"] == 5
+    assert raised.value.diagnostics.causes[-1].code == "secret_cleanup_failed"
+    assert path.read_bytes() == before
+    assert "synthetic-private" not in repr(raised.value.diagnostics)
+    path.with_suffix(".json.tmp").unlink(missing_ok=True)

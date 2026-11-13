@@ -12,7 +12,7 @@ from typing import Any
 
 from puripuly_heart.config.settings_vnext import defaults, migration, serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.diagnostics import safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
@@ -115,19 +115,13 @@ def load_vnext_settings(
         source_text = original_bytes.decode("utf-8")
         raw = json.loads(source_text)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-        _log_migration_failure("unknown", SettingsPersistenceStatus.PARSE_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.PARSE_FAILED,
-            error=_error(SettingsPersistenceStatus.PARSE_FAILED, exc),
-        )
+        return _failed_load(_error(SettingsPersistenceStatus.PARSE_FAILED, exc))
     if not isinstance(raw, dict):
-        _log_migration_failure("unknown", SettingsPersistenceStatus.PARSE_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.PARSE_FAILED,
-            error=SettingsPersistenceError(
+        return _failed_load(
+            SettingsPersistenceError(
                 SettingsPersistenceStatus.PARSE_FAILED,
                 "settings file must contain a JSON object",
-            ),
+            )
         )
 
     source_shape = "canonical" if migration.is_vnext_settings_dict(raw) else "pre_vnext"
@@ -138,11 +132,7 @@ def load_vnext_settings(
                 parse_constant=_reject_nonstandard_json_constant,
             )
         except (json.JSONDecodeError, ValueError) as exc:
-            _log_migration_failure(source_shape, SettingsPersistenceStatus.PARSE_FAILED)
-            return VNextSettingsLoadResult(
-                status=SettingsPersistenceStatus.PARSE_FAILED,
-                error=_error(SettingsPersistenceStatus.PARSE_FAILED, exc),
-            )
+            return _failed_load(_error(SettingsPersistenceStatus.PARSE_FAILED, exc))
 
     try:
         settings = (
@@ -151,11 +141,7 @@ def load_vnext_settings(
             else defaults.new_settings_for_reset()
         )
     except Exception as exc:
-        _log_migration_failure(source_shape, SettingsPersistenceStatus.MIGRATION_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.MIGRATION_FAILED,
-            error=_error(SettingsPersistenceStatus.MIGRATION_FAILED, exc),
-        )
+        return _failed_load(_error(SettingsPersistenceStatus.MIGRATION_FAILED, exc))
 
     if not _requires_canonical_save(raw, settings):
         return VNextSettingsLoadResult(
@@ -183,11 +169,7 @@ def load_vnext_settings(
             max_attempts=max_backup_attempts,
         )
     except Exception as exc:
-        _log_migration_failure(source_shape, SettingsPersistenceStatus.BACKUP_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.BACKUP_FAILED,
-            error=_error(SettingsPersistenceStatus.BACKUP_FAILED, exc),
-        )
+        return _failed_load(_error(SettingsPersistenceStatus.BACKUP_FAILED, exc))
 
     save_result = save_vnext_settings(path, settings)
     if not save_result.ok:
@@ -198,12 +180,7 @@ def load_vnext_settings(
         )
         if restore_error is not None:
             error = _combined_restore_error(error, restore_error)
-        _log_migration_failure(source_shape, SettingsPersistenceStatus.SAVE_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.SAVE_FAILED,
-            backup_path=backup_path,
-            error=error,
-        )
+        return _failed_load(error, backup_path=backup_path)
 
     try:
         _validate_persisted_settings(path, settings)
@@ -214,12 +191,7 @@ def load_vnext_settings(
         restore_error = _restore_original_bytes(path, original_bytes)
         if restore_error is not None:
             error = _combined_restore_error(error, restore_error)
-        _log_migration_failure(source_shape, SettingsPersistenceStatus.SAVE_FAILED)
-        return VNextSettingsLoadResult(
-            status=SettingsPersistenceStatus.SAVE_FAILED,
-            backup_path=backup_path,
-            error=error,
-        )
+        return _failed_load(error, backup_path=backup_path)
 
     return VNextSettingsLoadResult(
         status=SettingsPersistenceStatus.SUCCESS,
@@ -276,12 +248,21 @@ def create_system_prompt_backup(
             with candidate.open("xb") as handle:
                 try:
                     handle.write(encoded)
-                except Exception:
+                except Exception as exc:
+                    error = safe_persistence_error(SettingsPersistenceStatus.BACKUP_FAILED, exc)
                     try:
                         candidate.unlink(missing_ok=True)
-                    except Exception:
-                        pass
-                    raise
+                    except Exception as cleanup_exc:
+                        secondary = safe_persistence_error(
+                            SettingsPersistenceStatus.BACKUP_FAILED, cleanup_exc
+                        ).diagnostics
+                        error = replace(
+                            error,
+                            secondary_diagnostics=(
+                                replace(secondary, cause_id=error.diagnostics.diagnostic_id),
+                            ),
+                        )
+                    raise _SettingsWriteFailure(error) from exc
             return candidate
         except FileExistsError:
             continue
@@ -323,12 +304,21 @@ def create_pre_migration_backup(
             with candidate.open("xb") as handle:
                 try:
                     handle.write(original_bytes)
-                except Exception:
+                except Exception as exc:
+                    error = safe_persistence_error(SettingsPersistenceStatus.BACKUP_FAILED, exc)
                     try:
                         candidate.unlink(missing_ok=True)
-                    except Exception:
-                        pass
-                    raise
+                    except Exception as cleanup_exc:
+                        secondary = safe_persistence_error(
+                            SettingsPersistenceStatus.BACKUP_FAILED, cleanup_exc
+                        ).diagnostics
+                        error = replace(
+                            error,
+                            secondary_diagnostics=(
+                                replace(secondary, cause_id=error.diagnostics.diagnostic_id),
+                            ),
+                        )
+                    raise _SettingsWriteFailure(error) from exc
             return candidate
         except FileExistsError:
             continue
@@ -484,16 +474,17 @@ def _reject_nonstandard_json_constant(value: str) -> object:
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
-def _log_migration_failure(
-    source_shape: str,
-    status: SettingsPersistenceStatus,
-) -> None:
-    logger.warning(
-        "settings_migration source_shape=%s destination_shape=canonical status=failure "
-        "failure_category=%s",
-        source_shape,
-        status.value,
+def _failed_load(
+    error: SettingsPersistenceError, *, backup_path: Path | None = None
+) -> VNextSettingsLoadResult:
+    result = VNextSettingsLoadResult(
+        status=error.stage, backup_path=backup_path, error=error
     )
+    if error.diagnostics is not None:
+        emit_failure(logger, error.diagnostics, severity="warning")
+    for secondary in error.secondary_diagnostics:
+        emit_failure(logger, secondary, severity="warning", disposition="degraded")
+    return result
 
 
 def safe_persistence_error(

@@ -3737,3 +3737,41 @@ async def test_deferred_loop_failure_diagnostic_cannot_replace_recovered_snapsho
         )
         await owner.close()
     assert all(source.close_calls == 1 for source in sources)
+
+
+@pytest.mark.asyncio
+async def test_partial_peer_open_retains_owned_cleanup_debt_and_native_cause():
+    from puripuly_heart.core.audio.source import AudioSourceOpenFailure
+
+    class Source:
+        closed = False
+        fail_close = True
+
+        async def close(self):
+            if self.fail_close:
+                raise OSError(5, "private cleanup detail")
+            self.closed = True
+
+    source = Source()
+    calls = []
+
+    def create_source(config, target):
+        calls.append(config)
+        raise AudioSourceOpenFailure(source, OSError(13, "private open detail"))
+
+    owner, *_ = make_owner(source_factory=create_source)
+    try:
+        with pytest.raises(OSError):
+            await owner.apply_intent(make_config(), enabled=True)
+        assert owner.snapshot.cleanup_debt == 1
+        assert owner.cleanup_source is source
+        assert owner.snapshot.failure_reason.value == "source_open_failed"
+        assert "private" not in repr(owner.snapshot.failure_diagnostics)
+        with pytest.raises(OSError):
+            await owner.apply_intent(make_config(), enabled=True)
+        assert len(calls) == 1
+    finally:
+        source.fail_close = False
+        await owner.close()
+    assert source.closed is True
+    assert owner.snapshot.cleanup_debt == 0

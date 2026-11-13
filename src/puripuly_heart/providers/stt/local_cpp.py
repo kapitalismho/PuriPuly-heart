@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import tempfile
 import unicodedata
 import wave
 from collections.abc import Awaitable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 from uuid import uuid4
@@ -20,6 +21,11 @@ from puripuly_heart.core.asr_worker import (
     ASRWorkerRequestError,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.stt.diagnostics import (
+    recognition_cleanup_failure,
+    recognition_failure_diagnostics,
+)
 from puripuly_heart.core.local_asr.local_stt_assets import (
     GIGAAM_MODEL_ID,
     GRANITE_MODEL_ID,
@@ -110,10 +116,39 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
             self._resource_id = uuid4().hex
             start_lifecycle_task(self._scope, self._drain_events(client), name="events")
             return client
-        except BaseException:
+        except BaseException as primary:
             self._quarantined_client = client
-            await self._close_resource(client)
-            self._quarantined_client = None
+            diagnostics = recognition_failure_diagnostics(
+                primary,
+                provider=self.provider_id,
+                channel=self.stream_label or "unknown",
+                operation="readiness",
+                reason="provider_not_ready",
+            )
+            primary.failure_diagnostics = diagnostics
+            try:
+                await self._close_resource(client)
+            except Exception as cleanup:
+                secondary = recognition_cleanup_failure(
+                    cleanup,
+                    provider=self.provider_id,
+                    channel=self.stream_label,
+                    primary=diagnostics,
+                )
+                primary.cleanup_diagnostics = (secondary,)
+                primary.failure_diagnostics = replace(
+                    diagnostics, causes=(*diagnostics.causes, secondary)
+                )
+                cleanup.failure_diagnostics = secondary
+                emit_failure(
+                    logging.getLogger(__name__),
+                    secondary,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="cleanup",
+                )
+            else:
+                self._quarantined_client = None
             raise
 
     async def _drain_events(self, client: ASRWorkerClientPort) -> None:

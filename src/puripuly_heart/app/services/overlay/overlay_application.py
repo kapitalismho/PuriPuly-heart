@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal, cast
 
 from puripuly_heart.app.ports.translation_diagnostics_runtime import (
@@ -22,7 +22,14 @@ from puripuly_heart.config.resolved import (
     ResolvedOverlayConfig,
 )
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.diagnostics import current_diagnostic_operation
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+    sanitize_diagnostics,
+    serialize_diagnostics,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
@@ -193,6 +200,7 @@ class OverlayApplicationOwner:
     _runtime: OverlayRuntimeHandle | None = field(init=False, default=None, repr=False)
     _state: str = field(init=False, default="off", repr=False)
     _failure_reason: str | None = field(init=False, default=None, repr=False)
+    _failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
     _auto_restart_scheduled: bool = field(init=False, default=False, repr=False)
     _terminal_restart_attempts: int = field(init=False, default=0, repr=False)
     _recovering_from_crash: bool = field(init=False, default=False, repr=False)
@@ -330,6 +338,10 @@ class OverlayApplicationOwner:
             ),
             "generation": runtime.overlay_instance_id if runtime is not None else None,
             "failure_reason": snapshot.failure_reason,
+            "failure_diagnostics": (
+                serialize_diagnostics(self._failure_diagnostics)
+                if self._failure_diagnostics is not None else None
+            ),
             "auto_restart_scheduled": snapshot.auto_restart_scheduled,
             "fallback_active": snapshot.fallback_active,
             "recovery_active": snapshot.recovery_active,
@@ -1012,7 +1024,8 @@ class OverlayApplicationOwner:
             )
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            self._retain_failure(exc, "replacement_start", runtime=runtime)
             await self._fail_terminal_restart(failure_reason)
             return
         if status == "started":
@@ -1116,10 +1129,7 @@ class OverlayApplicationOwner:
             self._recovery_task = None
             self._normal_stop_pending = False
         if not task.cancelled() and (error := task.exception()) is not None:
-            self.log_basic(
-                f"[Overlay] Recovery task failed: exception_type={type(error).__name__}",
-                logging.ERROR,
-            )
+            self._retain_failure(error, "replacement_start")
 
     async def _handle_runtime_stop(
         self,
@@ -1351,7 +1361,8 @@ class OverlayApplicationOwner:
                 return
             try:
                 state = self.state_provider()
-            except Exception:
+            except Exception as exc:
+                self._retain_failure(exc, "recovery_state", runtime=previous)
                 await self._finish_startup_recovery_terminal(reason)
                 return
             if not state.settings_available or not state.overlay_intent_enabled:
@@ -1363,7 +1374,8 @@ class OverlayApplicationOwner:
                 )
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
+                self._retain_failure(exc, "replacement_start", runtime=previous)
                 await self._finish_startup_recovery_terminal(reason)
                 return
             if status == "started":
@@ -1731,11 +1743,41 @@ class OverlayApplicationOwner:
         _metadata: object,
         exception: Exception | None,
     ) -> None:
+        if exception is not None:
+            self._retain_failure(exception, "replacement_start")
         self.log_diagnostic(
             f"[Overlay] Session desktop fallback failed: event={event}",
             logging.WARNING,
             exception,
         )
+
+    def _retain_failure(
+        self, exception: Exception, operation: str, *, runtime: OverlayRuntimeHandle | None = None
+    ) -> None:
+        current = runtime or self._runtime
+        manager = current.process_manager if current is not None else None
+        primary = getattr(manager, "failure_diagnostics", None)
+        if (
+            primary is None
+            and current is not None
+            and self._failure_diagnostics is not None
+            and self._failure_diagnostics.fields.get("overlay_instance_id") == current.overlay_instance_id
+        ):
+            primary = self._failure_diagnostics
+        diagnostics = exception_diagnostics(
+            exception, component="overlay_application", operation=operation,
+            code="worker_startup_failed",
+            fields={"overlay_instance_id": current.overlay_instance_id} if current else None,
+        )
+        if isinstance(primary, ErrorDiagnostics):
+            diagnostics = replace(
+                diagnostics, causes=(primary, *diagnostics.causes),
+                cause_id=primary.diagnostic_id,
+                operation_id=primary.operation_id, request_id=primary.request_id,
+            )
+        diagnostics = sanitize_diagnostics(diagnostics)
+        self._failure_diagnostics = diagnostics
+        emit_failure(logging.getLogger(__name__), diagnostics)
 
     def _can_start_fallback(self) -> bool:
         state = self.state_provider()

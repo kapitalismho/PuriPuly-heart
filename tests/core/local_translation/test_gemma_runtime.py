@@ -414,6 +414,9 @@ async def test_gpu_start_failure_falls_back_internally_to_cpu(tmp_path: Path) ->
 
     assert readiness.requested_backend == "gpu"
     assert readiness.effective_backend == "cpu"
+    assert len(readiness.recovery_diagnostics) == 1
+    assert readiness.recovery_diagnostics[0].operation == "runtime_startup"
+    assert readiness.recovery_diagnostics[0].fields["exception_class"] == "RuntimeError"
     assert len(provision_calls) == 1
     assert [command[0] for command in commands] == [
         str(tmp_path / "gpu" / "llama-server.exe"),
@@ -434,7 +437,7 @@ async def test_startup_reports_child_exit_and_falls_back_without_waiting_for_tim
         process_builder=ImmediateExitProcess,
     )
 
-    with pytest.raises(ManagedGemmaRuntimeError):
+    with pytest.raises(ManagedGemmaRuntimeError) as caught:
         await asyncio.wait_for(
             owner.prepare(
                 backend="gpu",
@@ -447,6 +450,8 @@ async def test_startup_reports_child_exit_and_falls_back_without_waiting_for_tim
 
     assert len(commands) == 2
     assert owner.readiness is None
+    diagnostics = caught.value.failure_diagnostics
+    assert [value.fields["exit_code"] for value in diagnostics.causes] == [23, 23]
 
 
 @pytest.mark.asyncio
@@ -1397,6 +1402,7 @@ async def test_26b_prefix_failure_never_substitutes_cpu_or_e4b(tmp_path):
         ("version: 0.6.0-dev (build 11537, commit a94d563ed)", 0, False),
         ("version: 0.6.0-dev (build 11537, commit 8e2d31e0e)", 1, False),
         ("unknown", 0, False),
+        ("version: build " + "9" * 5000 + ", commit 8e2d31e0e", 0, False),
     ],
 )
 async def test_executable_version_rejects_unpinned_build_or_commit(
@@ -1423,8 +1429,12 @@ async def test_executable_version_rejects_unpinned_build_or_commit(
     if valid:
         await runtime_module.validate_gemma_runtime_version(executable)
     else:
-        with pytest.raises(ManagedGemmaRuntimeError, match="Incompatible llama.cpp executable"):
+        with pytest.raises(ManagedGemmaRuntimeError, match="Incompatible llama.cpp executable") as caught:
             await runtime_module.validate_gemma_runtime_version(executable)
+        diagnostics = caught.value.failure_diagnostics
+        assert diagnostics.operation == "runtime_version"
+        assert diagnostics.fields["exit_code"] == returncode
+        assert str(executable) not in repr(diagnostics)
     assert calls == [(str(executable), "--version")]
 
 
@@ -1576,8 +1586,9 @@ async def test_unobservable_failed_slot_is_not_reused_before_other_result_and_re
     await _started(transport)
     transport.failures.add("failed")
     transport.gates["failed"].set()
-    with pytest.raises(RuntimeError, match="request failed"):
+    with pytest.raises(RuntimeError, match="request failed") as caught:
         await first
+    assert caught.value.failure_diagnostics.causes[-1].fields["exception_class"] == "TimeoutError"
     replacement = asyncio.create_task(
         owner.prepare(
             backend="gpu",
@@ -1650,3 +1661,57 @@ async def test_cancelled_prefix_drain_does_not_block_other_completed_result(tmp_
     )
     assert len(processes) == 1
     await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["restore", "save"])
+async def test_prefix_cache_failure_retains_cause_while_cold_preparation_succeeds(tmp_path, phase):
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+    from puripuly_heart.core.local_translation.prefix_cache import GemmaPrefixCache
+
+    private = "private-prompt-cache-path"
+    cache = GemmaPrefixCache(tmp_path / "cache")
+
+    class FailingCacheTransport(FakeTransport):
+        async def restore_prefix(self, *, filename, slot_id):
+            if phase == "restore":
+                raise OSError(5, private)
+            return await super().restore_prefix(filename=filename, slot_id=slot_id)
+
+        async def save_prefix(self, *, filename, slot_id):
+            if phase == "save":
+                raise OSError(5, private)
+            return await super().save_prefix(filename=filename, slot_id=slot_id)
+
+    owner, _commands, _processes, transports, _calls, _logs = _runtime(
+        tmp_path, prefix_cache=cache, transport_builder=FailingCacheTransport
+    )
+    arguments = dict(
+        backend="cpu", source_language="ko", target_language="en", system_prompt=private
+    )
+    try:
+        readiness = await owner.prepare(**arguments)
+        if phase == "restore":
+            filename = transports[0].saves[0]
+            (cache.cache_dir / filename).write_bytes(b"synthetic-cache")
+            await owner.release()
+            readiness = await owner.prepare(**arguments)
+        assert readiness.effective_backend == "cpu"
+        assert transports[-1].prefixes == [private]
+        assert len(readiness.recovery_diagnostics) == 1
+        diagnostics = readiness.recovery_diagnostics[0]
+        assert diagnostics.operation == "prefix_" + phase
+        assert diagnostics.fields["exception_class"] == "OSError"
+        assert diagnostics.fields["errno"] == 5
+        assert private not in str(serialize_diagnostics(diagnostics))
+        assert str(tmp_path) not in str(serialize_diagnostics(diagnostics))
+        if phase == "save":
+            for index in range(8):
+                readiness = await owner.prepare(
+                    **{**arguments, "system_prompt": private + str(index)}
+                )
+            assert len(readiness.recovery_diagnostics) == 8
+            assert readiness.recovery_diagnostics_truncated is True
+            assert owner.diagnostics_truncated is True
+    finally:
+        await owner.close()

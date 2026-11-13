@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -19,6 +19,8 @@ from puripuly_heart.app.ports.osc_control import (
     decode_control_message,
 )
 from puripuly_heart.app.ports.ui_models import OscControlPresentationName
+from puripuly_heart.core.diagnostics import deserialize_diagnostics, emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,9 @@ class OscDispatchResult:
     parameter: str
     superseded: bool = False
     error: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -95,6 +100,7 @@ class OscControlRouter:
         self._pending_lock = asyncio.Lock()
         self._pending: dict[str, _PendingCommand] = {}
         self._sequence = 0
+        self.failures: tuple[ErrorDiagnostics, ...] = ()
         self._worker_task: asyncio.Task[None] | None = None
         self._packet_sequence = 0
         self._scope = LifecycleScope("OscControlRouter")
@@ -303,9 +309,16 @@ class OscControlRouter:
                     self._invocation_messages.pop(invocation_task, None)
                     self._invocation_generations.pop(invocation_task, None)
         except Exception as exc:
+            diagnostics = exception_diagnostics(
+                exc, component="osc_control", operation="control_dispatch", code="osc_dispatch_failed"
+            )
+            emit_failure(logger, diagnostics)
+            self.failures = (*self.failures[-7:], diagnostics)
             self._publish_canonical_delta()
             self._report_error(f"{message.name}: {type(exc).__name__}")
-            return OscDispatchResult(False, message.name, error=type(exc).__name__)
+            return OscDispatchResult(
+                False, message.name, error=type(exc).__name__, diagnostics=diagnostics
+            )
         if self._closed:
             return OscDispatchResult(False, message.name, error="router_closed")
         if (cancelled is not None and cancelled()) or (
@@ -323,7 +336,15 @@ class OscControlRouter:
             ):
                 self._project_canonical_state(cast(OscControlPresentationName, message.name))
             self._report_error(f"{message.name}: application_rejected")
-            return OscDispatchResult(False, message.name, error="application_rejected")
+            diagnostics = getattr(result, "failure_diagnostics", None)
+            if not isinstance(diagnostics, ErrorDiagnostics):
+                value = getattr(result, "diagnostics", None)
+                diagnostics = deserialize_diagnostics(value) if isinstance(value, Mapping) else None
+            return OscDispatchResult(
+                False, message.name, error="application_rejected", diagnostics=diagnostics,
+                operation_id=getattr(result, "operation_id", None),
+                request_id=getattr(result, "request_id", None),
+            )
         self._publish_canonical_delta()
         if (cancelled is not None and cancelled()) or (
             invocation_task is not None and invocation_task.cancelling()
@@ -400,30 +421,45 @@ class OscControlRouter:
 
     def _report_error(self, message: str) -> None:
         if self._error_sink is not None:
-            self._error_sink(message)
+            with contextlib.suppress(Exception):
+                self._error_sink(message)
         else:
-            logger.warning("[OSC Control] %s", message)
+            with contextlib.suppress(Exception):
+                logger.warning("[OSC Control] %s", message)
 
     def _republish_canonical_state(self) -> None:
         callback = self._canonical_state_full_republisher or self._canonical_state_republisher
         if callback is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             callback()
+        except Exception as exc:
+            self._retain_projection_failure(exc)
 
     def _publish_canonical_delta(self) -> None:
         callback = self._canonical_state_republisher
         if callback is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             callback()
+        except Exception as exc:
+            self._retain_projection_failure(exc)
 
     def _project_canonical_state(self, control: OscControlPresentationName) -> None:
         callback = self._canonical_state_projector
         if callback is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             callback(control)
+        except Exception as exc:
+            self._retain_projection_failure(exc)
+
+    def _retain_projection_failure(self, exc: Exception) -> None:
+        diagnostics = exception_diagnostics(
+            exc, component="osc_control", operation="control_dispatch", code="output_observer_failed"
+        )
+        self.failures = (*self.failures[-7:], diagnostics)
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
 
     def current_invocation_guard(self) -> Callable[[], bool]:
         task = asyncio.current_task()

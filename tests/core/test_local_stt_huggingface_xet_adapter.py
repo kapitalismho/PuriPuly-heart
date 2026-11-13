@@ -771,3 +771,71 @@ async def test_invalid_ca_prevents_worker_launch(tmp_path, monkeypatch):
     assert fields["dispatch_certainty"] == "not_dispatched"
     assert fields["stage"] == "client_configuration"
     assert fields["tls_source"] == "explicit_file"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recovered", [False, True])
+async def test_worker_evidence_is_validated_and_transfer_attempts_survive(tmp_path, monkeypatch, recovered):
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+
+    monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+    private = "private-worker-body-url-and-credential"
+    invalid = LocalSTTDownloadPortError(private, failure_code=private, status_code="503")
+    assert invalid.failure_code == "worker_protocol_failed"
+    assert invalid.status_code is None
+    script = """
+import json, os, pathlib, sys
+request = json.loads(pathlib.Path(sys.argv[1]).read_text())
+events = pathlib.Path(sys.argv[2])
+if sys.argv[3] == "True" and os.environ.get("HF_HUB_DISABLE_XET") == "1":
+    target = pathlib.Path(request["local_dir"]) / request["remote_path"]
+    target.write_bytes(b"verified-fixture")
+    events.write_text(json.dumps({"type":"complete", "path":str(target)}) + "\\n")
+else:
+    events.write_text(json.dumps({
+        "type":"error",
+        "failure_code":"download_failed",
+        "error_type":sys.argv[4],
+        "message":sys.argv[4],
+        "status_code":"503",
+        "os_error_code":True,
+    }) + "\\n")
+    raise SystemExit(1)
+"""
+    adapter = HuggingFaceXetDownloadAdapter(
+        worker_command_factory=lambda request, request_path, event_path: [
+            sys.executable, "-c", script, str(request_path), str(event_path), str(recovered), private
+        ]
+    )
+    recoveries = []
+    request = HuggingFaceDownloadRequest(
+        repo_id="fixture/repo",
+        revision="pinned",
+        remote_path="model.gguf",
+        local_dir=tmp_path / "download",
+        expected_size_bytes=None,
+        on_recovery=recoveries.append,
+    )
+    if recovered:
+        downloaded = await adapter.download(request, cancel_event=None, on_progress=None)
+        assert downloaded.read_bytes() == b"verified-fixture"
+        assert len(recoveries) == 1
+        diagnostics = recoveries[0]
+        assert adapter.recovery_diagnostics == (diagnostics,)
+        assert diagnostics.fields["source_kind"] == "huggingface"
+        assert diagnostics.fields["source_attempt"] == 1
+    else:
+        with pytest.raises(LocalSTTDownloadPortError) as caught:
+            await adapter.download(request, cancel_event=None, on_progress=None)
+        assert caught.value.failure_code == "download_failed"
+        assert caught.value.cause_type is None
+        assert caught.value.status_code is None
+        assert caught.value.os_error_code is None
+        diagnostics = caught.value.failure_diagnostics
+        assert [cause.fields["source_attempt"] for cause in diagnostics.causes] == [1, 2]
+        assert [cause.fields["exit_code"] for cause in diagnostics.causes] == [1, 1]
+        assert recoveries == []
+    assert private not in json.dumps(serialize_diagnostics(diagnostics))
+    assert str(tmp_path) not in json.dumps(serialize_diagnostics(diagnostics))
+    assert adapter.child_states == ()
+    assert not tuple(request.local_dir.glob(".hf-xet-*"))

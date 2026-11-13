@@ -14,6 +14,7 @@ import pytest
 from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import SelfCaptureVadSinkAdapter
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.ownership import CaptureStreamInput
+from puripuly_heart.core.diagnostics import serialize_diagnostics
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -32,6 +33,7 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.providers.stt import custom as custom_module
 from puripuly_heart.providers.stt.gemini_transcribe import _GeminiTranscribeLiveSession
+from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 from tests.core.runtime.test_peer_capture_session import make_config, make_owner
 from tests.core.runtime.test_self_capture_session import build_owner, config
 from tests.core.test_peer_caption_lifecycle import ControlledBackend
@@ -156,6 +158,14 @@ async def recovery_pipeline(channel, provider_id, session_factory):
                 await vad_event(SpeechEnd(segment_id), order)
             return segment_id
 
+        async def reactivate():
+            nonlocal guarded
+            await capture.apply_intent(capture_config, enabled=False)
+            await engine.abort(reason="toggle_off")
+            await capture.apply_intent(capture_config, enabled=True)
+            await wait_until(lambda: capture.snapshot.effective_active)
+            guarded = capture.guard_vad_sink()
+
         async def output_for(text):
             def completed():
                 while not translation.ui_events.empty():
@@ -180,6 +190,7 @@ async def recovery_pipeline(channel, provider_id, session_factory):
             osc=osc,
             speak=speak,
             output_for=output_for,
+            reactivate=reactivate,
         )
     finally:
         await capture.close()
@@ -469,3 +480,133 @@ async def test_independent_sealed_input_uses_only_stream_recovery_owner(
             await asyncio.gather(seal_task, return_exceptions=True)
         for session in sessions:
             await session.close()
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_soniox_startup_cleanup_debt_fences_allocation_until_explicit_reactivation(
+    channel, monkeypatch
+):
+    sockets = []
+    cleanup_allowed = False
+    send_failure = ConnectionResetError("private-soniox-startup-send")
+    recovered = "Fresh Soniox recognition after confirmed cleanup."
+
+    class WebSocket:
+        def __init__(self, *, fail_start):
+            self.fail_start = fail_start
+            self.closed = False
+            self.close_calls = 0
+            self.sent = []
+            self.incoming = asyncio.Queue()
+
+        async def send(self, payload):
+            self.sent.append(payload)
+            if self.fail_start:
+                raise send_failure
+            if (
+                isinstance(payload, str)
+                and payload
+                and json.loads(payload).get("type") == "finalize"
+            ):
+                self.incoming.put_nowait(
+                    json.dumps(
+                        {
+                            "tokens": [
+                                {"text": recovered, "is_final": True, "end_ms": 10},
+                                {"text": "<fin>", "is_final": True},
+                            ]
+                        }
+                    )
+                )
+
+        async def recv(self):
+            return await self.incoming.get()
+
+        async def close(self):
+            self.close_calls += 1
+            if self.fail_start and not cleanup_allowed:
+                raise RuntimeError("private-soniox-startup-cleanup")
+            self.closed = True
+
+    async def connect(*_args, **_kwargs):
+        socket = WebSocket(fail_start=not sockets)
+        sockets.append(socket)
+        return socket
+
+    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", connect)
+    backend = SonioxRealtimeSTTBackend(api_key="controlled", language_hints=["en"])
+
+    async def factory(_settings, epoch):
+        return await backend.open_session(projection=STTSessionProjection("scoped", epoch))
+
+    try:
+        async with recovery_pipeline(channel, "soniox", factory) as env:
+            await env.speak(0)
+            await wait_until(lambda: len(env.failures) == 1)
+            await wait_until(lambda: not env.capture.snapshot.effective_active)
+            terminals = [
+                event for event in env.events if isinstance(event, STTProviderTurnTerminal)
+            ]
+            assert len(terminals) == 1
+            terminal = terminals[0]
+            assert terminal.outcome == "failed" and terminal.text == ""
+            assert terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+            assert terminal.failure_diagnostics.fields["channel_availability"] == "unavailable"
+            assert terminal.failure_diagnostics.fields["recovery_pending"] is False
+            assert env.delays == [0.8]
+            assert env.engine._episode_failures == 3
+            assert env.engine._terminal_failure_notified
+            assert not env.translator.calls
+            assert len(sockets) == 1 and not sockets[0].closed
+            assert sockets[0].close_calls >= 2
+            assert len(backend._starting_sessions) == 1
+            assert backend._starting_sessions[0]._ws is sockets[0]
+            evidence = json.dumps(serialize_diagnostics(env.failures[0]))
+            assert send_failure.failure_diagnostics.diagnostic_id in evidence
+            assert "ConnectionResetError" in evidence
+            assert "stt.provider_cleanup_failed" in evidence
+            assert any(
+                cause.code == "stt.provider_cleanup_failed"
+                and cause.operation == "cleanup"
+                and cause.diagnostic_id != send_failure.failure_diagnostics.diagnostic_id
+                and cause.cause_id == send_failure.failure_diagnostics.diagnostic_id
+                and cause.fields["cleanup_confirmed"] is False
+                for cause in send_failure.failure_diagnostics.causes
+            )
+            assert "private-soniox-startup" not in evidence
+
+            cleanup_allowed = True
+            await backend.close()
+            assert sockets[0].closed
+            assert not backend._starting_sessions
+            assert env.engine._terminal_failure_notified
+            assert not env.capture.snapshot.effective_active
+            assert len(sockets) == 1
+
+            authority = env.engine._authority_generation
+            await env.reactivate()
+            assert env.engine._authority_generation > authority
+            assert not env.engine._terminal_failure_notified
+            await env.speak(1)
+            await env.output_for(recovered)
+            fresh = [
+                event
+                for event in env.events
+                if isinstance(event, STTProviderTurnTerminal) and event.outcome == "final"
+            ]
+            assert len(fresh) == 1 and fresh[0].text == recovered
+            assert (
+                fresh[0].identity.segment.activation_generation
+                > terminal.identity.segment.activation_generation
+            )
+            assert len(sockets) == 2 and not sockets[1].closed
+            assert not any(isinstance(payload, bytes) for payload in sockets[0].sent)
+            assert any(isinstance(payload, bytes) for payload in sockets[1].sent)
+            assert [call.text for call in env.translator.calls] == [recovered]
+            assert len(env.failures) == 1 and env.delays == [0.8]
+            assert env.engine._episode_failures == 0
+            assert env.capture.snapshot.effective_active
+        assert all(socket.closed for socket in sockets)
+    finally:
+        cleanup_allowed = True
+        await backend.close()

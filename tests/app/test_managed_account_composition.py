@@ -395,7 +395,9 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("outcome", ["ready", "missing", "cancel", "freeze", "replace", "failure"])
+@pytest.mark.parametrize(
+    "outcome", ["ready", "missing", "cancel", "freeze", "replace", "failure", "metadata_failure"]
+)
 async def test_usage_credentials_keep_loop_responsive_and_reject_stale_observations(
     monkeypatch, tmp_path, outcome
 ):
@@ -425,6 +427,8 @@ async def test_usage_credentials_keep_loop_responsive_and_reject_stale_observati
     async def fetch_metadata(key):
         assert key == "synthetic-managed-key"
         verifier_threads.append(threading.get_ident())
+        if outcome == "metadata_failure":
+            raise RuntimeError("synthetic private metadata body")
         return metadata
 
     verifier = AsyncMock(spec=ProviderVerifierPort)
@@ -470,9 +474,12 @@ async def test_usage_credentials_keep_loop_responsive_and_reject_stale_observati
                 await task
         else:
             result = await task
-            assert result.key_available is (outcome == "ready")
+            assert result.key_available is (outcome in {"ready", "metadata_failure"})
             assert result.metadata is (metadata if outcome == "ready" else None)
-        if outcome == "ready":
+            if outcome in {"failure", "metadata_failure"}:
+                assert result.diagnostics is not None
+                assert "synthetic private" not in str(result.diagnostics)
+        if outcome in {"ready", "metadata_failure"}:
             assert verifier_threads == [loop_thread]
             verifier.fetch_openrouter_key_metadata.assert_awaited_once()
         else:

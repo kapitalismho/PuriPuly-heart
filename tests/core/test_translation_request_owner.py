@@ -1050,3 +1050,47 @@ async def test_terminal_index_failure_does_not_consume_changed_request(change) -
     assert result.output.translation.text == "translated"
     assert len(provider.calls) == 2
     assert fixture.presentation.messages == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recovered_truncated,secondary_truncated", [(True, False), (False, True)])
+async def test_request_normalization_preserves_successful_fallback_history(
+    recovered_truncated, secondary_truncated
+):
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+    from puripuly_heart.core.messages import ErrorDiagnostics
+
+    recovered = serialize_diagnostics(ErrorDiagnostics(
+        component="provider.llm", operation="translate", code="provider.auth",
+        category="auth", status_code=403,
+        visibility="basic", content_policy="metadata_only", retry_after_ms=None, fields={},
+    ))
+    cleanup = serialize_diagnostics(ErrorDiagnostics(
+        component="provider.llm", operation="cleanup", code="provider.unknown",
+        category="unknown", status_code=None,
+        visibility="basic", content_policy="metadata_only", retry_after_ms=None,
+        fields={"exception_class": "OSError"},
+    ))
+
+    class RecoveredProvider(RecordingProvider):
+        async def translate(self, **kwargs):
+            translation = await super().translate(**kwargs)
+            self.produced = Translation(
+                utterance_id=translation.utterance_id, text=translation.text,
+                recovered_failures=(recovered,),
+                secondary_diagnostics=(cleanup,),
+                recovered_failures_truncated=recovered_truncated,
+                secondary_diagnostics_truncated=secondary_truncated,
+            )
+            return self.produced
+
+    provider = RecoveredProvider()
+    fixture = build_owner(provider)
+    result = await fixture.owner.process(process_request(fixture, channel="self"))
+    assert result.outcome == "translated"
+    assert result.output.translation.recovered_failures[0]["status_code"] == 403
+    assert result.output.translation.recovered_failures == provider.produced.recovered_failures
+    assert result.output.translation.secondary_diagnostics == provider.produced.secondary_diagnostics
+    assert result.output.translation.secondary_diagnostics[0]["diagnostic_id"] == cleanup["diagnostic_id"]
+    assert result.output.translation.recovered_failures_truncated is recovered_truncated
+    assert result.output.translation.secondary_diagnostics_truncated is secondary_truncated

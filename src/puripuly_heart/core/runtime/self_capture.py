@@ -23,7 +23,11 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.audio.source import AudioSourceOpenFailure
-from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+)
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.messages import ErrorDiagnostics
@@ -597,6 +601,7 @@ class SelfCaptureSessionOwner:
         self._retired_sources: list[object] = []
         self._failure_reason: SelfCaptureFailureReason | None = None
         self._primary_failure: tuple[int, ErrorDiagnostics] | None = None
+        self._diagnostic_delivery_failure: ErrorDiagnostics | None = None
         self._admission_reason: str | None = None
         self._last_cleanup_exception: Exception | None = None
         self._closed = False
@@ -631,6 +636,8 @@ class SelfCaptureSessionOwner:
                 if self._failure_reason is not None and self._primary_failure is not None
                 else None
             ),
+            source_open_diagnostics=getattr(self._source_factory, "last_open_diagnostics", None),
+            source_open_recovered=getattr(self._source_factory, "last_open_recovered", False),
         )
 
     @property
@@ -656,6 +663,10 @@ class SelfCaptureSessionOwner:
     @property
     def last_cleanup_exception(self) -> Exception | None:
         return self._last_cleanup_exception
+
+    @property
+    def diagnostic_delivery_failure(self) -> ErrorDiagnostics | None:
+        return self._diagnostic_delivery_failure
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -815,7 +826,7 @@ class SelfCaptureSessionOwner:
             name=f"SelfCaptureSessionOwner:recognition-fault:{generation}",
         )
         self._fault_tasks.add(task)
-        task.add_done_callback(self._fault_tasks.discard)
+        task.add_done_callback(self._on_fault_task_done)
 
     def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
         generation = self._intent_generations.get(task)
@@ -1596,7 +1607,39 @@ class SelfCaptureSessionOwner:
             name="SelfCaptureSessionOwner:session-fault",
         )
         self._fault_tasks.add(fault_task)
-        fault_task.add_done_callback(self._fault_tasks.discard)
+        fault_task.add_done_callback(self._on_fault_task_done)
+
+    def _on_fault_task_done(self, task: asyncio.Task[None]) -> None:
+        self._fault_tasks.discard(task)
+        if task.cancelled():
+            return
+        exception = task.exception()
+        if exception is not None:
+            diagnostics = exception_diagnostics(
+                exception,
+                component="capture.self",
+                operation="cleanup",
+                code="capture.self.background_failed",
+                fields={"cleanup_confirmed": False},
+            )
+            self._retain_secondary_failure(diagnostics)
+            emit_failure(
+                logger, diagnostics, disposition="degraded", stage="capture_background"
+            )
+
+    def _retain_secondary_failure(self, diagnostics: ErrorDiagnostics) -> None:
+        primary = self._primary_failure
+        if primary is not None:
+            self._primary_failure = (
+                primary[0],
+                replace(
+                    primary[1],
+                    causes=(*primary[1].causes[-15:], diagnostics),
+                    causes_truncated=primary[1].causes_truncated or len(primary[1].causes) >= 16,
+                ),
+            )
+        else:
+            self._primary_failure = (self._generation, diagnostics)
 
     async def _on_terminal_provider_failure(
         self,
@@ -1799,9 +1842,22 @@ class SelfCaptureSessionOwner:
         if loop_task is not None and loop_task is not completed_task:
             if not loop_task.done():
                 loop_task.cancel()
-            await asyncio.gather(loop_task, return_exceptions=True)
+            results = await asyncio.gather(loop_task, return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception):
+                    self._retain_secondary_failure(
+                        exception_diagnostics(
+                            result,
+                            component="capture.self",
+                            operation="source_read",
+                            code="capture.self.background_failed",
+                        )
+                    )
         if vad_dispatch is not None:
-            await vad_dispatch.abort()
+            try:
+                await vad_dispatch.abort()
+            except Exception as exc:
+                failures.append(exc)
         if source is not None:
             try:
                 await self._close_source(source)
@@ -1953,7 +2009,21 @@ class SelfCaptureSessionOwner:
 
     def _notify_state_changed(self) -> None:
         if self._state_changed is not None:
-            self._state_changed(self.snapshot)
+            try:
+                self._state_changed(self.snapshot)
+            except Exception as exc:
+                self._record_delivery_failure(exc)
+
+    def _record_delivery_failure(self, exception: BaseException) -> None:
+        diagnostics = exception_diagnostics(
+            exception,
+            component="capture.self",
+            operation="observe",
+            code="capture.self.diagnostic_sink_failed",
+        )
+        self._diagnostic_delivery_failure = diagnostics
+        self._retain_secondary_failure(diagnostics)
+        emit_failure(logger, diagnostics, disposition="degraded", stage="capture_observer")
 
     def _emit(
         self,
@@ -1989,17 +2059,25 @@ class SelfCaptureSessionOwner:
             if native is None and isinstance(exception, ErrorDiagnostics):
                 native = exception
             if native is None:
-                native = stt_failure_report(
-                    exception,
-                    provider=self._config.provider_id if self._config else "stt",
-                    operation=stage,
-                    channel="self",
-                ).diagnostics
+                code = f"capture.self.{reason.value if reason is not None else 'unknown'}"
+                native = (
+                    exception_diagnostics(
+                        exception, component="capture.self", operation=stage, code=code
+                    )
+                    if isinstance(exception, BaseException)
+                    else stt_failure_report(
+                        None,
+                        provider=self._config.provider_id if self._config else "stt",
+                        operation=stage,
+                        channel="self",
+                    ).diagnostics
+                )
                 native = replace(
                     native,
                     component="capture.self",
                     operation=stage,
-                    code=f"capture.self.{reason.value if reason is not None else 'unknown'}",
+                    code=code,
+                    channel="self",
                     generation=generation,
                     fields={
                         **native.fields,
@@ -2015,8 +2093,12 @@ class SelfCaptureSessionOwner:
                 native = replace(native, **self._generation_operation[1])
             primary = self._primary_failure
             if reason is SelfCaptureFailureReason.CLEANUP_FAILED and primary is not None:
-                if primary[0] == generation and primary[1].diagnostic_id != native.diagnostic_id:
-                    native = replace(native, cause_id=primary[1].diagnostic_id)
+                native = replace(
+                    native,
+                    cause_id=primary[1].diagnostic_id,
+                    fields={**native.fields, "cleanup_confirmed": False},
+                )
+                self._retain_secondary_failure(native)
             elif disposition in {"failed", "degraded"}:
                 self._primary_failure = (generation, native)
             failure_diagnostics = native
@@ -2029,8 +2111,7 @@ class SelfCaptureSessionOwner:
             )
         if self._diagnostic_sink is None:
             return
-        self._diagnostic_sink(
-            SelfCaptureDiagnostic(
+        diagnostic = SelfCaptureDiagnostic(
                 event=event,
                 generation=generation,
                 state=self._state,
@@ -2069,7 +2150,10 @@ class SelfCaptureSessionOwner:
                     else target_state
                 ),
             )
-        )
+        try:
+            self._diagnostic_sink(diagnostic)
+        except Exception as exc:
+            self._record_delivery_failure(exc)
 
 
 __all__ = ["SelfCaptureSessionOwner"]

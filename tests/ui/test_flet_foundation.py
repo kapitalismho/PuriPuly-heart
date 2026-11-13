@@ -294,3 +294,66 @@ def test_foundation_preview_action_is_hidden_without_flag_and_has_no_external_ca
 
     assert len(app.page.opened) == 1
     assert isinstance(app.page.opened[0].content, FoundationPreviewSurface)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("concurrent_future", [False, True])
+async def test_foundation_observes_failed_task_and_future_without_sensitive_text(concurrent_future):
+    from concurrent.futures import Future
+
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+
+    original = PermissionError(13, "private task content")
+    attached = exception_diagnostics(
+        original, component="clipboard", operation="clipboard_submit", code="clipboard_failed"
+    )
+    original.failure_diagnostics = attached
+    future = Future()
+    page = SimpleNamespace(run_task=lambda *_args: future) if concurrent_future else TaskPage()
+    runtime = FletFoundationRuntime(
+        page, FletFoundationAdapter(
+            RecordingApplication(), RecordingPresentation(debug_ui_preview=False)
+        )
+    )
+    runtime.bind_application_lifecycle(ApplicationShutdownCoordinator())
+
+    async def failed():
+        raise original
+
+    task = runtime.run_page_task(failed)
+    if concurrent_future:
+        future.set_exception(original)
+    else:
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.sleep(0)
+    assert runtime.snapshot.tracked_task_count == 0
+    assert runtime.failure_diagnostics.fields["errno"] == 13
+    assert runtime.failure_diagnostics.causes[0].diagnostic_id == attached.diagnostic_id
+    assert "private" not in repr(runtime.failure_diagnostics)
+    await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_headless_observes_failure_without_turning_cancellation_into_failure(caplog):
+    from puripuly_heart.composition.headless_application import HeadlessApplicationPresentation
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+
+    presentation = HeadlessApplicationPresentation()
+
+    async def failed():
+        raise PermissionError(13, "private headless content")
+
+    async def cancelled():
+        raise asyncio.CancelledError
+
+    presentation.schedule_task(failed)
+    presentation.schedule_task(cancelled)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert len([
+        record for record in caplog.records
+        if getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None) is not None
+    ]) == 1
+    assert presentation.failure_diagnostics.fields["errno"] == 13
+    assert "private" not in repr(presentation.failure_diagnostics)
+    await presentation.close_after_launch_tasks()

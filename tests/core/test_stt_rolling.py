@@ -830,3 +830,36 @@ async def test_rolling_gemini_preserves_independent_stream_units_across_local_tu
         "second",
     ]
     await session.close()
+
+
+async def test_all_member_failures_and_excluded_members_keep_shared_causes():
+    from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+
+    definitions = []
+    originals = []
+    for provider in (STTProviderName.ELEVENLABS_SCRIBE, STTProviderName.GEMINI_TRANSCRIBE):
+        error = RuntimeError("PRIVATE_MEMBER_DETAIL")
+        error.failure_diagnostics = recognition_failure_diagnostics(
+            TimeoutError(),
+            provider=provider.value,
+            channel="peer",
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        originals.append(error.failure_diagnostics)
+        definition, _ = _definition(
+            provider,
+            _ScriptedSession(error=error),
+            fail_times=99,
+            classifier=lambda _: "auth",
+        )
+        definitions.append(definition)
+    rolling = _make(*definitions)
+    for _ in range(2):
+        with pytest.raises(RuntimeError) as caught:
+            await rolling.open_session()
+        diagnostics = caught.value.failure_diagnostics
+        assert {cause.diagnostic_id for cause in diagnostics.causes} == {
+            original.diagnostic_id for original in originals
+        }
+        assert "PRIVATE" not in repr(diagnostics)

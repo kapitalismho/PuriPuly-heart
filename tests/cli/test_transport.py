@@ -468,3 +468,25 @@ async def test_cli_subprocess_discovers_authenticates_and_keeps_valid_queries_af
         assert not list(profile.rglob("*.log"))
     finally:
         await server.close()
+
+
+@pytest.mark.asyncio
+async def test_unexpected_query_failure_reaches_client_with_safe_cause_and_identity():
+    class FailedControl(_Control):
+        async def query(self, _name, _arguments):
+            raise PermissionError(13, "private query content")
+
+    server = ControlServer(FailedControl(), instance_id="correct-instance", token="local-secret-token")
+    port = await server.start()
+    try:
+        with pytest.raises(ControlTransportError) as caught:
+            await request(_Record(port), "query", {"name": "app.status"})
+        assert caught.value.code == "operation_error"
+        diagnostics = caught.value.diagnostics
+        assert diagnostics["code"] == "control_request_failed"
+        assert diagnostics["fields"]["errno"] == 13
+        assert diagnostics["request_id"] == server.failure_diagnostics.request_id
+        assert diagnostics["diagnostic_id"] == server.failure_diagnostics.diagnostic_id
+        assert "private" not in repr(diagnostics)
+    finally:
+        await server.close()

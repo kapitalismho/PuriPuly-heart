@@ -35,8 +35,9 @@ from puripuly_heart.core.audio.smart_turn import (
     SmartTurnInferenceOwner,
     smart_turn_language_profile,
 )
+from puripuly_heart.core.audio.source import AudioSourceOpenFailure
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure, exception_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.messages import ErrorDiagnostics
@@ -1651,6 +1652,37 @@ class PeerCaptureSessionOwner:
         *,
         provider_operation: dict[str, str | None],
     ) -> None:
+        if self._is_superseded(generation):
+            return
+        if self._retired_sources:
+            cleanup_failures: list[Exception] = []
+            await self._retry_retired_cleanup_debt(cleanup_failures, tuple(self._retired_sources))
+            if cleanup_failures:
+                diagnostics = exception_diagnostics(
+                    ExceptionGroup("peer source cleanup incomplete", cleanup_failures),
+                    component="capture.peer", operation="cleanup",
+                    code="capture.peer.cleanup_failed", fields={"cleanup_confirmed": False},
+                )
+                if not self._is_superseded(generation):
+                    self._state = PeerCaptureSessionState.FAULTED
+                    previous = self._last_failure
+                    if previous is not None and previous.failure_diagnostics is not None:
+                        self._last_failure = replace(
+                            previous,
+                            failure_diagnostics=replace(
+                                previous.failure_diagnostics,
+                                causes=(*previous.failure_diagnostics.causes[-15:], diagnostics),
+                                causes_truncated=(
+                                    previous.failure_diagnostics.causes_truncated
+                                    or len(previous.failure_diagnostics.causes) >= 16
+                                ),
+                            ),
+                        )
+                    self._notify_state_changed()
+                emit_failure(logger, diagnostics, disposition="degraded", stage="cleanup")
+                self._raise_cleanup_failures("peer source cleanup incomplete", cleanup_failures)
+            if self._is_superseded(generation):
+                return
         source = None
         provider_ready = False
         load_started_at = self.clock.now()
@@ -1691,6 +1723,9 @@ class PeerCaptureSessionOwner:
                     source = await source
             except asyncio.CancelledError:
                 raise
+            except AudioSourceOpenFailure as exc:
+                self._retain_retired_source(exc.source)
+                raise _PeerCaptureSourceOpenFailed from exc
             except Exception as exc:
                 raise _PeerCaptureSourceOpenFailed from exc
             try:
@@ -2121,6 +2156,16 @@ class PeerCaptureSessionOwner:
                     exception, provider=config.provider_id, channel="peer", operation=stage
                 ).diagnostics
             )
+            if isinstance(exception, Exception) and reason is PeerCaptureFailureReason.SOURCE_OPEN_FAILED:
+                native = replace(
+                    native,
+                    causes=(
+                        exception_diagnostics(
+                            exception, component="capture.peer", operation=stage,
+                            code="capture.peer.source_open_failed",
+                        ),
+                    ),
+                )
             if not isinstance(exception, ErrorDiagnostics):
                 native = replace(
                     native,

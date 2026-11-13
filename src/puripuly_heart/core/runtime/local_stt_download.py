@@ -7,6 +7,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 
 LocalSTTDownloadRunner = Callable[[threading.Event, int], Awaitable[object]]
 LocalSTTDownloadStateChanged = Callable[["LocalSTTDownloadRuntime"], None]
@@ -41,6 +43,7 @@ class LocalSTTDownloadRuntime:
         self._closing = False
         self._closed = False
         self._close_lock = asyncio.Lock()
+        self.failure_diagnostics: ErrorDiagnostics | None = None
 
     @property
     def owner_name(self) -> str:
@@ -95,6 +98,7 @@ class LocalSTTDownloadRuntime:
             self._download_task = None
 
         self._generation += 1
+        self.failure_diagnostics = None
         generation = self._generation
         cancel_event = threading.Event()
         self._cancel_event = cancel_event
@@ -176,17 +180,24 @@ class LocalSTTDownloadRuntime:
         self._generation += 1
         self._notify_state_changed()
 
-    @staticmethod
-    def _observe_task_exception(task: asyncio.Task[Any]) -> None:
+    def _observe_task_exception(self, task: asyncio.Task[Any]) -> None:
         if not task.cancelled():
-            try:
-                task.exception()
-            except asyncio.CancelledError:
-                pass
+            failure = task.exception()
+            if failure is not None:
+                self.failure_diagnostics = model_asset_failure_diagnostics(
+                    failure, component="local_asr_provisioning", operation="models.install"
+                )
+                failure.failure_diagnostics = self.failure_diagnostics
 
     def _notify_state_changed(self) -> None:
         if self._state_changed is not None:
-            self._state_changed(self)
+            try:
+                self._state_changed(self)
+            except Exception as failure:
+                self.failure_diagnostics = model_asset_failure_diagnostics(
+                    failure, operation="state_delivery",
+                    code="model_assets.state_delivery_failed",
+                )
 
 
 __all__ = ["LocalSTTDownloadRuntime"]

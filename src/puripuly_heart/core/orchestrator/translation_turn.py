@@ -581,6 +581,7 @@ class TranslationTurnLifecycleOwner:
     _blocked_channels: set[ChannelId] = field(default_factory=set)
     _accepting: bool = True
     _closed: bool = False
+    retirement_failure_diagnostics: ErrorDiagnostics | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.peer_waiting_capacity < 1 or self.self_speech_waiting_capacity < 1:
@@ -1530,6 +1531,10 @@ class TranslationTurnLifecycleOwner:
             source_text_hash=translation.source_text_hash,
             source_text_len=translation.source_text_len,
             logical_turn_key=f"{translation.channel}:{parent_utterance_id}",
+            recovered_failures=translation.recovered_failures,
+            secondary_diagnostics=translation.secondary_diagnostics,
+            recovered_failures_truncated=translation.recovered_failures_truncated,
+            secondary_diagnostics_truncated=translation.secondary_diagnostics_truncated,
         )
 
     def _observe_predecessor_wait(
@@ -1852,6 +1857,8 @@ class TranslationTurnLifecycleOwner:
         )
         if parent is not None and not secondary:
             parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
+        if secondary:
+            self.retirement_failure_diagnostics = diagnostics
         emit_failure(
             logger,
             diagnostics,
@@ -1889,6 +1896,8 @@ class TranslationTurnLifecycleOwner:
         )
         if not secondary:
             parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
+        if secondary:
+            self.retirement_failure_diagnostics = diagnostics
         emit_failure(
             logger,
             diagnostics,
@@ -2014,8 +2023,14 @@ class TranslationTurnLifecycleOwner:
                                 request_id=child.request_id,
                             )
                         )
-                    except Exception:
-                        logger.exception("translation retirement output submission failed")
+                    except Exception as exc:
+                        self._record_child_failure(
+                            child,
+                            exc,
+                            "translation.output_submission_failed",
+                            stage="output_submit",
+                            secondary=True,
+                        )
                     else:
                         self._output_submitted_child_ids.add(child.utterance_id)
         except asyncio.CancelledError:

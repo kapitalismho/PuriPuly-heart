@@ -958,3 +958,51 @@ async def test_owner_cancel_during_production_prepare_abandons_owned_attempt(
     assert calls == {"prepare": 1, "onnx": 1}
     await owner.close()
     assert owner.snapshot.availability == "closed"
+
+
+@pytest.mark.asyncio
+async def test_optional_inference_and_callback_failures_retain_typed_evidence_and_next_success(tmp_path):
+    class Inference:
+        fail = True
+
+        async def predict(self, audio, *, sample_rate_hz):
+            if self.fail:
+                self.fail = False
+                raise OSError(13, "private inference detail")
+            return 0.9
+
+    owner = SmartTurnInferenceOwner(
+        model_path=tmp_path / "synthetic.onnx", inference_factory=lambda path: Inference(),
+    )
+    owner.request_prepare()
+    await owner._prepare_task
+    identity = SmartTurnRequestIdentity(
+        activation_generation=7, segment_id=uuid4(), pause_id=1, context_revision=1,
+        input_revision=SMART_TURN_INPUT_REVISION, source_frontier=3584,
+        probe_frontier_monotonic_s=0.224, complete_deadline_monotonic_s=0.512,
+    )
+    completions = []
+
+    async def fail_delivery(result):
+        completions.append(result)
+        raise OSError(5, "private completion detail")
+
+    assert owner.submit(identity, np.zeros(16000, dtype=np.float32), fail_delivery) == "started"
+    await owner._execution_task
+    assert completions[0].outcome == "error"
+    assert completions[0].failure_diagnostics.fields["errno"] == 13
+    retained = owner.snapshot.failure_diagnostics
+    assert retained.diagnostic_id == completions[0].failure_diagnostics.diagnostic_id
+    assert retained.causes[-1].fields["errno"] == 5
+    assert retained.turn_id == str(identity.segment_id)
+    assert "private" not in repr(retained)
+
+    async def deliver(result):
+        completions.append(result)
+
+    assert owner.submit(identity, np.zeros(16000, dtype=np.float32), deliver) == "started"
+    await owner._execution_task
+    assert completions[-1].outcome == "complete"
+    assert completions[-1].score == 0.9
+    assert completions[-1].failure_diagnostics is None
+    await owner.close()

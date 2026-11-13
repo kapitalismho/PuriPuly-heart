@@ -21,7 +21,7 @@ from puripuly_heart.app.services.operational_state_payloads import (
     ProviderVerificationEvidence,
     provider_verification_state_values,
 )
-from puripuly_heart.core.diagnostics import safe_exception_fields, sanitize_diagnostics
+from puripuly_heart.core.diagnostics import exception_diagnostics, safe_exception_fields, sanitize_diagnostics
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -275,11 +275,15 @@ class SecretSettingsTransaction:
                 )
             )
         except Exception as exc:
-            return _settings_commit_failed_result(
-                provider=request.provider,
-                secret_key=request.secret_key,
-                message=None,
-                exception=exc,
+            return replace(
+                _settings_commit_failed_result(
+                    provider=request.provider,
+                    secret_key=request.secret_key,
+                    message=None,
+                    exception=exc,
+                ),
+                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
+                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
             )
 
         if not commit_result.succeeded or commit_result.snapshot is None:
@@ -295,6 +299,8 @@ class SecretSettingsTransaction:
                     provider=request.provider,
                     secret_key=request.secret_key,
                 ),
+                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
+                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
             )
 
         if verification_result.status == PROVIDER_VERIFICATION_STATUS_VERIFIED:
@@ -302,6 +308,8 @@ class SecretSettingsTransaction:
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=verification_result.message or commit_result.message,
                 diagnostics=commit_result.diagnostics,
+                secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
+                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
             )
 
         return TransactionResult(
@@ -312,6 +320,8 @@ class SecretSettingsTransaction:
                 if verification_result.diagnostics is not None
                 else None
             ),
+            secondary_diagnostics=getattr(self.settings_repository, "secondary_diagnostics", ()),
+            secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
         )
 
     async def _commit_settings_or_restore_secret(
@@ -392,16 +402,13 @@ class SecretSettingsTransaction:
             )
         except Exception as exc:
             restore_succeeded = False
-            restore_cause = ErrorDiagnostics(
+            restore_cause = exception_diagnostics(
+                exc,
                 component="secret_settings_transaction",
                 operation="restore_secret",
                 code="secret_restore_failed",
                 category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-                visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-                content_policy=CONTENT_POLICY_METADATA_ONLY,
-                status_code=None,
-                retry_after_ms=None,
-                fields={"phase": "restore_secret", **safe_exception_fields(exc)},
+                fields={"phase": "restore_secret"},
             )
         outcome = _compensation_diagnostics(
             code=(
@@ -467,6 +474,14 @@ def _secret_write_failed_result(
     diagnostics: ErrorDiagnostics | None = None,
 ) -> TransactionResult:
     cause = sanitize_diagnostics(diagnostics) if diagnostics is not None else None
+    if cause is None and exception is not None:
+        cause = exception_diagnostics(
+            exception,
+            component="secret_settings_transaction",
+            operation=operation,
+            code="secret_write_failed",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+        )
     return TransactionResult(
         status=TRANSACTION_STATUS_SECRET_WRITE_FAILED,
         message=None,
@@ -488,6 +503,7 @@ def _secret_write_failed_result(
                 "secret_write_succeeded": False,
             },
             cause_id=cause.diagnostic_id if cause else None,
+            causes=(cause,) if cause is not None else (),
         ),
         secondary_diagnostics=(cause,) if cause else (),
     )
@@ -560,6 +576,15 @@ def _provider_verification_failed_result(
         diagnostics=(
             sanitize_diagnostics(diagnostics)
             if diagnostics is not None
+            else exception_diagnostics(
+                exception,
+                component="secret_settings_transaction",
+                operation="verify_provider_secret",
+                code=code,
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                fields=fields,
+            )
+            if exception is not None
             else ErrorDiagnostics(
                 component="secret_settings_transaction",
                 operation="verify_provider_secret",
@@ -599,6 +624,20 @@ def _settings_commit_failed_diagnostics(
     secret_key: str,
     exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
+    if exception is not None:
+        return exception_diagnostics(
+            exception,
+            component="secret_settings_transaction",
+            operation="commit_provider_verification",
+            code="settings_commit_failed",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields={
+                "provider": provider,
+                "secret_key": secret_key,
+                "settings_commit_succeeded": False,
+                "phase": "settings_save",
+            },
+        )
     return ErrorDiagnostics(
         component="secret_settings_transaction",
         operation="commit_provider_verification",

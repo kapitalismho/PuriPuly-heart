@@ -7,7 +7,13 @@ from datetime import datetime, timezone
 from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION
 from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
-from puripuly_heart.app.services.agent_chat.execution import model_safe_catalog, project_catalog
+from puripuly_heart.app.services.agent_chat.execution import (
+    model_safe_catalog,
+    project_capture_channel,
+    project_overlay_output,
+    project_audio_test,
+    project_catalog,
+)
 from puripuly_heart.app.services.agent_chat.modules import TOPICS, topic_queries
 from puripuly_heart.app.services.agent_chat.provider_setup import (
     ACCOUNT_SETUP_ACTIONS,
@@ -21,58 +27,10 @@ from puripuly_heart.app.services.agent_chat.tools import (
     project_settings,
 )
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
-from puripuly_heart.core.diagnostics import sanitize_diagnostic_fields
+from puripuly_heart.core.diagnostics import project_diagnostic_record
 
 SETTINGS_PATHS = tuple(
     "intent." + path for path in (*SETTINGS_FIELD_PATHS.values(), *LANGUAGE_FIELD_PATHS.values())
-)
-CHANNEL_FIELDS = (
-    "selected_provider",
-    "runtime_provider",
-    "capture_attached_provider",
-    "desired_active",
-    "effective_active",
-    "pending_handoff",
-    "failure_reason",
-    "provider_status",
-)
-OVERLAY_FIELDS = (
-    "settings_available",
-    "desired_enabled",
-    "configured_target",
-    "effective_target",
-    "attempting_target",
-    "lifecycle",
-    "runtime_active",
-    "process_state",
-    "presentation_ready",
-    "desktop_visible",
-    "failure_reason",
-    "auto_restart_scheduled",
-    "fallback_active",
-    "recovery_active",
-    "recovery_reason",
-    "ingress_stopped",
-)
-DIAGNOSTIC_FIELDS = (
-    "diagnostic_id",
-    "occurred_at",
-    "component",
-    "operation",
-    "stage",
-    "severity",
-    "disposition",
-    "code",
-    "category",
-    "cause_id",
-    "operation_id",
-    "request_id",
-    "channel",
-    "turn_id",
-    "generation",
-    "status_code",
-    "retry_after_ms",
-    "diagnostic_sequence",
 )
 
 
@@ -283,26 +241,11 @@ async def collect_agent_context(
                     "stopping",
                 ),
             )
-            result["audio_test"] = _pick(
-                app.get("audio_test"),
-                ("state", "ready", "active", "failure_code", "cleanup_complete"),
-            )
+            result["audio_test"] = project_audio_test(_mapping(app.get("audio_test")))
             result["channels"] = {}
             for channel in ("self", "peer"):
                 source = _mapping(_mapping(app.get("channels")).get(channel))
-                result["channels"][channel] = {
-                    **_pick(source, CHANNEL_FIELDS),
-                    "capture": _pick(
-                        source.get("capture"),
-                        (
-                            "generation",
-                            "state",
-                            "desired_active",
-                            "effective_active",
-                            "has_source",
-                        ),
-                    ),
-                }
+                result["channels"][channel] = project_capture_channel(source)
     if "settings.current" in queries:
         settings = await query("settings.current")
         if settings is not None:
@@ -369,7 +312,7 @@ async def collect_agent_context(
         osc = await query("osc.status")
         result["output"] = {
             "overlay": (
-                {**_pick(overlay.get("output"), OVERLAY_FIELDS), **_pick(overlay, ("locked",))}
+                {**project_overlay_output(overlay.get("output")), **_pick(overlay, ("locked",))}
                 if overlay
                 else None
             ),
@@ -414,10 +357,7 @@ async def collect_agent_context(
                 "lookup": target.get("lookup") if target else "query_failed",
             }
         result["recent_diagnostics"] = [
-            {
-                **_pick(item, DIAGNOSTIC_FIELDS),
-                "fields": sanitize_diagnostic_fields(_mapping(_mapping(item).get("fields")))[0],
-            }
+            project_diagnostic_record(item)
             for item in records[:10]
             if isinstance(item, Mapping)
         ]

@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID
@@ -13,6 +13,8 @@ from uuid import UUID
 import numpy as np
 
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 SMART_TURN_MODEL_FILENAME = "smart-turn-v3.2-cpu.onnx"
@@ -108,6 +110,7 @@ class SmartTurnCompletion:
     completed_at_monotonic_s: float
     duration_s: float
     outcome: Literal["complete", "error", "nonfinite"]
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +121,7 @@ class SmartTurnRuntimeSnapshot:
     late_count: int
     active_request: SmartTurnRequestIdentity | None
     last_error: str | None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class SmartTurnInferencePort(Protocol):
@@ -202,6 +206,7 @@ class SmartTurnInferenceOwner:
         self._busy_skip_count = 0
         self._late_count = 0
         self._last_error: str | None = None
+        self._last_failure: ErrorDiagnostics | None = None
 
     @property
     def snapshot(self) -> SmartTurnRuntimeSnapshot:
@@ -212,6 +217,7 @@ class SmartTurnInferenceOwner:
             late_count=self._late_count,
             active_request=self._active_request,
             last_error=self._last_error,
+            failure_diagnostics=self._last_failure,
         )
 
     def request_prepare(self) -> None:
@@ -225,6 +231,7 @@ class SmartTurnInferenceOwner:
         self._prepare_attempted = True
         self._availability = "loading"
         self._prepare_task = asyncio.create_task(self._prepare(), name="SmartTurn:prepare")
+        self._prepare_task.add_done_callback(self._observe_task_result)
 
     def submit(
         self,
@@ -246,6 +253,7 @@ class SmartTurnInferenceOwner:
             self._execute(identity, owned_audio, completion),
             name=f"SmartTurn:infer:{identity.segment_id}:{identity.pause_id}",
         )
+        self._execution_task.add_done_callback(self._observe_task_result)
         return "started"
 
     def record_late(self) -> None:
@@ -271,10 +279,14 @@ class SmartTurnInferenceOwner:
         finally:
             self._availability = "closed"
             inference = self._inference
-            self._inference = None
             close = getattr(inference, "close", None)
             if callable(close):
-                close()
+                try:
+                    close()
+                except Exception as exc:
+                    self._record_failure(exc, operation="cleanup")
+                    raise
+            self._inference = None
 
     async def _prepare(self) -> None:
         if self._closed:
@@ -294,7 +306,7 @@ class SmartTurnInferenceOwner:
                 timed_out = True
                 self._availability = "error"
                 self._last_error = "TimeoutError"
-                logger.warning("[STT][Runtime] smart-turn error error=TimeoutError")
+                self._record_failure(TimeoutError(), operation="smart_turn_prepare")
             try:
                 inference = await _await_owned_operation(operation)
             except asyncio.CancelledError:
@@ -303,14 +315,16 @@ class SmartTurnInferenceOwner:
                 if not timed_out:
                     self._availability = "error"
                     self._last_error = type(exc).__name__
-                    logger.warning("[STT][Runtime] smart-turn error error=%s", type(exc).__name__)
+                self._record_failure(exc, operation="smart_turn_prepare", secondary=timed_out)
                 return
             if inference is None:
                 return
             if timed_out or self._closed:
+                self._inference = inference
                 close = getattr(inference, "close", None)
                 if callable(close):
                     close()
+                self._inference = None
                 return
             self._inference = inference
             self._availability = "ready"
@@ -336,7 +350,7 @@ class SmartTurnInferenceOwner:
         started = self._clock()
         outcome: Literal["complete", "error", "nonfinite"] = "error"
         score: float | None = None
-        error: str | None = None
+        diagnostics: ErrorDiagnostics | None = None
         try:
             assert self._inference is not None
             score = await _await_owned_operation(
@@ -346,13 +360,19 @@ class SmartTurnInferenceOwner:
                 )
             )
             outcome = "complete" if math.isfinite(score) else "nonfinite"
+            if outcome == "nonfinite":
+                diagnostics = self._record_failure(
+                    ValueError(), operation="smart_turn_predict",
+                    identity=identity, code="capture.peer.smart_turn_nonfinite",
+                )
         except asyncio.CancelledError:
             self._active_request = None
             self._execution_task = None
             raise
         except Exception as exc:
-            self._last_error = type(exc).__name__
-            error = self._last_error
+            diagnostics = self._record_failure(
+                exc, operation="smart_turn_predict", identity=identity
+            )
         completed = self._clock()
         self._inference_count += 1
         result = SmartTurnCompletion(
@@ -361,17 +381,51 @@ class SmartTurnInferenceOwner:
             completed_at_monotonic_s=completed,
             duration_s=max(0.0, completed - started),
             outcome=outcome,
+            failure_diagnostics=diagnostics,
         )
-        if outcome != "complete":
-            logger.warning(
-                "[STT][Runtime] smart-turn inference failed cause=%s",
-                error or outcome,
-            )
         self._active_request = None
         try:
             await completion(result)
+        except Exception as exc:
+            self._record_failure(
+                exc, operation="smart_turn_completion", identity=identity,
+                secondary=diagnostics is not None,
+            )
         finally:
             self._execution_task = None
+
+    def _record_failure(
+        self, exception: BaseException, *, operation: str,
+        identity: SmartTurnRequestIdentity | None = None,
+        code: str = "capture.peer.smart_turn_failed",
+        secondary: bool = False,
+    ) -> ErrorDiagnostics:
+        diagnostics = exception_diagnostics(
+            exception, component="capture.peer", operation=operation, code=code,
+        )
+        if identity is not None:
+            diagnostics = replace(
+                diagnostics, generation=identity.activation_generation,
+                turn_id=str(identity.segment_id), channel="peer",
+            )
+        self._last_error = diagnostics.fields.get("exception_class", "unclassified")
+        if secondary and self._last_failure is not None:
+            previous = self._last_failure
+            self._last_failure = replace(
+                previous, causes=(*previous.causes[-15:], diagnostics),
+                causes_truncated=previous.causes_truncated or len(previous.causes) >= 16,
+            )
+        else:
+            self._last_failure = diagnostics
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=operation)
+        return diagnostics
+
+    def _observe_task_result(self, task: asyncio.Task[None]) -> None:
+        if task.cancelled():
+            return
+        exception = task.exception()
+        if exception is not None:
+            self._record_failure(exception, operation="cleanup", secondary=True)
 
 
 __all__ = [

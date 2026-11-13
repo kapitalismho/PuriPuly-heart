@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from puripuly_heart.app.ports.audio_test import AudioDiagnosticCandidate
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
+from puripuly_heart.core.diagnostics import serialize_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 if TYPE_CHECKING:
     from puripuly_heart.core.audio.audio_test_vad import AudioTestVadSample
@@ -58,6 +60,25 @@ class AudioDiagnosticEvidence:
     elapsed_ms: int = 0
     failure_code: str | None = None
     cleanup_complete: bool = True
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    device_metadata_availability: str = "unknown"
+
+    def retain_failure(self, diagnostics: ErrorDiagnostics) -> None:
+        if self.diagnostics is None:
+            self.diagnostics = diagnostics
+        elif diagnostics.diagnostic_id != self.diagnostics.diagnostic_id:
+            self.retain_secondary(diagnostics)
+
+    def retain_secondary(self, diagnostics: ErrorDiagnostics) -> None:
+        if any(item.diagnostic_id == diagnostics.diagnostic_id for item in self.secondary_diagnostics):
+            return
+        if len(self.secondary_diagnostics) < 4:
+            self.secondary_diagnostics += (diagnostics,)
+        else:
+            self.secondary_omitted_count += 1
 
     def observe(self, samples: tuple[AudioTestVadSample, ...]) -> None:
         self.vad_sample_count += len(samples)
@@ -102,6 +123,13 @@ class AudioDiagnosticEvidence:
 
     def snapshot(self) -> dict[str, object]:
         candidate = self.candidate
+        diagnostics = self.diagnostics
+        if diagnostics is None and self.failure_code not in {None, "cancelled"}:
+            diagnostics = ErrorDiagnostics(
+                component="audio_diagnosis", operation="audio.diagnose", code=self.failure_code,
+                category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
+                status_code=None, retry_after_ms=None, fields={},
+            )
         return {
             "id": f"input-{candidate.device_index}",
             "input_host_api": safe_audio_device_label(candidate.input_host_api),
@@ -122,4 +150,16 @@ class AudioDiagnosticEvidence:
             "elapsed_ms": self.elapsed_ms,
             "failure_code": self.failure_code,
             "cleanup_complete": self.cleanup_complete,
+            "diagnostics": (
+                serialize_diagnostics(diagnostics) if diagnostics is not None else None
+            ),
+            "secondary_diagnostics": [
+                serialize_diagnostics(item) for item in self.secondary_diagnostics
+            ],
+            "secondary_omitted_count": self.secondary_omitted_count,
+            "secondary_truncated": self.secondary_omitted_count > 0,
+            "device_metadata_availability": self.device_metadata_availability,
+            "recovery_diagnostics": [
+                serialize_diagnostics(item) for item in self.recovery_diagnostics
+            ],
         }

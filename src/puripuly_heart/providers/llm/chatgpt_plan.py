@@ -237,7 +237,9 @@ class ChatGptPlanLLMProvider(LLMProvider):
     def _maintenance_finished(self, task: asyncio.Task[None]) -> None:
         self._maintenance.discard(task)
         if not task.cancelled():
-            task.exception()
+            failure = task.exception()
+            if failure is not None:
+                self._log_failure("task_done", failure)
 
     def _schedule_dispatch(self) -> None:
         if not self._closed and self._dispatch_handle is None:
@@ -608,14 +610,16 @@ class ChatGptPlanLLMProvider(LLMProvider):
                     self._run_connection(connection, message, started, abandoned, entered)
                 )
                 self._requests.add(task)
-                task.add_done_callback(self._request_finished)
+                task.add_done_callback(lambda finished: self._request_finished(finished, abandoned))
             try:
                 return await asyncio.shield(task)
             except asyncio.CancelledError:
+                abandoned.set()
                 if not started.is_set():
-                    abandoned.set()
                     task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
+                elif task.done():
+                    self._request_finished(task, abandoned)
                 raise
         finally:
             if not entered.is_set():
@@ -626,10 +630,12 @@ class ChatGptPlanLLMProvider(LLMProvider):
                     await cleanup
                     raise
 
-    def _request_finished(self, task: asyncio.Task[str]) -> None:
+    def _request_finished(self, task: asyncio.Task[str], abandoned: asyncio.Event) -> None:
         self._requests.discard(task)
         if not task.cancelled():
-            task.exception()
+            failure = task.exception()
+            if failure is not None and abandoned.is_set():
+                self._log_failure("task_done", failure)
 
     async def _run_connection(
         self,
@@ -680,7 +686,12 @@ class ChatGptPlanLLMProvider(LLMProvider):
         parts: list[str] = []
         length = 0
         while True:
-            event = json.loads(await connection.socket.recv())
+            try:
+                event = json.loads(await connection.socket.recv())
+            except (TypeError, ValueError) as exc:
+                raise LLMResponseError(
+                    "ChatGPT plan response was not valid JSON", provider="chatgpt"
+                ) from exc
             if not isinstance(event, dict):
                 continue
             kind = event.get("type")
@@ -692,13 +703,17 @@ class ChatGptPlanLLMProvider(LLMProvider):
                     parts.append(delta)
                     length += len(delta)
                     if length > self.max_output_chars:
-                        raise RuntimeError("ChatGPT plan response was truncated by length limit")
+                        raise LLMResponseError(
+                            "ChatGPT plan response was truncated by length limit", provider="chatgpt"
+                        )
             elif kind == "response.completed":
                 if observation is not None:
                     observation.record_openai_response(event.get("response"))
                 result = "".join(parts).strip()
                 if not result:
-                    raise RuntimeError("ChatGPT plan response contained empty message content")
+                    raise LLMResponseError(
+                        "ChatGPT plan response contained empty message content", provider="chatgpt"
+                    )
                 return result
             elif kind in ("response.failed", "response.incomplete", "error"):
                 raise _error_from_event(event)
@@ -817,13 +832,16 @@ class ChatGptPlanLLMProvider(LLMProvider):
         if callable(close):
             try:
                 await close()
-            except Exception:
-                return
+            except Exception as exc:
+                self._log_failure("cleanup", exc)
 
     def _log_failure(self, operation: str, exc: BaseException) -> None:
+        boundary = (
+            operation if operation in {"translate", "cleanup", "task_done"} else "provider_build"
+        )
         if getattr(exc, "failure_diagnostics", None) is None:
             exc.failure_diagnostics = provider_failure_report(
-                exc, provider="chatgpt", operation="translate"
+                exc, provider="chatgpt", operation=boundary
             ).diagnostics
         if operation != "translate":
             emit_failure(
@@ -831,7 +849,7 @@ class ChatGptPlanLLMProvider(LLMProvider):
                 exc.failure_diagnostics,
                 severity="warning",
                 disposition="degraded",
-                stage="provider_build",
+                stage=boundary,
                 exception=exc,
             )
 

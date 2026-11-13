@@ -14,6 +14,7 @@ use puripuly_heart_overlay::logging::OverlayLogger;
 use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperiment};
 use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
+use puripuly_heart_overlay::NativeFailure;
 use puripuly_heart_overlay::{
     resolve_quiet_tail_profile, validate_manifest, AdapterIdentity, BridgeClient, CaptionBlock,
     CaptionChannel, CaptionPresentation, CaptionRenderer, NativePresentationOwner, OpenVrError,
@@ -2104,6 +2105,11 @@ async fn forced_readiness_terminal_failures_never_submit_and_are_typed() {
             RuntimeFailure::ReadinessFailed,
             PresentationOutcome::Failure,
         ),
+        (
+            ReadinessOutcome::NativeFailed(NativeFailure::new("gpu_query_poll", Some(-2005270523))),
+            RuntimeFailure::ReadinessNative(NativeFailure::new("gpu_query_poll", Some(-2005270523))),
+            PresentationOutcome::Failure,
+        ),
     ] {
         let renderer = CaptionRenderer::new_for_test().unwrap();
         renderer.set_test_readiness_terminal_outcome(outcome);
@@ -2156,6 +2162,10 @@ fn readiness_failures_expose_typed_parent_failure_reasons() {
         ),
         (RuntimeFailure::ReadinessFailed, "gpu_query_failed"),
         (RuntimeFailure::ReadinessStalled, "gpu_stalled"),
+        (
+            RuntimeFailure::ReadinessNative(NativeFailure::new("gpu_query_create", Some(-1))),
+            "gpu_query_failed",
+        ),
         (RuntimeFailure::RuntimeDisconnected, "runtime_disconnected"),
     ] {
         assert_eq!(failure.failure_reason(), reason);
@@ -2170,11 +2180,11 @@ fn runtime_returns_standardized_startup_failure_codes_before_ready() {
     assert_eq!(StartupError::SteamVrNotRunning.exit_code(), 20);
     assert_eq!(StartupError::HmdNotFound.exit_code(), 20);
     assert_eq!(
-        StartupError::OpenVrInit("steamvr missing".into()).exit_code(),
+        StartupError::OpenVrInit(NativeFailure::new("openvr_init", Some(301))).exit_code(),
         20
     );
     assert_eq!(
-        StartupError::RendererInit("d3d init failed".into()).exit_code(),
+        StartupError::RendererInit(NativeFailure::new("renderer_init", Some(-1))).exit_code(),
         21
     );
     assert_eq!(StartupError::ReadinessCancelled.exit_code(), 21);
@@ -4766,8 +4776,8 @@ async fn production_owner_own_process_quit_events_remain_fatal() {
             .expect("genuine quit event did not stop the owner")
             .unwrap_err();
         assert!(
-            matches!(&failure, RuntimeFailure::OpenVr(message)
-                if message == &format!("event={}", event.as_str())),
+            matches!(&failure, RuntimeFailure::OpenVr(cause)
+                if cause.native_stage == "event_process_quit" && cause.native_code == Some(701)),
             "wrong terminal result for {event:?}: {failure:?}"
         );
         assert!(owner.resources_released());
@@ -5332,7 +5342,7 @@ async fn production_owner_preserves_primary_failure_and_reports_hide_cleanup_fai
         .await
         .unwrap_err();
     assert!(
-        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("event=process_quit")),
+        matches!(&failure, RuntimeFailure::OpenVr(cause) if cause.native_stage == "event_process_quit" && cause.native_code == Some(701)),
         "primary terminal cause was replaced: {failure:?}"
     );
     assert!(owner.resources_released());
@@ -5390,7 +5400,7 @@ async fn production_owner_promotes_hide_cleanup_failure_after_successful_shutdow
         .await
         .unwrap_err();
     assert!(
-        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("cleanup hide failed")),
+        matches!(&failure, RuntimeFailure::OpenVr(cause) if cause.native_stage == "cleanup_hide"),
         "cleanup failure was not terminal: {failure:?}"
     );
     assert!(owner.resources_released());

@@ -136,7 +136,7 @@ impl OverlayPlacementApi for OpenVrPlacementApi<'_> {
             .SetOverlayWidthInMeters
             .ok_or_else(missing_overlay_method("SetOverlayWidthInMeters"))?;
         let error = unsafe { set_width(self.overlay_handle, width_meters) };
-        map_overlay_init_error(self.overlay_api, "SetOverlayWidthInMeters", error)
+        map_overlay_error("calibration", error)
     }
 
     fn set_hmd_relative_transform(&mut self, transform: [[f32; 4]; 3]) -> Result<(), OpenVrError> {
@@ -154,11 +154,7 @@ impl OverlayPlacementApi for OpenVrPlacementApi<'_> {
                 &mut transform,
             )
         };
-        map_overlay_init_error(
-            self.overlay_api,
-            "SetOverlayTransformTrackedDeviceRelative",
-            error,
-        )
+        map_overlay_error("calibration", error)
     }
 }
 
@@ -277,6 +273,21 @@ pub enum OpenVrError {
     Submit(String),
     #[error("openvr calibration failed: {0}")]
     Calibration(String),
+    #[error("native OpenVR failure: {0}")]
+    Native(crate::runtime_diagnostics::NativeFailure),
+}
+
+impl OpenVrError {
+    pub fn native_failure(&self) -> crate::runtime_diagnostics::NativeFailure {
+        use crate::runtime_diagnostics::NativeFailure;
+        match self {
+            Self::Init(_) => NativeFailure::new("openvr_init", None),
+            Self::AdapterSelection(_) => NativeFailure::new("adapter_selection", None),
+            Self::Submit(_) => NativeFailure::new("submit", None),
+            Self::Calibration(_) => NativeFailure::new("calibration", None),
+            Self::Native(failure) => *failure,
+        }
+    }
 }
 
 #[cfg_attr(not(any(windows, test)), allow(dead_code))]
@@ -285,7 +296,7 @@ enum OpenVrBackgroundInitError {
     #[error("SteamVR runtime is not running")]
     NoServerForBackgroundApp,
     #[error("openvr init failed: {0}")]
-    Init(String),
+    Init(crate::runtime_diagnostics::NativeFailure),
 }
 
 #[cfg_attr(not(any(windows, test)), allow(dead_code))]
@@ -298,7 +309,7 @@ pub(crate) enum OpenVrStartupPreflightError {
     #[error("VR headset not found")]
     HmdNotFound,
     #[error("openvr init failed: {0}")]
-    Init(String),
+    Init(crate::runtime_diagnostics::NativeFailure),
 }
 
 #[cfg_attr(not(any(windows, test)), allow(dead_code))]
@@ -663,9 +674,8 @@ impl OpenVrPreflightApi for WindowsOpenVrPreflightApi {
         if init_error == openvr_sys::EVRInitError_VRInitError_Init_NoServerForBackgroundApp {
             return Err(OpenVrBackgroundInitError::NoServerForBackgroundApp);
         }
-        Err(OpenVrBackgroundInitError::Init(format!(
-            "VR_InitInternal failed: {}",
-            vr_init_error_name(init_error)
+        Err(OpenVrBackgroundInitError::Init(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(init_error as i32),
         )))
     }
 
@@ -853,7 +863,7 @@ impl WindowsOpenVrOverlay {
             .SetOverlayRenderingPid
             .ok_or_else(missing_overlay_method("SetOverlayRenderingPid"))?;
         let error = unsafe { set_overlay_rendering_pid(self.overlay_handle, std::process::id()) };
-        map_overlay_init_error(self.overlay_api(), "SetOverlayRenderingPid", error)?;
+        map_overlay_error("openvr_init", error)?;
 
         let set_overlay_flag = self
             .overlay_api()
@@ -866,7 +876,7 @@ impl WindowsOpenVrOverlay {
                 true,
             )
         };
-        map_overlay_init_error(self.overlay_api(), "SetOverlayFlag", error)?;
+        map_overlay_error("openvr_init", error)?;
         self.apply_placement()
     }
 
@@ -876,7 +886,7 @@ impl WindowsOpenVrOverlay {
             .ShowOverlay
             .ok_or_else(missing_overlay_method("ShowOverlay"))?;
         let error = unsafe { show_overlay(self.overlay_handle) };
-        map_overlay_init_error(self.overlay_api(), "ShowOverlay", error)
+        map_overlay_error("show_overlay", error)
     }
 
     fn hide_overlay(&self) -> Result<(), OpenVrError> {
@@ -885,7 +895,7 @@ impl WindowsOpenVrOverlay {
             .HideOverlay
             .ok_or_else(missing_overlay_method("HideOverlay"))?;
         let error = unsafe { hide_overlay(self.overlay_handle) };
-        map_overlay_init_error(self.overlay_api(), "HideOverlay", error)
+        map_overlay_error("hide_overlay", error)
     }
 
     fn overlay_api(&self) -> &openvr_sys::VR_IVROverlay_FnTable {
@@ -941,7 +951,7 @@ impl WindowsOpenVrOverlay {
             .ok_or_else(missing_overlay_method("DestroyOverlay"))
             .and_then(|destroy| {
                 let error = unsafe { destroy(self.overlay_handle) };
-                map_overlay_init_error(self.overlay_api(), "DestroyOverlay", error)
+                map_overlay_error("cleanup_release", error)
             });
         unsafe { openvr_sys::VR_ShutdownInternal() };
         self.overlay_api = std::ptr::null_mut();
@@ -1115,7 +1125,7 @@ impl SpatialReanchorApi for WindowsOpenVrOverlay {
                 &mut transform,
             )
         };
-        map_overlay_submit_error(self.overlay_api(), "SetOverlayTransformAbsolute", error)
+        map_overlay_error("reanchor", error)
     }
 }
 
@@ -1153,20 +1163,20 @@ fn identify_openvr_output_adapter(
         HighPart: high,
     };
     let factory: IDXGIFactory4 = unsafe { CreateDXGIFactory1() }
-        .map_err(|_| OpenVrError::AdapterSelection("DXGI adapter factory unavailable".into()))?;
+        .map_err(|error| OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new("adapter_selection", Some(error.code().0))))?;
     let adapter: IDXGIAdapter = unsafe { factory.EnumAdapterByLuid(luid) }
-        .map_err(|_| OpenVrError::AdapterSelection("DXGI adapter lookup failed".into()))?;
+        .map_err(|error| OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new("adapter_selection", Some(error.code().0))))?;
     let description = unsafe { adapter.GetDesc() }
-        .map_err(|_| OpenVrError::AdapterSelection("output adapter identity unavailable".into()))?;
+        .map_err(|error| OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new("adapter_selection", Some(error.code().0))))?;
     let resolved_identity = AdapterIdentity::DxgiLuid {
         high: description.AdapterLuid.HighPart,
         low: description.AdapterLuid.LowPart,
     };
     let adapter1: IDXGIAdapter1 = adapter
         .cast()
-        .map_err(|_| OpenVrError::AdapterSelection("adapter classification unavailable".into()))?;
+        .map_err(|error| OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new("adapter_selection", Some(error.code().0))))?;
     let description1 = unsafe { adapter1.GetDesc1() }
-        .map_err(|_| OpenVrError::AdapterSelection("adapter classification unavailable".into()))?;
+        .map_err(|error| OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new("adapter_selection", Some(error.code().0))))?;
     validate_resolved_adapter(
         requested_identity,
         resolved_identity,
@@ -1227,7 +1237,7 @@ impl OverlayTextureSubmitter for WindowsOpenVrOverlay {
             eColorSpace: openvr_sys::EColorSpace_ColorSpace_Auto,
         };
         let error = unsafe { method(self.overlay_handle, &mut descriptor) };
-        map_overlay_submit_error(self.overlay_api(), "SetOverlayTexture", error)
+        map_overlay_error("submit_frame", error)
     }
 }
 
@@ -1302,9 +1312,8 @@ fn initialize_overlay_api() -> Result<*mut openvr_sys::VR_IVROverlay_FnTable, Op
         );
     }
     if init_error != openvr_sys::EVRInitError_VRInitError_None {
-        return Err(OpenVrError::Init(format!(
-            "VR_InitInternal failed: {}",
-            vr_init_error_name(init_error)
+        return Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(init_error as i32),
         )));
     }
 
@@ -1317,9 +1326,8 @@ fn initialize_overlay_api() -> Result<*mut openvr_sys::VR_IVROverlay_FnTable, Op
         unsafe {
             openvr_sys::VR_ShutdownInternal();
         }
-        return Err(OpenVrError::Init(format!(
-            "VR_GetGenericInterface failed: {}",
-            vr_init_error_name(interface_error)
+        return Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(interface_error as i32),
         )));
     }
 
@@ -1337,9 +1345,8 @@ fn initialize_system_api() -> Result<*mut openvr_sys::VR_IVRSystem_FnTable, Open
         unsafe {
             openvr_sys::VR_ShutdownInternal();
         }
-        return Err(OpenVrError::Init(format!(
-            "VR_GetGenericInterface failed: {}",
-            vr_init_error_name(interface_error)
+        return Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(interface_error as i32),
         )));
     }
 
@@ -1358,9 +1365,8 @@ fn initialize_compositor_api() -> Result<*mut openvr_sys::VR_IVRCompositor_FnTab
         )
     };
     if interface_error != openvr_sys::EVRInitError_VRInitError_None || compositor_api == 0 {
-        return Err(OpenVrError::Init(format!(
-            "VR_GetGenericInterface (compositor) failed: {}",
-            vr_init_error_name(interface_error)
+        return Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(interface_error as i32),
         )));
     }
 
@@ -1402,9 +1408,8 @@ fn create_overlay_handle(
         unsafe {
             openvr_sys::VR_ShutdownInternal();
         }
-        return Err(OpenVrError::Init(format!(
-            "CreateOverlay failed: {}",
-            overlay_error_name(unsafe { &*overlay_api }, error)
+        return Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+            "openvr_init", Some(error as i32),
         )));
     }
     Ok(handle)
@@ -1416,62 +1421,19 @@ fn missing_overlay_method(method_name: &'static str) -> impl FnOnce() -> OpenVrE
 }
 
 #[cfg(windows)]
-fn map_overlay_init_error(
-    overlay_api: &openvr_sys::VR_IVROverlay_FnTable,
-    method_name: &str,
+fn map_overlay_error(
+    stage: &'static str,
     error: openvr_sys::EVROverlayError,
 ) -> Result<(), OpenVrError> {
     if error == openvr_sys::EVROverlayError_VROverlayError_None {
         return Ok(());
     }
-    Err(OpenVrError::Init(format!(
-        "{method_name} failed: {}",
-        overlay_error_name(overlay_api, error)
+    Err(OpenVrError::Native(crate::runtime_diagnostics::NativeFailure::new(
+        stage, Some(error as i32),
     )))
 }
 
-#[cfg(windows)]
-fn map_overlay_submit_error(
-    overlay_api: &openvr_sys::VR_IVROverlay_FnTable,
-    method_name: &str,
-    error: openvr_sys::EVROverlayError,
-) -> Result<(), OpenVrError> {
-    if error == openvr_sys::EVROverlayError_VROverlayError_None {
-        return Ok(());
-    }
-    Err(OpenVrError::Submit(format!(
-        "{method_name} failed: {}",
-        overlay_error_name(overlay_api, error)
-    )))
-}
 
-#[cfg(windows)]
-fn overlay_error_name(
-    overlay_api: &openvr_sys::VR_IVROverlay_FnTable,
-    error: openvr_sys::EVROverlayError,
-) -> String {
-    let Some(get_error_name) = overlay_api.GetOverlayErrorNameFromEnum else {
-        return format!("code {error}");
-    };
-    let name = unsafe { get_error_name(error) };
-    if name.is_null() {
-        return format!("code {error}");
-    }
-    unsafe { CStr::from_ptr(name) }
-        .to_string_lossy()
-        .into_owned()
-}
-
-#[cfg(windows)]
-fn vr_init_error_name(error: openvr_sys::EVRInitError) -> String {
-    let name = unsafe { openvr_sys::VR_GetVRInitErrorAsSymbol(error) };
-    if name.is_null() {
-        return format!("code {error}");
-    }
-    unsafe { CStr::from_ptr(name) }
-        .to_string_lossy()
-        .into_owned()
-}
 
 #[cfg(test)]
 mod tests {
@@ -1493,7 +1455,7 @@ mod tests {
     enum FakeBackgroundInitResult {
         Ok,
         NoServer,
-        OtherError(&'static str),
+        OtherError(i32),
     }
 
     struct FakePreflightApi {
@@ -1578,8 +1540,8 @@ mod tests {
                 FakeBackgroundInitResult::NoServer => {
                     Err(OpenVrBackgroundInitError::NoServerForBackgroundApp)
                 }
-                FakeBackgroundInitResult::OtherError(message) => {
-                    Err(OpenVrBackgroundInitError::Init(message.to_string()))
+                FakeBackgroundInitResult::OtherError(code) => {
+                    Err(OpenVrBackgroundInitError::Init(crate::runtime_diagnostics::NativeFailure::new("openvr_init", Some(code))))
                 }
             }
         }
@@ -1619,9 +1581,9 @@ mod tests {
             ),
             (
                 true,
-                FakeBackgroundInitResult::OtherError("unexpected"),
+                FakeBackgroundInitResult::OtherError(301),
                 true,
-                Err(OpenVrStartupPreflightError::Init("unexpected".to_string())),
+                Err(OpenVrStartupPreflightError::Init(crate::runtime_diagnostics::NativeFailure::new("openvr_init", Some(301)))),
                 0,
             ),
             (true, FakeBackgroundInitResult::Ok, true, Ok(()), 1),

@@ -141,8 +141,11 @@ class VrchatSceneLogTailer:
 
     def scan_candidates(self) -> tuple[VrchatSceneLogCandidate, ...]:
         try:
-            paths = tuple(self.log_directory.glob("output_log_*.txt"))
-        except OSError:
+            paths = tuple(
+                path for path in self.log_directory.iterdir()
+                if path.name.startswith("output_log_") and path.suffix == ".txt"
+            )
+        except FileNotFoundError:
             return ()
         found: list[VrchatSceneLogCandidate] = []
         for path in paths:
@@ -151,7 +154,7 @@ class VrchatSceneLogTailer:
                 continue
             try:
                 status = path.stat()
-            except OSError:
+            except FileNotFoundError:
                 continue
             found.append(
                 VrchatSceneLogCandidate(
@@ -163,11 +166,6 @@ class VrchatSceneLogTailer:
             )
         return tuple(found)
 
-    def candidate_mtime(self, path: Path) -> float | None:
-        try:
-            return path.stat().st_mtime
-        except OSError:
-            return None
 
     def begin_replay(self, path: Path) -> list[str]:
         self._path = path
@@ -185,10 +183,7 @@ class VrchatSceneLogTailer:
         path = self._path
         if path is None:
             return []
-        try:
-            status = path.stat()
-        except OSError:
-            raise
+        status = path.stat()
         if self._identity is not None and (status.st_dev, status.st_ino) != self._identity:
             raise VrchatSceneLogTruncated(str(path))
         if status.st_size < self._offset:
@@ -204,10 +199,7 @@ class VrchatSceneLogTailer:
         return lines
 
     def _record_observation(self, path: Path) -> None:
-        try:
-            status = path.stat()
-        except OSError:
-            return
+        status = path.stat()
         self._identity = (status.st_dev, status.st_ino)
         self._observed_mtime = status.st_mtime
 

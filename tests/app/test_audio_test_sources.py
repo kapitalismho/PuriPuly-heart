@@ -11,6 +11,7 @@ from puripuly_heart.app.adapters.audio_test_sources import (
 )
 from puripuly_heart.app.ports.audio_test import AudioTestSourceUnavailable
 from puripuly_heart.core.audio.source import MicrophoneTestRouteObservation
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureResolvedTarget,
     PeerCaptureTargetIntent,
@@ -27,8 +28,12 @@ def _route(*, attempt: bool = True, error: str | None = None) -> MicrophoneTestR
         hostapi_index=2,
         resolved_device_idx=7 if attempt else None,
         resolved_device_name="Desk Mic" if attempt else None,
-        resolution_exception_class=error,
-        resolution_exception_message=None,
+        failure_diagnostics=(
+            exception_diagnostics(
+                LookupError(error), component="capture.self", operation="source_open",
+                code="source_open_failed",
+            ) if error else None
+        ),
         should_attempt_open=attempt,
     )
 
@@ -82,8 +87,13 @@ async def test_microphone_falls_back_to_internal_channels_and_reports_opened_dev
         "name": "Desk Mic (2- USB)",
         "host_api": "Windows WASAPI",
         "default_fallback": False,
+        "metadata_availability": "observed",
     }
     assert any("channel fallback" in line for line in logs)
+    (recovered,) = opened.recovery_diagnostics
+    assert recovered.code == "source_open_failed"
+    assert recovered.fields["exception_class"] == "OSError"
+    assert "invalid channel count" not in repr(recovered)
 
 
 class Resolver:
@@ -203,3 +213,34 @@ async def test_diagnostic_opener_rejects_index_reuse_before_opening_a_different_
         await opener.open(on_acquired=lambda _source: pytest.fail("No source was acquired"))
     assert raised.value.reason == "input_route_changed"
     assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_opened_metadata_failure_preserves_existing_open_success_without_fabricated_name():
+    class Source:
+        def opened_input_metadata(self):
+            raise PermissionError(13, "PRIVATE-METADATA-PATH")
+
+    source = Source()
+    acquired = []
+    opened = await _microphone(_route(), lambda **kwargs: source).open(on_acquired=acquired.append)
+    assert opened.source is source and acquired == [source]
+    assert opened.device["metadata_availability"] == "unavailable"
+    assert opened.device["name"] is None and opened.device["host_api"] is None
+    diagnostic = opened.device["diagnostics"]
+    assert diagnostic["code"] == "capture.self.device_metadata_failed"
+    assert diagnostic["operation"] == "device_metadata"
+    assert diagnostic["fields"]["exception_class"] == "PermissionError"
+    assert diagnostic["fields"]["errno"] == 13
+    assert "PRIVATE" not in repr(opened.device)
+    assert opened.recovery_diagnostics == ()
+
+
+@pytest.mark.asyncio
+async def test_missing_opened_metadata_is_unavailable_not_an_observed_route_name():
+    source = object()
+    opened = await _microphone(_route(), lambda **kwargs: source).open(on_acquired=lambda value: None)
+    assert opened.source is source
+    assert opened.device["metadata_availability"] == "unavailable"
+    assert opened.device["name"] is None
+    assert "diagnostics" not in opened.device

@@ -1294,3 +1294,71 @@ async def test_stream_onset_context_is_real_bounded_and_permission_scoped(
     assert "local" not in order
     if boundary == "mute":
         assert [event.boundary_reason for event in streams].count("source_discontinuity") == 1
+
+
+@pytest.mark.asyncio
+async def test_retired_listen_timer_keeps_failure_on_owned_segment_without_failing_audio_loop(monkeypatch):
+    from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
+    from puripuly_heart.core.runtime import audio_vad_loop as loop_module
+
+    finished = asyncio.Event()
+
+    class ImmediateController(ListenDeliveryController):
+        async def _run_hard_timer(self, segment_id, delay_s):
+            try:
+                await super()._run_hard_timer(segment_id, 0.0)
+            finally:
+                finished.set()
+
+    monkeypatch.setattr(loop_module, "ListenDeliveryController", ImmediateController)
+    vad = create_peer_vad_gating(
+        SequenceVadEngine([0.9] * 3), sample_rate_hz=16000,
+        ring_buffer_ms=64, hangover_ms=500,
+    )
+
+    def fail_seal(*args, **kwargs):
+        raise OSError(5, "private timer detail")
+
+    monkeypatch.setattr(type(vad), "seal_active_for_rollover", fail_seal)
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=7,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test", provider_signature=("test",), runtime_signature=("test",),
+            source_mode="desktop", source_language="en", expected_languages=(),
+            target_sample_rate_hz=16000, vad_speech_threshold=0.5,
+            vad_hangover_ms=500, vad_pre_roll_ms=64,
+        ),
+    )
+    delivered = []
+
+    class Sink:
+        async def handle_owned_vad_event(self, event):
+            delivered.append(event)
+
+    class Source:
+        async def frames(self):
+            for index in range(3):
+                yield AudioFrameF32(
+                    samples=np.ones(512, dtype=np.float32), sample_rate_hz=16000,
+                    capture=AudioCaptureSpan(
+                        capture_epoch=1, callback_sequence=index, source_sample_rate_hz=16000,
+                        source_start_sample=index * 512, source_end_sample=(index + 1) * 512,
+                        source_start_monotonic_s=index * 0.032,
+                        source_end_monotonic_s=(index + 1) * 0.032,
+                    ),
+                )
+            await finished.wait()
+
+    await asyncio.wait_for(
+        run_audio_vad_loop(
+            source=Source(), vad=vad, sink=Sink(), target_sample_rate_hz=16000,
+            segment_ledger=ledger, monotonic_clock=lambda: 0.0,
+        ),
+        timeout=1.0,
+    )
+    retained = ledger.snapshots[0].delivery_failure_diagnostics
+    assert retained.code == "capture.peer.delivery_failed"
+    assert retained.fields["errno"] == 5
+    assert retained.generation == 7
+    assert "private" not in repr(retained)
+    assert any(isinstance(event.event, SpeechEnd) for event in delivered)

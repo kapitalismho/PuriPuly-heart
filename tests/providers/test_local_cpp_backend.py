@@ -635,3 +635,44 @@ async def test_cpu_scoped_results_suppress_only_granite_marker_only_output(
         await session.close()
     finally:
         await provider.close()
+
+
+async def test_activation_primary_survives_failed_cleanup_and_retains_owned_worker(
+    tmp_path, monkeypatch
+):
+    primary = ASRWorkerRequestError("model_invalid")
+    cleanup = PermissionError(13, "PRIVATE_WORKER_CLEANUP")
+    fail_cleanup = True
+
+    async def fail_activate(self, **kwargs):
+        raise primary
+
+    close = NativeWorker.close
+
+    async def close_worker(self):
+        if fail_cleanup:
+            raise cleanup
+        await close(self)
+
+    monkeypatch.setattr(NativeWorker, "activate", fail_activate)
+    monkeypatch.setattr(NativeWorker, "close", close_worker)
+    factory = WorkerFactory()
+    provider = backend(tmp_path, "self", factory, monkeypatch)
+    try:
+        with pytest.raises(ASRWorkerRequestError) as caught:
+            await provider.open_session()
+        assert caught.value is primary
+        assert primary.failure_diagnostics.fields["native_classification"] == "model_invalid"
+        assert primary.cleanup_diagnostics[0].fields["errno"] == 13
+        assert primary.cleanup_diagnostics[0].cause_id == primary.failure_diagnostics.diagnostic_id
+        assert primary.failure_diagnostics.causes[-1] is primary.cleanup_diagnostics[0]
+        assert provider._quarantined_client is factory.workers[0]
+        assert not factory.workers[0].is_closed
+        with pytest.raises(PermissionError):
+            await provider.close()
+        fail_cleanup = False
+        await provider.close()
+        assert factory.workers[0].is_closed and provider._quarantined_client is None
+    finally:
+        fail_cleanup = False
+        await provider.close()

@@ -39,7 +39,11 @@ class ExternalScribeRealtime(ScribeRealtime):
 
 @asynccontextmanager
 async def deepgram_listen_connect(
-    client: Any, *, _close_deadline: Callable[[], float] | None = None, **options: Any
+    client: Any,
+    *,
+    _close_deadline: Callable[[], float] | None = None,
+    _cleanup_callback: Callable[[Exception], None] | None = None,
+    **options: Any,
 ):
     from deepgram.core.api_error import ApiError
     from deepgram.listen.v1.socket_client import AsyncV1SocketClient
@@ -74,6 +78,7 @@ async def deepgram_listen_connect(
                 ) from exc
 
         async def close(self, *args: Any, **kwargs: Any) -> None:
+            graceful_failure: Exception | None = None
             try:
                 if not asyncio.current_task().cancelling():
                     if _close_deadline is None:
@@ -81,8 +86,8 @@ async def deepgram_listen_connect(
                     else:
                         async with asyncio.timeout_at(_close_deadline()):
                             await super().close(*args, **kwargs)
-            except TimeoutError:
-                pass
+            except TimeoutError as exc:
+                graceful_failure = exc
             finally:
                 if not self.connection_lost_waiter.done():
                     self.transport.abort()
@@ -90,6 +95,8 @@ async def deepgram_listen_connect(
                 task = self.keepalive_task
                 if task is not None and task is not asyncio.current_task():
                     await asyncio.gather(task, return_exceptions=True)
+            if graceful_failure is not None and _cleanup_callback is not None:
+                _cleanup_callback(graceful_failure)
 
     async with network_clients.external_websocket_connect(
         url + f"?{query}", additional_headers=headers, create_connection=DeepgramConnection

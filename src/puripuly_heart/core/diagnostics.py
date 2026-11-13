@@ -9,11 +9,13 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import replace
+from dataclasses import fields as dataclass_fields
 from datetime import datetime
 from itertools import islice
 from threading import RLock
 from uuid import uuid4
+
+import httpx
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.diagnostic_codes import (
@@ -31,8 +33,20 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
     REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
 )
-from puripuly_heart.core.messages import DIAGNOSTIC_CATEGORIES, SEVERITIES, ErrorDiagnostics
-from puripuly_heart.core.network_diagnostics import TRANSPORT_ENUM_FIELDS, TRANSPORT_NUMERIC_FIELDS
+from puripuly_heart.core.messages import (
+    DIAGNOSTIC_CATEGORIES,
+    DIAGNOSTIC_VISIBILITIES,
+    SEVERITIES,
+    DiagnosticCategory,
+    ErrorDiagnostics,
+)
+from puripuly_heart.core.network_diagnostics import (
+    TRANSPORT_ENUM_FIELDS,
+    TRANSPORT_NUMERIC_FIELDS,
+    classify_transport_error,
+    safe_transport_fields,
+    transport_exception_chain,
+)
 from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
 from puripuly_heart.core.qq_auth_diagnostics import ENUM_FIELDS as QQ_ENUM_FIELDS
 from puripuly_heart.core.qq_auth_diagnostics import STAGES as QQ_STAGES
@@ -42,6 +56,8 @@ DIAGNOSTIC_RECORD_MAX_BYTES = 4096
 DIAGNOSTIC_HISTORY_MAX_RECORDS = 256
 DIAGNOSTIC_HISTORY_MAX_BYTES = 512 * 1024
 DIAGNOSTIC_QUERY_MAX_RECORDS = 100
+DIAGNOSTIC_CAUSE_MAX_COUNT = 8
+DIAGNOSTIC_CAUSE_MAX_DEPTH = 3
 DIAGNOSTIC_RECORD_ATTRIBUTE = "_puripuly_heart_failure"
 DIAGNOSTIC_PROJECTION_ATTRIBUTE = "_puripuly_heart_failure_projection"
 DISPOSITIONS = frozenset(
@@ -119,6 +135,7 @@ _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset(
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"logging_oversized_rejected"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"dropped"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"pending_temporary_directories"})
+_NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"source_attempt"})
 _UNIT_INTERVAL_FIELDS = frozenset(
     {"speech_probability_min", "speech_probability_max", "speech_threshold"}
 )
@@ -174,6 +191,21 @@ _ENUM_FIELDS = {
     **OPENAI_FAILURE_ENUM_FIELDS,
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
+    "service_code": frozenset(
+        {
+            "service_authentication_failed",
+            "service_authentication_unavailable",
+            "service_rate_limited",
+            "service_turn_exhausted",
+            "service_busy",
+            "request_too_large",
+            "service_allowance_exhausted",
+            "service_shutdown",
+            "unsupported_protocol",
+        }
+    ),
+    "source_kind": frozenset({"huggingface", "huggingface_mirror", "modelscope", "local"}),
+    "backend": frozenset({"cpu", "gpu"}),
     "channel": frozenset({"self", "peer"}),
     "channel_availability": frozenset({"continue", "recovering", "unavailable"}),
     "audio_failure_code": AUDIO_DIAGNOSE_FAILURE_CODES | {"none"},
@@ -445,10 +477,29 @@ _COMPONENTS = frozenset(
         "managed_usage",
         "managed_auth",
         "translation.turn",
+        "translation_request",
         "managed_connection_auth",
         "qq_managed_auth",
         "manual_typing",
         "local_asr_provisioning",
+        "clipboard",
+        "updater",
+        "ui.foundation",
+        "headless.presentation",
+        "control.transport",
+        "lifecycle.scope",
+        "lifecycle.shutdown",
+        "index_selection",
+        "ui_audio_settings",
+        "ui_i18n",
+        "ui_model_assets",
+        "ui_application",
+        "gui_launcher",
+        "api_key_verification",
+        "model_assets",
+        "settings_projection",
+        "telemetry",
+        "managed_openrouter_release",
     }
 )
 _BOUNDARIES = (
@@ -481,6 +532,64 @@ _BOUNDARIES = (
             "source_read",
             "probe",
             "translate",
+            "translation_probe",
+            "agent_tool",
+            "support_report",
+            "agent_chat",
+            "tool_dispatch",
+            "bundle",
+            "upload",
+            "response",
+            "watcher_start",
+            "watcher_stop",
+            "clipboard_read",
+            "clipboard_callback",
+            "clipboard_cleanup",
+            "clipboard_loop",
+            "clipboard_submit",
+            "submit_drain",
+            "update_check",
+            "page_task",
+            "shutdown_task",
+            "control_request",
+            "fallback_commit",
+            "task_done",
+            "close_callback",
+            "host_api_enumeration",
+            "microphone_enumeration",
+            "desktop_output_enumeration",
+            "desktop_output_cleanup",
+            "bundle_load",
+            "locale_discovery",
+            "message_format",
+            "asset_operation",
+            "model_list_scroll",
+            "star_prompt",
+            "usage_refresh",
+            "runtime_preparation",
+            "discord_auth",
+            "discord_translation_start",
+            "managed_auth_admission",
+            "window_center",
+            "window_hide",
+            "ui_task_cleanup",
+            "startup_cleanup",
+            "update_notification",
+            "gui_startup",
+            "gui_runtime",
+            "gui_cleanup",
+            "secret_save",
+            "cpu_install",
+            "gpu_install",
+            "gemma_install",
+            "download",
+            "remove",
+            "render_settings",
+            "refresh_settings_after_openrouter_pkce_success",
+            "telemetry_send",
+            "telemetry_persist",
+            "telemetry_notification",
+            "managed_delivery_store",
             "installation",
             "save",
             "settings_save",
@@ -786,9 +895,113 @@ _ENUM_FIELDS.update(
         "phase": _BOUNDARIES,
         "primary_failure_reason": _NATIVE_REASONS,
         "cleanup_failure_reason": _NATIVE_REASONS,
-        "cleanup_stage": frozenset({"process_terminate", "cleanup"}),
+        "cleanup_stage": _ENUM_FIELDS["cleanup_stage"] | {"cleanup"},
     }
 )
+_NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset(
+    {"native_status", "native_code", "requested_channels"}
+)
+_COMPONENTS = _COMPONENTS | frozenset(
+    {"github_star_prompt", "control.host", "recognition_probe", "secret_store", "overlay_application"}
+)
+_BOUNDARIES = _BOUNDARIES | frozenset(
+    {
+        "state_delivery", "diagnostic_delivery", "inspection", "error_presented",
+        "launch_prompt", "translation_success", "prompt_persist", "prompt_rollback",
+        "endpoint_close", "host_start", "host_close", "readiness_cleanup",
+        "capture_observer", "capture_background", "routing_observer", "observe",
+        "recognition_probe", "process_lifecycle", "diagnostic_sink",
+        "preflight_managed_auth_claim",
+        "avatar_query", "host_info", "discovery_monitor", "unadvertise_receiver",
+        "receiver_stop", "service_stop", "control_dispatch", "transport_write",
+        "replacement_start", "recovery_state",
+    }
+)
+_ENUM_FIELDS.update(
+    {
+        "asset_failure_code": frozenset(
+            {
+                "unknown", "install_failed", "download_failed", "download_timeout",
+                "proxy_failed", "connection_failed", "source_unavailable", "disk_full",
+                "checksum_failed", "file_size_mismatch", "mirror_unavailable",
+                "mirror_redirect_external", "range_invalid", "network_configuration_failed",
+                "worker_spawn_failed", "worker_protocol_failed", "worker_reported_failure",
+                "worker_exited", "worker_import_failed", "status_callback_failed",
+                "unsupported_source", "missing_file", "import_failed", "task_busy",
+                "model_in_use", "model_owner_unavailable", "unknown_model", "cancelled",
+                "inspect_failed",
+            }
+        ),
+        "capture_attempt": frozenset(
+            {
+                "device_resolution", "primary", "primary_mono_retry", "name_fallback",
+                "name_fallback_mono_retry", "system_default", "system_default_mono_retry",
+            }
+        ),
+        "native_reason": frozenset(
+            {
+                "invalid_argument", "not_implemented", "model_file_not_found", "model_load",
+                "out_of_memory", "backend", "unsupported", "bad_struct_size", "input_too_long",
+                "aborted", "output_truncated", "output_repetition", "unsupported_role",
+                "input_too_short", "version_mismatch", "nul", "busy", "other",
+            }
+        ),
+        "native_classification": frozenset(
+            {
+                "decode_failure", "audio_invalid", "cancelled", "worker_busy",
+                "protocol_invalid", "mode_rejected", "request_rejected", "worker_failure",
+            }
+        ),
+    }
+)
+_OVERLAY_NATIVE_STAGES = frozenset(
+    {
+        "unknown",
+        "renderer_init", "hardware_device", "draw", "openvr_init", "adapter_selection",
+        "submit", "calibration", "render_frame", "reanchor", "submit_frame",
+        "show_overlay", "hide_overlay", "reconcile_visibility", "cleanup_hide",
+        "cleanup_release", "acknowledge_quit", "event_process_quit",
+    }
+)
+_ENUM_FIELDS.update(
+    {"native_stage": _OVERLAY_NATIVE_STAGES}
+)
+_NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"runtime_build"})
+_BOOLEAN_FIELDS = _BOOLEAN_FIELDS | frozenset({"build_match", "commit_match"})
+_COMPONENTS = _COMPONENTS | frozenset({"audio_test", "stt.provider_runtime"})
+_BOUNDARIES = _BOUNDARIES | frozenset(
+    {
+        "audio.test", "device_metadata", "device_resolution", "smart_turn_prepare",
+        "smart_turn_predict", "smart_turn_completion", "segmentation",
+        "runtime_version", "runtime_files", "runtime_startup", "runtime",
+        "prefix", "prefix_restore", "prefix_save", "slot_cleanup",
+        "state_changed",
+    }
+)
+_ENUM_FIELDS["native_stage"] = _ENUM_FIELDS["native_stage"] | {"gpu_query_create", "gpu_query_poll"}
+_ENUM_FIELDS["native_classification"] = _ENUM_FIELDS["native_classification"] | {
+    "worker_operation_panicked", "worker_operation_cancelled",
+    "worker_unload_panicked", "worker_unload_cancelled",
+    "worker_reader_failed", "worker_writer_failed",
+    "worker_unload_failed",
+    "worker_connection_closed",
+}
+_ENUM_FIELDS["reason"] = frozenset(
+    {
+        "transport", "metadata_unavailable", "credential_unavailable",
+        "observation_unavailable", "owned_work_failed", "settings_unavailable",
+        "credential_not_current", "metadata_invalid",
+    }
+)
+_ENUM_FIELDS["deepgram_code"] = frozenset({"DATA-0000", "NET-0000", "NET-0001", "NET-0002"})
+_ENUM_FIELDS["owner_name"] = _ENUM_FIELDS["owner_name"] | {
+    "self_audio", "provider_runtime", "runtime_logging",
+}
+_ENUM_FIELDS["callback_name"] = _ENUM_FIELDS["callback_name"] | {
+    "drain_cancel", "close_provider", "final_summary",
+}
+_BOUNDARIES = _BOUNDARIES | {"accounts.status"}
+_ID_FIELDS = _ID_FIELDS | {"provider_request_id"}
 _NULLABLE_FIELDS = (
     _NUMERIC_FIELDS
     | _BOOLEAN_FIELDS
@@ -812,15 +1025,18 @@ def emit_failure(
     exception: BaseException | None = None,
 ) -> None:
     """Emit owned typed meaning; the installed application ingress normalizes it."""
-    logger.log(
-        (
-            logging.INFO
-            if severity == "info"
-            else logging.WARNING if severity == "warning" else logging.ERROR
-        ),
-        "[Failure] structured_failure",
-        extra={DIAGNOSTIC_RECORD_ATTRIBUTE: (diagnostics, severity, disposition, stage, exception)},
-    )
+    try:
+        logger.log(
+            (
+                logging.INFO
+                if severity == "info"
+                else logging.WARNING if severity == "warning" else logging.ERROR
+            ),
+            "[Failure] structured_failure",
+            extra={DIAGNOSTIC_RECORD_ATTRIBUTE: (diagnostics, severity, disposition, stage, exception)},
+        )
+    except Exception:
+        return
 
 
 def safe_exception_fields(exception: BaseException) -> dict[str, str | int | bool]:
@@ -849,6 +1065,88 @@ def safe_exception_fields(exception: BaseException) -> dict[str, str | int | boo
     if current is not None and len(seen) == 5:
         fields["cause_chain_truncated"] = True
     return fields
+
+
+def exception_diagnostics(
+    exception: BaseException,
+    *,
+    component: str,
+    operation: str,
+    code: str,
+    category: DiagnosticCategory = "lifecycle",
+    fields: Mapping[str, object] | None = None,
+) -> ErrorDiagnostics:
+    seen: set[int] = set()
+    remaining = [DIAGNOSTIC_CAUSE_MAX_COUNT]
+
+    def build(current: BaseException, depth: int) -> ErrorDiagnostics:
+        seen.add(id(current))
+        attached = getattr(current, "failure_diagnostics", None)
+        if not isinstance(attached, ErrorDiagnostics):
+            attached = getattr(current, "diagnostics", None)
+        causes = [attached] if isinstance(attached, ErrorDiagnostics) else []
+        truncated = False
+        children = (
+            current.exceptions
+            if isinstance(current, BaseExceptionGroup)
+            else (
+                (current.__cause__ or (
+                    None if current.__suppress_context__ else current.__context__
+                )),
+            )
+        )
+        for child in children:
+            if child is None:
+                continue
+            if depth >= DIAGNOSTIC_CAUSE_MAX_DEPTH or remaining[0] == 0:
+                truncated = True
+                break
+            if id(child) in seen:
+                truncated = True
+                continue
+            remaining[0] -= 1
+            causes.append(build(child, depth + 1))
+        transport_kind = classify_transport_error(current)
+        effective_category = category
+        if category == "lifecycle" and transport_kind is not None and (
+            transport_kind in {"timeout", "tls", "proxy"}
+            or isinstance(current, (httpx.HTTPError, ConnectionError))
+        ):
+            effective_category = "timeout" if transport_kind == "timeout" else "network"
+        status_code = next(
+            (
+                item.response.status_code
+                for item in transport_exception_chain(current)
+                if isinstance(item, httpx.HTTPStatusError)
+                and type(item.response.status_code) is int
+                and 100 <= item.response.status_code <= 599
+            ),
+            None,
+        )
+        return ErrorDiagnostics(
+            component=component,
+            operation=operation,
+            code=code,
+            category=effective_category,
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=status_code,
+            retry_after_ms=None,
+            fields={
+                **safe_exception_fields(current),
+                **{
+                    key: value
+                    for key, value in safe_transport_fields(current).items()
+                    if value != "unknown"
+                },
+                **(fields if depth == 0 and fields is not None else {}),
+            },
+            **(current_diagnostic_operation() if depth == 0 else {}),
+            causes=tuple(causes),
+            causes_truncated=truncated,
+        )
+
+    return sanitize_diagnostics(build(exception, 0))
 
 
 @contextmanager
@@ -917,6 +1215,8 @@ def sanitize_diagnostic_fields(
             )
         elif key in {"level_ppm", "speech_probability_ppm"}:
             accepted = type(value) is int and 0 <= value <= 1_000_000
+        elif key in {"native_status", "native_code"}:
+            accepted = type(value) is int and -(2**31) <= value < 2**31
         elif key in _NUMERIC_FIELDS:
             accepted = type(value) is int and (
                 -(2**31) <= value < 2**32
@@ -956,6 +1256,13 @@ def sanitize_diagnostic_fields(
             and stt_startup_failure_code(value) == value
         ):
             accepted = True
+        if key == "model_id" and type(value) is str and not accepted:
+            from puripuly_heart.core.local_translation.assets import (
+                GEMMA_26B_MODEL_ID,
+                GEMMA_MODEL_ID,
+            )
+
+            accepted = value in {GEMMA_MODEL_ID, GEMMA_26B_MODEL_ID}
         if key in _KNOWN_ID_SENTINELS and type(value) is str and value in _KNOWN_ID_SENTINELS[key]:
             accepted = True
         if accepted:
@@ -974,6 +1281,33 @@ def normalize_diagnostic(
     stage: str | None = None,
     exception: BaseException | None = None,
     file_evidence: str = "unknown",
+) -> dict:
+    return _normalize_diagnostic(
+        diagnostics,
+        instance_id=instance_id,
+        severity=severity,
+        disposition=disposition,
+        stage=stage,
+        exception=exception,
+        file_evidence=file_evidence,
+        depth=0,
+        ancestors=frozenset(),
+        remaining=[DIAGNOSTIC_CAUSE_MAX_COUNT],
+    )
+
+
+def _normalize_diagnostic(
+    diagnostics: ErrorDiagnostics,
+    *,
+    instance_id: str | None,
+    severity: str,
+    disposition: str,
+    stage: str | None = None,
+    exception: BaseException | None = None,
+    file_evidence: str = "unknown",
+    depth: int,
+    ancestors: frozenset[int],
+    remaining: list[int],
 ) -> dict:
     context = _operation_context.get()
     source_bound = (
@@ -1001,6 +1335,40 @@ def normalize_diagnostic(
         diagnostics.rejected_fields
         if type(diagnostics.rejected_fields) is int and 0 <= diagnostics.rejected_fields < 2**31
         else 1
+    )
+    causes = []
+    causes_truncated = diagnostics.causes_truncated is True
+    rejected += int(type(diagnostics.causes_truncated) is not bool)
+    ancestors = ancestors | {id(diagnostics)}
+    for index, cause in enumerate(diagnostics.causes):
+        if (
+            depth >= DIAGNOSTIC_CAUSE_MAX_DEPTH
+            or remaining[0] == 0
+            or index >= DIAGNOSTIC_CAUSE_MAX_COUNT
+        ):
+            causes_truncated = True
+            break
+        if not isinstance(cause, ErrorDiagnostics):
+            rejected += 1
+            continue
+        if id(cause) in ancestors:
+            causes_truncated = True
+            continue
+        remaining[0] -= 1
+        cause_record = _normalize_diagnostic(
+            cause,
+            instance_id=None,
+            severity="error",
+            disposition="failed",
+            depth=depth + 1,
+            ancestors=ancestors,
+            remaining=remaining,
+        )
+        causes.append(_diagnostic_value(cause_record))
+    detail_truncated = (
+        bool(diagnostics.detail_truncated)
+        or causes_truncated
+        or any(cause["detail_truncated"] for cause in causes)
     )
     diagnostic_id = _identity(diagnostics.diagnostic_id)
     if diagnostic_id is None:
@@ -1080,6 +1448,13 @@ def normalize_diagnostic(
             if type(diagnostics.category) is str and diagnostics.category in DIAGNOSTIC_CATEGORIES
             else "unknown"
         ),
+        "visibility": (
+            diagnostics.visibility
+            if type(diagnostics.visibility) is str
+            and diagnostics.visibility in DIAGNOSTIC_VISIBILITIES
+            else "basic"
+        ),
+        "content_policy": "metadata_only",
         "cause_id": identities["cause_id"],
         "operation_id": identities["operation_id"]
         or (inherit[1] if inherit and diagnostics.operation_id is None else None),
@@ -1095,31 +1470,174 @@ def normalize_diagnostic(
         "status_code": status_code,
         "retry_after_ms": retry_after_ms,
         "fields": fields,
+        "causes": causes,
+        "causes_truncated": causes_truncated,
         "file_evidence": (
-            file_evidence if file_evidence in {"unknown", "unavailable"} else "unknown"
+            file_evidence
+            if type(file_evidence) is str and file_evidence in {"unknown", "unavailable"}
+            else "unknown"
         ),
         "detail": {
             "state": (
                 "truncated"
-                if diagnostics.detail_truncated
+                if detail_truncated
                 else (
                     "rejected"
                     if rejected
                     else (
                         "available"
                         if any(value is not None for value in fields.values())
-                        or diagnostics.status_code is not None
+                        or causes
+                        or status_code is not None
                         else "unavailable"
                     )
                 )
             ),
             "rejected_fields": rejected,
-            "truncated": bool(diagnostics.detail_truncated),
+            "truncated": detail_truncated,
         },
     }
-    if len(json.dumps(record, separators=(",", ":")).encode()) + 64 > DIAGNOSTIC_RECORD_MAX_BYTES:
-        record["fields"] = {}
-        record["detail"] = {"state": "truncated", "rejected_fields": rejected, "truncated": True}
+    _bound_diagnostic_record(record)
+    return record
+
+
+def _diagnostic_value(record: Mapping[str, object]) -> dict:
+    detail = record["detail"]
+    values = {item.name: record.get(item.name) for item in dataclass_fields(ErrorDiagnostics)}
+    values.update(
+        content_policy="metadata_only",
+        rejected_fields=detail["rejected_fields"],
+        detail_truncated=detail["truncated"],
+    )
+    return values
+
+
+def _bound_diagnostic_record(record: dict) -> None:
+    def truncate(node: dict) -> None:
+        if "detail" in node:
+            node["detail"]["state"] = "truncated"
+            node["detail"]["truncated"] = True
+        else:
+            node["detail_truncated"] = True
+
+    def prune_causes(node: dict) -> bool:
+        for cause in reversed(node["causes"]):
+            if cause["causes"] and prune_causes(cause):
+                truncate(node)
+                return True
+        if len(node["causes"]) > 1:
+            node["causes"].pop()
+            node["causes_truncated"] = True
+            truncate(node)
+            return True
+        return False
+
+    def prune_fields(node: dict) -> bool:
+        for cause in reversed(node["causes"]):
+            if prune_fields(cause):
+                truncate(node)
+                return True
+        if node["fields"]:
+            node["fields"].pop(next(reversed(node["fields"])))
+            truncate(node)
+            return True
+        return False
+
+    while len(json.dumps(record, separators=(",", ":")).encode()) + 64 > DIAGNOSTIC_RECORD_MAX_BYTES:
+        if prune_causes(record) or prune_fields(record):
+            continue
+        if record["causes"]:
+            record["causes"].pop()
+            record["causes_truncated"] = True
+            truncate(record)
+            continue
+        break
+
+
+def _diagnostics_from_mapping(
+    value: Mapping[str, object], *, depth: int = 0, remaining: list[int] | None = None
+) -> ErrorDiagnostics:
+    if remaining is None:
+        remaining = [DIAGNOSTIC_CAUSE_MAX_COUNT]
+    detail = value.get("detail")
+    detail = detail if isinstance(detail, Mapping) else {}
+    fields = value.get("fields", {})
+    rejected = value.get("rejected_fields", detail.get("rejected_fields", 0))
+    rejected = rejected if type(rejected) is int and 0 <= rejected < 2**31 else 1
+    if not isinstance(fields, Mapping):
+        fields = {}
+        rejected += 1
+    raw_causes = value.get("causes", ())
+    causes = []
+    truncated = value.get("causes_truncated") is True
+    if not isinstance(raw_causes, (tuple, list)):
+        rejected += 1
+    else:
+        for index, cause in enumerate(raw_causes):
+            if (
+                depth >= DIAGNOSTIC_CAUSE_MAX_DEPTH
+                or remaining[0] == 0
+                or index >= DIAGNOSTIC_CAUSE_MAX_COUNT
+            ):
+                truncated = True
+                break
+            if not isinstance(cause, Mapping):
+                rejected += 1
+                continue
+            remaining[0] -= 1
+            causes.append(_diagnostics_from_mapping(cause, depth=depth + 1, remaining=remaining))
+    values = {
+        item.name: value[item.name]
+        for item in dataclass_fields(ErrorDiagnostics)
+        if item.name in value
+    }
+    values.update(
+        component=value.get("component", "unclassified"),
+        operation=value.get("operation"),
+        code=value.get("code"),
+        category=value.get("category", "unknown"),
+        visibility=value.get("visibility", "basic"),
+        content_policy="metadata_only",
+        status_code=value.get("status_code"),
+        retry_after_ms=value.get("retry_after_ms"),
+        fields=fields,
+        diagnostic_id=value.get("diagnostic_id"),
+        occurred_at=value.get("occurred_at"),
+        rejected_fields=rejected,
+        detail_truncated=value.get("detail_truncated", detail.get("truncated")) is True,
+        causes=tuple(causes),
+        causes_truncated=truncated,
+    )
+    return ErrorDiagnostics(**values)
+
+
+def serialize_diagnostics(diagnostics: ErrorDiagnostics) -> dict:
+    return _diagnostic_value(
+        normalize_diagnostic(
+            diagnostics, instance_id=None, severity="error", disposition="unknown"
+        )
+    )
+
+
+def deserialize_diagnostics(value: Mapping[str, object]) -> ErrorDiagnostics:
+    return sanitize_diagnostics(_diagnostics_from_mapping(value))
+
+
+def project_diagnostic_record(value: Mapping[str, object]) -> dict:
+    instance_id = value.get("instance_id")
+    if type(instance_id) is not str or re.fullmatch(r"[A-Za-z0-9_-]{1,64}", instance_id) is None:
+        instance_id = None
+    record = normalize_diagnostic(
+        _diagnostics_from_mapping(value),
+        instance_id=instance_id,
+        severity=value.get("severity", "error"),
+        disposition=value.get("disposition", "unknown"),
+        stage=value.get("stage"),
+        file_evidence=value.get("file_evidence", "unknown"),
+    )
+    sequence = value.get("diagnostic_sequence")
+    if type(sequence) is int and 0 <= sequence < 2**64:
+        record["diagnostic_sequence"] = sequence
     return record
 
 
@@ -1131,27 +1649,7 @@ def sanitize_diagnostics(diagnostics: ErrorDiagnostics) -> ErrorDiagnostics:
         severity="error",
         disposition="unknown",
     )
-    return replace(
-        diagnostics,
-        component=record["component"],
-        operation=record["operation"],
-        code=record["code"],
-        category=record["category"],
-        content_policy="metadata_only",
-        diagnostic_id=record["diagnostic_id"],
-        occurred_at=record["occurred_at"],
-        cause_id=record["cause_id"],
-        operation_id=record["operation_id"],
-        request_id=record["request_id"],
-        channel=record["channel"],
-        turn_id=record["turn_id"],
-        generation=record["generation"],
-        status_code=record["status_code"],
-        retry_after_ms=record["retry_after_ms"],
-        fields=record["fields"],
-        rejected_fields=record["detail"]["rejected_fields"],
-        detail_truncated=record["detail"]["truncated"],
-    )
+    return _diagnostics_from_mapping(_diagnostic_value(record))
 
 
 class DiagnosticQueryArgumentsError(ValueError):

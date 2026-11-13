@@ -8,6 +8,8 @@ from urllib.parse import urlsplit
 import httpx
 
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +33,17 @@ class AppActiveDayTelemetryClientPort(Protocol):
     ) -> bool: ...
 
 
-TelemetryPersistSentDate = Callable[[AppActiveDayTelemetryState], Awaitable[bool]]
+@dataclass(frozen=True, slots=True)
+class TelemetryPersistenceResult:
+    persisted: bool
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+
+TelemetryPersistSentDate = Callable[
+    [AppActiveDayTelemetryState], Awaitable[TelemetryPersistenceResult]
+]
 TelemetryDiagnosticsSink = Callable[[str, Mapping[str, object]], None]
 
 
@@ -41,7 +53,15 @@ class AppActiveDayTelemetryResult:
     attempted_send: bool = False
     persisted: bool = False
     active_date_utc: str | None = None
-    diagnostics: Mapping[str, object] | None = None
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+
+class TelemetryRequestError(RuntimeError):
+    def __init__(self, diagnostics: ErrorDiagnostics) -> None:
+        self.diagnostics = diagnostics
+        super().__init__(diagnostics.code)
 
 
 @dataclass(slots=True)
@@ -70,8 +90,38 @@ class HttpAppActiveDayTelemetryClient:
                 },
             )
         response.raise_for_status()
-        payload = response.json()
-        return isinstance(payload, Mapping) and payload.get("ok") is True
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            cause = exception_diagnostics(
+                exc,
+                component="telemetry",
+                operation="telemetry_send",
+                code="telemetry_response_rejected",
+                category="invalid_response",
+                fields={"response_shape": "non_json", "dispatch_certainty": "response_received"},
+            )
+            raise TelemetryRequestError(
+                replace(cause, status_code=response.status_code)
+            ) from exc
+        if not isinstance(payload, Mapping) or payload.get("ok") is not True:
+            raise TelemetryRequestError(
+                ErrorDiagnostics(
+                    component="telemetry",
+                    operation="telemetry_send",
+                    code="telemetry_response_rejected",
+                    category="invalid_response",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=response.status_code,
+                    retry_after_ms=None,
+                    fields={
+                        "response_shape": "malformed_success" if isinstance(payload, Mapping) else "non_object",
+                        "dispatch_certainty": "response_received",
+                    },
+                )
+            )
+        return True
 
 
 class AppActiveDayTelemetryService:
@@ -121,23 +171,46 @@ class AppActiveDayTelemetryService:
                 "send_failed",
                 attempted_send=True,
                 active_date_utc=active_date_utc,
-                reason="client_exception",
-                error_type=type(exc).__name__,
+                diagnostics=exception_diagnostics(
+                    exc,
+                    component="telemetry",
+                    operation="telemetry_send",
+                    code="telemetry_send_failed",
+                ),
             )
         if not sent:
             return self._result(
                 "send_failed",
                 attempted_send=True,
                 active_date_utc=active_date_utc,
-                reason="client_returned_false",
+                diagnostics=_telemetry_failure("telemetry_send", "telemetry_response_rejected"),
             )
 
-        persisted = await persist_sent_date(settings.with_sent_date(active_date_utc))
+        try:
+            persistence = await persist_sent_date(settings.with_sent_date(active_date_utc))
+        except Exception as exc:
+            persistence = TelemetryPersistenceResult(
+                False,
+                exception_diagnostics(
+                    exc,
+                    component="telemetry",
+                    operation="telemetry_persist",
+                    code="telemetry_persist_failed",
+                    category="transaction",
+                ),
+            )
         return self._result(
-            "sent" if persisted else "persist_failed",
+            "sent" if persistence.persisted else "persist_failed",
             attempted_send=True,
-            persisted=persisted,
+            persisted=persistence.persisted,
             active_date_utc=active_date_utc,
+            diagnostics=(
+                persistence.diagnostics
+                if persistence.persisted or persistence.diagnostics is not None
+                else _telemetry_failure("telemetry_persist", "telemetry_persist_failed")
+            ),
+            secondary_diagnostics=persistence.secondary_diagnostics,
+            secondary_omitted_count=persistence.secondary_omitted_count,
         )
 
     def _result(
@@ -147,25 +220,51 @@ class AppActiveDayTelemetryService:
         attempted_send: bool = False,
         persisted: bool = False,
         active_date_utc: str | None = None,
-        **diagnostics: object,
+        diagnostics: ErrorDiagnostics | None = None,
+        reason: str | None = None,
+        secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+        secondary_omitted_count: int = 0,
     ) -> AppActiveDayTelemetryResult:
-        safe_diagnostics = {
-            key: value
-            for key, value in diagnostics.items()
-            if value is None or isinstance(value, str | int | float | bool)
-        }
+        metadata = {"diagnostics": diagnostics} if diagnostics is not None else (
+            {"reason": reason} if reason is not None else {}
+        )
         if self._diagnostics_sink is not None:
             try:
-                self._diagnostics_sink(status, safe_diagnostics)
-            except Exception:
-                pass
+                self._diagnostics_sink(status, metadata)
+            except Exception as exc:
+                secondary_diagnostics += (
+                    exception_diagnostics(
+                        exc,
+                        component="telemetry",
+                        operation="telemetry_notification",
+                        code="telemetry_notification_failed",
+                        fields={"notification_delivered": False},
+                    ),
+                )
+        excess = max(0, len(secondary_diagnostics) - 4)
         return AppActiveDayTelemetryResult(
             status=status,
             attempted_send=attempted_send,
             persisted=persisted,
             active_date_utc=active_date_utc,
-            diagnostics=safe_diagnostics,
+            diagnostics=diagnostics,
+            secondary_diagnostics=secondary_diagnostics[:4],
+            secondary_omitted_count=secondary_omitted_count + excess,
         )
+
+
+def _telemetry_failure(operation: str, code: str) -> ErrorDiagnostics:
+    return ErrorDiagnostics(
+        component="telemetry",
+        operation=operation,
+        code=code,
+        category="transaction" if operation == "telemetry_persist" else "invalid_response",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={},
+    )
 
 
 def _normalize_base_url(base_url: str) -> str:
@@ -186,4 +285,5 @@ __all__ = [
     "AppActiveDayTelemetryService",
     "AppActiveDayTelemetryState",
     "HttpAppActiveDayTelemetryClient",
+    "TelemetryPersistenceResult",
 ]

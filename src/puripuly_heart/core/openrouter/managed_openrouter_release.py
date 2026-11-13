@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import inspect
 import time
 from collections.abc import Awaitable, Callable, Mapping
+from contextvars import ContextVar
 from dataclasses import InitVar, dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum
@@ -48,6 +48,11 @@ from puripuly_heart.core.discord.discord_oauth_loopback import (
     bind_first_available,
 )
 from puripuly_heart.core.error_messages import provider_failure_report
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.managed_credential import (
@@ -89,6 +94,36 @@ DiscordOAuthCallbackRunner = Callable[
     [DiscordOAuthLoopbackListener, str, str],
     Awaitable[tuple[str, str]],
 ]
+
+
+@dataclass(slots=True)
+class _ReleaseEvidence:
+    diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    omitted_count: int = 0
+
+    def retain(self, diagnostics: ErrorDiagnostics) -> None:
+        if len(self.diagnostics) < 4:
+            self.diagnostics = (*self.diagnostics, diagnostics)
+        else:
+            self.omitted_count += 1
+
+
+_release_evidence: ContextVar[_ReleaseEvidence | None] = ContextVar(
+    "managed_release_evidence", default=None
+)
+
+
+def _release_failure(exception: BaseException, operation: str) -> ErrorDiagnostics:
+    diagnostics = exception_diagnostics(
+        exception,
+        component="managed_openrouter_release",
+        operation=operation,
+        code="managed_release_failed",
+    )
+    evidence = _release_evidence.get()
+    if evidence is not None:
+        evidence.retain(diagnostics)
+    return diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +218,14 @@ class ManagedOpenRouterReleaseResult:
     local_key_available: bool = False
     pending_issue: bool = False
     single_flight_reused: bool = False
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
 
 
 @dataclass(frozen=True, slots=True)
@@ -447,10 +490,37 @@ class ManagedOpenRouterReleaseService:
         attr_name: str,
         coro: Awaitable[ManagedOpenRouterReleaseResult],
     ) -> asyncio.Task[ManagedOpenRouterReleaseResult]:
-        task = self.oauth_runtime.create_auth_task(
-            coro,
-            task_name=_managed_release_auth_task_name(attr_name),
-        )
+        async def observed() -> ManagedOpenRouterReleaseResult:
+            evidence = _ReleaseEvidence()
+            token = _release_evidence.set(evidence)
+            try:
+                result = await coro
+                diagnostics = result.diagnostics
+                if evidence.diagnostics and result.behavior != ManagedOpenRouterReleaseBehavior.READY:
+                    if diagnostics is None:
+                        diagnostics = ManagedOpenRouterReleaseDiagnostics()
+                    if diagnostics.failure_diagnostics is None:
+                        diagnostics = replace(
+                            diagnostics, failure_diagnostics=evidence.diagnostics[0]
+                        )
+                return replace(
+                    result,
+                    diagnostics=diagnostics,
+                    secondary_diagnostics=(*result.secondary_diagnostics, *evidence.diagnostics),
+                    secondary_omitted_count=result.secondary_omitted_count + evidence.omitted_count,
+                )
+            finally:
+                _release_evidence.reset(token)
+
+        try:
+            task = self.oauth_runtime.create_auth_task(
+                observed(),
+                task_name=_managed_release_auth_task_name(attr_name),
+            )
+        except BaseException:
+            if inspect.iscoroutine(coro):
+                coro.close()
+            raise
         setattr(self, attr_name, task)
 
         def _clear(finished_task: asyncio.Task[ManagedOpenRouterReleaseResult]) -> None:
@@ -543,8 +613,11 @@ class ManagedOpenRouterReleaseService:
                     self.secrets.get(_delivery_ack_token_secret_key(source)),
                 )
             )
-        except Exception:
-            return self._delivery_ack_retry_result("pending_delivery_observation_failed")
+        except Exception as exc:
+            return self._delivery_ack_retry_result(
+                "pending_delivery_observation_failed",
+                diagnostics=_release_failure(exc, "secret_observation"),
+            )
         operation_source = state.pending_managed_operation_source
         operation_id = state.pending_managed_operation_id
         if (
@@ -571,8 +644,11 @@ class ManagedOpenRouterReleaseService:
             )
         except ManagedOpenRouterReleaseError as exc:
             return self._handle_release_error(exc, operation="managed_key_delivery_ack")
-        except Exception:
-            return self._delivery_ack_retry_result("pending_delivery_ack_request_failed")
+        except Exception as exc:
+            return self._delivery_ack_retry_result(
+                "pending_delivery_ack_request_failed",
+                diagnostics=_release_failure(exc, "managed_key_delivery_ack"),
+            )
         if not ack.succeeded:
             if ack.status in {"expired", "invalid", "mismatched", "failed"}:
                 return await self._reconcile_pending_delivery()
@@ -591,9 +667,15 @@ class ManagedOpenRouterReleaseService:
             state.pending_managed_operation_state = None
         try:
             await run_owned_thread_call(state.persist)
-        except Exception:
-            state.restore(snapshot)
-            return self._delivery_ack_retry_result("pending_delivery_ack_clear_persist_failed")
+        except Exception as exc:
+            diagnostics = _release_failure(exc, "managed_key_delivery_ack")
+            try:
+                state.restore(snapshot)
+            except Exception as restore_exc:
+                _release_failure(restore_exc, "managed_operation_recovery")
+            return self._delivery_ack_retry_result(
+                "pending_delivery_ack_clear_persist_failed", diagnostics=diagnostics
+            )
 
         def clear_tokens() -> None:
             self.secrets.delete(_delivery_ack_token_secret_key(source))
@@ -602,8 +684,11 @@ class ManagedOpenRouterReleaseService:
 
         try:
             await run_owned_thread_call(clear_tokens)
-        except Exception:
-            return self._delivery_ack_retry_result("pending_delivery_ack_token_clear_failed")
+        except Exception as exc:
+            return self._delivery_ack_retry_result(
+                "pending_delivery_ack_token_clear_failed",
+                diagnostics=_release_failure(exc, "managed_operation_clear"),
+            )
         return None
 
     def _delivery_ack_retry_result(
@@ -781,7 +866,8 @@ class ManagedOpenRouterReleaseService:
                 hardware_hash = await self._resolve_hardware_hash(
                     fingerprint_salt=start_response.fingerprint_salt,
                 )
-            except Exception:
+            except Exception as exc:
+                _release_failure(exc, "discord_callback")
                 self._clear_retry_after()
                 return ManagedOpenRouterReleaseResult(
                     behavior=ManagedOpenRouterReleaseBehavior.STOP,
@@ -817,6 +903,7 @@ class ManagedOpenRouterReleaseService:
             try:
                 issue_response = await self.client.issue_discord_managed_key(issue_request)
             except ManagedOpenRouterReleaseError as exc:
+                _release_failure(exc, "managed_operation_recovery")
                 if (
                     exc.error_class == "retryable"
                     and exc.subcode
@@ -848,8 +935,10 @@ class ManagedOpenRouterReleaseService:
     def _notify_discord_callback_received(self) -> None:
         if self.on_discord_callback_received is None:
             return
-        with contextlib.suppress(Exception):
+        try:
             self.on_discord_callback_received()
+        except Exception as exc:
+            _release_failure(exc, "discord_callback")
 
     def _ensure_pending_managed_operation(self, installation_id: str) -> tuple[str, str] | None:
         pending_id = _normalize_optional_text(
@@ -869,7 +958,8 @@ class ManagedOpenRouterReleaseService:
         ):
             try:
                 stored_token = self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
-            except Exception:
+            except Exception as exc:
+                _release_failure(exc, "secret_observation")
                 return None
             if is_valid_resume_token(stored_token):
                 return (pending_id, stored_token)
@@ -879,7 +969,8 @@ class ManagedOpenRouterReleaseService:
         resume_token = new_managed_operation_resume_token()
         try:
             self.secrets.set(MANAGED_OPERATION_RESUME_TOKEN_SECRET, resume_token)
-        except Exception:
+        except Exception as exc:
+            _release_failure(exc, "ensure_managed_operation")
             self._clear_pending_managed_operation()
             return None
         self.managed_state.pending_managed_operation_id = operation_id
@@ -888,7 +979,8 @@ class ManagedOpenRouterReleaseService:
         self.managed_state.pending_managed_operation_state = None
         try:
             self.managed_state.persist()
-        except Exception:
+        except Exception as exc:
+            _release_failure(exc, "ensure_managed_operation")
             self._clear_pending_managed_operation()
             return None
         return (operation_id, resume_token)
@@ -919,13 +1011,17 @@ class ManagedOpenRouterReleaseService:
                 self.managed_state.pending_delivery_ack_managed_credential_ref = None
                 self.managed_state.pending_delivery_ack_expires_at = None
                 self.managed_state.persist()
-        except Exception:
-            self.managed_state.restore(previous)
+        except Exception as exc:
+            _release_failure(exc, "managed_operation_clear")
+            try:
+                self.managed_state.restore(previous)
+            except Exception as restore_exc:
+                _release_failure(restore_exc, "managed_operation_clear")
             return
         try:
             self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
-        except Exception:
-            pass
+        except Exception as exc:
+            _release_failure(exc, "managed_operation_clear")
 
     def _record_operation_state(self, operation_status: str | None) -> None:
         if operation_status not in {
@@ -945,8 +1041,8 @@ class ManagedOpenRouterReleaseService:
         try:
             self.managed_state.pending_managed_operation_state = operation_status
             self.managed_state.persist()
-        except Exception:
-            pass
+        except Exception as exc:
+            _release_failure(exc, "managed_operation_status")
 
     async def _fetch_operation_status(
         self, operation_id: str, resume_token: str, installation_id: str
@@ -1015,7 +1111,8 @@ class ManagedOpenRouterReleaseService:
                 await run_owned_thread_call(
                     partial(ensure_managed_identity_bundle, state, self.secrets)
                 )
-            except Exception:
+            except Exception as exc:
+                _release_failure(exc, "managed_operation_recovery")
                 return self._managed_operation_action_required_result(
                     code="managed_identity_recovery_required",
                     message_key=f"{message_prefix}.error.action_required",
@@ -1031,7 +1128,8 @@ class ManagedOpenRouterReleaseService:
             token = await run_owned_thread_call(
                 lambda: self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
             )
-        except Exception:
+        except Exception as exc:
+            _release_failure(exc, "secret_observation")
             return self._managed_operation_recovering_result(
                 operation="secret_observation", code="managed_operation_token_read_failed"
             )
@@ -1074,8 +1172,11 @@ class ManagedOpenRouterReleaseService:
                             self.secrets.get(_delivery_ack_token_secret_key(source)),
                         )
                     )
-                except Exception:
-                    return self._delivery_ack_retry_result("managed_secret_read_failed")
+                except Exception as exc:
+                    return self._delivery_ack_retry_result(
+                        "managed_secret_read_failed",
+                        diagnostics=_release_failure(exc, "secret_observation"),
+                    )
                 if (
                     ack_token
                     and binding is not None
@@ -1095,9 +1196,15 @@ class ManagedOpenRouterReleaseService:
                     state.pending_delivery_ack_expires_at = delivery.expires_at
                     try:
                         await run_owned_thread_call(state.persist)
-                    except Exception:
-                        state.restore(snapshot)
-                        return self._delivery_ack_retry_result("pending_metadata_persist_failed")
+                    except Exception as exc:
+                        diagnostics = _release_failure(exc, "managed_key_delivery_ack")
+                        try:
+                            state.restore(snapshot)
+                        except Exception as restore_exc:
+                            _release_failure(restore_exc, "managed_operation_recovery")
+                        return self._delivery_ack_retry_result(
+                            "pending_metadata_persist_failed", diagnostics=diagnostics
+                        )
                     pending = await self._retry_pending_delivery_ack_if_needed()
                     if pending is not None:
                         return pending
@@ -1155,8 +1262,11 @@ class ManagedOpenRouterReleaseService:
                         self.secrets.get(managed_key_secret(source)),
                     )
                 )
-            except Exception:
-                return self._delivery_ack_retry_result("managed_secret_read_failed")
+            except Exception as exc:
+                return self._delivery_ack_retry_result(
+                    "managed_secret_read_failed",
+                    diagnostics=_release_failure(exc, "secret_observation"),
+                )
             ref = status.managed_credential_ref or (
                 status.attempt.managed_credential_ref if status.attempt is not None else None
             )
@@ -1325,20 +1435,27 @@ class ManagedOpenRouterReleaseService:
                 clear_temporary_managed_release_state(state)
                 self.secrets.delete(credential_binding_secret(source))
                 state.persist()
-            except Exception:
+            except Exception as exc:
+                _release_failure(exc, "managed_delivery_store")
                 try:
                     for key, value in previous.items():
                         if value is None:
                             self.secrets.delete(key)
                         else:
                             self.secrets.set(key, value)
+                except Exception as restore_exc:
+                    _release_failure(restore_exc, "managed_delivery_store")
                 finally:
-                    state.restore(snapshot)
-                    clear_temporary_managed_release_state(state)
                     try:
-                        state.persist()
-                    except Exception:
                         state.restore(snapshot)
+                        clear_temporary_managed_release_state(state)
+                        state.persist()
+                    except Exception as restore_exc:
+                        _release_failure(restore_exc, "managed_delivery_store")
+                        try:
+                            state.restore(snapshot)
+                        except Exception as memory_exc:
+                            _release_failure(memory_exc, "managed_delivery_store")
                 raise
 
         try:
@@ -1437,9 +1554,15 @@ class ManagedOpenRouterReleaseService:
 
         try:
             await run_owned_thread_call(store_delivery)
-        except Exception:
-            state.restore(snapshot)
-            return self._delivery_ack_retry_result("managed_delivery_store_failed")
+        except Exception as exc:
+            diagnostics = _release_failure(exc, "managed_delivery_store")
+            try:
+                state.restore(snapshot)
+            except Exception as restore_exc:
+                _release_failure(restore_exc, "managed_operation_recovery")
+            return self._delivery_ack_retry_result(
+                "managed_delivery_store_failed", diagnostics=diagnostics
+            )
         if issue_response.delivery_ack_required:
             pending = await self._retry_pending_delivery_ack_if_needed()
             if pending is not None:
@@ -1657,10 +1780,27 @@ class ManagedOpenRouterUserFacingError(RuntimeError):
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     diagnostics: ManagedOpenRouterReleaseDiagnostics | None = None
     failure_diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
 
     def __post_init__(self) -> None:
         if self.failure_diagnostics is None and self.diagnostics is not None:
             self.failure_diagnostics = self.diagnostics.failure_diagnostics
+        if self.failure_diagnostics is not None and (
+            self.secondary_diagnostics or self.secondary_omitted_count
+        ):
+            primary = self.failure_diagnostics
+            self.failure_diagnostics = replace(
+                primary,
+                causes=(
+                    *primary.causes,
+                    *(
+                        cause for cause in self.secondary_diagnostics
+                        if cause.diagnostic_id != primary.diagnostic_id
+                    ),
+                ),
+                causes_truncated=primary.causes_truncated or self.secondary_omitted_count > 0,
+            )
 
     def __str__(self) -> str:
         diagnostics = self.failure_diagnostics
@@ -1701,6 +1841,7 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
     delegate_factory: ManagedOpenRouterDelegateFactory
     on_delegate_ready: Callable[[], object] | None = None
     _delegate: LLMProvider | None = field(init=False, default=None, repr=False)
+    _activation_result: ManagedOpenRouterReleaseResult | None = field(init=False, default=None, repr=False)
     _delegate_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
 
     @property
@@ -1751,15 +1892,20 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
                     message_key=result.message_key or "managed_release.restart",
                     message_kwargs=result.message_kwargs,
                     diagnostics=result.diagnostics,
+                    secondary_diagnostics=result.secondary_diagnostics,
+                    secondary_omitted_count=result.secondary_omitted_count,
                 )
             try:
                 self._delegate = self.delegate_factory(result.api_key)
+                self._activation_result = result
             except Exception as exc:
                 raise ManagedOpenRouterUserFacingError(
                     message_key="managed_release.retry",
                     failure_diagnostics=provider_failure_report(
                         exc, provider="openrouter", operation="provider_build"
                     ).diagnostics,
+                    secondary_diagnostics=result.secondary_diagnostics,
+                    secondary_omitted_count=result.secondary_omitted_count,
                 ) from exc
             if self.on_delegate_ready is not None:
                 callback_result = self.on_delegate_ready()
@@ -1779,7 +1925,6 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
         scene_participant_count: int | None = None,
         max_output_tokens: int | None = None,
     ) -> Translation:
-        delegate = await self._ensure_delegate()
         kwargs = {
             "utterance_id": utterance_id,
             "text": text,
@@ -1791,12 +1936,64 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
         }
         if max_output_tokens is not None:
             kwargs["max_output_tokens"] = max_output_tokens
-        return await delegate.translate(**kwargs)  # type: ignore[arg-type]
+        try:
+            delegate = await self._ensure_delegate()
+            translation = await delegate.translate(**kwargs)  # type: ignore[arg-type]
+        except (Exception, asyncio.CancelledError) as exc:
+            self._transfer_activation_failure(exc)
+            raise
+        activation = self._activation_result
+        if activation is None:
+            return translation
+        self._activation_result = None
+        if not activation.secondary_diagnostics and not activation.secondary_omitted_count:
+            return translation
+        secondaries = (
+            *translation.secondary_diagnostics,
+            *(serialize_diagnostics(cause) for cause in activation.secondary_diagnostics),
+        )
+        return replace(
+            translation,
+            secondary_diagnostics=secondaries[:DIAGNOSTIC_CAUSE_MAX_COUNT],
+            secondary_diagnostics_truncated=(
+                translation.secondary_diagnostics_truncated
+                or activation.secondary_omitted_count > 0
+                or len(secondaries) > DIAGNOSTIC_CAUSE_MAX_COUNT
+            ),
+        )
+
+    def _transfer_activation_failure(self, exception: BaseException) -> None:
+        activation = self._activation_result
+        if activation is None:
+            return
+        secondaries = (
+            *getattr(exception, "secondary_diagnostics", ()),
+            *activation.secondary_diagnostics,
+        )
+        omitted = (
+            getattr(exception, "secondary_omitted_count", 0)
+            + activation.secondary_omitted_count
+            + max(0, len(secondaries) - DIAGNOSTIC_CAUSE_MAX_COUNT)
+        )
+        if secondaries or omitted:
+            if not isinstance(exception, asyncio.CancelledError):
+                primary = provider_failure_report(
+                    exception, provider="openrouter", operation="provider_build"
+                ).diagnostics
+                exception.failure_diagnostics = replace(
+                    primary,
+                    causes=(*primary.causes, *secondaries),
+                    causes_truncated=primary.causes_truncated or omitted > 0,
+                )
+            exception.secondary_diagnostics = secondaries[:DIAGNOSTIC_CAUSE_MAX_COUNT]
+            exception.secondary_omitted_count = omitted
+        self._activation_result = None
 
     async def close(self) -> None:
         if self._delegate is not None:
             await self._delegate.close()
             self._delegate = None
+            self._activation_result = None
 
 
 def _normalize_optional_text(value: object) -> str | None:

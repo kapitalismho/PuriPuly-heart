@@ -1940,3 +1940,17 @@ async def test_discord_auth_own_ack_recovers_while_qq_operation_preserved() -> N
     assert managed_state.pending_delivery_ack_source is None
     assert "openrouter_managed_delivery_ack_token" not in store.values
     _assert_no_raw_values(result, label="managed ACK cross-source preservation result")
+
+
+@pytest.mark.asyncio
+async def test_failed_claim_observation_is_not_reported_as_proven_absence():
+    class Store(RecordingSecretStore):
+        async def get_secret(self, key):
+            raise PermissionError(13, "synthetic-private-path")
+
+    guard = ManagedAuthClaimGuard(RecordingManagedState(), Store())
+    assert await guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD) is None
+    assert len(guard.observation_diagnostics) == 2
+    assert guard.observation_diagnostics[0].code == "managed_auth_claim_observation_failed"
+    assert guard.observation_diagnostics[0].fields["observation_succeeded"] is False
+    assert "synthetic-private" not in str(guard.observation_diagnostics)

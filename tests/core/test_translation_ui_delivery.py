@@ -61,7 +61,7 @@ async def test_ui_write_failure_is_destination_local_and_observable(failure: str
     class FailingQueue(asyncio.Queue):
         async def put(self, item):
             if failure == "exception":
-                raise RuntimeError("destination failed")
+                raise OSError(13, "private destination detail")
             await super().put(item)
 
     destination = FailingQueue(maxsize=1)
@@ -78,6 +78,11 @@ async def test_ui_write_failure_is_destination_local_and_observable(failure: str
         receipt = output.routing_decisions[-1]
         assert receipt.reason == expected
         assert receipt.metadata["ui_queue_submitted"] is False
+        assert receipt.diagnostics is not None
+        if failure == "exception":
+            assert receipt.diagnostics.fields["errno"] == 13
+            assert receipt.diagnostics.fields["exception_class"] == "PermissionError"
+            assert "private destination detail" not in repr(receipt.diagnostics)
         assert not owner.has_resources
     finally:
         await output.close()
@@ -528,3 +533,22 @@ async def test_bridge_replacement_close_does_not_restart_peer_delivery(
         first.close()
         second.close()
         await output.close()
+
+
+@pytest.mark.asyncio
+async def test_unexpected_ui_writer_failure_is_observed_once_by_output_owner():
+    output = OutputRuntime(chatbox=RecordingOscQueue())
+    owner = TranslationUiMessageQueue(asyncio.Queue(), output)
+
+    async def fail():
+        raise OSError(5, "private writer detail")
+
+    worker = asyncio.create_task(fail())
+    await asyncio.gather(worker, return_exceptions=True)
+    owner._finish_self_writer(worker)
+    owner._finish_self_writer(worker)
+    failures = [decision for decision in output.routing_decisions if decision.diagnostics]
+    assert len(failures) == 1
+    assert failures[0].diagnostics.fields["errno"] == 5
+    assert "private" not in repr(failures)
+    await output.close()

@@ -146,6 +146,13 @@ def assert_no_output(result):
     assert not {"text", "translation", "prompt", "context", "provider", "model"} & result.keys()
 
 
+def target_outcomes(result):
+    return [
+        {key: item[key] for key in ("target_language", "translation_result")}
+        for item in result["target_results"]
+    ]
+
+
 async def test_probe_invokes_current_backend_and_retains_metadata_only_terminal_receipt():
     backend = ControlledBackend()
     control, runtime = control_for(backend)
@@ -159,7 +166,7 @@ async def test_probe_invokes_current_backend_and_retains_metadata_only_terminal_
         assert result["source_language"] == "ko"
         assert result["target_language"] == "en"
         assert result["target_languages"] == ["en"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {"target_language": "en", "translation_result": "succeeded"}
         ]
         assert len(backend.requests) == 1
@@ -372,7 +379,7 @@ async def test_agent_probe_waits_for_actual_terminal_receipt_without_settings_ac
         assert result["receipt"]["translation_result"] == "succeeded"
         assert result["receipt"]["source_language"] == "ko"
         assert result["receipt"]["target_languages"] == ["en", "ja"]
-        assert result["receipt"]["target_results"] == [
+        assert target_outcomes(result["receipt"]) == [
             {"target_language": "en", "translation_result": "succeeded"},
             {"target_language": "ja", "translation_result": "succeeded"},
         ]
@@ -537,7 +544,7 @@ async def test_probe_exercises_both_self_targets_with_separate_isolated_requests
         assert result["translation_result"] == "succeeded"
         assert result["target_language"] == "en"
         assert result["target_languages"] == ["en", "ja"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {"target_language": "en", "translation_result": "succeeded"},
             {"target_language": "ja", "translation_result": "succeeded"},
         ]
@@ -564,7 +571,7 @@ async def test_probe_reports_each_target_without_claiming_partial_success(failed
         assert result["status"] == "failed"
         assert result["translation_result"] == "failed"
         assert result["target_languages"] == ["en", "ja"]
-        assert result["target_results"] == [
+        assert target_outcomes(result) == [
             {
                 "target_language": "en",
                 "translation_result": "failed" if failed_target == "en" else "succeeded",

@@ -3,10 +3,22 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import aclosing
+from dataclasses import replace
 from typing import Any
+
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    project_diagnostic_record,
+    serialize_diagnostics,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
+
+logger = logging.getLogger(__name__)
 
 PROTOCOL_VERSION = 1
 MAX_REQUEST_BYTES = 64 * 1024
@@ -17,9 +29,12 @@ WRITE_TIMEOUT = 5.0
 
 
 class ControlTransportError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, diagnostics: dict | None = None):
         super().__init__(message)
         self.code = code
+        self.diagnostics = (
+            project_diagnostic_record(diagnostics) if diagnostics is not None else None
+        )
 
 
 def _encode(value: dict[str, Any], *, limit: int = MAX_RESPONSE_BYTES) -> bytes:
@@ -73,6 +88,7 @@ class ControlServer:
         self._inflight = 0
         self._drained = asyncio.Event()
         self._drained.set()
+        self.failure_diagnostics: ErrorDiagnostics | None = None
 
     async def start(self) -> int:
         if self._server is not None:
@@ -300,9 +316,21 @@ class ControlServer:
             await self._send_error(
                 writer, request_id, "invalid_arguments", "Control arguments are invalid"
             )
-        except Exception:
+        except Exception as exc:
+            diagnostics = replace(
+                exception_diagnostics(
+                    exc,
+                    component="control.transport",
+                    operation="control_request",
+                    code="control_request_failed",
+                ),
+                request_id=request_id,
+            )
+            self.failure_diagnostics = diagnostics
+            emit_failure(logger, diagnostics)
             await self._send_error(
-                writer, request_id, "operation_error", "Control request could not complete"
+                writer, request_id, "operation_error", "Control request could not complete",
+                diagnostics=diagnostics,
             )
         finally:
             if dispatching:
@@ -320,7 +348,8 @@ class ControlServer:
         await asyncio.wait_for(writer.drain(), WRITE_TIMEOUT)
 
     async def _send_error(
-        self, writer: asyncio.StreamWriter, request_id: str | None, code: str, message: str
+        self, writer: asyncio.StreamWriter, request_id: str | None, code: str, message: str,
+        *, diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         try:
             await self._send(
@@ -329,7 +358,11 @@ class ControlServer:
                     "protocol": PROTOCOL_VERSION,
                     "instance_id": self.instance_id,
                     "request_id": request_id,
-                    "error": {"code": code, "message": message},
+                    "error": {
+                        "code": code,
+                        "message": message,
+                        **({"diagnostics": serialize_diagnostics(diagnostics)} if diagnostics else {}),
+                    },
                 },
             )
         except OSError, TimeoutError:
@@ -389,6 +422,7 @@ async def request(
             raise ControlTransportError(
                 str(error.get("code", "operation_error")),
                 str(error.get("message", "Control request failed")),
+                error.get("diagnostics") if isinstance(error.get("diagnostics"), dict) else None,
             )
         result = response.get("result")
         if not isinstance(result, dict):
@@ -444,7 +478,10 @@ async def follow(record: Any, arguments: dict[str, Any]) -> AsyncIterator[dict[s
                 error = response["error"]
                 if not isinstance(error, dict):
                     raise ControlTransportError("malformed_response", "Invalid control error")
-                raise ControlTransportError(str(error.get("code")), str(error.get("message")))
+                raise ControlTransportError(
+                    str(error.get("code")), str(error.get("message")),
+                    error.get("diagnostics") if isinstance(error.get("diagnostics"), dict) else None,
+                )
             if "event" in response:
                 yield response["event"]
     except OSError as exc:

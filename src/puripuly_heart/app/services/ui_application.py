@@ -1324,11 +1324,17 @@ class UiApplicationBoundary:
         event: str,
         metadata: object,
     ) -> None:
-        details = dict(metadata) if isinstance(metadata, dict) else {}
-        self.log_diagnostic(
-            f"[Lifecycle][GithubStarPromptRuntime] event={event} metadata={details}",
-            level=logging.WARNING,
-        )
+        diagnostics = metadata.get("diagnostics") if isinstance(metadata, dict) else None
+        if isinstance(diagnostics, ErrorDiagnostics):
+            emit_failure(
+                logging.getLogger(__name__), diagnostics,
+                severity="warning", disposition="degraded",
+            )
+        else:
+            self.log_diagnostic(
+                f"[Lifecycle][GithubStarPromptRuntime] event={event}",
+                level=logging.WARNING,
+            )
 
     async def persist_github_star_prompt_opened(
         self,

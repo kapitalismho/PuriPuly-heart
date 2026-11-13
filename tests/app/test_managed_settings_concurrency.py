@@ -14,6 +14,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeTransition
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
 from puripuly_heart.app.services.settings.settings_projection import SettingsProjectionOwner
@@ -423,7 +424,7 @@ async def test_runtime_failure_compensation_preserves_overlapping_managed_commit
     committed = owner.commit_delta(base, _locale(base, "ja"))
     effects = RuntimeEffects(owner)
     projection = SettingsProjectionOwner(
-        presentation=SimpleNamespace(render_settings=lambda *args, **kwargs: True),
+        presentation=SimpleNamespace(render_settings=lambda *args, **kwargs: SettingsRenderResult(True)),
         config_path=owner.path,
         current_settings=lambda: owner.canonical,
     )

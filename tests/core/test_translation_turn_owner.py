@@ -984,9 +984,26 @@ async def test_interrupted_parent_admission_closes_parent_and_allows_next_turn(
 
 
 @pytest.mark.asyncio
-async def test_dual_target_precomputed_translation_is_normalized_to_primary_child() -> None:
+@pytest.mark.parametrize("recovered_truncated,secondary_truncated", [(True, False), (False, True)])
+async def test_dual_target_precomputed_translation_is_normalized_to_primary_child(
+    recovered_truncated, secondary_truncated
+) -> None:
     parent_id = uuid4()
     observed: list[TranslationTurnChild] = []
+    from puripuly_heart.core.diagnostics import serialize_diagnostics
+    from puripuly_heart.core.messages import ErrorDiagnostics
+
+    recovered = serialize_diagnostics(ErrorDiagnostics(
+        component="provider.llm", operation="translate", code="provider.auth",
+        category="auth", status_code=403,
+        visibility="basic", content_policy="metadata_only", retry_after_ms=None, fields={},
+    ))
+    cleanup = serialize_diagnostics(ErrorDiagnostics(
+        component="provider.llm", operation="cleanup", code="provider.unknown",
+        category="unknown", status_code=None,
+        visibility="basic", content_policy="metadata_only", retry_after_ms=None,
+        fields={"exception_class": "OSError"},
+    ))
 
     async def process(child: TranslationTurnChild, _cancellation_requested):
         observed.append(child)
@@ -1009,6 +1026,10 @@ async def test_dual_target_precomputed_translation_is_normalized_to_primary_chil
             source_text="hello",
             source_language="en",
             target_language="zh-CN",
+            recovered_failures=(recovered,),
+            secondary_diagnostics=(cleanup,),
+            recovered_failures_truncated=recovered_truncated,
+            secondary_diagnostics_truncated=secondary_truncated,
         ),
     )
     owner = _owner(process_child=process)
@@ -1023,6 +1044,13 @@ async def test_dual_target_precomputed_translation_is_normalized_to_primary_chil
     assert primary.precomputed_translation is not None
     assert primary.precomputed_translation.utterance_id == primary.utterance_id
     assert primary.precomputed_translation.logical_turn_key == f"self:{parent_id}"
+    assert primary.precomputed_translation.recovered_failures[0]["status_code"] == 403
+    assert request.precomputed_translation is not None
+    assert primary.precomputed_translation.recovered_failures == request.precomputed_translation.recovered_failures
+    assert primary.precomputed_translation.secondary_diagnostics == request.precomputed_translation.secondary_diagnostics
+    assert primary.precomputed_translation.secondary_diagnostics[0]["diagnostic_id"] == cleanup["diagnostic_id"]
+    assert primary.precomputed_translation.recovered_failures_truncated is recovered_truncated
+    assert primary.precomputed_translation.secondary_diagnostics_truncated is secondary_truncated
     assert primary.target_index == 0
     assert secondary.target_index == 1
     assert secondary.precomputed_translation is None
@@ -2349,3 +2377,43 @@ async def test_full_ui_owner_evicts_oldest_and_releases_peer_predecessors() -> N
     finally:
         await owner.close()
         await output_runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_retirement_output_failure_is_secondary_and_other_waiting_work_progresses():
+    release = asyncio.Event()
+    processed = []
+    trace = []
+
+    async def process(child, _cancellation_requested):
+        processed.append(child.parent_utterance_id)
+        if len(processed) == 1:
+            await release.wait()
+        return "translated"
+
+    class FailingRetirementOutput:
+        async def submit_translation_output(self, submission):
+            raise PermissionError(13, "private destination content")
+
+    owner = _owner(process_child=process, trace=trace, output=FailingRetirementOutput())
+    owner.peer_waiting_capacity = 1
+    ids = [uuid4() for _ in range(3)]
+    try:
+        for parent_id in ids:
+            await owner.submit(replace(
+                _request(parent_id=parent_id, turn_kind="peer"),
+                config_snapshot=TranslationRuntimeConfigSnapshot(
+                    revision=0, value=TranslationRuntimeConfig(concurrency_limit=1)
+                ),
+            ))
+        release.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert processed == [ids[0], ids[2]]
+    assert any(event[0] == "terminal" and event[2] == "source_only" for event in trace)
+    diagnostics = owner.retirement_failure_diagnostics
+    assert diagnostics.code == "translation.output_submission_failed"
+    assert diagnostics.fields["parent_utterance_id"] == str(ids[1])
+    assert diagnostics.fields["errno"] == 13
+    assert "private" not in repr(diagnostics)

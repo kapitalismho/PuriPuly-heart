@@ -5,16 +5,25 @@ from collections.abc import Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, TypeVar
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 _FrameResultT = TypeVar("_FrameResultT")
 AudioTestChannel = Literal["self", "peer"]
 AUDIO_TEST_CHANNELS: tuple[AudioTestChannel, ...] = ("self", "peer")
 
 
 class AudioTestSourceUnavailable(RuntimeError):
-    def __init__(self, reason: str, cause: str | None = None) -> None:
+    def __init__(
+        self,
+        reason: str,
+        cause: str | None = None,
+        *,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.cause = cause
+        self.failure_diagnostics = failure_diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +39,7 @@ class AudioDiagnosticCandidate:
 class AudioTestOpenedSource:
     source: object
     device: Mapping[str, object] = field(default_factory=dict)
+    recovery_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 class AudioTestSourceOpener(Protocol):
@@ -43,12 +53,14 @@ class AudioTestCaptureRequest:
     opener: AudioTestSourceOpener
     ready_on_open: bool = False
     frame_timeout_s: float | None = None
-    opened_callback: Callable[[int, Mapping[str, object]], None] | None = field(
+    opened_callback: Callable[
+        [int, Mapping[str, object], tuple[ErrorDiagnostics, ...]], None
+    ] | None = field(
         default=None,
         repr=False,
     )
     ready_callback: Callable[[int], None] | None = field(default=None, repr=False)
-    failure_callback: Callable[[int, str, str | None], None] | None = field(
+    failure_callback: Callable[[int, str, str | None, ErrorDiagnostics], None] | None = field(
         default=None,
         repr=False,
     )

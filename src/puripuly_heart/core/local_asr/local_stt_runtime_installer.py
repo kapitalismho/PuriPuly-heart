@@ -10,7 +10,7 @@ import os
 import shutil
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import IO, Awaitable, Callable, Literal
 from uuid import uuid4
@@ -18,6 +18,12 @@ from uuid import uuid4
 import httpx
 
 from puripuly_heart.core import network_clients
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import (
+    model_asset_failure_code,
+    model_asset_failure_diagnostics,
+)
 from puripuly_heart.core.model_download_sources import (
     HF_MIRROR_ENDPOINT,
     model_download_source_candidates,
@@ -43,6 +49,13 @@ from .local_stt_download_port import (
 
 RuntimeLocalSTTStatus = Literal["downloading", "ready", "download_failed"]
 logger = logging.getLogger(__name__)
+
+
+def _emit_source_log(message: str, *, level: int) -> None:
+    try:
+        emit_basic_log(logger, message, level=level)
+    except Exception:
+        return
 
 
 @dataclass(slots=True, frozen=True)
@@ -186,14 +199,23 @@ def cleanup_local_stt_install_residue(
 class LocalSTTRuntimeInstallError(LocalSTTAssetError):
     """Raised when runtime local STT provisioning fails."""
 
-    def __init__(self, message: str, *, failure_code: str = "unknown", status_code=None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_code: str = "unknown",
+        status_code=None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ):
         super().__init__(message)
         self.failure_code = failure_code
         self.status_code = status_code
+        self.failure_diagnostics = failure_diagnostics
 
 
 class LocalSTTRuntimeInstallCancelled(LocalSTTAssetError):
     """Raised when runtime local STT provisioning is cancelled."""
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 class _StatusCallbackError(LocalSTTRuntimeInstallError):
@@ -287,9 +309,15 @@ def _source_plans(
     )
 
 
-def _raise_if_cancelled(cancel_event: threading.Event | None) -> None:
+def _raise_if_cancelled(
+    cancel_event: threading.Event | None,
+    *,
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+) -> None:
     if cancel_event is not None and cancel_event.is_set():
-        raise LocalSTTRuntimeInstallCancelled("runtime local STT install cancelled")
+        failure = LocalSTTRuntimeInstallCancelled("runtime local STT install cancelled")
+        failure.secondary_diagnostics = secondary_diagnostics
+        raise failure
 
 
 async def _owned_io(function, *, io_cancel_event: threading.Event, **kwargs):
@@ -341,8 +369,12 @@ async def _cleanup_failed_download(
                     continue
         try:
             download_task.result()
-        except asyncio.CancelledError, LocalSTTRuntimeInstallCancelled:
-            pass
+        except (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled) as cancelled:
+            if cancelled is not primary_failure:
+                primary_failure.secondary_diagnostics = (
+                    getattr(primary_failure, "secondary_diagnostics", ())
+                    + getattr(cancelled, "secondary_diagnostics", ())
+                )
         except BaseException as cleanup_failure:
             if cleanup_failure is not primary_failure:
                 if isinstance(cleanup_failure, BaseExceptionGroup):
@@ -481,6 +513,7 @@ async def _download_huggingface_xet_source_into_staging(
 ) -> InstalledLocalSTTManifest:
     source = manifest.sources[source_name]
     completed_bytes = 0
+    recoveries: list[ErrorDiagnostics] = []
     try:
         for asset in manifest.files:
             _raise_if_cancelled(cancel_event)
@@ -498,6 +531,7 @@ async def _download_huggingface_xet_source_into_staging(
                     local_dir=staging_dir,
                     expected_size_bytes=asset.size_bytes,
                     endpoint=endpoint,
+                    on_recovery=recoveries.append,
                 ),
                 cancel_event=cancel_event,
                 on_progress=on_progress,
@@ -527,6 +561,7 @@ async def _download_huggingface_xet_source_into_staging(
             install_dirname=manifest.install_dirname,
             selected_source="hf_mirror" if endpoint == HF_MIRROR_ENDPOINT else source_name,
             selected_revision=source.revision,
+            recovery_diagnostics=tuple(recoveries),
         )
         (staging_dir / manifest.installed_manifest_filename).write_text(
             json.dumps(installed.to_dict(), indent=2),
@@ -540,7 +575,9 @@ async def _download_huggingface_xet_source_into_staging(
         )
         return installed
     except LocalSTTDownloadPortCancelled as exc:
-        raise LocalSTTRuntimeInstallCancelled("runtime local STT install cancelled") from exc
+        failure = LocalSTTRuntimeInstallCancelled("runtime local STT install cancelled")
+        failure.secondary_diagnostics = exc.secondary_diagnostics
+        raise failure from exc
 
 
 async def _download_source_into_staging_async(
@@ -587,27 +624,64 @@ def _promote_staging_install(
     staging_dir: Path,
     install_dir: Path,
     cancel_event: threading.Event | None = None,
-) -> None:
+) -> tuple[ErrorDiagnostics, ...]:
     _raise_if_cancelled(cancel_event)
     backup_dir = install_dir.with_name(f"{install_dir.name}.backup")
     install_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.rmtree(backup_dir, ignore_errors=True)
+    cleanup_diagnostics: list[ErrorDiagnostics] = []
 
+    def remove_backup() -> None:
+        try:
+            shutil.rmtree(backup_dir)
+        except FileNotFoundError:
+            pass
+        except Exception as exc:
+            cleanup_diagnostics.append(
+                model_asset_failure_diagnostics(
+                    exc, operation="cleanup", code="local_asr.cleanup_failed",
+                    fields={"cleanup_complete": False},
+                )
+            )
+
+    def retain_cleanup(failure: BaseException) -> None:
+        if cleanup_diagnostics:
+            diagnostics = model_asset_failure_diagnostics(
+                failure, operation="installation", code="local_asr.install_failed"
+            )
+            failure.failure_diagnostics = sanitize_diagnostics(
+                replace(diagnostics, causes=diagnostics.causes + tuple(cleanup_diagnostics))
+            )
+
+    remove_backup()
     had_existing_install = install_dir.exists()
     if had_existing_install:
-        install_dir.rename(backup_dir)
-
+        try:
+            install_dir.rename(backup_dir)
+        except Exception as failure:
+            retain_cleanup(failure)
+            raise
     try:
         staging_dir.rename(install_dir)
-    except Exception:
+    except Exception as primary:
+        retain_cleanup(primary)
+        failures: list[BaseException] = [primary]
         if install_dir.exists():
-            shutil.rmtree(install_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(install_dir)
+            except Exception as cleanup:
+                failures.append(cleanup)
         if had_existing_install and backup_dir.exists():
-            backup_dir.rename(install_dir)
+            try:
+                backup_dir.rename(install_dir)
+            except Exception as restore:
+                failures.append(restore)
+        if len(failures) > 1:
+            raise ExceptionGroup("Model promotion and restoration failed", failures) from primary
         raise
     else:
         if backup_dir.exists():
-            shutil.rmtree(backup_dir, ignore_errors=True)
+            remove_backup()
+    return tuple(cleanup_diagnostics)
 
 
 async def ensure_local_stt_installed(
@@ -659,17 +733,36 @@ async def ensure_local_stt_installed(
         )
     except BaseException as exc:
         primary_failure = exc
+        if not isinstance(exc, (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled)):
+            exc.failure_diagnostics = model_asset_failure_diagnostics(
+                exc,
+                component="local_asr_provisioning",
+                operation="models.install",
+                code="local_asr_install_failed",
+                fields={"model_id": manifest.model_id if manifest is not None else model_id},
+            )
         raise
     finally:
         if lease is not None:
             try:
                 await _owned_io(lease.close, io_cancel_event=cancellation)
             except BaseException as cleanup_failure:
+                if isinstance(cleanup_failure, (Exception, BaseExceptionGroup)):
+                    cleanup_failure.failure_diagnostics = model_asset_failure_diagnostics(
+                        cleanup_failure, operation="cleanup", code="local_asr.cleanup_failed"
+                    )
                 if primary_failure is not None:
-                    raise BaseExceptionGroup(
+                    combined = BaseExceptionGroup(
                         "Local STT installation and lease cleanup failed",
                         (primary_failure, cleanup_failure),
-                    ) from primary_failure
+                    )
+                    combined.failure_diagnostics = model_asset_failure_diagnostics(
+                        combined,
+                        component="local_asr_provisioning",
+                        operation="models.install",
+                        code="local_asr_install_failed",
+                    )
+                    raise combined from primary_failure
                 raise
 
 
@@ -711,19 +804,21 @@ async def _ensure_local_stt_installed_with_lease(
     _raise_if_cancelled(cancel_event)
     if total_bytes and shutil.disk_usage(resolved_root).free < total_bytes + 64 * 1024**2:
         raise LocalSTTRuntimeInstallError("Insufficient staging space", failure_code="disk_full")
-    failures: list[str] = []
+    failures: list[ErrorDiagnostics] = []
     first_error: Exception | None = None
     last_progress_percent: int | None = None
     last_error: Exception | None = None
 
-    for source_name, endpoint, source_label in _source_plans(
-        resolved_manifest,
-        preferred_source=preferred_source,
-        locale=locale,
+    for source_attempt, (source_name, endpoint, source_label) in enumerate(
+        _source_plans(
+            resolved_manifest,
+            preferred_source=preferred_source,
+            locale=locale,
+        ),
+        start=1,
     ):
-        _raise_if_cancelled(cancel_event)
-        emit_basic_log(
-            logger,
+        _raise_if_cancelled(cancel_event, secondary_diagnostics=tuple(failures))
+        _emit_source_log(
             f"[ModelDownload] source_attempt model={resolved_manifest.model_id} "
             f"source={source_label}",
             level=logging.INFO,
@@ -773,26 +868,32 @@ async def _ensure_local_stt_installed_with_lease(
             if current_percent != last_progress_percent:
                 last_progress_percent = current_percent
                 await _emit_status(on_status, "downloading", percent=current_percent)
-            await _owned_io(
+            promotion_diagnostics = await _owned_io(
                 _promote_staging_install,
                 staging_dir=staging_dir,
                 install_dir=install_dir,
                 cancel_event=cancel_event,
                 io_cancel_event=cancel_event or threading.Event(),
             )
-            emit_basic_log(
-                logger,
+            _emit_source_log(
                 f"[ModelDownload] source_completed model={resolved_manifest.model_id} "
                 f"source={source_label}",
                 level=logging.INFO,
             )
             await _emit_status(on_status, "ready", percent=None)
+            if failures or promotion_diagnostics:
+                installed = replace(
+                    installed,
+                    recovery_diagnostics=tuple(failures) + installed.recovery_diagnostics,
+                    secondary_diagnostics=promotion_diagnostics or (),
+                )
             return installed
         except (
             asyncio.CancelledError,
             LocalSTTRuntimeInstallCancelled,
             _StatusCallbackError,
         ) as exc:
+            exc.secondary_diagnostics = tuple(failures) + getattr(exc, "secondary_diagnostics", ())
             await _cleanup_failed_download(
                 download_task,
                 staging_dir=staging_dir,
@@ -801,6 +902,27 @@ async def _ensure_local_stt_installed_with_lease(
             )
             raise
         except Exception as exc:
+            diagnostics = model_asset_failure_diagnostics(
+                exc,
+                component="local_asr_provisioning",
+                operation="download",
+                code="local_asr.download_failed",
+            )
+            diagnostics = sanitize_diagnostics(
+                replace(
+                    diagnostics,
+                    fields={
+                        **diagnostics.fields,
+                        "model_id": resolved_manifest.model_id,
+                        "source_kind": (
+                            "huggingface_mirror" if source_label == "hf_mirror" else source_label
+                        ),
+                        "source_attempt": source_attempt,
+                    },
+                )
+            )
+            exc.failure_diagnostics = diagnostics
+            failures.append(diagnostics)
             await _cleanup_failed_download(
                 download_task,
                 staging_dir=staging_dir,
@@ -809,10 +931,8 @@ async def _ensure_local_stt_installed_with_lease(
             )
             if first_error is None:
                 first_error = exc
-            failures.append(f"{source_label}: {exc}")
             last_error = exc
-            emit_basic_log(
-                logger,
+            _emit_source_log(
                 f"[ModelDownload] source_failed model={resolved_manifest.model_id} "
                 f"source={source_label} cause={type(exc).__name__}",
                 level=logging.WARNING,
@@ -826,27 +946,42 @@ async def _ensure_local_stt_installed_with_lease(
             )
             raise
 
-    await _emit_status(on_status, "download_failed", percent=None)
-    code = getattr(last_error, "failure_code", "unknown")
-    if isinstance(last_error, httpx.TimeoutException):
-        code = "download_timeout"
-    elif isinstance(last_error, httpx.ProxyError):
-        code = "proxy_failed"
-    elif isinstance(last_error, httpx.ConnectError):
-        code = "connection_failed"
-    elif isinstance(last_error, httpx.HTTPStatusError):
-        code = "source_unavailable"
-    elif isinstance(last_error, OSError) and last_error.errno == errno.ENOSPC:
-        code = "disk_full"
-    status_code = getattr(last_error, "status_code", None)
-    if isinstance(last_error, httpx.HTTPStatusError):
-        status_code = last_error.response.status_code
-    if preferred_source is not None:
-        message = "checksum mismatch" if code == "checksum_failed" else "Model installation failed"
-    else:
-        message = "; ".join(failures) or "runtime local STT install failed"
+    code = model_asset_failure_code(last_error) if last_error is not None else "unknown"
+    diagnostics = sanitize_diagnostics(
+        ErrorDiagnostics(
+            component="local_asr_provisioning",
+            operation="models.install",
+            code="local_asr_install_failed",
+            category="lifecycle",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={"model_id": resolved_manifest.model_id, "asset_failure_code": code},
+            causes=tuple(failures),
+        )
+    )
+    try:
+        await _emit_status(on_status, "download_failed", percent=None)
+    except BaseException as callback:
+        if isinstance(callback, (Exception, BaseExceptionGroup)):
+            callback.failure_diagnostics = sanitize_diagnostics(
+                replace(
+                    diagnostics,
+                    fields={
+                        **diagnostics.fields,
+                        "asset_failure_code": model_asset_failure_code(callback),
+                    },
+                    causes=diagnostics.causes + (
+                        model_asset_failure_diagnostics(callback, operation="models.install"),
+                    ),
+                )
+            )
+        else:
+            callback.secondary_diagnostics = tuple(failures)
+        raise
     raise LocalSTTRuntimeInstallError(
-        message,
+        "checksum mismatch" if code == "checksum_failed" else "Model installation failed",
         failure_code=code,
-        status_code=status_code,
+        failure_diagnostics=diagnostics,
     ) from first_error

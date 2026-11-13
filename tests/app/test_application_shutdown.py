@@ -537,3 +537,87 @@ async def test_composed_application_exposes_live_owner_snapshots_and_repeated_cl
 
     assert app.application_lifecycle().snapshot == first_terminal
     assert first_terminal.state == "completed"
+
+
+@pytest.mark.asyncio
+async def test_shutdown_retains_late_cleanup_failure_after_timeout():
+    release = asyncio.Event()
+    original = PermissionError(13, "private cleanup state")
+
+    async def stubborn():
+        while not release.is_set():
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                continue
+        raise original
+
+    coordinator = ApplicationShutdownCoordinator(
+        (application_shutdown_callback(
+            phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+            owner_name="PeerCaptureSessionOwner",
+            callback_name="close",
+            callback=stubborn,
+            timeout_seconds=0.001,
+        ),),
+        task_settle_timeout_seconds=0.001,
+    )
+    try:
+        with pytest.raises(TimeoutError):
+            await coordinator.shutdown()
+        assert coordinator.snapshot.terminal is False
+        assert len(coordinator.snapshot.outstanding_task_names) == 1
+    finally:
+        release.set()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    snapshot = coordinator.snapshot
+    assert snapshot.terminal is True
+    assert snapshot.outstanding_task_names == ()
+    assert snapshot.failures[0].timed_out is True
+    assert snapshot.failures[1].diagnostics.fields["errno"] == 13
+    assert snapshot.failures[1].diagnostics.cause_id == snapshot.failures[0].diagnostics.diagnostic_id
+    assert "private" not in repr(snapshot.failures)
+    with pytest.raises(ExceptionGroup) as caught:
+        await coordinator.shutdown()
+    assert caught.value.exceptions[1] is original
+
+
+@pytest.mark.asyncio
+async def test_shutdown_original_survives_failed_logging_and_optional_sink(monkeypatch):
+    from puripuly_heart.app.services import application_shutdown as shutdown_module
+
+    original = PermissionError(13, "private owner content")
+    delivered = []
+
+    def fail_owner():
+        raise original
+
+    def failed_sink(_diagnostic):
+        raise OSError(5, "private sink path")
+
+    def failed_logging(*_args, **_kwargs):
+        raise RuntimeError("private logging content")
+
+    monkeypatch.setattr(shutdown_module.logger, "log", failed_logging)
+    coordinator = ApplicationShutdownCoordinator(
+        (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PeerCaptureSessionOwner", callback_name="close", callback=fail_owner,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
+                owner_name="RuntimeLoggingService", callback_name="close",
+                callback=lambda: delivered.append("closed"),
+            ),
+        ),
+        diagnostics_sink=failed_sink,
+    )
+    with pytest.raises(ExceptionGroup) as caught:
+        await coordinator.shutdown()
+    assert caught.value.exceptions[0] is original
+    assert delivered == ["closed"]
+    assert coordinator.snapshot.failure_count == 2
+    assert coordinator.snapshot.failures[0].diagnostics.fields["errno"] == 13
+    assert "private" not in repr(coordinator.snapshot.failures)

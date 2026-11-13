@@ -1,6 +1,49 @@
+use std::fmt;
+
+use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::presentation::PresentationStage;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct NativeFailure {
+    pub native_stage: &'static str,
+    pub native_code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary: Option<NativeCause>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct NativeCause {
+    pub native_stage: &'static str,
+    pub native_code: Option<i32>,
+}
+
+impl NativeFailure {
+    pub fn new(stage: &'static str, code: Option<i32>) -> Self {
+        Self { native_stage: stage, native_code: code, secondary: None }
+    }
+
+    pub fn at(mut self, stage: &'static str) -> Self {
+        self.native_stage = stage;
+        self
+    }
+
+    pub fn with_secondary(mut self, other: Self) -> Self {
+        self.secondary = Some(NativeCause {
+            native_stage: other.native_stage,
+            native_code: other.native_code,
+        });
+        self
+    }
+}
+
+impl fmt::Display for NativeFailure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{} code={:?}", self.native_stage, self.native_code)
+    }
+}
+
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct OwnerStatusInput<'a> {

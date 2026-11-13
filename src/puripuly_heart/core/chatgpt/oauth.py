@@ -7,7 +7,7 @@ import secrets
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Final
 from urllib.parse import urlencode
 
@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.diagnostics import exception_diagnostics
 
 CHATGPT_ISSUER: Final = "https://auth.openai.com"
 CHATGPT_AUTHORIZE_URL: Final = f"{CHATGPT_ISSUER}/api/accounts/authorize"
@@ -164,14 +165,9 @@ def token_set_from_response(
     previous_refresh_token: str | None = None,
     now: float | None = None,
 ) -> ChatGptTokenSet:
-    access_token = payload.get("access_token")
-    if not isinstance(access_token, str) or not access_token:
-        raise ChatGptAuthError("token_response_invalid")
-    refresh_token = payload.get("refresh_token")
-    if not isinstance(refresh_token, str) or not refresh_token:
-        refresh_token = previous_refresh_token
-    if not refresh_token:
-        raise ChatGptAuthError("token_response_invalid")
+    access_token, refresh_token = _token_response_values(
+        payload, previous_refresh_token=previous_refresh_token
+    )
     expires_in = payload.get("expires_in")
     ttl = float(expires_in) if isinstance(expires_in, int | float) and expires_in > 0 else 3600.0
     scope = payload.get("scope")
@@ -184,6 +180,20 @@ def token_set_from_response(
         scopes=scopes,
         id_token=id_token if isinstance(id_token, str) and id_token else None,
     )
+
+
+def _token_response_values(
+    payload: Mapping[str, object], *, previous_refresh_token: str | None = None
+) -> tuple[str, str]:
+    access_token = payload.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
+        raise ChatGptAuthError("token_response_invalid")
+    refresh_token = payload.get("refresh_token")
+    if not isinstance(refresh_token, str) or not refresh_token:
+        refresh_token = previous_refresh_token
+    if not refresh_token:
+        raise ChatGptAuthError("token_response_invalid")
+    return access_token, refresh_token
 
 
 def _oauth_error_code(response: httpx.Response) -> str | None:
@@ -231,9 +241,8 @@ async def exchange_authorization_code(
             _oauth_error_code(response) or "token_exchange_failed",
             status_code=response.status_code,
         )
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise ChatGptAuthError("token_response_invalid")
+    payload = _response_payload(response, operation="token_exchange", code="token_response_invalid")
+    _validate_token_response(response, payload, operation="token_exchange")
     return payload
 
 
@@ -253,14 +262,79 @@ async def refresh_access_token(
         },
     )
     if response.status_code == 200:
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise ChatGptAuthError("token_response_invalid")
+        payload = _response_payload(response, operation="refresh_response", code="token_response_invalid")
+        _validate_token_response(
+            response, payload, operation="refresh_response", previous_refresh_token=refresh_token
+        )
         return payload
     code = _oauth_error_code(response) or "refresh_failed"
     if code in _TERMINAL_REFRESH_ERRORS:
         raise ChatGptReauthRequired(code, status_code=response.status_code)
     raise ChatGptAuthError(code, status_code=response.status_code)
+
+
+def _validate_token_response(
+    response: httpx.Response,
+    payload: Mapping[str, object],
+    *,
+    operation: str,
+    previous_refresh_token: str | None = None,
+) -> None:
+    try:
+        _token_response_values(payload, previous_refresh_token=previous_refresh_token)
+    except ChatGptAuthError as exc:
+        diagnostics = ErrorDiagnostics(
+            component="chatgpt_session",
+            operation=operation,
+            code="chatgpt_token_response_invalid",
+            category="invalid_response",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=response.status_code,
+            retry_after_ms=None,
+            fields={"response_shape": "malformed_success", "dispatch_certainty": "response_received"},
+        )
+        raise ChatGptAuthError(
+            "token_response_invalid", status_code=response.status_code, diagnostics=diagnostics
+        ) from exc
+
+
+def _response_payload(
+    response: httpx.Response, *, operation: str, code: str
+) -> Mapping[str, object]:
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        diagnostics = exception_diagnostics(
+            exc,
+            component="chatgpt_session",
+            operation=operation,
+            code=f"chatgpt_{code}",
+            category="invalid_response",
+            fields={"response_shape": "non_json", "dispatch_certainty": "response_received"},
+        )
+        raise ChatGptAuthError(
+            code,
+            status_code=response.status_code,
+            diagnostics=replace(diagnostics, status_code=response.status_code),
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ChatGptAuthError(
+            code,
+            status_code=response.status_code,
+            diagnostics=ErrorDiagnostics(
+                component="chatgpt_session",
+                operation=operation,
+                code=f"chatgpt_{code}",
+                category="invalid_response",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=response.status_code,
+                retry_after_ms=None,
+                fields={"response_shape": "non_object", "dispatch_certainty": "response_received"},
+            ),
+        )
+    return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,10 +398,10 @@ class ChatGptIdTokenVerifier:
         response = await self.http.get(self.jwks_url)
         if response.status_code != 200:
             raise ChatGptAuthError("jwks_unavailable", status_code=response.status_code)
-        payload = response.json()
+        payload = _response_payload(response, operation="identity_verification", code="jwks_unavailable")
         keys = payload.get("keys") if isinstance(payload, dict) else None
         if not isinstance(keys, list):
-            raise ChatGptAuthError("jwks_unavailable")
+            raise ChatGptAuthError("jwks_unavailable", status_code=response.status_code)
         self._keys = {
             str(key["kid"]): key for key in keys if isinstance(key, dict) and "kid" in key
         }

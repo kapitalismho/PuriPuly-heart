@@ -5,9 +5,12 @@ import asyncio
 import contextlib
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 if TYPE_CHECKING:
@@ -15,6 +18,31 @@ if TYPE_CHECKING:
     from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 
 logger = logging.getLogger(__name__)
+
+
+def _launcher_failure(operation: str, error: BaseException) -> ErrorDiagnostics:
+    diagnostics = exception_diagnostics(
+        error,
+        component="gui_launcher",
+        operation=operation,
+        code={
+            "gui_startup": "gui_startup_failed",
+            "gui_runtime": "gui_runtime_failed",
+            "gui_cleanup": "gui_cleanup_failed",
+        }[operation],
+    )
+    error.failure_diagnostics = diagnostics
+    emit_failure(logger, diagnostics, stage=operation)
+    return diagnostics
+
+
+def _launcher_cleanup_failure(error: Exception, primary: BaseException | None) -> None:
+    diagnostics = _launcher_failure("gui_cleanup", error)
+    if primary is not None:
+        original = getattr(primary, "failure_diagnostics", None)
+        if not isinstance(original, ErrorDiagnostics):
+            original = _launcher_failure("gui_runtime", primary)
+        primary.failure_diagnostics = replace(original, causes=(*original.causes, diagnostics))
 
 
 def configure_main_logging(*, log_dir: Path | None = None):
@@ -241,7 +269,13 @@ def _run_gui(
             runtime_logging_sinks=runtime_logging_sinks,
         )
     finally:
-        lease.close()
+        primary = sys.exception()
+        try:
+            lease.close()
+        except Exception as exc:
+            _launcher_cleanup_failure(exc, primary)
+            if primary is None:
+                raise
 
 
 def _run_gui_with_lease(
@@ -282,14 +316,7 @@ def _run_gui_with_lease(
                 vrchat_osc_presence=vrchat_osc_presence,
             )
         except Exception as exc:
-            from puripuly_heart.core.runtime_logging import emit_basic_log
-
-            emit_basic_log(
-                logger,
-                "The application window failed to start · Cause %s",
-                type(exc).__name__,
-                level=logging.ERROR,
-            )
+            _launcher_failure("gui_startup", exc)
             raise
 
     try:
@@ -308,22 +335,19 @@ def _run_gui_with_lease(
                     view=ft.AppView.FLET_APP_HIDDEN,
                 )
     except Exception as exc:
-        from puripuly_heart.core.runtime_logging import emit_basic_log
-
-        emit_basic_log(
-            logger,
-            "The application window stopped after a runtime failure · Cause %s",
-            type(exc).__name__,
-            level=logging.ERROR,
-        )
+        _launcher_failure("gui_runtime", exc)
         if view_process_owner is not None:
             try:
                 asyncio.run(view_process_owner.close())
-            except Exception:
-                logger.exception("The Flet desktop view cleanup also failed")
+            except Exception as cleanup_error:
+                _launcher_cleanup_failure(cleanup_error, exc)
         raise
     if view_process_owner is not None:
-        asyncio.run(view_process_owner.close())
+        try:
+            asyncio.run(view_process_owner.close())
+        except Exception as exc:
+            _launcher_cleanup_failure(exc, None)
+            raise
     return 0
 
 
@@ -360,9 +384,18 @@ def _load_settings_or_default(
     if path.exists():
         result = load_vnext_settings(path)
         if result.settings is None:
-            raise RuntimeError(
-                result.error.message if result.error is not None else str(result.status)
-            )
+            error = RuntimeError("Settings could not be loaded")
+            if result.error is not None:
+                error.failure_diagnostics = result.error.diagnostics
+                if isinstance(error.failure_diagnostics, ErrorDiagnostics):
+                    error.failure_diagnostics = replace(
+                        error.failure_diagnostics,
+                        causes=(
+                            *error.failure_diagnostics.causes,
+                            *result.error.secondary_diagnostics,
+                        ),
+                    )
+            raise error
         return result.settings
 
     return new_settings_for_first_run()
@@ -519,7 +552,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 2
     finally:
-        logging_sinks.close(force=True)
+        primary = sys.exception()
+        try:
+            logging_sinks.close(force=True)
+        except Exception as exc:
+            _launcher_cleanup_failure(exc, primary)
+            if primary is None:
+                raise
 
 
 if __name__ == "__main__":

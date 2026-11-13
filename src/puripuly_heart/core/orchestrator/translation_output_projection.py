@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
 from uuid import UUID
+from weakref import WeakSet
 
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.orchestrator.configuration import (
@@ -294,6 +295,9 @@ class TranslationUiMessageQueue:
     _completed_order: deque[tuple[int, str]] = field(default_factory=deque, init=False)
     _peer_parent_identities: dict[tuple[int, UUID], int] = field(default_factory=dict, init=False)
     _peer_parent_identity_order: deque[tuple[int, UUID]] = field(default_factory=deque, init=False)
+    _observed_failed_workers: WeakSet[asyncio.Task[None]] = field(
+        default_factory=WeakSet, init=False, repr=False
+    )
     _active_generation: int | None = field(default=None, init=False)
     _latest_source_order: int = field(default=-1, init=False)
     _closed: bool = field(default=False, init=False)
@@ -598,6 +602,7 @@ class TranslationUiMessageQueue:
             self._self_worker.add_done_callback(self._finish_self_writer)
 
     def _finish_self_writer(self, worker: asyncio.Task[None]) -> None:
+        self._observe_writer_completion(worker, channel="self")
         if self._self_worker is worker:
             self._active_self_event = None
             self._self_worker = None
@@ -616,8 +621,8 @@ class TranslationUiMessageQueue:
                     continue
                 try:
                     await asyncio.wait_for(self.queue.put(event), timeout=self.write_timeout_s)
-                except TimeoutError:
-                    self._record_self(event, "destination_write_timeout")
+                except TimeoutError as exc:
+                    self._record_self(event, "destination_write_timeout", exception=exc)
                 except asyncio.CancelledError:
                     authority = cast(_UiDeliveryAuthority, event.delivery_authority)
                     reason = (
@@ -631,8 +636,8 @@ class TranslationUiMessageQueue:
                     )
                     self._record_self(event, reason)
                     raise
-                except Exception:
-                    self._record_self(event, "destination_publish_failed")
+                except Exception as exc:
+                    self._record_self(event, "destination_publish_failed", exception=exc)
                 else:
                     self._record_self(event, "ui_queue_submitted")
                 finally:
@@ -641,7 +646,9 @@ class TranslationUiMessageQueue:
             if self._self_worker is asyncio.current_task():
                 self._active_self_event = None
 
-    def _record_self(self, event: UIEvent, reason: str) -> OutputPublicationResult:
+    def _record_self(
+        self, event: UIEvent, reason: str, *, exception: BaseException | None = None
+    ) -> OutputPublicationResult:
         accepted = reason in {"accepted_handoff", "ui_queue_submitted"}
         authority = cast(_UiDeliveryAuthority, event.delivery_authority)
         return self.output_runtime.record_ui_publication(
@@ -659,6 +666,7 @@ class TranslationUiMessageQueue:
             ui_queue_submitted=reason == "ui_queue_submitted",
             operation_id=event.operation_id,
             request_id=event.request_id,
+            exception=exception,
         )
 
     def _ensure_peer_writer(self) -> None:
@@ -667,6 +675,7 @@ class TranslationUiMessageQueue:
             self._peer_worker.add_done_callback(self._finish_peer_writer)
 
     def _finish_peer_writer(self, worker: asyncio.Task[None]) -> None:
+        self._observe_writer_completion(worker, channel="peer")
         if self._peer_worker is worker:
             self._active_peer_batch = None
             self._writer_cancel_reason = None
@@ -698,12 +707,13 @@ class TranslationUiMessageQueue:
                             self.queue.put(event),
                             timeout=self.write_timeout_s,
                         )
-                    except TimeoutError:
+                    except TimeoutError as exc:
                         self._reject_event(
                             batch,
                             event,
                             publication_id,
                             "destination_write_timeout",
+                            exception=exc,
                         )
                     except asyncio.CancelledError:
                         reason = self._writer_cancel_reason or "output_runtime_closing"
@@ -717,9 +727,10 @@ class TranslationUiMessageQueue:
                             )
                         batch.events.clear()
                         raise
-                    except Exception:
+                    except Exception as exc:
                         self._reject_event(
-                            batch, event, publication_id, "destination_publish_failed"
+                            batch, event, publication_id, "destination_publish_failed",
+                            exception=exc,
                         )
                     else:
                         self._complete_key(batch.publication_generation, publication_id)
@@ -847,6 +858,8 @@ class TranslationUiMessageQueue:
         event: UIEvent,
         publication_id: str,
         reason: str,
+        *,
+        exception: BaseException | None = None,
     ) -> None:
         self._in_flight_keys.discard((batch.publication_generation, publication_id))
         self._record(
@@ -857,6 +870,7 @@ class TranslationUiMessageQueue:
             source_order=batch.source_order,
             status=OUTPUT_ROUTING_DECISION_SKIPPED,
             reason=reason,
+            exception=exception,
         )
 
     def _complete_key(self, generation: int, publication_id: str) -> None:
@@ -881,6 +895,7 @@ class TranslationUiMessageQueue:
         reason: str,
         accepted_handoff: bool = False,
         ui_queue_submitted: bool = False,
+        exception: BaseException | None = None,
     ) -> OutputPublicationResult:
         return self.output_runtime.record_ui_publication(
             channel="peer",
@@ -895,6 +910,30 @@ class TranslationUiMessageQueue:
             ui_queue_submitted=ui_queue_submitted,
             operation_id=event.operation_id,
             request_id=event.request_id,
+            exception=exception,
+        )
+
+    def _observe_writer_completion(self, worker: asyncio.Task[None], *, channel: str) -> None:
+        if worker in self._observed_failed_workers:
+            return
+        if worker.cancelled():
+            return
+        exception = worker.exception()
+        if exception is None:
+            return
+        self._observed_failed_workers.add(worker)
+        self.output_runtime.record_ui_publication(
+            channel=channel,
+            status=OUTPUT_ROUTING_DECISION_SKIPPED,
+            publication_id=f"{channel}-ui-writer",
+            reason="destination_publish_failed",
+            publication_generation=None,
+            source_order=None,
+            parent_utterance_id=None,
+            event_type=UIEventType.ERROR.value,
+            accepted_handoff=False,
+            ui_queue_submitted=False,
+            exception=exception,
         )
 
     @staticmethod

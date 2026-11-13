@@ -3,6 +3,11 @@ from __future__ import annotations
 import builtins
 import math
 from collections.abc import Mapping
+from puripuly_heart.core.diagnostics import (
+    deserialize_diagnostics,
+    sanitize_diagnostic_fields,
+    serialize_diagnostics,
+)
 
 NATIVE_FAILURE_REASONS = frozenset(
     {
@@ -201,7 +206,13 @@ def project_child_owner_status(message: Mapping[str, object]) -> dict[str, objec
     return projected
 
 
+class ValidatedChildFailure(dict[str, object]):
+    __slots__ = ()
+
+
 def project_child_failure(message: Mapping[str, object]) -> dict[str, object]:
+    if isinstance(message, ValidatedChildFailure):
+        return message
     projected = {
         "type": message.get("type"),
         "failure_reason": safe_failure_reason(message.get("failure_reason")),
@@ -243,6 +254,18 @@ def project_child_failure(message: Mapping[str, object]) -> dict[str, object]:
             projected[key] = value
         elif value is not None:
             rejected += 1
+    for key in ("native_failure", "cleanup_native_failure"):
+        value = message.get(key)
+        if value is not None:
+            projected[key], invalid = _project_native_failure(value)
+            rejected += invalid
+    cleanup_diagnostics = message.get("cleanup_diagnostics")
+    if isinstance(cleanup_diagnostics, Mapping):
+        projected["cleanup_diagnostics"] = serialize_diagnostics(
+            deserialize_diagnostics(cleanup_diagnostics)
+        )
+    elif cleanup_diagnostics is not None:
+        rejected += 1
     evidence = message.get("evidence")
     if isinstance(evidence, Mapping):
         safe_evidence: dict[str, object] = {}
@@ -320,10 +343,30 @@ def project_child_failure(message: Mapping[str, object]) -> dict[str, object]:
         "cleanup_stage",
         "evidence_state",
         "evidence",
+        "native_failure",
+        "cleanup_native_failure",
+        "cleanup_diagnostics",
     }
     rejected += len(set(message) - known)
     if projected["failure_reason"] != message.get("failure_reason"):
         rejected += 1
     if rejected:
         projected["rejected_records"] = (projected.get("rejected_records") or 0) + rejected
-    return projected
+    return ValidatedChildFailure(projected)
+
+
+def _project_native_failure(value: object, *, secondary: bool = False) -> tuple[dict, int]:
+    if not isinstance(value, Mapping):
+        return {}, 1
+    fields, rejected = sanitize_diagnostic_fields({
+        key: value[key] for key in ("native_stage", "native_code") if key in value
+    })
+    rejected += len(set(value) - {"native_stage", "native_code", "secondary"})
+    child = value.get("secondary")
+    if child is not None:
+        if secondary:
+            rejected += 1
+        else:
+            fields["secondary"], invalid = _project_native_failure(child, secondary=True)
+            rejected += invalid
+    return fields, rejected

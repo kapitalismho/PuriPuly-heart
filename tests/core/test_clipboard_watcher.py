@@ -110,8 +110,9 @@ def test_start_timeout_requests_stop_and_joins_thread(
     watcher_module.sys.platform != "win32",
     reason="Win32 window class path is Windows-only",
 )
+@pytest.mark.parametrize("window_created", [False, True])
 def test_message_loop_unregisters_class_when_window_creation_fails(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, window_created: bool,
 ) -> None:
     hinstance = 9876
 
@@ -128,14 +129,14 @@ def test_message_loop_unregisters_class_when_window_creation_fails(
         def __init__(self) -> None:
             self.RegisterClassW = FakeFunction(1)
             self.UnregisterClassW = FakeFunction(1)
-            self.CreateWindowExW = FakeFunction(0)
+            self.CreateWindowExW = FakeFunction(123 if window_created else 0)
             self.DefWindowProcW = FakeFunction(0)
             self.AddClipboardFormatListener = FakeFunction(1)
             self.RemoveClipboardFormatListener = FakeFunction(1)
             self.DestroyWindow = FakeFunction(1)
             self.PostMessageW = FakeFunction(1)
             self.PostQuitMessage = FakeFunction(None)
-            self.GetMessageW = FakeFunction(0)
+            self.GetMessageW = FakeFunction(-1 if window_created else 0)
             self.TranslateMessage = FakeFunction(1)
             self.DispatchMessageW = FakeFunction(0)
             self.IsClipboardFormatAvailable = FakeFunction(0)
@@ -156,10 +157,21 @@ def test_message_loop_unregisters_class_when_window_creation_fails(
 
     fake_windll = FakeWindll()
     monkeypatch.setattr(watcher_module.ctypes, "windll", fake_windll, raising=False)
+    monkeypatch.setattr(
+        watcher_module.ctypes, "WinError",
+        lambda: PermissionError(13, "private native failure"),
+    )
     watcher = create_clipboard_watcher(lambda _text: None)
 
     watcher._run_message_loop()
 
-    assert isinstance(watcher._start_error, ClipboardWatcherError)
+    if window_created:
+        assert watcher._start_error is None
+        assert watcher.failure_diagnostics.fields["errno"] == 13
+        assert watcher._stopped.is_set()
+        assert watcher.failure_diagnostics.operation == "clipboard_loop"
+        assert "private" not in repr(watcher.failure_diagnostics)
+    else:
+        assert isinstance(watcher._start_error, ClipboardWatcherError)
     assert watcher._ready.is_set()
     assert fake_windll.user32.UnregisterClassW.calls == [(watcher._class_name, hinstance)]

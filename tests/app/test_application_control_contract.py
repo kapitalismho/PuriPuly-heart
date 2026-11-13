@@ -41,7 +41,7 @@ from puripuly_heart.core.audio.source import (
     SelfMicCaptureChannelDecision,
     SoundDeviceInputMetadata,
 )
-from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, exception_diagnostics
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.messages import TransactionResult
 from puripuly_heart.core.peer_capture import (
@@ -1528,8 +1528,10 @@ async def test_control_audio_test_reports_channel_failures_pending_stop_and_live
             hostapi_index=None,
             resolved_device_idx=None,
             resolved_device_name=None,
-            resolution_exception_class="DeviceUnavailable",
-            resolution_exception_message=None,
+            failure_diagnostics=exception_diagnostics(
+                RuntimeError(), component="capture.self", operation="source_open",
+                code="source_open_failed",
+            ),
             should_attempt_open=False,
             wasapi_auto_convert=False,
             wasapi_exclusive=False,
@@ -2178,6 +2180,7 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
 
     from puripuly_heart.app.services.model_assets import ModelAssetsApplication
     from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
+    from puripuly_heart.core.local_translation.assets import GemmaInstallState
 
     monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
     monkeypatch.setattr(
@@ -2198,7 +2201,11 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
             self.requests.append(request)
             self.started.set()
             await self.release.wait()
-            return SimpleNamespace(cancelled=self.cancelled, failed_model_ids=(), failure_codes=())
+            return SimpleNamespace(
+                cancelled=self.cancelled, failed_model_ids=(),
+                failure_diagnostics=None, recovery_diagnostics=(),
+                secondary_diagnostics=(),
+            )
 
         async def cancel_install(self, backend, *, origin=None):
             self.cancelled = True
@@ -2210,12 +2217,13 @@ async def test_control_model_commands_download_import_delete_cancel_and_report_a
     class Gemma:
         status = "missing"
 
-        def install_status(self, model_id):
-            return self.status
+        def install_state(self, model_id):
+            return GemmaInstallState(self.status, tmp_path / "gemma")
 
         async def install_assets(self, **kwargs):
             self.kwargs = kwargs
             self.status = "ready"
+            return SimpleNamespace(recovery_diagnostics=(), secondary_diagnostics=())
 
         async def delete_assets(self, model_id):
             self.status = "missing"

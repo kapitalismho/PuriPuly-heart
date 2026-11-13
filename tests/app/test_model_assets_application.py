@@ -12,6 +12,8 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
 )
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTRuntimeInstallError
+from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
 
 GEMMA_ID = "gemma-test"
 CHOICES = (
@@ -38,7 +40,11 @@ class FakeProvisioning:
         self.active_backend = None
         self.release = asyncio.Event()
         self.started = asyncio.Event()
-        self.result = SimpleNamespace(cancelled=False, failed_model_ids=(), failure_codes=())
+        self.result = SimpleNamespace(
+            cancelled=False, failed_model_ids=(), failure_codes=(),
+            failure_diagnostics=None, recovery_diagnostics=(),
+            secondary_diagnostics=(),
+        )
         self.snapshot = SimpleNamespace(
             activity_for=lambda backend: object() if backend == self.active_backend else None
         )
@@ -52,7 +58,11 @@ class FakeProvisioning:
 
     async def cancel_install(self, backend, *, origin=None):
         self.cancelled.append((backend, origin))
-        self.result = SimpleNamespace(cancelled=True, failed_model_ids=(), failure_codes=())
+        self.result = SimpleNamespace(
+            cancelled=True, failed_model_ids=(), failure_codes=(),
+            failure_diagnostics=None, recovery_diagnostics=(),
+            secondary_diagnostics=(),
+        )
         self.release.set()
 
     async def delete_model(self, model_id):
@@ -65,13 +75,14 @@ class FakeGemma:
         self.deleted = []
         self.status = "missing"
 
-    def install_status(self, model_id):
-        return self.status
+    def install_state(self, model_id):
+        return SimpleNamespace(status=self.status, failure_diagnostics=None)
 
     async def install_assets(self, **kwargs):
         self.installs.append(kwargs)
         kwargs["on_status"](SimpleNamespace(downloaded_bytes=3, total_bytes=4))
         self.status = "ready"
+        return SimpleNamespace(recovery_diagnostics=(), secondary_diagnostics=())
 
     async def delete_assets(self, model_id):
         self.deleted.append(model_id)
@@ -149,10 +160,16 @@ async def test_asr_download_reports_progress_for_the_selected_model_without_chan
 async def test_failure_is_recorded_on_the_entry_and_cleared_by_the_next_attempt(tmp_path) -> None:
     service, provisioning, _gemma = _service(tmp_path)
     provisioning.release.set()
+    diagnostics = model_asset_failure_diagnostics(
+        LocalSTTRuntimeInstallError("private", failure_code="connection_failed")
+    )
     provisioning.result = SimpleNamespace(
         cancelled=False,
         failed_model_ids=(GRANITE_MODEL_ID,),
         failure_codes=("connection_failed",),
+        failure_diagnostics=diagnostics,
+        recovery_diagnostics=(),
+        secondary_diagnostics=(),
     )
 
     with pytest.raises(ModelAssetsError) as caught:
@@ -160,9 +177,16 @@ async def test_failure_is_recorded_on_the_entry_and_cleared_by_the_next_attempt(
 
     assert caught.value.failure_code == "connection_failed"
     assert service.entry(GRANITE_MODEL_ID).failure_code == "connection_failed"
-    provisioning.result = SimpleNamespace(cancelled=False, failed_model_ids=(), failure_codes=())
+    assert caught.value.failure_diagnostics is diagnostics
+    assert service.entry(GRANITE_MODEL_ID).failure_diagnostics is diagnostics
+    provisioning.result = SimpleNamespace(
+        cancelled=False, failed_model_ids=(), failure_codes=(),
+        failure_diagnostics=None, recovery_diagnostics=(),
+        secondary_diagnostics=(),
+    )
     await service.download(GRANITE_MODEL_ID)
     assert service.entry(GRANITE_MODEL_ID).failure_code is None
+    assert service.entry(GRANITE_MODEL_ID).failure_diagnostics is None
 
 
 @pytest.mark.asyncio

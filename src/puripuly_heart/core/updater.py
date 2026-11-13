@@ -7,13 +7,16 @@ Network failures are handled gracefully without affecting the main application.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from typing import Any
 
 import httpx
 
 from puripuly_heart import GITHUB_REPO, __version__
 from puripuly_heart.core import external_network, network_clients
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,11 @@ class UpdateInfo:
     download_url: str
     release_notes: str
 
+
+class UpdateCheckError(RuntimeError):
+    def __init__(self, diagnostics: ErrorDiagnostics) -> None:
+        self.failure_diagnostics = diagnostics
+        super().__init__("Update availability could not be checked")
 
 def _parse_version(version_str: str) -> tuple[int, ...]:
     """Parse version string like '0.1.0' or 'v0.1.0' into tuple of ints."""
@@ -54,9 +62,9 @@ def _is_newer(remote: str, current: str) -> bool:
 async def check_for_update() -> UpdateInfo | None:
     """Check GitHub for a newer release.
 
-    Returns UpdateInfo if a new version is available, None otherwise.
-    Network errors are silently ignored (returns None).
+    Returns UpdateInfo for a newer release and None after a successful no-update observation.
     """
+    status_code: int | None = None
     try:
         tls, policy = await run_owned_thread_call(
             lambda: (external_network.select_tls(), external_network.ProxyPolicy())
@@ -69,14 +77,16 @@ async def check_for_update() -> UpdateInfo | None:
                 headers={"Accept": "application/vnd.github.v3+json"},
                 follow_redirects=True,
             )
+            status_code = resp.status_code
             if resp.status_code != 200:
-                return None
+                raise ValueError("Update service returned an unsuccessful status")
 
             data: dict[str, Any] = resp.json()
-            latest_version = data.get("tag_name", "").lstrip("v")
-
-            if not latest_version:
-                return None
+            if not isinstance(data, dict) or not isinstance(data.get("tag_name"), str):
+                raise ValueError("Update service returned an invalid release")
+            latest_version = data["tag_name"].lstrip("v")
+            if re.fullmatch(r"[0-9]+(?:\.[0-9]+)*(?:-[0-9A-Za-z.-]+)?", latest_version) is None:
+                raise ValueError("Update service returned an invalid release")
             if not _is_newer(latest_version, __version__):
                 return None
 
@@ -94,7 +104,21 @@ async def check_for_update() -> UpdateInfo | None:
                 release_notes=data.get("body", ""),
             )
 
-    except httpx.TimeoutException:
-        return None
-    except Exception:
-        return None
+    except Exception as exc:
+        category = (
+            "timeout"
+            if isinstance(exc, httpx.TimeoutException)
+            else "network" if status_code is None else "invalid_response"
+        )
+        diagnostics = replace(
+            exception_diagnostics(
+                exc,
+                component="updater",
+                operation="update_check",
+                code="updater_check_failed",
+                category=category,
+            ),
+            status_code=status_code,
+        )
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
+        raise UpdateCheckError(diagnostics) from exc

@@ -20,6 +20,8 @@ from puripuly_heart.app.services.managed_gemma_translation import (
 from puripuly_heart.app.wiring.wiring_managed_gemma import managed_gemma_selection
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
+from puripuly_heart.core.diagnostics import serialize_diagnostics
+from puripuly_heart.core.lifecycle import LifecycleDiagnosticsUnavailableError
 from puripuly_heart.core.local_asr.local_stt_download_port import (
     HuggingFaceDownloadProgress,
     LocalSTTDownloadPortError,
@@ -177,14 +179,15 @@ async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
 
     owner = ManagedGemmaTranslationOwner(runtime=RecordingRuntime(prepare))
 
-    with pytest.raises(RuntimeError, match="provisioning wrapper"):
+    with pytest.raises(RuntimeError, match="provisioning wrapper") as caught:
         await owner.prepare(_selection())
 
-    assert owner.snapshot.failure_phase == "download"
-    assert owner.snapshot.failure_code == "download_failed"
-    assert owner.snapshot.cause_type == "RuntimeError"
-    assert owner.snapshot.worker_exit_code == 1
-    assert owner.snapshot.status_code == 503
+    diagnostics = owner.snapshot.failure_diagnostics
+    assert diagnostics is caught.value.failure_diagnostics
+    assert diagnostics.fields["asset_failure_code"] == "download_failed"
+    assert diagnostics.fields["cause_class_1"] == "RuntimeError"
+    assert diagnostics.fields["exit_code"] == 1
+    assert diagnostics.status_code == 503
     assert "sensitive worker detail" not in repr(owner.snapshot)
 
 
@@ -193,7 +196,7 @@ async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
     ("failure", "phase", "code"),
     [
         (ManagedGemmaRuntimeMissingError("server is missing"), "runtime_files", "runtime_missing"),
-        (ManagedGemmaRuntimeVersionError("incompatible"), "runtime_files", "runtime_incompatible"),
+        (ManagedGemmaRuntimeVersionError("incompatible"), "runtime_version", "runtime_incompatible"),
         (ManagedGemmaRuntimeError("exited during startup"), "runtime", "runtime_failed"),
     ],
 )
@@ -209,8 +212,8 @@ async def test_runtime_file_failures_are_distinguished_from_native_load_failures
         await owner.prepare(_selection("gpu"))
 
     assert owner.snapshot.state == "failed"
-    assert owner.snapshot.failure_phase == phase
-    assert owner.snapshot.failure_code == code
+    assert owner.snapshot.failure_diagnostics.operation == phase
+    assert owner.snapshot.failure_diagnostics.code == "model_assets." + code
 
 
 @pytest.mark.asyncio
@@ -238,9 +241,11 @@ async def test_combined_cancellation_and_cleanup_failure_is_terminal_and_bounded
     )
     assert any(isinstance(exception, PermissionError) for exception in caught.value.exceptions)
     assert owner.snapshot.state == "failed"
-    assert owner.snapshot.failure_phase == "provisioning"
-    assert owner.snapshot.failure_code == "filesystem_failed"
-    assert owner.snapshot.cause_type == "PermissionError"
+    diagnostics = owner.snapshot.failure_diagnostics
+    assert diagnostics.operation == "gemma_install"
+    assert [value.fields["exception_class"] for value in diagnostics.causes] == [
+        "unclassified", "PermissionError"
+    ]
     assert all(snapshot.state != "ready" for snapshot in statuses)
     assert "sensitive staging path" not in repr(owner.snapshot)
 
@@ -284,8 +289,11 @@ async def test_lifecycle_diagnostic_sink_failure_still_closes_runtime() -> None:
 
     with pytest.raises(RuntimeError, match="download failed"):
         await owner.prepare(_selection())
-    with pytest.raises(RuntimeError, match="diagnostic sink failed"):
+    with pytest.raises(LifecycleDiagnosticsUnavailableError) as caught:
         await owner.close()
+    assert isinstance(caught.value.__cause__, RuntimeError)
+    assert str(caught.value.__cause__) == "diagnostic sink failed"
+    assert caught.value.failure_diagnostics.causes
 
     assert runtime.close_count == 1
 
@@ -502,10 +510,14 @@ async def test_modelscope_http_failure_preserves_download_status_metadata(
             await owner.prepare(_selection())
 
         assert owner.snapshot.state == "failed"
-        assert owner.snapshot.failure_phase == "download"
-        assert owner.snapshot.failure_code == "download_failed"
-        assert owner.snapshot.cause_type == "HTTPStatusError"
-        assert owner.snapshot.status_code == 503
+        diagnostics = owner.snapshot.failure_diagnostics
+        assert diagnostics.operation == "download"
+        assert diagnostics.status_code is None
+        assert [value.status_code for value in diagnostics.causes] == [503, 503, 503]
+        assert [value.fields["source_kind"] for value in diagnostics.causes] == [
+            "huggingface", "modelscope", "huggingface_mirror"
+        ]
+        assert "primary download unavailable" not in str(serialize_diagnostics(diagnostics))
     finally:
         await owner.close()
 
@@ -872,6 +884,6 @@ async def test_delete_assets_removes_an_idle_install_but_not_the_loaded_model(
         await owner.delete_assets(selection.model_id)
 
         assert not install_dir.exists()
-        assert owner.install_status(selection.model_id) == "missing"
+        assert owner.install_state(selection.model_id).status == "missing"
     finally:
         await owner.close()

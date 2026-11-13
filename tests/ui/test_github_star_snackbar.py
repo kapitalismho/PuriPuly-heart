@@ -774,7 +774,10 @@ async def test_after_launch_update_failure_still_runs_github_star_prompt(
     await app._run_after_launch_tasks()
 
     assert events == ["update", "github-star"]
-    assert any("Update check failed" in message for message in logged)
+    assert logged == []
+    failure = next(item for item in app.boundary_diagnostics if item.operation == "update_check")
+    assert failure.fields["exception_class"] == "TimeoutError"
+    assert "network gate" not in repr(failure)
 
 
 @pytest.mark.asyncio

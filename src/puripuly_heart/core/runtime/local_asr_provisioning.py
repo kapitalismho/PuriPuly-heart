@@ -10,8 +10,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
 
-from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
-from puripuly_heart.core.error_messages import provider_failure_report
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.feature_diagnostics import log_feature
 from puripuly_heart.core.local_asr.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -54,6 +58,11 @@ from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
     ensure_local_stt_installed,
 )
 from puripuly_heart.core.model_install_removal import remove_model_install_dir
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.model_asset_diagnostics import (
+    model_asset_failure_code,
+    model_asset_failure_diagnostics,
+)
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
 
@@ -404,6 +413,10 @@ class LocalASRProvisioningOwner:
                         event="result_delivery",
                         outcome="failed",
                         failure_type=type(exc).__name__,
+                        failure_diagnostics=model_asset_failure_diagnostics(
+                            exc, operation="diagnostic_delivery",
+                            code="model_assets.diagnostic_delivery_failed",
+                        ),
                     )
                 )
                 return
@@ -421,6 +434,10 @@ class LocalASRProvisioningOwner:
                         origin=result.request.origin,
                         outcome="failed",
                         failure_type=type(exc).__name__,
+                        failure_diagnostics=model_asset_failure_diagnostics(
+                            exc, operation="diagnostic_delivery",
+                            code="model_assets.diagnostic_delivery_failed",
+                        ),
                     )
                 )
 
@@ -434,7 +451,23 @@ class LocalASRProvisioningOwner:
             coroutine.close()
             return
         self._result_delivery_tasks.add(task)
-        task.add_done_callback(self._result_delivery_tasks.discard)
+        task.add_done_callback(self._finish_result_delivery)
+
+    def _finish_result_delivery(self, task: asyncio.Task[None]) -> None:
+        self._result_delivery_tasks.discard(task)
+        if not task.cancelled():
+            failure = task.exception()
+            if failure is not None:
+                self._diagnostics.append(
+                    LocalASRProvisioningDiagnostic(
+                        event="result_delivery",
+                        outcome="failed",
+                        failure_diagnostics=model_asset_failure_diagnostics(
+                            failure, operation="diagnostic_delivery",
+                            code="model_assets.diagnostic_delivery_failed",
+                        ),
+                    )
+                )
 
     async def _close_result_delivery_tasks(self) -> None:
         tasks = tuple(self._result_delivery_tasks)
@@ -462,6 +495,9 @@ class LocalASRProvisioningOwner:
         installed: list[str] = []
         failed: list[str] = []
         failure_codes: list[str] = []
+        failures: list[ErrorDiagnostics] = []
+        recoveries: list[ErrorDiagnostics] = []
+        secondaries: list[ErrorDiagnostics] = []
         cancelled = False
         active_model_id: str | None = None
         try:
@@ -540,6 +576,8 @@ class LocalASRProvisioningOwner:
                             "installed manifest does not match requested model"
                         )
                     installed.append(model_id)
+                    recoveries.extend(installed_manifest.recovery_diagnostics)
+                    secondaries.extend(installed_manifest.secondary_diagnostics)
                     await self._emit_diagnostic(
                         LocalASRProvisioningDiagnostic(
                             event="install",
@@ -560,12 +598,16 @@ class LocalASRProvisioningOwner:
                     is_cancelled = isinstance(
                         primary, (asyncio.CancelledError, LocalSTTRuntimeInstallCancelled)
                     )
+                    secondaries.extend(getattr(primary, "secondary_diagnostics", ()))
                     if is_cancelled:
                         cancelled = True
                     else:
                         failed.append(model_id)
-                        failure_codes.append(
-                            self._log_install_failure(
+                        failure_codes.append(model_asset_failure_code(primary))
+                    model_failures: list[ErrorDiagnostics] = []
+                    if not is_cancelled:
+                        model_failures.append(
+                            self._install_failure(
                                 primary,
                                 model_id=model_id,
                                 generation=generation,
@@ -574,12 +616,14 @@ class LocalASRProvisioningOwner:
                             )
                         )
                     for cleanup_failure in cleanup_failures:
-                        self._log_install_failure(
-                            cleanup_failure,
-                            model_id=model_id,
-                            generation=generation,
-                            diagnostic_identity=diagnostic_identity,
-                            stage="cleanup",
+                        model_failures.append(
+                            self._install_failure(
+                                cleanup_failure,
+                                model_id=model_id,
+                                generation=generation,
+                                diagnostic_identity=diagnostic_identity,
+                                stage="cleanup",
+                            )
                         )
                         await self._emit_diagnostic(
                             LocalASRProvisioningDiagnostic(
@@ -595,6 +639,19 @@ class LocalASRProvisioningOwner:
                     self._set_operation(
                         model_id, operation="cancelled" if is_cancelled else "download_failed"
                     )
+                    if model_failures:
+                        diagnostics = model_failures[0]
+                        if len(model_failures) > 1:
+                            diagnostics = sanitize_diagnostics(
+                                replace(
+                                    diagnostics,
+                                    causes=diagnostics.causes + tuple(model_failures[1:]),
+                                )
+                            )
+                        failures.append(diagnostics)
+                        self._models[model_id] = replace(
+                            self._models[model_id], failure_diagnostics=diagnostics
+                        )
                     await self._emit_diagnostic(
                         LocalASRProvisioningDiagnostic(
                             event="install",
@@ -639,9 +696,35 @@ class LocalASRProvisioningOwner:
             cancelled=cancelled,
             snapshot=self.snapshot,
             failure_codes=tuple(failure_codes),
+            failure_diagnostics=(
+                failures[0]
+                if len(failures) == 1
+                else (
+                    sanitize_diagnostics(
+                        ErrorDiagnostics(
+                            component="local_asr_provisioning",
+                            operation="models.install",
+                            code="local_asr_install_failed",
+                            category="lifecycle",
+                            visibility="diagnostic_only",
+                            content_policy="metadata_only",
+                            status_code=None,
+                            retry_after_ms=None,
+                            fields={"backend": request.backend},
+                            **diagnostic_identity,
+                            generation=generation,
+                            causes=tuple(failures),
+                        )
+                    )
+                    if failures
+                    else None
+                )
+            ),
+            recovery_diagnostics=tuple(recoveries),
+            secondary_diagnostics=tuple(secondaries),
         )
 
-    def _log_install_failure(
+    def _install_failure(
         self,
         failure: BaseException,
         *,
@@ -649,32 +732,35 @@ class LocalASRProvisioningOwner:
         generation: int,
         diagnostic_identity: dict[str, str | None],
         stage: str,
-    ) -> str:
-        code = getattr(failure, "failure_code", "unknown")
-        if not isinstance(code, str) or not code.isascii() or not code.replace("_", "").isalnum():
-            code = "unknown"
+    ) -> ErrorDiagnostics:
+        native = model_asset_failure_diagnostics(
+            failure,
+            component="local_asr_provisioning",
+            operation="models.install",
+            code="local_asr_install_failed",
+        )
+        diagnostics = sanitize_diagnostics(
+            replace(
+                native,
+                component="local_asr_provisioning",
+                operation="models.install",
+                code="local_asr_install_failed",
+                visibility="diagnostic_only",
+                fields={**native.fields, "model_id": model_id},
+                operation_id=diagnostic_identity.get("operation_id"),
+                request_id=diagnostic_identity.get("request_id"),
+                generation=generation,
+            )
+        )
         log_feature(
             "ModelDownload",
             stage,
-            "cleanup_failed" if stage == "cleanup" else code,
+            "cleanup_failed" if stage == "cleanup" else model_asset_failure_code(failure),
             error=failure,
-            http_status=getattr(failure, "status_code", None),
-        )
-        native = provider_failure_report(
-            failure, provider="local_asr", operation="models.install"
-        ).diagnostics
-        diagnostics = replace(
-            native,
-            component="local_asr_provisioning",
-            code="local_asr_install_failed",
-            visibility="diagnostic_only",
-            fields={**native.fields, "model_id": model_id},
-            operation_id=diagnostic_identity.get("operation_id"),
-            request_id=diagnostic_identity.get("request_id"),
-            generation=generation,
+            http_status=diagnostics.status_code,
         )
         emit_failure(logger, diagnostics, disposition="failed", stage=stage, exception=failure)
-        return code
+        return diagnostics
 
     async def _ensure_startup_cleanup(
         self,
@@ -722,6 +808,9 @@ class LocalASRProvisioningOwner:
                         outcome="failed",
                         elapsed_seconds=time.monotonic() - started_at,
                         failure_type=type(exc).__name__,
+                        failure_diagnostics=model_asset_failure_diagnostics(
+                            exc, operation="cleanup", code="local_asr.cleanup_failed"
+                        ),
                     )
                 )
             finally:
@@ -824,11 +913,19 @@ class LocalASRProvisioningOwner:
                     verify_checksums=verify_checksums,
                 )
                 installs.append(snapshot.models[0])
-            except Exception:
+            except Exception as exc:
                 installs.append(
                     LocalCPUModelInstall(
                         model_id=model_id,
-                        state=LocalSTTInstallState(status="invalid"),
+                        state=LocalSTTInstallState(
+                            status="invalid",
+                            failure_diagnostics=model_asset_failure_diagnostics(
+                                exc,
+                                operation="inspection",
+                                code="model_assets.inspect_failed",
+                                fields={"model_id": model_id},
+                            ),
+                        ),
                     )
                 )
         return LocalCPUInstallSnapshot(models=tuple(installs))
@@ -846,11 +943,19 @@ class LocalASRProvisioningOwner:
                 verify_checksums=verify_checksums,
                 manifest=manifest,
             )
-        except Exception:
+        except Exception as exc:
             return LocalGPUInstallSnapshot(
                 explicit_opt_in=True,
                 status="invalid",
-                state=LocalSTTInstallState(status="invalid"),
+                state=LocalSTTInstallState(
+                    status="invalid",
+                    failure_diagnostics=model_asset_failure_diagnostics(
+                        exc,
+                        operation="inspection",
+                        code="model_assets.inspect_failed",
+                        fields={"model_id": LOCAL_QWEN_GPU_MODEL_ID},
+                    ),
+                ),
             )
 
     def _manifest_for(
@@ -914,6 +1019,9 @@ class LocalASRProvisioningOwner:
             backend=current.backend,
             integrity=current.integrity,
             operation=operation,
+            failure_diagnostics=(
+                current.failure_diagnostics if operation != "downloading" else None
+            ),
         )
         if activity is not None:
             self._activities[current.backend] = activity
@@ -931,23 +1039,54 @@ class LocalASRProvisioningOwner:
             backend=backend,
             integrity=state.status,
             operation=operation,
+            failure_diagnostics=state.failure_diagnostics,
         )
 
     async def _publish_state(self) -> None:
         self._revision += 1
         if self._state_changed is None:
             return
-        result = self._state_changed(self.snapshot)
-        if inspect.isawaitable(result):
-            await result
+        try:
+            result = self._state_changed(self.snapshot)
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            self._diagnostics.append(
+                LocalASRProvisioningDiagnostic(
+                    event="state_delivery",
+                    outcome="failed",
+                    failure_type=type(exc).__name__,
+                    failure_diagnostics=exception_diagnostics(
+                        exc,
+                        component="model_assets",
+                        operation="state_delivery",
+                        code="model_assets.state_delivery_failed",
+                    ),
+                )
+            )
 
     async def _emit_diagnostic(self, diagnostic: LocalASRProvisioningDiagnostic) -> None:
         self._diagnostics.append(diagnostic)
         if self._diagnostic_sink is None:
             return
-        result = self._diagnostic_sink(diagnostic)
-        if inspect.isawaitable(result):
-            await result
+        try:
+            result = self._diagnostic_sink(diagnostic)
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            self._diagnostics.append(
+                LocalASRProvisioningDiagnostic(
+                    event="diagnostic_delivery",
+                    outcome="failed",
+                    failure_type=type(exc).__name__,
+                    failure_diagnostics=exception_diagnostics(
+                        exc,
+                        component="model_assets",
+                        operation="diagnostic_delivery",
+                        code="model_assets.diagnostic_delivery_failed",
+                    ),
+                )
+            )
 
 
 __all__ = [

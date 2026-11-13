@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
 from puripuly_heart.core.llm.latency import current_request, observe_attempt
 from puripuly_heart.core.llm.provider import (
     LLMProvider,
@@ -15,11 +22,13 @@ from puripuly_heart.core.llm.provider import (
     LLMRequestExecution,
 )
 from puripuly_heart.core.observability import ProviderObservationPort
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 if TYPE_CHECKING:
     from puripuly_heart.domain.models import Translation
 
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class LLMProviderAttempt:
@@ -46,6 +55,8 @@ class _BranchOutcome:
     result: Translation | None = None
     error: Exception | None = None
     elapsed_ms: int | None = None
+    failure: ErrorDiagnostics | None = None
+    recorded: bool = False
 
     @property
     def resolved(self) -> bool:
@@ -241,6 +252,8 @@ class FallbackRacingLLMProvider(LLMProvider):
                         task=task,
                         outcome=outcomes[index],
                         started_at=started_at,
+                        index=index,
+                        turn_id=str(utterance_id),
                     )
                     if index == 0 and outcomes[index].error is not None:
                         primary_error.set()
@@ -281,7 +294,24 @@ class FallbackRacingLLMProvider(LLMProvider):
                         continue
                     await start_attempt(index, trigger_reason=str(trigger_reason))
             if winner_index is not None and winner_result is not None:
-                return winner_result
+                recovered = []
+                for outcome in outcomes:
+                    if outcome.failure is not None:
+                        self._record_recovered(outcome)
+                        recovered.append(serialize_diagnostics(outcome.failure))
+                for error in schedule_errors:
+                    failure = exception_diagnostics(
+                        error,
+                        component="provider.llm",
+                        operation="translate",
+                        code="provider.schedule_failed",
+                    )
+                    emit_failure(logger, failure, severity="warning", disposition="recovered")
+                    recovered.append(serialize_diagnostics(failure))
+                return replace(
+                    winner_result,
+                    recovered_failures=(*winner_result.recovered_failures, *recovered),
+                )
 
             errors = tuple(
                 [outcome.error for outcome in outcomes if outcome.error is not None]
@@ -298,6 +328,8 @@ class FallbackRacingLLMProvider(LLMProvider):
                     schedule_tasks=schedule_tasks,
                     outcomes=outcomes,
                     winner=winner_index is not None,
+                    turn_id=str(utterance_id),
+                    interrupted=winner_index is None and operation.cancelling() > 0,
                     executions=executions,
                 )
             )
@@ -316,6 +348,8 @@ class FallbackRacingLLMProvider(LLMProvider):
         schedule_tasks: dict[asyncio.Task[object], int],
         outcomes: list[_BranchOutcome],
         winner: bool,
+        turn_id: str,
+        interrupted: bool,
         executions: list[LLMRequestExecution],
     ) -> None:
         for task in schedule_tasks:
@@ -326,17 +360,41 @@ class FallbackRacingLLMProvider(LLMProvider):
                     started_at=started_at,
                     provider_tasks=provider_tasks,
                     outcomes=outcomes,
+                    turn_id=turn_id,
                 )
         finally:
             try:
                 for task in schedule_tasks:
                     await self._cancel_task(task)
-                for task in provider_tasks.values():
+                for index, task in provider_tasks.items():
                     await self._cancel_task(task)
+                    if not task.cancelled() and not outcomes[index].resolved:
+                        await self._capture_outcome(
+                            task=task,
+                            outcome=outcomes[index],
+                            started_at=started_at,
+                            index=index,
+                            turn_id=turn_id,
+                        )
             finally:
                 for execution in executions:
-                    with contextlib.suppress(Exception):
+                    try:
                         await execution.close()
+                    except Exception as exc:
+                        self._record_cleanup_failure(exc)
+                if winner:
+                    for outcome in outcomes:
+                        self._record_recovered(outcome)
+                elif interrupted:
+                    for outcome in outcomes:
+                        if outcome.failure is not None:
+                            emit_failure(
+                                logger,
+                                outcome.failure,
+                                severity="warning",
+                                disposition="degraded",
+                                stage="translate",
+                            )
 
     async def close(self) -> None:
         if self._shutdown_task is None:
@@ -365,8 +423,10 @@ class FallbackRacingLLMProvider(LLMProvider):
             if id(provider) in closed_ids:
                 continue
             closed_ids.add(id(provider))
-            with contextlib.suppress(Exception):
+            try:
                 await provider.close()
+            except Exception as exc:
+                self._record_cleanup_failure(exc)
 
     async def _wait_for_attempt_start(
         self,
@@ -410,6 +470,7 @@ class FallbackRacingLLMProvider(LLMProvider):
         started_at: float,
         provider_tasks: dict[int, asyncio.Task[object]],
         outcomes: list[_BranchOutcome],
+        turn_id: str,
     ) -> None:
         pending = set(provider_tasks.values())
         if pending and self.loser_grace_ms > 0:
@@ -423,11 +484,21 @@ class FallbackRacingLLMProvider(LLMProvider):
                         task=task,
                         outcome=outcomes[index],
                         started_at=started_at,
+                        index=index,
+                        turn_id=turn_id,
                     )
         for index, task in tuple(provider_tasks.items()):
             if outcomes[index].resolved:
                 continue
             await self._cancel_task(task)
+            if not task.cancelled():
+                await self._capture_outcome(
+                    task=task,
+                    outcome=outcomes[index],
+                    started_at=started_at,
+                    index=index,
+                    turn_id=turn_id,
+                )
 
     async def _capture_outcome(
         self,
@@ -435,6 +506,8 @@ class FallbackRacingLLMProvider(LLMProvider):
         task: asyncio.Task[object],
         outcome: _BranchOutcome,
         started_at: float,
+        index: int,
+        turn_id: str,
     ) -> None:
         if outcome.resolved:
             return
@@ -447,6 +520,40 @@ class FallbackRacingLLMProvider(LLMProvider):
             raise
         except Exception as exc:
             outcome.error = exc
+            from puripuly_heart.core.error_messages import provider_failure_report
+
+            outcome.failure = replace(
+                provider_failure_report(
+                    exc, provider=self.attempts[index].provider_name, operation="translate"
+                ).diagnostics,
+                **current_diagnostic_operation(),
+                turn_id=turn_id,
+            )
+            exc.failure_diagnostics = outcome.failure
+
+    @staticmethod
+    def _record_recovered(outcome: _BranchOutcome) -> None:
+        if outcome.failure is not None and not outcome.recorded:
+            emit_failure(
+                logger, outcome.failure, severity="warning", disposition="recovered", stage="translate"
+            )
+            outcome.recorded = True
+
+    @staticmethod
+    def _record_cleanup_failure(exception: BaseException) -> None:
+        emit_failure(
+            logger,
+            exception_diagnostics(
+                exception,
+                component="provider.llm",
+                operation="cleanup",
+                code="provider.cleanup_failed",
+                fields={"cleanup_confirmed": False},
+            ),
+            severity="warning",
+            disposition="degraded",
+            stage="cleanup",
+        )
 
     async def _create_tracked_task(self, awaitable: Awaitable[object]) -> asyncio.Task[object]:
         task = asyncio.create_task(awaitable)

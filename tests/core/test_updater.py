@@ -69,13 +69,16 @@ async def test_check_for_update_returns_info(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_check_for_update_returns_none_on_error(monkeypatch):
+async def test_check_for_update_retains_unavailable_http_observation(monkeypatch):
     response = DummyResponse(500, {})
     monkeypatch.setattr(
         updater.network_clients, "external_async_client", lambda **_kwargs: DummyClient(response)
     )
 
-    assert await updater.check_for_update() is None
+    with pytest.raises(updater.UpdateCheckError) as caught:
+        await updater.check_for_update()
+    assert caught.value.failure_diagnostics.status_code == 500
+    assert caught.value.failure_diagnostics.code == "updater_check_failed"
 
 
 @pytest.mark.asyncio
@@ -151,4 +154,27 @@ async def test_update_transport_preparation_failure_is_best_effort(monkeypatch):
         raise OSError("synthetic TLS preparation failure")
 
     monkeypatch.setattr(updater.external_network, "select_tls", fail)
+    with pytest.raises(updater.UpdateCheckError) as caught:
+        await updater.check_for_update()
+    assert caught.value.failure_diagnostics.fields["exception_class"] == "OSError"
+    assert isinstance(caught.value.__cause__, OSError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("malformed", [
+    {"private": "private release body"},
+    {"tag_name": "not-a-version", "body": "private release body"},
+    ["private release body"],
+])
+async def test_successful_no_update_is_distinct_from_malformed_release(monkeypatch, malformed):
+    monkeypatch.setattr(updater, "__version__", "1.2.3")
+    response = DummyResponse(200, {"tag_name": "v1.2.3"})
+    monkeypatch.setattr(
+        updater.network_clients, "external_async_client", lambda **_kwargs: DummyClient(response)
+    )
     assert await updater.check_for_update() is None
+    response._data = malformed
+    with pytest.raises(updater.UpdateCheckError) as caught:
+        await updater.check_for_update()
+    assert caught.value.failure_diagnostics.category == "invalid_response"
+    assert "private" not in repr(caught.value.failure_diagnostics)

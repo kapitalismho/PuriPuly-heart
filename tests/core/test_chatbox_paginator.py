@@ -583,7 +583,7 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
     paginator.enqueue(_message("system!!", clock))
     receipts: list[tuple[int, str]] = []
     paginator.bind_delivery_observer(
-        lambda message, status: receipts.append((message.presentation_revision, status))
+        lambda message, status, diagnostics: receipts.append((message.presentation_revision, status))
     )
     paginator.enqueue(
         _message(
@@ -932,7 +932,7 @@ def test_empty_self_turn_settles_delivery_once_without_sending() -> None:
     deliveries: list[tuple[uuid.UUID, str]] = []
     paginator = ChatboxPaginator(sender=sender, clock=clock, page_interval_s=3.0)
     paginator.bind_delivery_observer(
-        lambda message, status: deliveries.append((message.utterance_id, status))
+        lambda message, status, diagnostics: deliveries.append((message.utterance_id, status))
     )
 
     empty = _message(
@@ -976,7 +976,7 @@ def test_empty_self_turn_settles_after_older_pagination_drains() -> None:
     deliveries: list[tuple[uuid.UUID, str]] = []
     paginator = ChatboxPaginator(sender=sender, clock=clock, max_chars=5, page_interval_s=3.0)
     paginator.bind_delivery_observer(
-        lambda message, status: deliveries.append((message.utterance_id, status))
+        lambda message, status, diagnostics: deliveries.append((message.utterance_id, status))
     )
 
     paginator.enqueue(_message("abcde fghij", clock))

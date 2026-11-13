@@ -8,6 +8,7 @@ pub mod renderer;
 mod retry_episode;
 pub mod runtime;
 mod runtime_diagnostics;
+pub use runtime_diagnostics::{NativeCause, NativeFailure};
 mod spatial_policy;
 pub mod state;
 

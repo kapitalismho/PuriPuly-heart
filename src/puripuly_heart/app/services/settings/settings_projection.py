@@ -12,8 +12,9 @@ from puripuly_heart.app.ports.settings_view import (
     PromptSettingsSnapshot,
     ProviderSettingsSnapshot,
 )
-from puripuly_heart.app.ports.ui_presentation import UiPresentationPort
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult, UiPresentationPort
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.diagnostics import exception_diagnostics
 
 from .settings_mutation_legacy import (
     _SettingsPathSnapshot,
@@ -25,6 +26,7 @@ from .settings_mutation_legacy import (
     settings_path_snapshot_for_stt_language_audio,
     settings_path_snapshot_for_ui_prompt_clipboard_state,
 )
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,8 @@ class SettingsProjectionOwner:
     presentation: UiPresentationPort
     config_path: Path
     current_settings: Callable[[], AppSettingsVNext | None]
+    failure_sink: Callable[[SettingsRenderResult], None] | None = None
+    last_render_result: SettingsRenderResult | None = field(init=False, default=None)
     _order22_baseline: _SettingsPathSnapshot | None = field(
         init=False,
         default=None,
@@ -127,9 +131,9 @@ class SettingsProjectionOwner:
         overlay: OverlaySettingsSnapshot,
         compatibility_settings: AppSettingsVNext,
         preserve_custom_vocab_draft: bool = False,
-    ) -> bool | None:
+    ) -> SettingsRenderResult:
         try:
-            loaded = self.presentation.render_settings(
+            result = self.presentation.render_settings(
                 provider=provider,
                 general=general,
                 prompt=prompt,
@@ -137,17 +141,24 @@ class SettingsProjectionOwner:
                 config_path=self.config_path,
                 preserve_custom_vocab_draft=preserve_custom_vocab_draft,
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            return self._render_result(
+                SettingsRenderResult(
+                    False,
+                    exception_diagnostics(
+                        exc, component="settings_projection", operation="render_settings", code="settings_render_failed"
+                    ),
+                )
+            )
         self.remember_all(compatibility_settings)
-        return bool(loaded)
+        return self._render_result(result)
 
     def render(
         self,
         settings: AppSettingsVNext,
         *,
         preserve_custom_vocab_draft: bool = False,
-    ) -> bool | None:
+    ) -> SettingsRenderResult:
         from .settings_application import settings_view_surface_snapshots
 
         provider, general, prompt, overlay = settings_view_surface_snapshots(settings)
@@ -166,17 +177,33 @@ class SettingsProjectionOwner:
         provider: ProviderSettingsSnapshot,
         prompt: PromptSettingsSnapshot,
         compatibility_settings: AppSettingsVNext,
-    ) -> bool | None:
+    ) -> SettingsRenderResult:
         try:
-            loaded = self.presentation.refresh_settings_after_openrouter_pkce_success(
+            result = self.presentation.refresh_settings_after_openrouter_pkce_success(
                 provider=provider,
                 prompt=prompt,
                 config_path=self.config_path,
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            return self._render_result(
+                SettingsRenderResult(
+                    False,
+                    exception_diagnostics(
+                        exc,
+                        component="settings_projection",
+                        operation="refresh_settings_after_openrouter_pkce_success",
+                        code="settings_render_failed",
+                    ),
+                )
+            )
         self.remember_all(compatibility_settings)
-        return bool(loaded)
+        return self._render_result(result)
+
+    def _render_result(self, result: SettingsRenderResult) -> SettingsRenderResult:
+        self.last_render_result = result
+        if self.failure_sink is not None:
+            self.failure_sink(result)
+        return result
 
     def order22_patch_base_and_values(
         self,

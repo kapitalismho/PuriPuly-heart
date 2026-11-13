@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.ports.ui_presentation import SettingsRenderResult
 from puripuly_heart.app.services.settings.settings_application import (
     settings_view_surface_snapshots,
 )
@@ -149,10 +150,10 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     )
     settings = SimpleNamespace(
         set_gpu_devices=lambda **kwargs: events.append(("gpu-devices", kwargs)),
-        load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs)),
+        load_from_settings=lambda *args, **kwargs: events.append(("load-settings", args, kwargs)) or SettingsRenderResult(True),
         refresh_after_openrouter_pkce_success=lambda *args, **kwargs: events.append(
             ("pkce-refresh", args, kwargs)
-        ),
+        ) or SettingsRenderResult(True),
         set_overlay_calibration=lambda value: events.append(("calibration", value)),
         refresh_loopback_capture_target=lambda value: events.append(("capture-target", value)),
         set_local_cpu_auto_available=lambda value: events.append(("cpu-auto", value)),
@@ -221,12 +222,12 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         prompt=prompt,
         overlay=overlay,
         config_path=tmp_path / "settings.json",
-    )
+    ).loaded
     assert adapter.refresh_settings_after_openrouter_pkce_success(
         provider=provider,
         prompt=prompt,
         config_path=tmp_path / "settings.json",
-    )
+    ).loaded
     adapter.set_settings_overlay_calibration(calibration)
     adapter.refresh_settings_loopback_capture_target(general)
     adapter.set_settings_local_cpu_auto_available(True)

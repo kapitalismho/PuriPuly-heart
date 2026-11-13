@@ -1012,6 +1012,10 @@ class TranslationRequestOwner:
             source_text_hash=translation.source_text_hash,
             source_text_len=translation.source_text_len,
             logical_turn_key=f"{channel}:{translation.utterance_id}",
+            recovered_failures=translation.recovered_failures,
+            secondary_diagnostics=translation.secondary_diagnostics,
+            recovered_failures_truncated=translation.recovered_failures_truncated,
+            secondary_diagnostics_truncated=translation.secondary_diagnostics_truncated,
         )
 
     @staticmethod

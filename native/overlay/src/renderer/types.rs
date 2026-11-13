@@ -44,7 +44,7 @@ pub(crate) const TEXT_OUTLINE_COLOR: (f32, f32, f32, f32) = (0.0, 0.0, 0.0, 1.0)
 pub(crate) const TEXT_OUTLINE_OFFSETS_PX: [(f32, f32); 4] =
     [(-5.0, 0.0), (5.0, 0.0), (0.0, -5.0), (0.0, 5.0)];
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CaptionRenderError {
     #[error("renderer init failed: {0}")]
     Init(String),
@@ -52,6 +52,40 @@ pub enum CaptionRenderError {
     HardwareDevice(String),
     #[error("renderer draw failed: {0}")]
     Draw(String),
+    #[error("native renderer failure: {0}")]
+    Native(crate::runtime_diagnostics::NativeFailure),
+}
+
+impl CaptionRenderError {
+    pub fn native_failure(&self) -> crate::runtime_diagnostics::NativeFailure {
+        use crate::runtime_diagnostics::NativeFailure;
+        match self {
+            Self::Init(_) => NativeFailure::new("renderer_init", None),
+            Self::HardwareDevice(_) => NativeFailure::new("hardware_device", None),
+            Self::Draw(_) => NativeFailure::new("draw", None),
+            Self::Native(failure) => *failure,
+        }
+    }
+
+    #[cfg(windows)]
+    pub fn from_windows(stage: &'static str, error: windows::core::Error) -> Self {
+        Self::Native(crate::runtime_diagnostics::NativeFailure::new(
+            stage, Some(error.code().0),
+        ))
+    }
+}
+
+#[cfg(all(windows, test))]
+#[test]
+fn native_renderer_failure_preserves_hresult_without_private_prose() {
+    let error = CaptionRenderError::from_windows(
+        "draw",
+        windows::core::Error::new(windows::core::HRESULT(-2005270523), "private-path-token-body"),
+    );
+    let value = serde_json::to_value(error.native_failure()).unwrap();
+    assert_eq!(value["native_stage"], "draw");
+    assert_eq!(value["native_code"], -2005270523);
+    assert!(!value.to_string().contains("private"));
 }
 
 #[derive(Debug, Clone, PartialEq)]

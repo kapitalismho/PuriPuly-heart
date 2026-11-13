@@ -1086,3 +1086,106 @@ async def test_gpu_backend_resolves_default_path_without_blocking_or_starting_ca
     finally:
         release.set()
         await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gate(monkeypatch):
+    from puripuly_heart.app.wiring.wiring_stt_factory import _prepared_rolling_definition
+    from puripuly_heart.core.stt.rolling import RollingSTTBackend
+    from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
+
+    failed_connections = []
+    fail_cleanup = True
+
+    class FailedConnection:
+        closed = False
+
+        def on(self, *args):
+            raise ValueError("PRIVATE_STARTUP_FAILURE")
+
+        async def close(self):
+            if fail_cleanup:
+                raise PermissionError(13, "PRIVATE_STARTUP_CLEANUP")
+            self.closed = True
+
+    async def connect(options):
+        connection = FailedConnection()
+        failed_connections.append(connection)
+        return connection
+
+    class AvailableSession:
+        closed = False
+
+        async def close(self):
+            self.closed = True
+
+    class AvailableBackend:
+        def __init__(self):
+            self.close_calls = 0
+            self.sessions = []
+
+        async def open_session(self, **kwargs):
+            session = AvailableSession()
+            self.sessions.append(session)
+            return session
+
+        async def close(self):
+            self.close_calls += 1
+            for session in self.sessions:
+                await session.close()
+
+    available = AvailableBackend()
+    failed = _prepared_rolling_definition(
+        name=STTProviderName.ELEVENLABS_SCRIBE,
+        api_key="synthetic-old-key",
+        build=lambda key: ElevenLabsScribeSTTBackend(
+            api_key=key, scribe_connect_factory=connect
+        ),
+    )
+    alternate = _prepared_rolling_definition(
+        name=STTProviderName.DEEPGRAM,
+        api_key="synthetic-alternate-key",
+        build=lambda key: available,
+    )
+    rolling = RollingSTTBackend(providers=(failed, alternate), channel="self")
+    monkeypatch.setattr(
+        runtime_wiring, "create_stt_backend_from_resolved_config", lambda *args, **kwargs: rolling
+    )
+    factory = SharedSTTProviderFactory(
+        secrets=object(),
+        clock=FakeClock(),
+        reset_deadline_s=300,
+        gpu_model_path=Path("synthetic-unused.gguf"),
+    )
+    provider = await factory.create(
+        ProviderRuntimeBuildRequest(
+            config=_resolved_config("self", "rolling_free"),
+            recognition_projection="scoped",
+            provider_signature=("rolling_free",),
+            runtime_signature=("self", "synthetic"),
+        ),
+        gpu_runtime=object(),
+    )
+    try:
+        for _ in range(2):
+            session = await rolling.open_session()
+            assert session.provider_name is STTProviderName.DEEPGRAM
+            await session.close()
+        assert len(failed_connections) == 1
+        assert len(failed.build_backend()._starting_sessions) == 1
+        assert rolling.rebind_member(STTProviderName.ELEVENLABS_SCRIBE, "synthetic-rotated-key")
+        session = await rolling.open_session()
+        assert session.provider_name is STTProviderName.DEEPGRAM
+        await session.close()
+        assert len(failed_connections) == 1
+        assert rolling.rebind_member(STTProviderName.ELEVENLABS_SCRIBE, "")
+        with pytest.raises(Exception):
+            await provider.close_backend_and_wait()
+        assert not failed_connections[0].closed
+        assert available.close_calls >= 1
+        assert all(session.closed for session in available.sessions)
+        fail_cleanup = False
+        await provider.close_backend_and_wait()
+        assert failed_connections[0].closed
+    finally:
+        fail_cleanup = False
+        await provider.close_backend_and_wait()

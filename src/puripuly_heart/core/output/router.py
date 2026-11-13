@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics, safe_exception_fields
 from puripuly_heart.core.messages import DiagnosticFieldValue, ErrorDiagnostics
 from puripuly_heart.core.output.chatbox import (
     SelfChatboxOutputPort,
@@ -190,6 +190,12 @@ class OutputRouter:
                     "error_type": safe_exception_fields(exc)["exception_class"],
                     **safe_exception_fields(exc),
                 },
+                diagnostics=exception_diagnostics(
+                    exc,
+                    component="output_runtime",
+                    operation="publish",
+                    code=_DESTINATION_PUBLISH_FAILED_REASON,
+                ),
             )
         return await self._record_decision(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
@@ -209,38 +215,18 @@ class OutputRouter:
         publication_kind: OutputPublicationKind,
         reason: str | None,
         metadata: _DecisionMetadata,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> OutputRoutingDecision:
-        diagnostics = None
-        if reason == _DESTINATION_PUBLISH_FAILED_REASON:
-            diagnostics = ErrorDiagnostics(
-                component="output_runtime",
-                operation="publish",
-                code=reason,
-                category="lifecycle",
-                visibility="basic",
-                content_policy="metadata_only",
-                status_code=None,
-                retry_after_ms=None,
+        if diagnostics is not None:
+            diagnostics = replace(
+                diagnostics,
                 fields={
+                    **diagnostics.fields,
                     "destination": route,
                     "publication_id": publication_id,
                     "publication_kind": publication_kind,
-                    **{
-                        key: value
-                        for key, value in metadata.items()
-                        if key
-                        in {
-                            "exception_class",
-                            "errno",
-                            "winerror",
-                            "cause_class_1",
-                            "cause_class_2",
-                            "cause_class_3",
-                            "cause_class_4",
-                        }
-                    },
                 },
-                channel=(
+                channel=diagnostics.channel or (
                     metadata.get("channel") if metadata.get("channel") in {"self", "peer"} else None
                 ),
             )
@@ -262,17 +248,16 @@ class OutputRouter:
                 if self.observer_failure_count == 1:
                     emit_failure(
                         logger,
-                        ErrorDiagnostics(
-                            component="output_runtime",
-                            operation="observe",
-                            code="output_observer_failed",
-                            category="lifecycle",
-                            visibility="diagnostic_only",
-                            content_policy="metadata_only",
-                            status_code=None,
-                            retry_after_ms=None,
-                            fields={"destination": route, "publication_id": publication_id},
+                        replace(
+                            exception_diagnostics(
+                                exc,
+                                component="output_runtime",
+                                operation="observe",
+                                code="output_observer_failed",
+                                fields={"destination": route, "publication_id": publication_id},
+                            ),
                             cause_id=diagnostics.diagnostic_id if diagnostics else None,
+                            visibility="diagnostic_only",
                         ),
                         severity="warning",
                         disposition="degraded",

@@ -750,3 +750,117 @@ async def test_started_refresh_mutation_settles_before_new_sign_in(
             5,
         )
         await session.close()
+
+
+async def test_refresh_transport_evidence_survives_auth_wrapper_without_credentials():
+    failure = httpx.ProxyError("synthetic-private-url")
+    failure.connection_diagnostics = {
+        "transport": "https",
+        "proxy_source": "env",
+        "stage": "request_send",
+        "dispatch_certainty": "possible",
+    }
+
+    def handler(_request):
+        raise failure
+
+    store = _signed_in_store()
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        with pytest.raises(ChatGptAuthError) as raised:
+            await session.access_token()
+        diagnostics = raised.value.diagnostics
+        assert diagnostics.code == "chatgpt_refresh_network_error"
+        assert diagnostics.category == "network"
+        assert diagnostics.fields["proxy_source"] == "env"
+        assert diagnostics.fields["dispatch_certainty"] == "possible"
+        assert session.status().signed_in is True
+        assert "synthetic-private" not in str(diagnostics)
+        assert "u@example.com" not in str(diagnostics)
+    finally:
+        await session.close()
+
+
+async def test_refresh_invalid_json_retains_status_and_shape_without_response_body():
+    store = _signed_in_store()
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(200, text="synthetic-private-body")
+            )
+        ),
+    )
+    try:
+        with pytest.raises(ChatGptAuthError) as raised:
+            await session.access_token()
+        assert raised.value.diagnostics.status_code == 200
+        assert raised.value.diagnostics.category == "invalid_response"
+        assert raised.value.diagnostics.fields["response_shape"] == "non_json"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r0"
+        assert "synthetic-private-body" not in str(raised.value.diagnostics)
+    finally:
+        await session.close()
+
+
+async def test_sign_out_timeout_preserves_remote_failure_and_local_cleanup():
+    def handler(_request):
+        raise TimeoutError("synthetic-private-transport")
+
+    store = _signed_in_store()
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        result = await session.sign_out()
+        assert result.remote_revoked is False
+        assert result.local_credentials_removed is True
+        assert result.diagnostics.category == "timeout"
+        assert result.diagnostics.fields["exception_class"] == "TimeoutError"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+        assert "synthetic-private" not in str(result)
+    finally:
+        await session.close()
+
+
+async def test_refresh_malformed_object_is_invalid_response_without_retiring_credentials():
+    store = _signed_in_store()
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={}))
+        ),
+    )
+    try:
+        with pytest.raises(ChatGptAuthError) as raised:
+            await session.access_token()
+        assert raised.value.diagnostics.category == "invalid_response"
+        assert raised.value.diagnostics.status_code == 200
+        assert raised.value.diagnostics.fields["response_shape"] == "malformed_success"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r0"
+        assert session.status().signed_in is True
+    finally:
+        await session.close()
+
+
+async def test_refresh_without_rotated_refresh_token_keeps_existing_authority():
+    store = _signed_in_store()
+    session = ChatGptSession(
+        secret_store=lambda: store,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(
+                    200, json={"access_token": "synthetic-access", "scope": CHATGPT_PLAN_SCOPE}
+                )
+            )
+        ),
+    )
+    try:
+        assert await session.access_token() == "synthetic-access"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r0"
+    finally:
+        await session.close()

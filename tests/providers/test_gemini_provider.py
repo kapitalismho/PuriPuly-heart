@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.gemini import (
     GeminiClient,
     GeminiLLMProvider,
@@ -241,13 +242,12 @@ async def test_gemini_verify_api_key_checks_requested_model(monkeypatch):
         )
         is True
     )
-    assert (
+    with pytest.raises(LLMResponseError) as failure:
         await GeminiLLMProvider.verify_api_key(
             "secret",
             model="gemini-3.8-flash-preview",
         )
-        is False
-    )
+    assert failure.value.failure_diagnostics.category == "invalid_response"
     assert state["list_configs"] == [{"page_size": 1000}, {"page_size": 1000}]
 
 

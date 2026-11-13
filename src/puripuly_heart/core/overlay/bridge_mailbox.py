@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from collections import OrderedDict, deque
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import current_diagnostic_operation
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 from .presenter_projection import NativeRetryIntentProjection
 from .protocol import (
@@ -25,6 +27,7 @@ class SceneEnvelope:
     message: str
     block_expirations: Mapping[str, float | None]
     admitted_at: float
+    operation_identity: Mapping[str, str | None] = field(default_factory=current_diagnostic_operation)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,7 @@ class ControlEnvelope:
     key: str
     message: str
     payload_type: str
+    operation_identity: Mapping[str, str | None] = field(default_factory=current_diagnostic_operation)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +46,7 @@ class OverlayDeliveryReceipt:
     connection_epoch: int | None
     cause: str | None
     observed_at: float
+    diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,10 +119,13 @@ class OverlayBridgeMailbox:
         *,
         startup_runtime_controls: Iterable[Mapping[str, Any]] | None = None,
     ) -> None:
-        self.current_scene = self.make_scene(
-            self.current_scene.snapshot,
-            self.current_scene.block_expirations,
-            startup_runtime_controls=startup_runtime_controls,
+        self.current_scene = replace(
+            self.make_scene(
+                self.current_scene.snapshot,
+                self.current_scene.block_expirations,
+                startup_runtime_controls=startup_runtime_controls,
+            ),
+            operation_identity=self.current_scene.operation_identity,
         )
 
     def admit_scene(
@@ -339,6 +347,7 @@ class OverlayBridgeMailbox:
         scene_revision: int | None,
         cause: str | None,
         connection_epoch: int | None = None,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> OverlayDeliveryReceipt:
         stages = {
             "written": "transport_written",
@@ -352,6 +361,7 @@ class OverlayBridgeMailbox:
             connection_epoch=connection_epoch,
             cause=cause,
             observed_at=self._clock.now(),
+            diagnostics=diagnostics,
         )
         self.delivery_receipts.append(receipt)
         return receipt

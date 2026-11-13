@@ -290,8 +290,10 @@ async def test_failed_diagnostic_sink_keeps_pending_event_for_later_retry() -> N
     scope.create_task(failing_task(), name="worker")
     await asyncio.sleep(0)
 
-    with pytest.raises(SinkTransportError):
+    with pytest.raises(_lifecycle_module().LifecycleDiagnosticsUnavailableError) as error:
         await scope.close()
+    assert isinstance(error.value.__cause__, SinkTransportError)
+    assert error.value.failure_diagnostics.causes[0].fields["exception_class"] == "RuntimeError"
 
     await scope.close()
 
@@ -317,3 +319,30 @@ async def test_create_task_after_close_rejects_and_closes_supplied_coroutine() -
         scope.create_task(coroutine, name="late")
 
     assert coroutine.cr_frame is None
+
+
+@pytest.mark.asyncio
+async def test_scope_retains_native_and_typed_cause_before_optional_delivery():
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+
+    lifecycle = _lifecycle_module()
+    original = PermissionError(13, "private background content")
+    attached = exception_diagnostics(
+        original, component="clipboard", operation="clipboard_submit", code="clipboard_failed"
+    )
+    original.failure_diagnostics = attached
+    scope = lifecycle.LifecycleScope("runtime")
+
+    async def failed():
+        raise original
+
+    task = scope.create_task(failed(), name="worker")
+    await asyncio.gather(task, return_exceptions=True)
+    await asyncio.sleep(0)
+    diagnostics = scope.failure_diagnostics
+    assert diagnostics.fields["errno"] == 13
+    assert diagnostics.causes[0].diagnostic_id == attached.diagnostic_id
+    with pytest.raises(lifecycle.LifecycleDiagnosticsUnavailableError) as caught:
+        await scope.close()
+    assert caught.value.failure_diagnostics.causes[0] is diagnostics
+    assert "private" not in repr(caught.value.failure_diagnostics)

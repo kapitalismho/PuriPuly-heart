@@ -8,7 +8,41 @@ from puripuly_heart.app.control_presentation import SETTINGS_PRESENTATION, setti
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
 from puripuly_heart.app.services.application_control import COMMANDS, QUERIES, SETTINGS_FIELDS
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
-from puripuly_heart.core.diagnostics import sanitize_diagnostic_fields
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_CAUSE_MAX_COUNT,
+    project_diagnostic_record,
+    sanitize_diagnostic_fields,
+)
+
+CHANNEL_FIELDS = (
+    "selected_provider",
+    "runtime_provider",
+    "capture_attached_provider",
+    "desired_active",
+    "effective_active",
+    "pending_handoff",
+    "failure_reason",
+    "provider_status",
+)
+OVERLAY_FIELDS = (
+    "settings_available",
+    "desired_enabled",
+    "configured_target",
+    "effective_target",
+    "attempting_target",
+    "lifecycle",
+    "runtime_active",
+    "process_state",
+    "presentation_ready",
+    "desktop_visible",
+    "failure_reason",
+    "auto_restart_scheduled",
+    "fallback_active",
+    "recovery_active",
+    "recovery_reason",
+    "ingress_stopped",
+    "generation",
+)
 
 DEDICATED_COMMANDS = frozenset(
     {
@@ -508,6 +542,80 @@ RECEIPT_FIELDS = frozenset(
 )
 
 
+def project_diagnostic_evidence(value: object) -> dict:
+    source = value if isinstance(value, Mapping) else {}
+    result = {
+        key: project_diagnostic_record(source[key])
+        for key in (
+            "diagnostics", "cause_diagnostics", "failure_diagnostics",
+            "query_diagnostics", "discovery_diagnostics", "avatar_diagnostics",
+            "source_open_diagnostics",
+        )
+        if isinstance(source.get(key), Mapping)
+    }
+    for key in ("secondary_diagnostics_truncated", "diagnostics_truncated"):
+        if type(source.get(key)) is bool:
+            result[key] = source[key]
+    for key, bound, count_key, flag_key in (
+        ("secondary_diagnostics", 4, "secondary_omitted_count", "secondary_truncated"),
+        ("recovered_diagnostics", DIAGNOSTIC_CAUSE_MAX_COUNT,
+         "recovered_diagnostics_omitted_count", "recovered_failures_truncated"),
+        ("recovery_diagnostics", DIAGNOSTIC_CAUSE_MAX_COUNT,
+         "recovery_diagnostics_omitted_count", "recovery_diagnostics_truncated"),
+        ("runtime_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
+         "runtime_failures_omitted_count", "runtime_failures_truncated"),
+        ("service_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
+         "service_failures_omitted_count", "service_failures_truncated"),
+        ("dispatch_failures", DIAGNOSTIC_CAUSE_MAX_COUNT,
+         "dispatch_failures_omitted_count", "dispatch_failures_truncated"),
+    ):
+        if type(source.get(flag_key)) is bool:
+            result[flag_key] = source[flag_key]
+        omitted = source.get(count_key)
+        if type(omitted) is int and 0 <= omitted < 2**31:
+            result[count_key] = omitted
+        items = source.get(key)
+        if isinstance(items, (list, tuple)):
+            result[key] = [
+                project_diagnostic_record(item)
+                for item in items[:bound]
+                if isinstance(item, Mapping)
+            ]
+            if len(items) > bound:
+                result[count_key] = result.get(count_key, 0) + len(items) - bound
+                result[flag_key] = True
+    return result
+
+
+def project_capture_channel(value: object) -> dict:
+    source = value if isinstance(value, Mapping) else {}
+    capture = source.get("capture")
+    capture = capture if isinstance(capture, Mapping) else {}
+    result = {
+        **safe_fields(source, CHANNEL_FIELDS),
+        **project_diagnostic_evidence(source),
+        "capture": {
+            **safe_fields(
+                capture,
+                ("state", "generation", "desired_active", "effective_active", "has_source",
+                 "cleanup_debt", "closed", "source_open_recovered"),
+            ),
+            **project_diagnostic_evidence(capture),
+        },
+    }
+    provider = project_diagnostic_evidence(source.get("provider"))
+    if provider:
+        result["provider"] = provider
+    return result
+
+
+def project_overlay_output(value: object) -> dict:
+    return {
+        **safe_fields(value, OVERLAY_FIELDS),
+        **project_diagnostic_evidence(value),
+    }
+
+
 def safe_receipt(value: object) -> dict:
     source = value if isinstance(value, Mapping) else {}
 
@@ -524,18 +632,45 @@ def safe_receipt(value: object) -> dict:
         return result
 
     result = project(source)
-    for key in ("error", "diagnostics", "transaction", "runtime_observation"):
+    result.update(project_diagnostic_evidence(source))
+    for key in ("error", "runtime_observation"):
         if isinstance(source.get(key), Mapping):
             result[key] = project(source[key])
+    observation = source.get("runtime_observation")
+    if isinstance(observation, Mapping) and isinstance(observation.get("channels"), Mapping):
+        result["runtime_observation"]["channels"] = {
+            channel: project_capture_channel(value)
+            for channel, value in observation["channels"].items()
+            if channel in {"self", "peer"}
+        }
+    if isinstance(source.get("channel"), Mapping):
+        result["channel"] = project_capture_channel(source["channel"])
+    if isinstance(source.get("output"), Mapping):
+        result["output"] = project_diagnostic_evidence(source["output"])
+    if isinstance(source.get("transaction"), Mapping):
+        result["transaction"] = safe_receipt(source["transaction"])
+    if isinstance(source.get("audio_test"), Mapping):
+        result["audio_test"] = project_audio_test(source["audio_test"])
+    return result
+
+
+def project_audio_test(source: Mapping) -> dict:
+    result = safe_fields(source, ("state", "desired_active", "effective_active"))
+    result["channels"] = {
+        channel: {
+            **safe_fields(
+                value, ("state", "failure_reason", "failure_type", "device_metadata_availability")
+            ),
+            **safe_receipt(value),
+        }
+        for channel, value in source.get("channels", {}).items()
+        if channel in {"self", "peer"} and isinstance(value, Mapping)
+    }
     return result
 
 
 async def project_query(name: str, source: dict, control, localize) -> dict:
-    from puripuly_heart.app.services.agent_chat.context import (
-        CHANNEL_FIELDS,
-        OVERLAY_FIELDS,
-        _audio_devices,
-    )
+    from puripuly_heart.app.services.agent_chat.context import _audio_devices
     from puripuly_heart.app.services.agent_chat.tools import (
         project_accounts,
         project_osc_output,
@@ -560,7 +695,7 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
         return {
             **base,
             **safe_fields(source, ("target", "locked")),
-            "output": safe_fields(source.get("output"), OVERLAY_FIELDS),
+            "output": project_overlay_output(source.get("output")),
         }
     if domain == "devices":
         return {**base, **_audio_devices(source, {})}
@@ -573,18 +708,11 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
             ),
         }
         result["channels"] = {
-            channel: {
-                **safe_fields(source.get("channels", {}).get(channel), CHANNEL_FIELDS),
-                "capture": safe_fields(
-                    source.get("channels", {}).get(channel, {}).get("capture"),
-                    ("state", "generation", "desired_active", "effective_active", "has_source"),
-                ),
-            }
+            channel: project_capture_channel(source.get("channels", {}).get(channel))
             for channel in ("self", "peer")
         }
-        result["audio_test"] = safe_fields(
-            source.get("audio_test"),
-            ("state", "ready", "active", "failure_code", "cleanup_complete"),
+        result["audio_test"] = project_audio_test(
+            source["audio_test"] if isinstance(source.get("audio_test"), Mapping) else {}
         )
         return result
     if domain == "secrets":
@@ -602,10 +730,15 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
     if domain == "auth":
         return {
             **base,
+            **safe_receipt(source),
             **safe_fields(source, ("action", "prompt_kind", "failure_kind", "consent_accepted")),
-            "chatgpt": safe_fields(
-                source.get("chatgpt"), ("available", "signed_in", "in_progress", "sign_in_required")
-            ),
+            "chatgpt": {
+                **safe_fields(
+                    source.get("chatgpt"),
+                    ("available", "signed_in", "in_progress", "sign_in_required"),
+                ),
+                **safe_receipt(source.get("chatgpt")),
+            },
             "login_available_locally": True,
         }
     if domain == "consent":
@@ -674,6 +807,7 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
             if isinstance(item, Mapping):
                 return {
                     **safe_fields(item, fields),
+                    **safe_receipt(item),
                     **{
                         key: project(value, depth + 1)
                         for key, value in item.items()
@@ -716,7 +850,11 @@ async def project_query(name: str, source: dict, control, localize) -> dict:
                     "truncated",
                 ),
             ),
-            "records": [project_event(item) for item in source.get("records", [])[:100]],
+            "records": [
+                project_diagnostic_record(item)
+                for item in source.get("records", [])[:100]
+                if isinstance(item, Mapping)
+            ],
         }
     if domain == "health":
         fields = {
@@ -809,5 +947,11 @@ def project_event(source: dict, *, depth: int = 0) -> dict:
     if isinstance(source.get("receipt"), Mapping):
         result["receipt"] = safe_receipt(source["receipt"])
     if depth == 0 and isinstance(source.get("diagnostic"), Mapping):
-        result["diagnostic"] = project_event(source["diagnostic"], depth=1)
+        result["diagnostic"] = project_diagnostic_record(source["diagnostic"])
+    if isinstance(source.get("error"), Mapping):
+        result["error"] = safe_receipt({"error": source["error"]})["error"]
+        if isinstance(source["error"].get("diagnostics"), Mapping):
+            result["error"]["diagnostics"] = project_diagnostic_record(
+                source["error"]["diagnostics"]
+            )
     return result

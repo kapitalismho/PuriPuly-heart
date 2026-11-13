@@ -1178,3 +1178,58 @@ async def test_realtime_failed_startup_cleanup_remains_owned_for_backend_close_r
         await asyncio.gather(opening, return_exceptions=True)
         await live.close()
         await backend.close()
+
+
+async def test_commit_failure_retains_transport_cause_and_known_reason() -> None:
+    class FailingCommitSocket(_FakeWebSocket):
+        async def send(self, payload):
+            if json.loads(payload)["type"] == "input_audio_buffer.commit":
+                raise OSError(10054, "PRIVATE_SOCKET_DETAIL")
+            await super().send(payload)
+
+    ws = FailingCommitSocket([], hang=True)
+
+    async def connect(*args, **kwargs):
+        return ws
+
+    backend = _backend(mode="realtime", compatibility="openai_realtime", websocket_connect=connect)
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request()
+    try:
+        await session.begin_turn(request)
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="speech_end",
+            observed_trailing_silence_ms=None,
+        )
+        terminal = await asyncio.wait_for(anext(session.turn_events()), timeout=1)
+        assert terminal.outcome == "failed"
+        assert terminal.failure_reason == "commit_write_failed"
+        assert terminal.failure_diagnostics.fields["recognition_cause"] == "commit_write_failed"
+        assert terminal.failure_diagnostics.fields["errno"] == 10054
+        assert terminal.failure_diagnostics.turn_id == str(request.identity.segment.segment_id)
+        assert "PRIVATE" not in repr(terminal.failure_diagnostics)
+    finally:
+        await session.close()
+
+
+async def test_offline_cleanup_failure_retains_client_until_confirmed_close() -> None:
+    class Client(_FakeAsyncClient):
+        fail = True
+
+        async def aclose(self):
+            if self.fail:
+                raise PermissionError(13, "PRIVATE_HTTP_PATH")
+            await super().aclose()
+
+    client = Client(None)
+    session = await _backend(http_client_factory=lambda **kwargs: client).open_session()
+    with pytest.raises(PermissionError) as caught:
+        await session.close()
+    assert caught.value.failure_diagnostics.fields["cleanup_confirmed"] is False
+    assert caught.value.failure_diagnostics.fields["errno"] == 13
+    assert session._client is client and not client.closed
+    client.fail = False
+    await session.close()
+    assert client.closed and session._client is None

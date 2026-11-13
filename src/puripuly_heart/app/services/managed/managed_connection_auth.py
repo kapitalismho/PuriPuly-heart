@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
@@ -34,6 +35,7 @@ from puripuly_heart.app.ports.settings_repository import (
 )
 from puripuly_heart.core.diagnostics import (
     emit_failure,
+    exception_diagnostics,
     safe_exception_fields,
     sanitize_diagnostics,
 )
@@ -53,6 +55,18 @@ from puripuly_heart.core.messages import (
 )
 
 logger = logging.getLogger(__name__)
+_operation_evidence: ContextVar[tuple[ErrorDiagnostics, ...]] = ContextVar(
+    "managed_connection_evidence", default=()
+)
+_operation_omitted: ContextVar[int] = ContextVar("managed_connection_omitted", default=0)
+
+
+def _retain_secondary(diagnostics: ErrorDiagnostics) -> None:
+    retained = _operation_evidence.get()
+    if len(retained) < 4:
+        _operation_evidence.set((*retained, diagnostics))
+    else:
+        _operation_omitted.set(_operation_omitted.get() + 1)
 
 from .managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
@@ -148,6 +162,31 @@ class ManagedConnectionAuthService:
     managed_state: ManagedIdentityStatePort | None = None
 
     async def authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
+        token = _operation_evidence.set(())
+        omitted_token = _operation_omitted.set(0)
+        try:
+            result = await self._authorize(request)
+            return replace(
+                result,
+                secondary_diagnostics=(
+                    *result.secondary_diagnostics,
+                    *(
+                        cause for cause in _operation_evidence.get()
+                        if cause.diagnostic_id not in {
+                            value.diagnostic_id for value in (
+                                *((result.diagnostics,) if result.diagnostics is not None else ()),
+                                *result.secondary_diagnostics,
+                            )
+                        }
+                    ),
+                ),
+                secondary_omitted_count=result.secondary_omitted_count + _operation_omitted.get(),
+            )
+        finally:
+            _operation_evidence.reset(token)
+            _operation_omitted.reset(omitted_token)
+
+    async def _authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
         if _caller_settings_values_are_unsafe(request.settings_values):
             return _unsafe_settings_values_result(request)
         other_source_refusal = _refuse_other_source_pending(request, self._managed_state())
@@ -342,6 +381,9 @@ class ManagedConnectionAuthService:
         if metadata is not None:
             assert service is not None
             recovered = await service.retry_pending()
+            for cause in recovered.secondary_diagnostics:
+                _retain_secondary(cause)
+            _operation_omitted.set(_operation_omitted.get() + recovered.secondary_omitted_count)
             if recovered.ack_result is not None:
                 self._emit_ack_result(request, recovered.ack_result)
             if not recovered.succeeded:
@@ -419,7 +461,10 @@ class ManagedConnectionAuthService:
                 state.persist()
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
-            state.restore(previous)
+            try:
+                state.restore(previous)
+            except Exception as restore_exc:
+                _observe_managed_failure("managed_authentication", restore_exc)
             return
         if not cleared:
             return
@@ -481,14 +526,14 @@ class ManagedConnectionAuthService:
         resume_token = new_managed_operation_resume_token()
         try:
             await store_resume_token(self.secret_store, resume_token)
-        except ManagedOperationTokenStoreError:
+        except ManagedOperationTokenStoreError as exc:
             return _pre_issue_failed_result(
                 request=request,
                 operation="ensure_managed_operation",
                 code="managed_operation_token_store_failed_before_issue",
                 phase="persist_managed_operation",
                 message=None,
-                cause=None,
+                cause=exc.diagnostics,
             )
         operation = ManagedOperationIdentity(
             operation_id=new_managed_operation_id(),
@@ -580,6 +625,8 @@ class ManagedConnectionAuthService:
         settings_values: Mapping[str, object],
     ) -> TransactionResult:
         unknown = _issue_failure_unknown_outcome(issue_result)
+        if issue_result.diagnostics is not None:
+            _retain_secondary(issue_result.diagnostics)
         if issue_result.diagnostics is not None and (
             issue_result.diagnostics.fields.get("dispatch_certainty") == "not_dispatched"
         ):
@@ -592,8 +639,12 @@ class ManagedConnectionAuthService:
                 operation.installation_id,
             )
         except Exception as exc:
-            _observe_managed_failure("managed_authentication", exc)
-            first_probe = None
+            first_probe = ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=_observe_managed_failure("managed_authentication", exc),
+            )
         if first_probe is not None and (
             first_probe.operation_status == "FAILED"
             or first_probe.client_action == "action_required"
@@ -805,9 +856,9 @@ class ManagedConnectionAuthService:
                 try:
                     state.persist()
                 except Exception as exc:
-                    _observe_managed_failure("managed_authentication", exc)
+                    cause = _observe_managed_failure("managed_authentication", exc)
                     return _operation_recovery_pending_result(
-                        request, operation=operation, polls=polls
+                        request, operation=operation, polls=polls, cause=cause
                     )
             if probe.operation_status == "FAILED":
                 await self._clear_terminal_operation_safe()
@@ -962,8 +1013,10 @@ class ManagedConnectionAuthService:
             try:
                 self.claim_guard.managed_state.persist()
             except Exception as exc:
-                _observe_managed_failure("managed_authentication", exc)
-                return _operation_recovery_pending_result(request, operation=operation, polls=0)
+                cause = _observe_managed_failure("managed_authentication", exc)
+                return _operation_recovery_pending_result(
+                    request, operation=operation, polls=0, cause=cause
+                )
         await self._clear_terminal_operation_safe(preserve_active_credential=True)
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -999,6 +1052,9 @@ class ManagedConnectionAuthService:
             else None
         )
         if recovered is not None:
+            for cause in recovered.secondary_diagnostics:
+                _retain_secondary(cause)
+            _operation_omitted.set(_operation_omitted.get() + recovered.secondary_omitted_count)
             if recovered.ack_result is not None:
                 self._emit_ack_result(request, recovered.ack_result)
             if recovered.succeeded:
@@ -1007,9 +1063,9 @@ class ManagedConnectionAuthService:
                     try:
                         self.claim_guard.managed_state.persist()
                     except Exception as exc:
-                        _observe_managed_failure("managed_authentication", exc)
+                        cause = _observe_managed_failure("managed_authentication", exc)
                         return _operation_recovery_pending_result(
-                            request, operation=operation, polls=0
+                            request, operation=operation, polls=0, cause=cause
                         )
                 await self._clear_terminal_operation_safe(preserve_active_credential=True)
                 return TransactionResult(
@@ -1066,6 +1122,9 @@ class ManagedConnectionAuthService:
             source=ACK_SOURCE_DISCORD,
             managed_secret_key=request.local_secret_key,
         )
+        for cause in result.secondary_diagnostics:
+            _retain_secondary(cause)
+        _operation_omitted.set(_operation_omitted.get() + result.secondary_omitted_count)
         if result.ack_result is not None:
             self._emit_ack_result(request, result.ack_result)
         message = result.ack_result.message if result.ack_result is not None else None
@@ -1107,6 +1166,7 @@ class ManagedConnectionAuthService:
                             "secret_write_succeeded": True,
                             "settings_commit_succeeded": False,
                         },
+                        exception=exc,
                     ),
                 )
         return TransactionResult(
@@ -1128,7 +1188,10 @@ class ManagedConnectionAuthService:
     async def _preflight_claim_source(self) -> TransactionResult | None:
         if self.claim_guard is None:
             return None
-        return await self.claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+        result = await self.claim_guard.preflight(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
+        for diagnostics in self.claim_guard.observation_diagnostics:
+            _retain_secondary(diagnostics)
+        return result
 
     async def _preflight_local_identity(
         self,
@@ -1374,6 +1437,9 @@ class ManagedConnectionAuthService:
             await self._clear_managed_user_identifier()
             return
         if not user_write.succeeded or not installation_write.succeeded:
+            for write in (user_write, installation_write):
+                if write.diagnostics is not None:
+                    _retain_secondary(write.diagnostics)
             await self._clear_managed_user_identifier()
 
     async def _clear_managed_user_identifier(self) -> None:
@@ -1382,7 +1448,9 @@ class ManagedConnectionAuthService:
             OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
         ):
             try:
-                await self.secret_store.clear_secret(key)
+                result = await self.secret_store.clear_secret(key)
+                if result.diagnostics is not None:
+                    _retain_secondary(result.diagnostics)
             except Exception as exc:
                 _observe_managed_failure("managed_authentication", exc)
                 pass
@@ -1868,10 +1936,13 @@ def _metadata_diagnostics(
     exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
     if cause is None and exception is not None:
-        candidate = getattr(exception, "failure_diagnostics", None) or getattr(
-            exception, "diagnostics", None
+        cause = exception_diagnostics(
+            exception,
+            component="managed_connection_auth",
+            operation=operation,
+            code=code,
+            fields=fields,
         )
-        cause = candidate if isinstance(candidate, ErrorDiagnostics) else None
     cause = sanitize_diagnostics(cause) if cause is not None else None
     diagnostics = ErrorDiagnostics(
         component="managed_connection_auth",
@@ -1888,23 +1959,27 @@ def _metadata_diagnostics(
             **(safe_exception_fields(exception) if exception is not None else {}),
         },
         cause_id=cause.diagnostic_id if cause else None,
+        causes=(cause,) if cause is not None else (),
     )
     return sanitize_diagnostics(diagnostics)
 
 
-def _observe_managed_failure(phase: str, exception: BaseException) -> None:
+def _observe_managed_failure(phase: str, exception: BaseException) -> ErrorDiagnostics:
+    diagnostics = _metadata_diagnostics(
+        operation=phase,
+        code="managed_application_failed",
+        fields={"phase": phase, "observation_succeeded": False},
+        exception=exception,
+    )
+    _retain_secondary(diagnostics)
     emit_failure(
         logger,
-        _metadata_diagnostics(
-            operation=phase,
-            code="managed_application_failed",
-            fields={"phase": phase, "observation_succeeded": False},
-            exception=exception,
-        ),
+        diagnostics,
         severity="warning",
         disposition="degraded",
         stage=phase,
     )
+    return diagnostics
 
 
 __all__ = [

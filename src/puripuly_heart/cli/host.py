@@ -2,14 +2,59 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import secrets
 import uuid
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from puripuly_heart.cli.transport import ControlServer
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    exception_diagnostics,
+    serialize_diagnostics,
+)
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+logger = logging.getLogger(__name__)
+
+
+def _record_failure(exception: BaseException, operation: str) -> ErrorDiagnostics:
+    diagnostics = getattr(exception, "failure_diagnostics", None)
+    if isinstance(diagnostics, ErrorDiagnostics):
+        return diagnostics
+    diagnostics = exception_diagnostics(
+        exception, component="control.host", operation=operation, code="control_host_failed"
+    )
+    exception.failure_diagnostics = diagnostics
+    emit_failure(
+        logger, diagnostics,
+        severity="info" if isinstance(exception, asyncio.CancelledError) else "error",
+        disposition="cancelled" if isinstance(exception, asyncio.CancelledError) else "failed",
+    )
+    return diagnostics
+
+
+def _retain_secondary(
+    primary: BaseException, secondary: BaseException, operation: str
+) -> None:
+    diagnostics = getattr(primary, "failure_diagnostics", None)
+    if not isinstance(diagnostics, ErrorDiagnostics):
+        diagnostics = _record_failure(primary, operation)
+    cleanup = getattr(secondary, "failure_diagnostics", None)
+    if not isinstance(cleanup, ErrorDiagnostics):
+        cleanup = exception_diagnostics(
+            secondary, component="control.host", operation=operation, code="control_host_failed"
+        )
+    cleanup = replace(cleanup, cause_id=diagnostics.diagnostic_id)
+    secondary.failure_diagnostics = cleanup
+    emit_failure(logger, cleanup, severity="warning", disposition="degraded")
+    primary.failure_diagnostics = replace(
+        diagnostics, causes=(*diagnostics.causes, cleanup)
+    )
 
 
 class HostedApplication:
@@ -53,10 +98,21 @@ class HostedApplication:
     async def _close_endpoint(self) -> None:
         self._freeze_ingress()
         async with self._endpoint_lock:
+            primary: BaseException | None = None
             try:
                 await self.server.close()
+            except BaseException as exc:
+                primary = exc
+                _record_failure(exc, "endpoint_close")
+                raise
             finally:
-                self.lease.close()
+                try:
+                    self.lease.close()
+                except BaseException as exc:
+                    if primary is None:
+                        _record_failure(exc, "endpoint_close")
+                        raise
+                    _retain_secondary(primary, exc, "endpoint_close")
 
     async def start(self) -> None:
         try:
@@ -76,8 +132,12 @@ class HostedApplication:
                 )
                 if self._closing:
                     raise asyncio.CancelledError
-        except BaseException:
-            await self._close_endpoint()
+        except BaseException as exc:
+            _record_failure(exc, "host_start")
+            try:
+                await self._close_endpoint()
+            except BaseException as cleanup:
+                _retain_secondary(exc, cleanup, "endpoint_close")
             raise
 
     async def wait_for_stop(self) -> None:
@@ -89,10 +149,20 @@ class HostedApplication:
     async def close(self) -> None:
         self._freeze_ingress()
         self.control.freeze_ingress()
+        primary: BaseException | None = None
         try:
             await self.boundary.stop()
+        except BaseException as exc:
+            primary = exc
+            _record_failure(exc, "host_close")
+            raise
         finally:
-            await self._close_endpoint()
+            try:
+                await self._close_endpoint()
+            except BaseException as cleanup:
+                if primary is None:
+                    raise
+                _retain_secondary(primary, cleanup, "endpoint_close")
 
 
 async def run_headless(config_path: Path, *, ready_file: Path | None = None) -> int:
@@ -106,6 +176,7 @@ async def run_headless(config_path: Path, *, ready_file: Path | None = None) -> 
 
     lease = acquire(config_path)
     host: HostedApplication | None = None
+    primary: BaseException | None = None
     try:
         boundary = compose_headless_application(config_path)
         host = HostedApplication(boundary, lease)
@@ -115,17 +186,32 @@ async def run_headless(config_path: Path, *, ready_file: Path | None = None) -> 
         await host.wait_for_stop()
         return 0
     except BaseException as exc:
+        primary = exc
+        diagnostics = _record_failure(exc, "host_start")
         if ready_file is not None:
-            _write_ready(ready_file, {"state": "failed", "reason": type(exc).__name__})
+            try:
+                _write_ready(
+                    ready_file,
+                    {"state": "failed", "reason": type(exc).__name__,
+                     "diagnostics": serialize_diagnostics(diagnostics)},
+                )
+            except BaseException as cleanup:
+                _retain_secondary(exc, cleanup, "readiness")
         raise
     finally:
-        if host is not None:
-            await host.close()
-        else:
-            lease.close()
+        try:
+            if host is not None:
+                await host.close()
+            else:
+                lease.close()
+        except BaseException as cleanup:
+            if primary is None:
+                _record_failure(cleanup, "host_close")
+                raise
+            _retain_secondary(primary, cleanup, "host_close")
 
 
-def _write_ready(path: Path, status: dict[str, str]) -> None:
+def _write_ready(path: Path, status: dict[str, object]) -> None:
     pending = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     pending.write_text(json.dumps(status), encoding="utf-8")
     pending.replace(path)
@@ -171,8 +257,12 @@ def gui_control_factory(factory: Any, lease: Any | None = None) -> Any:
         try:
             boundary = factory(config_path=config_path, **kwargs)
             return GuiControlBoundary(boundary, lease)
-        except BaseException:
-            lease.close()
+        except BaseException as exc:
+            _record_failure(exc, "host_start")
+            try:
+                lease.close()
+            except BaseException as cleanup:
+                _retain_secondary(exc, cleanup, "endpoint_close")
             raise
 
     return compose

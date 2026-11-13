@@ -219,3 +219,28 @@ async def test_github_star_prompt_runtime_rejects_duplicate_active_launch_schedu
         runtime.start_launch_prompt(run_prompt)
 
     await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_optional_prompt_task_retains_original_cause_when_diagnostic_sink_fails():
+    delivered = []
+    def unavailable_sink(_event, _metadata):
+        delivered.append(_metadata["diagnostics"])
+        raise RuntimeError("private sink content")
+
+    runtime = GithubStarPromptRuntime(diagnostics_sink=unavailable_sink)
+    original = PermissionError(13, "private prompt content")
+
+    async def failed(_generation):
+        raise original
+
+    task = runtime.start_launch_prompt(failed)
+    with pytest.raises(PermissionError) as caught:
+        await task
+    await _flush_loop()
+    assert caught.value is original
+    assert runtime.failure_diagnostics.fields["errno"] == 13
+    assert runtime.failure_diagnostics.operation == "launch_prompt"
+    assert delivered == [runtime.failure_diagnostics]
+    assert "private" not in repr(runtime.failure_diagnostics)
+    await runtime.close()

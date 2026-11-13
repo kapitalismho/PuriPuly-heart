@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import importlib
 import logging
 import queue
@@ -20,10 +19,11 @@ from puripuly_heart.config.process_capture_platform import (
 from puripuly_heart.config.process_capture_resolution import ResolvedProcessCaptureIdentity
 from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.audio.source import (
+    AudioSourceOpenFailure,
     CaptureProgressionSnapshot,
     PhysicalCaptureProgression,
 )
-from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
@@ -67,7 +67,7 @@ class ProcessIdentityWatcher(Protocol):
     def watch(
         self,
         identity: ResolvedProcessCaptureIdentity,
-        on_terminal: Callable[[], None],
+        on_terminal: Callable[[str, ErrorDiagnostics | None], None],
     ) -> ProcessIdentityWatchPort: ...
 
 
@@ -91,8 +91,15 @@ class ProcTapProcessAudioCaptureFactory:
         try:
             verify_proctap_process_specific(capture)
         except Exception as exc:
-            with contextlib.suppress(Exception):
+            try:
                 capture.close()
+            except Exception as cleanup_exc:
+                failure = ExceptionGroup("process capture verification and cleanup failed", [exc, cleanup_exc])
+                failure.failure_diagnostics = exception_diagnostics(
+                    failure, component="capture.peer", operation="source_open",
+                    code="capture.peer.source_open_failed", fields={"cleanup_confirmed": False},
+                )
+                raise AudioSourceOpenFailure(capture, failure) from None
             if isinstance(exc, ProcessAudioCaptureSetupError):
                 raise
             raise ProcessAudioCaptureSetupError(
@@ -152,28 +159,48 @@ class ProcessAudioCaptureSource:
             capture = self.capture_factory.create(pid=self.identity.pid, on_data=self._on_data)
             self._capture = capture
             watch = self.watcher.watch(self.identity, self._on_process_terminal)
+            self._watch = watch
             with self._lock:
                 if self._terminal_reason is None and watch.identity_verified:
-                    self._watch = watch
                     capture.start()
                     if self._terminal_reason is not None:
                         self._release_native_resources()
                 else:
-                    with contextlib.suppress(Exception):
-                        watch.close()
                     if self._terminal_reason is None:
                         self._terminal_reason = "target_identity_mismatch"
                         self._signal_terminal()
-                        raise ProcessAudioCaptureSetupError(
+                        failure = ProcessAudioCaptureSetupError(
                             "resolved process identity could not be verified"
                         )
+                        failure.failure_diagnostics = getattr(watch, "failure_diagnostics", None)
+                        raise failure
                     self._release_native_resources()
         except Exception as exc:
-            self._release_native_resources()
+            if isinstance(exc, AudioSourceOpenFailure):
+                self._capture = exc.source
+            try:
+                self._release_native_resources()
+            except Exception as cleanup_exc:
+                failure = ExceptionGroup("process capture setup and cleanup failed", [exc, cleanup_exc])
+                failure.failure_diagnostics = exception_diagnostics(
+                    failure,
+                    component="capture.peer",
+                    operation="source_open",
+                    code="capture.peer.source_open_failed",
+                    fields={"cleanup_confirmed": False},
+                )
+                raise AudioSourceOpenFailure(self, failure) from None
             self._queue.close()
             if isinstance(exc, ProcessAudioCaptureUnavailableError):
                 raise
-            raise ProcessAudioCaptureSetupError("process audio capture setup failed") from exc
+            failure = ProcessAudioCaptureSetupError("process audio capture setup failed")
+            failure.failure_diagnostics = exception_diagnostics(
+                exc,
+                component="capture.peer",
+                operation="source_open",
+                code="capture.peer.source_open_failed",
+            )
+            raise failure from exc
 
     @property
     def terminal_reason(self) -> str | None:
@@ -204,7 +231,7 @@ class ProcessAudioCaptureSource:
 
     async def close(self) -> None:
         with self._lock:
-            if self._closed:
+            if self._closed and self._watch is None and self._capture is None:
                 return
             self._closed = True
             if self._terminal_reason is None:
@@ -214,8 +241,7 @@ class ProcessAudioCaptureSource:
         finally:
             self._signal_terminal()
             self._queue.close()
-            with contextlib.suppress(Exception):
-                await self._queue.wait_closed()
+            await self._queue.wait_closed()
 
     def _on_data(self, data: bytes, frames: int) -> None:
         if self._closed or self._terminal_reason is not None:
@@ -248,53 +274,61 @@ class ProcessAudioCaptureSource:
             )
             self._signal_terminal_failure("source_failure", exc)
 
-    def _on_process_terminal(self) -> None:
-        self._signal_terminal_failure("target_exited")
+    def _on_process_terminal(
+        self, reason: str, diagnostics: ErrorDiagnostics | None = None
+    ) -> None:
+        self._signal_terminal_failure(reason, diagnostics=diagnostics)
 
-    def _signal_terminal_failure(self, reason: str, exception: BaseException | None = None) -> None:
+    def _signal_terminal_failure(
+        self, reason: str, exception: BaseException | None = None,
+        *, diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
         with self._lock:
             if self._terminal_reason is not None:
                 return
             self._terminal_reason = reason
-            self._terminal_diagnostics = replace(
+            self._terminal_diagnostics = diagnostics or replace(
                 stt_failure_report(
                     exception, provider="stt", channel="peer", operation="source_read"
                 ).diagnostics,
                 component="capture.peer",
-                code=(
-                    "capture.peer.target_exited"
-                    if reason == "target_exited"
-                    else "capture.peer.source_failure"
-                ),
+                code=f"capture.peer.{reason}",
             )
             self._signal_terminal()
 
     def _release_native_resources(self) -> None:
-        watch, self._watch = self._watch, None
-        capture, self._capture = self._capture, None
-        for resource in (watch, capture):
+        failures: list[Exception] = []
+        for attribute in ("_watch", "_capture"):
+            resource = getattr(self, attribute)
             if resource is None:
                 continue
             try:
                 resource.close()
             except Exception as exc:
-                diagnostics = stt_failure_report(
-                    exc, provider="stt", channel="peer", operation="cleanup"
-                ).diagnostics
-                diagnostics = replace(
-                    diagnostics,
-                    component="capture.peer",
-                    code="capture.peer.cleanup_failed",
-                    cause_id=(
-                        self._terminal_diagnostics.diagnostic_id
-                        if self._terminal_diagnostics is not None
-                        else None
-                    ),
-                    fields={**diagnostics.fields, "cleanup_confirmed": False},
+                failures.append(exc)
+            else:
+                setattr(self, attribute, None)
+        if failures:
+            failure = ExceptionGroup("process capture cleanup failed", failures)
+            diagnostics = exception_diagnostics(
+                failure,
+                component="capture.peer",
+                operation="cleanup",
+                code="capture.peer.cleanup_failed",
+                fields={"cleanup_confirmed": False},
+            )
+            failure.failure_diagnostics = diagnostics
+            if self._terminal_diagnostics is None:
+                self._terminal_diagnostics = diagnostics
+            else:
+                self._terminal_diagnostics = replace(
+                    self._terminal_diagnostics,
+                    causes=(*self._terminal_diagnostics.causes, diagnostics),
                 )
-                emit_failure(
-                    logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
-                )
+            emit_failure(
+                logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+            )
+            raise failure
 
     def _signal_terminal(self) -> None:
         try:
