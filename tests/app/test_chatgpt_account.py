@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import threading
 import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
+import pytest
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
@@ -285,3 +288,109 @@ async def test_logout_allows_subsequent_authorized_sign_in_and_refresh(tmp_path:
         assert fresh.get("unrelated") == "keep"
     finally:
         await owner.close()
+
+
+class _BlockedExchangeFlow(_Flow):
+    def __init__(self) -> None:
+        super().__init__()
+        self.exchange_started = asyncio.Event()
+        self.release_exchange = asyncio.Event()
+        self.listener_count = 0
+
+    def listener_factory(self, *, locale: str | None = None) -> _Listener:
+        self.listener_count += 1
+        return super().listener_factory(locale=locale)
+
+    async def handler(self, request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_TOKEN_URL:
+            form = parse_qs(request.content.decode())
+            if form.get("grant_type") == ["authorization_code"]:
+                self.exchange_started.set()
+                await self.release_exchange.wait()
+        return super().handler(request)
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_callback_prevents_late_credential_commit() -> None:
+    store = InMemorySecretStore()
+    flow = _BlockedExchangeFlow()
+    owner = _owner(store, flow)
+    connecting = asyncio.create_task(owner.connect())
+    try:
+        await asyncio.wait_for(flow.exchange_started.wait(), timeout=2)
+        assert owner.in_progress
+        owner.cancel()
+        result = await asyncio.wait_for(connecting, timeout=2)
+        assert result.succeeded is False
+        assert result.failure_code == "cancelled"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+        assert not flow.release_exchange.is_set()
+    finally:
+        flow.release_exchange.set()
+        await asyncio.gather(connecting, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_second_connect_after_callback_cannot_compete_with_active_exchange() -> None:
+    store = InMemorySecretStore()
+    flow = _BlockedExchangeFlow()
+    owner = _owner(store, flow)
+    connecting = asyncio.create_task(owner.connect())
+    try:
+        await asyncio.wait_for(flow.exchange_started.wait(), timeout=2)
+        duplicate = await asyncio.wait_for(owner.connect(open_browser=False), timeout=2)
+        assert duplicate.succeeded is False
+        assert duplicate.failure_code == "in_progress"
+        assert flow.listener_count == 1
+        owner.cancel()
+        result = await asyncio.wait_for(connecting, timeout=2)
+        assert result.failure_code == "cancelled"
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+    finally:
+        flow.release_exchange.set()
+        await asyncio.gather(connecting, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cancel_after_credential_commit_started_reports_settled_outcome() -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingStore(InMemorySecretStore):
+        def set(self, key: str, value: str) -> None:
+            if key == CHATGPT_REFRESH_TOKEN_SECRET:
+                entered.set()
+                assert release.wait(2)
+            super().set(key, value)
+
+    store = BlockingStore()
+    owner = _owner(store, _Flow())
+    connecting = asyncio.create_task(owner.connect())
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        owner.cancel()
+        release.set()
+        result = await asyncio.wait_for(connecting, timeout=2)
+        assert result.succeeded is True
+        assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) == "refresh"
+    finally:
+        release.set()
+        await asyncio.gather(connecting, return_exceptions=True)
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_close_after_callback_cancels_and_drains_active_exchange() -> None:
+    store = InMemorySecretStore()
+    flow = _BlockedExchangeFlow()
+    owner = _owner(store, flow)
+    connecting = asyncio.create_task(owner.connect())
+    await asyncio.wait_for(flow.exchange_started.wait(), timeout=2)
+    await asyncio.wait_for(owner.close(), timeout=2)
+    result = await asyncio.wait_for(connecting, timeout=2)
+    assert result.succeeded is False
+    assert result.failure_code == "cancelled"
+    assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
+    assert not flow.release_exchange.is_set()
