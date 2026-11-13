@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from puripuly_heart.core.local_asr.local_stt_download_port import (
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTProvisioningLease
 from puripuly_heart.core.local_translation.assets import (
     InstalledGemmaManifest,
+    cleanup_gemma_install_residue,
     default_gemma_install_dir,
     inspect_gemma_install,
     resolve_gemma_spec,
@@ -107,6 +109,8 @@ class ManagedGemmaTranslationOwner:
         self._active_generation: int | None = None
         self._selected_model_id: str | None = None
         self._closed = False
+        self._residue_cleanup_lock = threading.Lock()
+        self._residue_cleanup_complete = False
 
     @property
     def runtime(self) -> ManagedGemmaRuntimeOwner:
@@ -121,7 +125,40 @@ class ManagedGemmaTranslationOwner:
         return self._selected_model_id if self._active_generation is not None else None
 
     def install_status(self, model_id: str) -> str:
+        self._ensure_startup_cleanup()
         return inspect_gemma_install(spec=resolve_gemma_spec(model_id)).status
+
+    def _ensure_startup_cleanup(self) -> None:
+        from puripuly_heart.core.feature_diagnostics import log_feature
+
+        with self._residue_cleanup_lock:
+            if self._closed or self._residue_cleanup_complete:
+                return
+            try:
+                removed = cleanup_gemma_install_residue()
+            except Exception as error:
+                self._residue_cleanup_complete = True
+                log_feature(
+                    "ModelDownload",
+                    "cleanup",
+                    "cleanup_failed",
+                    error=error,
+                )
+                return
+            if removed is None:
+                return
+            self._residue_cleanup_complete = True
+            if removed:
+                log_feature(
+                    "ModelDownload",
+                    "cleanup",
+                    "residue_removed",
+                    level=logging.INFO,
+                )
+
+    def _stop_residue_cleanup(self) -> None:
+        with self._residue_cleanup_lock:
+            self._residue_cleanup_complete = True
 
     async def prepare(
         self,
@@ -157,9 +194,10 @@ class ManagedGemmaTranslationOwner:
                 )
 
             spec = resolve_gemma_spec(selection.model_id)
-            task = start_lifecycle_task(
-                self._task_scope,
-                self._runtime.prepare(
+
+            async def prepare_runtime() -> ManagedGemmaReadiness:
+                await run_owned_thread_call(self._ensure_startup_cleanup)
+                return await self._runtime.prepare(
                     backend=backend,
                     source_language=selection.source_language,
                     target_language=selection.target_language,
@@ -173,7 +211,11 @@ class ManagedGemmaTranslationOwner:
                         "spec": spec,
                         "locale": selection.locale,
                     },
-                ),
+                )
+
+            task = start_lifecycle_task(
+                self._task_scope,
+                prepare_runtime(),
                 name=f"prepare-{generation}",
             )
             self._prepare_task = task
@@ -280,9 +322,9 @@ class ManagedGemmaTranslationOwner:
             else None if source == "local" else self._downloader
         )
 
-        task = start_lifecycle_task(
-            self._task_scope,
-            ensure_gemma_installed(
+        async def install() -> InstalledGemmaManifest:
+            await run_owned_thread_call(self._ensure_startup_cleanup)
+            return await ensure_gemma_installed(
                 source=source,
                 spec=spec,
                 downloader=downloader,
@@ -290,7 +332,11 @@ class ManagedGemmaTranslationOwner:
                 on_status=on_status,
                 locale=locale,
                 verify_existing_checksums=True,
-            ),
+            )
+
+        task = start_lifecycle_task(
+            self._task_scope,
+            install(),
             name="install-assets",
         )
         self._asset_task = task
@@ -344,6 +390,7 @@ class ManagedGemmaTranslationOwner:
                 raise ModelInstallInUseError("Model is loaded for translation")
             if self._active_generation is None:
                 await self._runtime.release()
+            await run_owned_thread_call(self._ensure_startup_cleanup)
             install_dir = default_gemma_install_dir(resolve_gemma_spec(model_id))
 
             def remove_install() -> None:
@@ -402,6 +449,7 @@ class ManagedGemmaTranslationOwner:
         lingering = self._cancel_linger()
         if self._closed and self._prepare_task is None and self._asset_task is None:
             await self._await_cancelled_linger(lingering)
+            await run_owned_thread_call(self._stop_residue_cleanup)
             await self._runtime.close()
             return
         self._closed = True
@@ -422,6 +470,7 @@ class ManagedGemmaTranslationOwner:
             await self._task_scope.close()
         finally:
             async with self._lock:
+                await run_owned_thread_call(self._stop_residue_cleanup)
                 await self._runtime.close()
                 self._publish("closed", backend=None, progress_percent=None)
 
