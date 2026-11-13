@@ -21,8 +21,8 @@ def setup_call(provider="openrouter", identity="setup"):
         "output": [
             {
                 **tool(identity),
-                "name": "get_provider_setup",
-                "arguments": json.dumps({"provider": provider}),
+                "name": "open_app",
+                "arguments": json.dumps({"view": "provider_setup", "provider": provider}),
             }
         ],
     }
@@ -301,7 +301,9 @@ async def test_account_actions_only_open_existing_user_auth_or_fixed_public_usag
     transport = Responses(
         {
             "status": "completed",
-            "output": [{**tool(), "arguments": json.dumps({"topic": "accounts"})}],
+            "output": [
+                {**tool(), "name": "open_app", "arguments": json.dumps({"view": "accounts"})}
+            ],
         },
         answer("Account setup actions are available."),
     )

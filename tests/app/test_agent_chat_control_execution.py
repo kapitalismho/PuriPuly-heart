@@ -10,11 +10,10 @@ import pytest
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.execution import (
     CLI_ONLY_COMMANDS,
-    CLI_ONLY_QUERIES,
+    app_actions,
     check_inventory,
     private_fields,
     project_query,
-    request_schemas,
     safe_receipt,
     validate,
 )
@@ -90,22 +89,47 @@ def tools_for(control):
 
 
 async def execute(tools, action, **arguments):
-    return await tools.execute("control_app", {"request": {"action": action, **arguments}})
+    selected = next(
+        (
+            item
+            for item in app_actions()
+            if item.binding.get("command") == action
+            or item.binding.get("query") == action.removeprefix("query.")
+        ),
+        None,
+    )
+    if selected is None:
+        return await tools.execute("manage_proposal", {"action": action, **arguments})
+    supplied = {key: value for key, value in arguments.items() if key not in selected.binding}
+    return await tools.execute(selected.tool, {selected.key: selected.value, **supplied})
 
 
 def test_inventory_classifies_every_cli_capability_and_exposes_only_the_chat_subset(catalog):
     check_inventory()
-    actions = {item["properties"]["action"]["enum"][0] for item in request_schemas(catalog)}
-    assert actions == {
+    actions = app_actions()
+    commands = {item.binding["command"] for item in actions if "command" in item.binding}
+    assert commands == {
+        "capture.set",
+        "translation.set",
         "overlay.set",
         "audio.retry",
         "models.retry",
+        "recognition.probe",
+        "translation.probe",
+        "audio.diagnose",
+        "osc.discovery.retry",
         "secrets.delete",
         "auth.logout",
         "overlay.position.reset",
-        *("query." + name for name in QUERIES - CLI_ONLY_QUERIES),
     }
-    assert actions.isdisjoint(CLI_ONLY_COMMANDS)
+    assert commands.isdisjoint(CLI_ONLY_COMMANDS)
+    assert {item.value for item in actions if item.tool == "probe_app"} == {
+        "recognition.self",
+        "recognition.peer",
+        "translation.self",
+        "translation.peer",
+        "microphone",
+    }
     assert private_fields().isdisjoint(SETTINGS_FIELDS)
 
 
@@ -136,7 +160,11 @@ async def test_cli_only_and_malformed_requests_are_rejected_without_side_effects
     control = ExecutionControl(catalog)
     tools, actions, events = tools_for(control)
     try:
-        result = await tools.execute("control_app", {"request": request_})
+        result = await execute(
+            tools,
+            request_["action"],
+            **{key: value for key, value in request_.items() if key != "action"},
+        )
         assert result["status"] == "rejected"
         assert tools.confirmation is None
         assert not control.submissions and not actions and not events
@@ -259,7 +287,7 @@ async def test_private_settings_are_outside_model_authority(catalog):
             for action in ("settings.edit", "settings.inspect"):
                 assert (await execute(owner._tools, action, field=field))["status"] == "rejected"
             rejected = await owner._tools.execute(
-                "change_settings", {"changes": {field: "PRIVATE-EDIT"}}
+                "manage_proposal", {"action": "settings", "changes": {field: "PRIVATE-EDIT"}}
             )
             assert rejected["status"] == "rejected"
         context = await collect_agent_context(
@@ -282,7 +310,7 @@ async def test_private_settings_are_outside_model_authority(catalog):
             not private_fields() & view[module].get("settings", {}).keys()
             for module in view["modules"]
         )
-        current = await execute(owner._tools, "query.settings.current")
+        current = project_settings(await control.query("settings.current", {}))
         surfaces = json.dumps(
             [
                 context,
@@ -387,12 +415,13 @@ async def test_production_tools_apply_notice_and_speaker_with_terminal_effective
         context = await collect_agent_context(control, activity=AgentActivity())
         owner._tools.observe_context(context)
         offered = await owner._tools.execute(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "chatbox.activation_notice.enabled": False,
                     "stt.soniox.enable_speaker_diarization": False,
-                }
+                },
             },
         )
         assert offered["status"] == "needs_confirmation"
@@ -401,9 +430,8 @@ async def test_production_tools_apply_notice_and_speaker_with_terminal_effective
         current = (await control.query("settings.current", {}))["settings"]["intent"]
         assert current["osc"]["activation_notice_enabled"] is False
         assert current["stt"]["soniox"]["enable_speaker_diarization"] is False
-        provider = await execute(owner._tools, "query.providers.status")
-        assert provider["status"] == "observed"
-        assert not provider["result"]["channels"]["self"]["effective_active"]
+        provider = await control.query("providers.status", {})
+        assert not provider["channels"]["self"]["effective_active"]
     finally:
         await app.stop()
     saved = json.loads(path.read_text(encoding="utf-8"))["intent"]
@@ -527,7 +555,7 @@ async def test_private_presence_is_actual_boolean_metadata():
 
 
 def test_request_schema_rejects_private_targets(catalog):
-    schema = {"anyOf": request_schemas(catalog)}
+    schema = {"anyOf": [action.schema(catalog) for action in app_actions()]}
     for request in (
         {"action": "audio.target.set", "value": r"process:exe:C:\PRIVATE-FOLDER\app.exe"},
         {"action": "secrets.delete", "name": "invented-secret"},

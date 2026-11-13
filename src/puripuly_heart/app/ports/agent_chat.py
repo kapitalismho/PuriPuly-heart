@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypedDict
 
-AGENT_CHAT_PROTOCOL = 6
+AGENT_CHAT_PROTOCOL = 7
 
 AgentEffort = Literal["low", "medium", "high"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]
@@ -108,7 +108,7 @@ class AgentToolResult:
     topic: str | None
     status: str
     result: dict
-    tool: str = "get_app_context"
+    tool: str = "read_app"
 
 
 @dataclass(frozen=True, slots=True)

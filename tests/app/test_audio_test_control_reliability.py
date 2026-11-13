@@ -759,7 +759,7 @@ async def test_diagnose_microphone_tool_uses_production_source_and_silero_with_s
         emit_event=lambda _event: True,
     )
     try:
-        result = await tools.execute("diagnose_microphone", {})
+        result = await tools.execute("probe_app", {"target": "microphone"})
     finally:
         await tools.close()
     assert result["status"] == "applied"
@@ -830,7 +830,7 @@ async def test_agent_diagnosis_does_not_apply_route_until_separate_live_capture_
         emit_event=lambda _event: False,
     )
     try:
-        diagnosed = await tools.execute("diagnose_microphone", {})
+        diagnosed = await tools.execute("probe_app", {"target": "microphone"})
         receipt = diagnosed["receipt"]
         assert receipt["terminal"] and diagnosed["status"] == "applied"
         assert receipt["recognition"] == "not_exercised"
@@ -850,7 +850,9 @@ async def test_agent_diagnosis_does_not_apply_route_until_separate_live_capture_
             "audio.input_host_api": selected["input_host_api"],
             "audio.input_device": selected["input_device"],
         }
-        proposed = await tools.execute("change_settings", {"changes": changes})
+        proposed = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         assert proposed["status"] == "needs_confirmation"
         assert await control.query("settings.current", {}) == before
         assert path.read_bytes() == persisted
@@ -860,7 +862,9 @@ async def test_agent_diagnosis_does_not_apply_route_until_separate_live_capture_
         assert owner.source is restored_source
         assert owner.snapshot.generation == restored_generation
         assert path.read_bytes() == persisted
-        proposed = await tools.execute("change_settings", {"changes": changes})
+        proposed = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         applied = await tools.confirm(proposed["confirmation"]["id"], True)
         assert applied["status"] == "applied" and applied["receipt"]["terminal"]
         current = await control.query("settings.current", {})
@@ -875,8 +879,8 @@ async def test_agent_diagnosis_does_not_apply_route_until_separate_live_capture_
         assert restored_source.close_calls == 1
         assert owner.snapshot.generation > restored_generation
         assert [action["tool"] for action in actions if action["phase"] == "completed"] == [
-            "diagnose_microphone",
-            "change_settings",
+            "audio.diagnose",
+            "settings.apply",
         ]
     finally:
         await tools.close()
@@ -910,21 +914,27 @@ async def test_paid_route_requires_current_user_card_before_real_settings_persis
         )
         tools.observe_context(context)
         changes = {"translation.model": "gpt_6_luna", "translation.connection": "official_byok"}
-        proposed = await tools.execute("change_settings", {"changes": changes})
+        proposed = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         card = proposed["confirmation"]
         assert proposed["status"] == "needs_confirmation"
         assert card["route_effects"][0]["cost"] == "provider_billed"
         assert card["route_effects"][0]["credential_readiness"] == "absent"
         assert (await tools.confirm("not-the-current-card", True))["status"] == "rejected"
-        assert (await tools.execute("change_settings", {"changes": changes, "approved": True}))[
-            "status"
-        ] == "rejected"
+        assert (
+            await tools.execute(
+                "manage_proposal", {"action": "settings", "changes": changes, "approved": True}
+            )
+        )["status"] == "rejected"
         assert await control.query("settings.current", {}) == before
         assert path.read_bytes() == persisted
         assert (await tools.confirm(card["id"], False))["status"] == "declined"
         assert (await tools.confirm(card["id"], True))["status"] == "rejected"
         assert path.read_bytes() == persisted
-        proposed = await tools.execute("change_settings", {"changes": changes})
+        proposed = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": changes}
+        )
         approved = await tools.confirm(proposed["confirmation"]["id"], True)
         assert approved["receipt"]["terminal"]
         assert approved["status"] == "degraded"

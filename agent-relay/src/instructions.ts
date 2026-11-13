@@ -41,7 +41,9 @@ export function workInstructions(contract: Contract): string {
   if (!appContext) throw new Error('Empty contract prompt: app context');
   const contractGuide = guide.replace(appContextMarker, () => appContext)
     .replace('{{setup_controls}}', () => contract.setupControls);
-  return `${identityAndVoice}\n\n${section(system, '## Work and unclear requests')}\n\n${contractGuide}\n\n${costs}\n\n${benchmarks}`;
+  const work = section(system, '## Work and unclear requests')
+    .replace('{{execution_boundary}}', () => contract.executionBoundary);
+  return `${identityAndVoice}\n\n${work}\n\n${contractGuide}\n\n${costs}\n\n${benchmarks}`;
 }
 
 export const socialInstructions = `${identityAndVoice}\n\n${section(system, '## Social acknowledgements')}`;

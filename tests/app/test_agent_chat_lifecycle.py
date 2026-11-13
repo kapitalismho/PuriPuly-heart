@@ -56,7 +56,9 @@ class HeldResponses(Responses):
 
 
 async def watch(owner, provider="openai"):
-    return await owner._tools.execute("open_settings", {"section": "api", "provider": provider})
+    return await owner._tools.execute(
+        "open_app", {"view": "settings", "section": "api", "provider": provider}
+    )
 
 
 async def notices_done(owner):
@@ -220,7 +222,7 @@ async def test_known_exhaustion_makes_eligible_notice_static_without_d_or_m():
 async def test_only_active_confirmation_result_resumes_without_reclassification(catalog, approved):
     control = Control(catalog)
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the card."),
         answer("Actual confirmation observed."),
     )
@@ -246,12 +248,15 @@ async def test_only_active_confirmation_result_resumes_without_reclassification(
 
 
 @pytest.mark.asyncio
-async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(catalog):
+async def test_batch_recovery_keeps_approval_and_allows_later_ui_navigation(catalog):
     control = Control(catalog)
-    change = call("change_settings", {"changes": {"stt.provider": "deepgram"}})
+    change = call(
+        "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+    )
     transport = Responses(
         {"status": "completed", "output": [tool("read"), *change["output"]]},
-        call("open_settings", {"section": "api"}, "blocked"),
+        call("open_app", {"view": "settings", "section": "api"}, "blocked"),
+        answer("Review the approval card."),
         answer("The approved setting is saved."),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -260,15 +265,15 @@ async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(ca
     await owner.start()
     try:
         result = await owner.send("Check the app and change recognition to Deepgram")
-        assert result.status == "needs_confirmation"
+        assert result.status == "completed"
         assert not control.submissions
-        assert not navigations
+        assert navigations == [("api", None)]
         assert [item.status for item in result.tool_results] == [
             "observed",
             "needs_confirmation",
-            "not_executed",
+            "opened",
         ]
-        assert transport.requests[-1]["allow_tools"] is False
+        assert transport.requests[-1]["allow_tools"] is True
         card = owner.snapshot.confirmation
         assert card["changes"] == {"stt.provider": "deepgram"}
         confirmed = await owner.confirm(card["id"], True)
@@ -285,7 +290,7 @@ async def test_batch_recovery_preserves_confirmation_gate_until_user_approval(ca
 async def test_model_withdrawal_uses_current_card_context_without_notice_continuation(catalog):
     control = Control(catalog)
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the card."),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -298,7 +303,7 @@ async def test_model_withdrawal_uses_current_card_context_without_notice_continu
         before = control.context()
         transport.responses.extend(
             [
-                call("withdraw_confirmation", {"card_id": card["id"]}, "withdraw"),
+                call("manage_proposal", {"action": "withdraw", "card_id": card["id"]}, "withdraw"),
                 answer("The pending proposal is withdrawn."),
                 answer("No settings were applied."),
             ]
@@ -327,9 +332,13 @@ async def test_model_withdrawal_uses_current_card_context_without_notice_continu
 async def test_model_cannot_withdraw_a_replaced_card_or_approve_current_settings(catalog, attempt):
     control = Control(catalog)
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review Deepgram."),
-        call("change_settings", {"changes": {"stt.provider": "soniox"}}, "replacement"),
+        call(
+            "manage_proposal",
+            {"action": "settings", "changes": {"stt.provider": "soniox"}},
+            "replacement",
+        ),
         answer("Review Soniox."),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -342,7 +351,7 @@ async def test_model_cannot_withdraw_a_replaced_card_or_approve_current_settings
         transport.responses.extend(
             [
                 (
-                    call("withdraw_confirmation", {"card_id": old["id"]}, "stale")
+                    call("manage_proposal", {"action": "withdraw", "card_id": old["id"]}, "stale")
                     if attempt == "stale_withdrawal"
                     else call("confirm", {"card_id": current["id"], "approved": True}, "approval")
                 ),
@@ -387,7 +396,7 @@ async def test_question_or_off_topic_message_preserves_pending_confirmation(
 
     control = Control(catalog)
     transport = RoutedResponses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the card."),
         answer("Your pending settings have not changed."),
     )
@@ -428,7 +437,9 @@ async def test_generation_fence_after_validation_awaits(catalog, point, interrup
 
     control = HeldControl(catalog)
     transport = Responses(
-        call("change_settings", {"changes": {"overlay.background_alpha": 0.6}}),
+        call(
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.6}}
+        ),
         answer("new answer"),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -473,7 +484,7 @@ async def test_late_model_finally_cannot_clear_new_active_turn_or_navigate():
         second = asyncio.create_task(owner.send("newest"))
         await transport.arrivals.get()
         active = owner._active
-        old_release.set_result(call("open_settings", {"section": "overlay"}))
+        old_release.set_result(call("open_app", {"view": "settings", "section": "overlay"}))
         assert (await first).status == "cancelled"
         assert owner._active is active and owner.snapshot.busy
         assert not navigations
@@ -528,7 +539,9 @@ async def test_cancel_during_submitted_work_keeps_real_fact_without_continuation
     control.status = status
     control.receipt_extra = {"error": {"code": "controlled_runtime_result"}}
     transport = Responses(
-        call("change_settings", {"changes": {"overlay.background_alpha": 0.4}}),
+        call(
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
+        ),
         answer("Review the card."),
         answer("new answer"),
     )
@@ -568,7 +581,7 @@ async def test_cancel_pending_confirmation_work_does_not_resume_and_new_message_
 ):
     control = Control(catalog)
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review card"),
         answer("newest answer"),
     )
@@ -604,15 +617,18 @@ async def test_last_five_actual_changes_exclude_queries_proposals_noops_and_dupl
             owner._tools.observe_context(control.context())
             control.status = "degraded" if index == 5 else "applied"
             proposed = await owner._tools.execute(
-                "change_settings", {"changes": {"overlay.background_alpha": index / 10}}
+                "manage_proposal",
+                {"action": "settings", "changes": {"overlay.background_alpha": index / 10}},
             )
             await owner._tools.confirm(proposed["confirmation"]["id"], True)
         owner._tools.observe_context(control.context())
         proposed = await owner._tools.execute(
-            "change_settings", {"changes": {"overlay.background_alpha": 0.6}}
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.6}}
         )
         await owner._tools.confirm(proposed["confirmation"]["id"], True)
-        await owner._tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}})
+        await owner._tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+        )
         await watch(owner)
         await owner.send("query")
         changes = context_of(owner._transport.requests[-1])["core"]["recent_actions"]
@@ -654,7 +670,9 @@ async def test_expiry_and_new_conversation_clear_context_reasoning_watch_and_car
         await owner.send("old conversation", diagnostic_id="synthetic-error")
         await watch(owner)
         owner._tools.observe_context(control.context())
-        await owner._tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}})
+        await owner._tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+        )
         owner.archive_support_report("Report sent")
         if reset == "explicit":
             owner.new_conversation()
@@ -773,12 +791,14 @@ async def test_cancel_command_bypasses_models_and_discards_queued_notices(catalo
         await transport.arrivals.get()
         await watch(owner)
         owner._tools.observe_context(control.context())
-        await owner._tools.execute("change_settings", {"changes": {"stt.provider": "deepgram"}})
+        await owner._tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}
+        )
         owner.key_verification_completed("openai", True)
         assert (await owner.send("취소")).status == "cancelled"
         assert not owner._pending_notices and owner._watched_provider is None
         assert owner.snapshot.confirmation is None and not owner.snapshot.busy
-        release.set_result(call("open_settings", {"section": "overlay"}))
+        release.set_result(call("open_app", {"view": "settings", "section": "overlay"}))
         assert (await first).status == "cancelled"
         assert len(transport.requests) == len(transport.classifications) == 1
         assert not control.submissions
@@ -811,7 +831,7 @@ async def test_composed_runtime_withdraws_pending_card_without_settings_or_netwo
     monkeypatch.setattr(socket.socket, "connect", reject_network)
     monkeypatch.setattr(socket.socket, "sendto", reject_network)
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the pending proposal."),
     )
     monkeypatch.setattr(application_runtime, "compose_agent_transport", lambda **_kwargs: transport)
@@ -840,9 +860,9 @@ async def test_composed_runtime_withdraws_pending_card_without_settings_or_netwo
         card = owner.snapshot.confirmation
         transport.responses.extend(
             [
-                call("withdraw_confirmation", {"card_id": "unknown"}, "unknown"),
+                call("manage_proposal", {"action": "withdraw", "card_id": "unknown"}, "unknown"),
                 answer("The current proposal has not changed."),
-                call("withdraw_confirmation", {"card_id": card["id"]}, "withdraw"),
+                call("manage_proposal", {"action": "withdraw", "card_id": card["id"]}, "withdraw"),
                 answer("The proposal is withdrawn without applying settings."),
             ]
         )
@@ -883,9 +903,11 @@ async def test_composed_runtime_notices_mutations_reset_and_restart(tmp_path, mo
     monkeypatch.setattr(socket.socket, "connect", reject_network)
     monkeypatch.setattr(socket.socket, "sendto", reject_network)
     transport = Responses(
-        call("change_settings", {"changes": {"overlay.background_alpha": 0.4}}),
+        call(
+            "manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": 0.4}}
+        ),
         answer("Review the settings card."),
-        call("open_settings", {"section": "api", "provider": "openai"}, "navigate"),
+        call("open_app", {"view": "settings", "section": "api", "provider": "openai"}, "navigate"),
         answer("Enter the key in Settings; the turn is finished."),
         answer("Verification succeeded; the current screen stays in place."),
         answer("Fresh conversation."),
@@ -1020,7 +1042,7 @@ async def test_confirmation_during_turn_queues_after_key_notice_with_actual_conf
     release = asyncio.get_running_loop().create_future()
     control = Control(catalog)
     transport = HeldResponses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the card"),
         release,
         answer("Key result received"),
@@ -1079,13 +1101,14 @@ async def test_replacement_card_retires_old_confirmation_continuation_but_keeps_
     control = Control(catalog)
     transport = Responses(
         call(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "stt.provider": "deepgram",
                     "overlay.background_alpha": 0.4,
                     "languages": {"source": "en"},
-                }
+                },
             },
         ),
         answer("Review the card"),
@@ -1100,13 +1123,14 @@ async def test_replacement_card_retires_old_confirmation_continuation_but_keeps_
         confirmation = asyncio.create_task(owner.confirm(card["id"], True))
         await control.entered.wait()
         replacement = await owner._tools.execute(
-            "change_settings",
+            "manage_proposal",
             {
+                "action": "settings",
                 "changes": {
                     "stt.provider": "soniox",
                     "locale": "en",
                     "peer_stt.provider": "deepgram",
-                }
+                },
             },
         )
         control.release.set()
@@ -1137,9 +1161,13 @@ async def test_pending_task_keeps_initiating_call_evidence_and_notice_under_trim
     catalog, task, absorb
 ):
     initiating = (
-        call("open_settings", {"section": "api", "provider": "openai"}, "task-call")
+        call("open_app", {"view": "settings", "section": "api", "provider": "openai"}, "task-call")
         if task == "key"
-        else call("change_settings", {"changes": {"stt.provider": "deepgram"}}, "task-call")
+        else call(
+            "manage_proposal",
+            {"action": "settings", "changes": {"stt.provider": "deepgram"}},
+            "task-call",
+        )
     )
     transport = Responses(
         answer("old unrelated evidence " + "x" * 3000),
@@ -1273,7 +1301,7 @@ async def test_context_read_late_completion_is_fenced_and_call_is_closed(interru
             return result
 
     transport = Responses(
-        call("get_app_context", {"topic": "output"}, "context"),
+        call("read_app", {"topic": "output"}, "context"),
         answer("New turn completed."),
     )
     owner = AgentChatOwner(HeldRecords(), transport, localize=str)
@@ -1417,7 +1445,7 @@ async def test_snapshot_exposes_running_tool_and_card_before_values_to_the_rende
     control = Control(catalog)
     seen = []
     transport = Responses(
-        call("change_settings", {"changes": {"stt.provider": "deepgram"}}),
+        call("manage_proposal", {"action": "settings", "changes": {"stt.provider": "deepgram"}}),
         answer("Review the card."),
     )
     owner = AgentChatOwner(control, transport, localize=str)
@@ -1425,7 +1453,7 @@ async def test_snapshot_exposes_running_tool_and_card_before_values_to_the_rende
     await owner.start()
     try:
         await owner.send("change", diagnostic_id="synthetic-error")
-        assert ("change_settings", None) in seen
+        assert ("manage_proposal", "settings") in seen
         assert owner.snapshot.active_tool is None
         card = owner.snapshot.confirmation
         previous = control.context()["settings"]["stt.provider"]
@@ -1454,7 +1482,7 @@ async def test_approval_queue_advances_without_model_until_final_card(catalog):
         "overlay.translation.enabled": False,
     }
     transport = Responses(
-        call("change_settings", {"changes": changes}),
+        call("manage_proposal", {"action": "settings", "changes": changes}),
         answer("Review the cards."),
         answer("All approved settings are applied."),
     )
@@ -1519,7 +1547,7 @@ async def test_held_approved_operation_cannot_revive_cancelled_queue(catalog, ca
         "stt.provider": "deepgram",
     }
     transport = Responses(
-        call("change_settings", {"changes": changes}),
+        call("manage_proposal", {"action": "settings", "changes": changes}),
         answer("Review the cards."),
     )
     owner = AgentChatOwner(control, transport, localize=str)

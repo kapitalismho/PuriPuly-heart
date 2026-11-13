@@ -424,7 +424,7 @@ async def test_voice_limit_ends_dictation_and_keeps_text(monkeypatch):
 
 
 def test_voice_tile_does_not_change_while_puri_works():
-    owner = Owner(snapshot(busy=True, phase="working", active_tool=("get_app_context", "overview")))
+    owner = Owner(snapshot(busy=True, phase="working", active_tool=("read_app", "overview")))
     view = AgentChatView(owner)
     assert view._voice_tile._label == "VOICE"
     live = [item for item in view._messages.controls if item.key == "status:live"]

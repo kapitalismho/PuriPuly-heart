@@ -16,7 +16,9 @@ from tests.app.test_agent_chat_tools import catalog as catalog
 
 
 def call(identity, family, action, **arguments):
-    key = "topic" if family == "read_app" else "action"
+    key = {"read_app": "topic", "open_app": "view", "manage_proposal": "action"}.get(
+        family, "target"
+    )
     return {
         "type": "function_call",
         "status": "completed",
@@ -38,7 +40,7 @@ async def test_three_topic_reads_keep_independent_results_on_partial_failure(cat
     transport = Responses(
         batch(
             call("output", "read_app", "output"),
-            call("gpu", "read_app", "gpu", provider="soniox"),
+            call("gpu", "read_app", "gpu"),
             call("diagnostics", "read_app", "diagnostics"),
         ),
         answer(),
@@ -77,13 +79,13 @@ async def test_failed_read_blocks_later_action_and_recovers_on_next_turn(catalog
         batch(
             call("failed-gpu", "read_app", "gpu"),
             call("independent-before", "read_app", "general"),
-            call("blocked-overlay", "execute_app", "overlay.set", enabled=True),
+            call("blocked-overlay", "set_app", "overlay", enabled=True),
             call("independent-after", "read_app", "general"),
         ),
         answer(),
         batch(
             call("recovered-gpu", "read_app", "gpu"),
-            call("allowed-overlay", "execute_app", "overlay.set", enabled=True),
+            call("allowed-overlay", "set_app", "overlay", enabled=True),
         ),
         answer(),
     )
@@ -146,18 +148,17 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
     transport = Responses(
         batch(
             call("before", "read_app", "general"),
-            call("execute", "execute_app", "overlay.set", enabled=True, channel="self"),
+            call("execute", "set_app", "overlay", enabled=True),
             call("after", "read_app", "general"),
         ),
         batch(
             call(
                 "proposal",
-                "propose_app",
+                "manage_proposal",
                 "settings",
                 changes={"overlay.background_alpha": 0.4},
-                summary="Adjust overlay transparency",
             ),
-            call("blocked", "execute_app", "overlay.set", enabled=False),
+            call("blocked", "set_app", "overlay", enabled=False),
         ),
         answer(),
     )
@@ -183,7 +184,7 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
 async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
     control = ExecutionControl(catalog)
     transport = Responses(
-        batch(call("stage", "execute_app", "ui.provider_setup", provider="openrouter")),
+        batch(call("stage", "open_app", "provider_setup", provider="openrouter")),
         answer(),
         batch(call("read", "read_app", "provider_setup", provider="deepseek")),
         answer(),
@@ -207,11 +208,11 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
 @pytest.mark.asyncio
 async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(catalog):
     for family, request in (
-        ("propose_app", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
-        ("propose_app", {"action": "settings", "changes": {"private": "value"}}),
-        ("execute_app", {"action": "capture.set", "channel": "self"}),
-        ("execute_app", {"action": "recognition.probe", "channel": "both"}),
-        ("execute_app", {"action": "auth.login", "provider": "chatgpt"}),
+        ("manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
+        ("manage_proposal", {"action": "settings", "changes": {"private": "value"}}),
+        ("set_app", {"target": "capture.self"}),
+        ("probe_app", {"target": "recognition.both"}),
+        ("open_app", {"view": "auth.login", "provider": "chatgpt"}),
         ("read_app", {"topic": "settings.current"}),
         ("read_app", {"topic": "provider_setup"}),
         ("read_app", {"request": {"topic": "overview"}}),
@@ -219,7 +220,7 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         with pytest.raises(ValueError):
             validate_app_request(family, request, catalog)
     assert validate_app_request(
-        "propose_app",
+        "manage_proposal",
         {
             "action": "settings",
             "changes": {
@@ -229,9 +230,18 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         },
         catalog,
     )["changes"] == {"translation.model": "gemma4_26b_31b", "translation.connection": "openrouter"}
-    assert validate_app_request(
-        "execute_app", {"action": "ui.settings", "section": "api", "provider": None}, catalog
-    ) == {"action": "ui.settings", "section": "api"}
+    for request in (
+        {"view": "settings", "section": "api", "provider": None},
+        {"target": "overlay", "enabled": True, "channel": "self"},
+        {"action": "report", "summary": "Failure", "changes": {}},
+    ):
+        family = (
+            "open_app"
+            if "view" in request
+            else "set_app" if "target" in request else "manage_proposal"
+        )
+        with pytest.raises(ValueError):
+            validate_app_request(family, request, catalog)
 
 
 @pytest.mark.asyncio
@@ -260,13 +270,13 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
         ),
     ],
 )
-async def test_flat_approval_requests_ignore_other_actions_without_extra_effects(
+async def test_flat_approval_requests_reject_other_actions_without_extra_effects(
     catalog, action, arguments, expected
 ):
     control = ExecutionControl(catalog)
     control.accounts = {"chatgpt": {"signed_in": True}}
     transport = Responses(
-        batch(call("proposal", "propose_app", action, summary="Requested change", **arguments)),
+        batch(call("proposal", "manage_proposal", action, summary="Requested change", **arguments)),
         answer(),
         answer(),
     )
@@ -274,26 +284,9 @@ async def test_flat_approval_requests_ignore_other_actions_without_extra_effects
     await owner.start()
     try:
         result = await owner.send("Apply the requested change.")
-        assert [item.status for item in result.tool_results] == ["needs_confirmation"]
-        card = owner.snapshot.confirmation
-        assert card["changes"] == expected
+        assert [item.status for item in result.tool_results] == ["rejected"]
+        assert owner.snapshot.confirmation is None
         assert not control.submissions
-        applied = await owner.confirm(card["id"], True)
-        assert applied["status"] == "applied"
-        if action == "settings":
-            assert control.submissions == [{"changes": expected, "expected_revision": 11}]
-        else:
-            assert control.submissions == [
-                {
-                    "command": action,
-                    "arguments": {
-                        key: value
-                        for key, value in arguments.items()
-                        if key != "changes" and action != "overlay.position.reset"
-                    },
-                    "revision": 11,
-                }
-            ]
     finally:
         await owner.close()
 
@@ -333,9 +326,12 @@ async def test_stop_keeps_accepted_operation_once_and_rejects_late_results(catal
     control = Held(catalog)
     transport = Responses(
         batch(
-            call("accepted", "execute_app", "overlay.set", enabled=True),
+            call("accepted", "set_app", "overlay", enabled=True),
             call(
-                "unapproved", "propose_app", "settings", changes={"overlay.background_alpha": 0.4}
+                "unapproved",
+                "manage_proposal",
+                "settings",
+                changes={"overlay.background_alpha": 0.4},
             ),
         )
     )
@@ -373,16 +369,16 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
 
     control = Uncertain(catalog)
     transport = Responses(
-        batch(call("original", "execute_app", "recognition.probe", channel="self")),
+        batch(call("original", "probe_app", "recognition.self")),
         answer("The accepted operation is still pending."),
         batch(
             call("receipt", "read_app", "operation", operation_id="op-1"),
-            call("blocked", "execute_app", "translation.set", enabled=True),
+            call("blocked", "set_app", "translation", enabled=True),
         ),
-        answer("Wait for the existing operation, without resubmitting it."),
+        batch(call("independent", "set_app", "overlay", enabled=True)),
+        answer("The existing probe is pending; an unrelated switch remains available."),
         batch(
             call("completed", "read_app", "operation", operation_id="op-1"),
-            call("later", "execute_app", "translation.set", enabled=True),
         ),
         answer("The earlier receipt is complete; the next operation was accepted."),
     )
@@ -399,7 +395,11 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         assert outputs["receipt"]["status"] == "pending"
         assert outputs["receipt"]["receipt"]["request_id"] == "original"
         assert outputs["blocked"]["status"] == "not_executed"
-        assert [item["command"] for item in control.submissions] == ["recognition.probe"]
+        assert outputs["independent"]["status"] == "pending"
+        assert [item["command"] for item in control.submissions] == [
+            "recognition.probe",
+            "overlay.set",
+        ]
         control.operations["op-1"].update(
             status="applied",
             terminal=True,
@@ -412,7 +412,7 @@ async def test_uncertain_wait_reconciles_same_receipt_before_later_effects(catal
         await owner.send("Now enable translation.")
         assert [item["command"] for item in control.submissions] == [
             "recognition.probe",
-            "translation.set",
+            "overlay.set",
         ]
         completed = next(
             json.loads(item["output"])
@@ -434,8 +434,8 @@ async def test_settings_ui_stops_dependent_actions_until_user_continuation(catal
     control = ExecutionControl(catalog)
     transport = Responses(
         batch(
-            call("settings", "execute_app", "ui.settings", section="api", provider="deepseek"),
-            call("premature", "execute_app", "translation.set", enabled=True),
+            call("settings", "open_app", "settings", section="api", provider="deepseek"),
+            call("premature", "set_app", "translation", enabled=True),
         ),
         answer("Use the displayed secure field before continuing."),
     )
@@ -456,5 +456,170 @@ async def test_settings_ui_stops_dependent_actions_until_user_continuation(catal
         assert results["settings"]["opened"] is True
         assert results["premature"]["status"] == "not_executed"
         assert control.submissions == []
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_peer_owner_probe_continues_to_diagnostics_and_user_click_report():
+    import httpx
+
+    from tests.app.test_agent_chat_report import ReportResponses
+    from tests.app.test_translation_probe import ControlledBackend, control_for
+
+    backend = ControlledBackend(failure=httpx.ConnectError("PRIVATE-ENDPOINT"))
+    production, runtime = control_for(
+        backend,
+        source_language="ko",
+        target_language="en",
+        peer_source_language="ja",
+        peer_target_language="ko",
+    )
+
+    class LinkedControl(Records):
+        async def query(self, name, arguments):
+            if name == "settings.choices":
+                self.queries.append((name, arguments))
+                raise RuntimeError("Settings catalog unavailable")
+            return await super().query(name, arguments)
+
+        async def submit(self, *args, **kwargs):
+            return await production.submit(*args, **kwargs)
+
+        async def wait(self, *args, **kwargs):
+            return await production.wait(*args, **kwargs)
+
+        async def operation(self, identity):
+            return await production.operation(identity)
+
+    control = LinkedControl()
+
+    class LinkedResponses(ReportResponses):
+        async def respond(self, **request):
+            catalog_counts.append(sum(name == "settings.choices" for name, _ in control.queries))
+            async for event in super().respond(**request):
+                yield event
+
+    catalog_counts = []
+    transport = LinkedResponses(
+        batch(
+            call("peer", "probe_app", "translation.peer"),
+            call("dependent", "set_app", "overlay", enabled=True),
+            call("diagnostics", "read_app", "diagnostics"),
+        ),
+        batch(
+            call(
+                "report",
+                "manage_proposal",
+                "report",
+                summary="Peer translation failed during the isolated network check.",
+            )
+        ),
+        answer(
+            "The isolated Peer check failed. Review the report card to send the retained evidence."
+        ),
+    )
+    owner = AgentChatOwner(
+        control, transport, localize=str, support_log_snapshot=lambda: b"synthetic log\n"
+    )
+    try:
+        await owner.start()
+        result = await owner.send(
+            "Check Peer translation, inspect the failure and offer a developer report."
+        )
+        assert [item.status for item in result.tool_results] == [
+            "failed",
+            "not_executed",
+            "observed",
+            "pending",
+        ]
+        receipt = result.tool_results[0].result["receipt"]
+        assert receipt["channel"] == "peer"
+        assert receipt["source_language"] == "ja" and receipt["target_languages"] == ["ko"]
+        assert receipt["translation_result"] == "failed"
+        assert receipt["failure_category"] == "network"
+        assert receipt["output_delivery"] == receipt["display"] == "not_exercised"
+        assert backend.requests[0].source_language == "ja"
+        assert backend.requests[0].target_language == "ko"
+        assert len(backend.requests) == 1
+        assert result.tool_results[2].result["context"]["view"] == "diagnostics"
+        assert all(request["allow_tools"] for request in transport.requests)
+        assert len(transport.requests) == 3
+        assert catalog_counts[1] == catalog_counts[2]
+        assert not transport.uploads
+        (offer,) = owner.snapshot.report_offers
+        assert offer.status == "offered"
+        assert owner.mark_report_displayed(offer.id)["status"] == "displayed"
+        uploaded = await owner.send_report(offer.id)
+        assert uploaded["status"] == "sent"
+        assert len(transport.uploads) == 1
+        assert "PRIVATE-" not in json.dumps([item.result for item in result.tool_results])
+    finally:
+        await owner.close()
+        production.freeze_ingress()
+        await production.drain_operations()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("uncertainty", ["pending", "submit_unknown", "lookup_missing"])
+async def test_repeated_unresolved_signature_keeps_original_identity_and_independent_work(
+    catalog, uncertainty
+):
+    class Uncertain(ExecutionControl):
+        async def submit(self, command, arguments, **kwargs):
+            receipt = await super().submit(command, arguments, **kwargs)
+            if command == "overlay.set" and uncertainty == "submit_unknown":
+                raise ConnectionError("Submission acknowledgment lost")
+            return receipt
+
+        async def wait(self, identity, timeout=None):
+            if self.operations[identity]["request_id"] == "original":
+                raise TimeoutError()
+            return await super().wait(identity, timeout)
+
+        async def operation(self, identity):
+            if uncertainty == "lookup_missing":
+                return {}
+            return dict(self.operations[identity])
+
+    control = Uncertain(catalog)
+    transport = Responses(
+        batch(call("original", "set_app", "overlay", enabled=True)),
+        batch(
+            call("repeat", "set_app", "overlay", enabled=True),
+            call("independent-read", "read_app", "general"),
+        ),
+        batch(call("independent-command", "set_app", "translation", enabled=True)),
+        answer("The original work remains unresolved; the unrelated switch completed."),
+    )
+    owner = AgentChatOwner(control, transport, localize=str)
+    try:
+        await owner.start()
+        result = await owner.send("Enable the overlay, then inspect and enable translation.")
+        assert [item.call_id for item in result.tool_results] == [
+            "original",
+            "repeat",
+            "independent-read",
+            "independent-command",
+        ]
+        original, repeated, read, independent = result.tool_results
+        assert (
+            original.status
+            == repeated.status
+            == ("unavailable" if uncertainty == "submit_unknown" else "pending")
+        )
+        assert read.status == "observed" and independent.status == "applied"
+        assert [item["command"] for item in control.submissions] == [
+            "overlay.set",
+            "translation.set",
+        ]
+        assert control.operations["op-1"]["request_id"] == "original"
+        if uncertainty == "submit_unknown":
+            assert repeated.result["request_id"] == "original"
+        else:
+            assert repeated.result["receipt"]["operation_id"] == "op-1"
+            assert repeated.result["receipt"]["request_id"] == "original"
+        assert all(request["allow_tools"] for request in transport.requests)
     finally:
         await owner.close()
