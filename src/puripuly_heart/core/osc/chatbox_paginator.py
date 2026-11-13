@@ -186,7 +186,7 @@ class ChatboxPaginator:
             return False, None
         try:
             self.sender.send_chatbox(text)
-        except OSError as exc:
+        except Exception as exc:
             return False, self._local_send_diagnostics(exc)
         return True, None
 
@@ -230,7 +230,7 @@ class ChatboxPaginator:
         try:
             self.sender.send_typing(is_typing)
             self._last_typing_state = bool(is_typing)
-        except OSError as exc:
+        except Exception as exc:
             self._emit_local_send_failure("typing_state", exc, operation=operation)
 
     def drop_pending(self) -> None:
@@ -497,7 +497,7 @@ class ChatboxPaginator:
     def _send_page(self, *, mode: str, text: str, remaining_parts: int) -> bool:
         try:
             self.sender.send_chatbox(text)
-        except OSError as exc:
+        except Exception as exc:
             if self._active_message is not None and self._active_page_index == 0:
                 self._notify_delivery(self._active_message, "output_send_failed")
             self._emit_send_failure(mode=mode, exc=exc)
@@ -563,7 +563,7 @@ class ChatboxPaginator:
             **fields,
         )
 
-    def _emit_send_failure(self, *, mode: str, exc: OSError) -> None:
+    def _emit_send_failure(self, *, mode: str, exc: BaseException) -> None:
         self._emit_local_send_failure(
             "chatbox_page", exc, message=self._active_message if mode == "queued" else None
         )
@@ -571,7 +571,7 @@ class ChatboxPaginator:
     def _emit_local_send_failure(
         self,
         stage: str,
-        exception: OSError,
+        exception: BaseException,
         *,
         message: OSCMessage | None = None,
         operation: str = "publish",
@@ -581,7 +581,7 @@ class ChatboxPaginator:
 
     @staticmethod
     def _local_send_diagnostics(
-        exception: OSError, *, message: OSCMessage | None = None, operation: str = "publish"
+        exception: BaseException, *, message: OSCMessage | None = None, operation: str = "publish"
     ) -> ErrorDiagnostics:
         active = message
         fields = {
