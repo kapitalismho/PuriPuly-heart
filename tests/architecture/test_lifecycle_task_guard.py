@@ -324,8 +324,9 @@ TASK_CREATION_REVIEWS = (
         {
             "AudioTestSessionOwner._release_diagnostic_resources": 1,
             "AudioTestSessionOwner._pause_diagnostic_capture": 1,
+            "AudioTestSessionOwner._schedule_diagnostic_restore": 1,
         },
-        "AudioTestSessionOwner retains bounded diagnostic cleanup until drained; cancellation cannot release capture restoration before source cleanup",
+        "AudioTestSessionOwner retains bounded diagnostic cleanup and restoration until drained; cancellation cannot release capture restoration before source cleanup or revive revoked capture",
     ),
     *_reviews(
         "core/runtime/audio_test.py",

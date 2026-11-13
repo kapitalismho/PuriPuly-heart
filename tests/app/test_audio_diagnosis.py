@@ -821,3 +821,101 @@ async def test_shutdown_does_not_discard_real_native_capture_cleanup_debt():
     finally:
         release.set()
         await asyncio.gather(task, closing, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_slow_candidate_cleanup_restores_capture_and_allows_retry():
+    harness = Harness()
+
+    class SlowCloseSource(FeedSource):
+        def __init__(self) -> None:
+            super().__init__()
+            self.release_cleanup = asyncio.Event()
+
+        async def close(self) -> None:
+            await self.release_cleanup.wait()
+            await super().close()
+
+    source = SlowCloseSource()
+    source.feed(0.5, chunks=4)
+    result = await diagnose(harness, (candidate(0, current=True),), {0: Opener(source, {})})
+    diagnosis = result["diagnosis"]
+    assert result["status"] == "failed"
+    assert diagnosis["failure_code"] == "resource_release_incomplete"
+    assert diagnosis["cleanup_complete"] is False
+    assert diagnosis["restoration"] == {"self": "cleanup_pending", "peer": "cleanup_pending"}
+    assert harness.control.enabled == {"self": False, "peer": False}
+
+    source.release_cleanup.set()
+    await _until(lambda: harness.control.enabled == {"self": True, "peer": True})
+    await _until(lambda: not harness.owner.active)
+    assert source.closed
+    assert harness.owner._restoration_status == {"self": "restored", "peer": "restored"}
+
+    retry_source = FeedSource()
+    retry_source.feed(0.5, chunks=4)
+    retry = await diagnose(
+        harness,
+        (candidate(0, current=True),),
+        {0: Opener(retry_source, {})},
+    )
+    assert retry["status"] == "applied"
+    assert retry["diagnosis"]["cleanup_complete"]
+    assert retry_source.closed
+    assert harness.control.enabled == {"self": True, "peer": True}
+
+
+@pytest.mark.asyncio
+async def test_slow_cleanup_never_revives_capture_revoked_before_restore():
+    harness = Harness()
+
+    class SlowCloseSource(FeedSource):
+        def __init__(self) -> None:
+            super().__init__()
+            self.release_cleanup = asyncio.Event()
+
+        async def close(self) -> None:
+            await self.release_cleanup.wait()
+            await super().close()
+
+    source = SlowCloseSource()
+    source.feed(0.5, chunks=4)
+    result = await diagnose(harness, (candidate(0, current=True),), {0: Opener(source, {})})
+    assert result["status"] == "failed"
+    assert result["diagnosis"]["cleanup_complete"] is False
+
+    for channel in ("self", "peer"):
+        harness.owner.release_capture_restore(channel)
+        harness.control.user_set(channel, False)
+    source.release_cleanup.set()
+    await _until(lambda: source.closed)
+    await _until(lambda: not harness.owner.active)
+
+    assert harness.control.enabled == {"self": False, "peer": False}
+    assert harness.owner._restoration_status == {"self": "skipped", "peer": "skipped"}
+    assert not harness.owner.snapshot["restore_capture"]
+
+
+@pytest.mark.asyncio
+async def test_cleanup_settled_before_final_receipt_still_restores(monkeypatch):
+    original = audio_test.AudioTestSessionOwner._release_diagnostic_resources
+
+    async def report_cleanup_failure(self, *, restore_capture: bool = False):
+        result = await original(self, restore_capture=restore_capture)
+        return False if not restore_capture else result
+
+    monkeypatch.setattr(
+        audio_test.AudioTestSessionOwner,
+        "_release_diagnostic_resources",
+        report_cleanup_failure,
+    )
+    harness = Harness()
+    source = FeedSource()
+    source.feed(0.5, chunks=4)
+    result = await diagnose(harness, (candidate(0, current=True),), {0: Opener(source, {})})
+    assert result["status"] == "failed"
+    assert result["diagnosis"]["cleanup_complete"] is False
+    assert source.closed
+
+    await _until(lambda: harness.control.enabled == {"self": True, "peer": True})
+    await _until(lambda: not harness.owner.active)

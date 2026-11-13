@@ -127,6 +127,7 @@ class AudioTestSessionOwner:
     _admission_revision: int = field(init=False, default=0, repr=False)
     _diagnosis_task: asyncio.Task[object] | None = field(init=False, default=None, repr=False)
     _diagnosis_cleanup_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _diagnosis_restore_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _diagnosis_pause_task: asyncio.Task[bool] | None = field(init=False, default=None, repr=False)
     _diagnosis_pause_aborted: bool = field(init=False, default=False, repr=False)
     _diagnostic_evidence: AudioDiagnosticEvidence | None = field(
@@ -163,6 +164,7 @@ class AudioTestSessionOwner:
         return (
             self._starting
             or self._diagnosis_cleanup_task is not None
+            or self._diagnosis_restore_task is not None
             or self._diagnosis_pause_task is not None
             or any(session.runtime.has_resources for session in self._sessions.values())
         )
@@ -205,6 +207,7 @@ class AudioTestSessionOwner:
                 "_closed",
                 "_diagnosis_task",
                 "_diagnosis_cleanup_task",
+                "_diagnosis_restore_task",
                 "_diagnosis_pause_task",
             ),
             "stop_ingress": "close marks the owner closed and rejects new sessions",
@@ -244,7 +247,11 @@ class AudioTestSessionOwner:
         async with self._lock():
             if self._closed:
                 return False
-            if self._diagnosis_pause_task is not None or self._diagnosis_cleanup_task is not None:
+            if (
+                self._diagnosis_pause_task is not None
+                or self._diagnosis_cleanup_task is not None
+                or self._diagnosis_restore_task is not None
+            ):
                 return False
             if self.active and any(
                 session.state in {"pending", "ready"} for session in self._sessions.values()
@@ -433,6 +440,7 @@ class AudioTestSessionOwner:
                     receipt["status"] = "applied"
                 self._starting = False
                 self._diagnosis_task = None
+                self._schedule_diagnostic_restore()
             return receipt
 
     async def _pause_diagnostic_capture(self) -> bool:
@@ -492,6 +500,31 @@ class AudioTestSessionOwner:
             and self._diagnosis_cleanup_task is task
         ):
             self._diagnosis_cleanup_task = None
+            self._schedule_diagnostic_restore()
+
+    def _schedule_diagnostic_restore(self) -> None:
+        if (
+            self._closed
+            or self._diagnosis_task is not None
+            or self._diagnosis_cleanup_task is not None
+            or self._diagnosis_restore_task is not None
+            or self._diagnosis_pause_task is not None
+            or not self._restore
+            or "failed" in self._restoration_status.values()
+            or any(session.runtime.has_resources for session in self._sessions.values())
+        ):
+            return
+        task = asyncio.create_task(
+            self._restore_translation_capture(), name="AudioTestSessionOwner:diagnose-restore"
+        )
+        self._diagnosis_restore_task = task
+        task.add_done_callback(self._on_diagnostic_restore_done)
+
+    def _on_diagnostic_restore_done(self, task: asyncio.Task[None]) -> None:
+        if self._diagnosis_restore_task is task:
+            self._diagnosis_restore_task = None
+        if not task.cancelled():
+            task.exception()
 
     async def _finish_diagnostic_cleanup(self, *, restore_capture: bool) -> None:
         pause = self._diagnosis_pause_task
@@ -521,6 +554,20 @@ class AudioTestSessionOwner:
         if task is not None and task is not asyncio.current_task() and not task.cancelling():
             task.cancel()
 
+    async def _wait_diagnostic_restore(self) -> bool:
+        task = self._diagnosis_restore_task
+        if task is None:
+            return True
+        done, _pending = await asyncio.wait({task}, timeout=DIAGNOSTIC_CLEANUP_TIMEOUT_S)
+        if not done:
+            return False
+        try:
+            task.result()
+        except Exception as exc:
+            self._emit("diagnose_restore_failed", {"channel": "self"}, exc)
+            return False
+        return True
+
     async def stop(self) -> None:
         self._admission_revision += 1
         self._cancel_diagnosis()
@@ -529,6 +576,8 @@ class AudioTestSessionOwner:
                 if not await self._release_diagnostic_resources():
                     raise RuntimeError("Audio test resource release is incomplete")
             await self._stop_sessions()
+            if not await self._wait_diagnostic_restore():
+                raise RuntimeError("Audio test capture restoration is incomplete")
             if self.active:
                 raise RuntimeError("Audio test resource release is incomplete")
             if not self._closed and not self.active:
@@ -544,6 +593,8 @@ class AudioTestSessionOwner:
                     raise RuntimeError("Audio test resource release is incomplete")
             try:
                 await self._stop_sessions(close=True)
+                if not await self._wait_diagnostic_restore():
+                    raise RuntimeError("Audio test capture restoration is incomplete")
                 if self.active:
                     raise RuntimeError("Audio test resource release is incomplete")
             finally:
