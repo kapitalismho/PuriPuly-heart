@@ -1605,7 +1605,7 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
                 assert result["browser_authorization"] == {
                     "method": "oauth_pkce",
                     "entry": "user_action_in_app_settings",
-                    "requires_selected_connection": "openrouter_byok",
+                    "requires_selected_connection": "openrouter",
                     "applies_selection_on_success": True,
                     "manual_key_fallback": True,
                 }

@@ -387,3 +387,74 @@ async def test_warning_delivery_failure_remains_with_originating_usage_scope(new
         finish.set()
         await asyncio.gather(old, return_exceptions=True)
         await owner.close()
+
+
+def _metadata_status_diagnostics(status: int):
+    import httpx
+
+    from puripuly_heart.core.diagnostics import exception_diagnostics
+
+    request = httpx.Request("GET", "https://openrouter.ai/api/v1/key")
+    try:
+        httpx.Response(status, request=request).raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        return exception_diagnostics(
+            exc,
+            component="managed_account",
+            operation="managed_usage_refresh",
+            code="managed_account_observation_failed",
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (
+            ManagedUsageMetadataResult(True, None, _metadata_status_diagnostics(401)),
+            {"status": "failed", "managed_access": "unusable"},
+        ),
+        (
+            ManagedUsageMetadataResult(True, None, _metadata_status_diagnostics(403)),
+            {"status": "failed", "managed_access": "unusable"},
+        ),
+        (
+            ManagedUsageMetadataResult(True, None, _metadata_status_diagnostics(503)),
+            {"status": "failed", "managed_access": "unknown"},
+        ),
+        (
+            ManagedUsageMetadataResult(
+                True, OpenRouterKeyMetadata(limit_usd=0.07, remaining_usd=0.035, usage_usd=None)
+            ),
+            {"status": "applied", "managed_access": "usable", "managed_remaining_percent": 50},
+        ),
+        (
+            ManagedUsageMetadataResult(
+                True, OpenRouterKeyMetadata(limit_usd=0.07, remaining_usd=0, usage_usd=None)
+            ),
+            {"status": "failed", "managed_access": "unusable", "managed_remaining_percent": 0},
+        ),
+        (
+            ManagedUsageMetadataResult(False, None),
+            {"status": "action_required", "reason": "credential_unavailable"},
+        ),
+    ],
+)
+async def test_managed_access_refresh_reports_usability_without_side_effects(result, expected):
+    from types import SimpleNamespace
+
+    from puripuly_heart.app.adapters.ui_runtime import UiManagedRuntimeAdapter
+
+    async def fetch():
+        return result
+
+    disabled = []
+    usage = _owner([_state()], metadata_fetcher=fetch, disabled=disabled, auto_show=True)
+
+    receipt = await UiManagedRuntimeAdapter(
+        SimpleNamespace(usage=usage)
+    ).refresh_managed_account_usage()
+
+    assert {key: receipt.get(key) for key in expected} == expected
+    assert disabled == []
+    await usage.close()

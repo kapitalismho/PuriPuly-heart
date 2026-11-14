@@ -436,13 +436,16 @@ def _failure_report(
         retry_values = {report.diagnostics.retry_after_ms for report in branch_reports}
         retry_after_ms = retry_values.pop() if matching and len(retry_values) == 1 else None
         shared_fields = {}
-        if unanimous_402:
-            for key in ("limit_source", "limit_reason"):
-                values = {report.diagnostics.fields.get(key) for report in branch_reports}
-                if len(values) == 1:
-                    value = values.pop()
-                    if value is not None:
-                        shared_fields[key] = value
+        for key in (
+            ("credential_source", "limit_source", "limit_reason")
+            if unanimous_402
+            else ("credential_source",)
+        ):
+            values = {report.diagnostics.fields.get(key) for report in branch_reports}
+            if len(values) == 1:
+                value = values.pop()
+                if value is not None:
+                    shared_fields[key] = value
     else:
         provider_label = _diagnostic_provider(exc, provider)
         status_code = _status_code(exc)
