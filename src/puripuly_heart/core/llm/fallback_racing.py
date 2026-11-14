@@ -39,6 +39,7 @@ class LLMProviderAttempt:
     log_summary: str | None = None
     provider_name: str = "unknown"
     model: str | None = None
+    credential_source: str | None = None
 
     def __post_init__(self) -> None:
         if self.start_after_ms < 0:
@@ -523,10 +524,17 @@ class FallbackRacingLLMProvider(LLMProvider):
             outcome.error = exc
             from puripuly_heart.core.error_messages import provider_failure_report
 
+            attempt = self.attempts[index]
+            failure = provider_failure_report(
+                exc, provider=attempt.provider_name, operation="translate"
+            ).diagnostics
+            if attempt.credential_source is not None:
+                failure = replace(
+                    failure,
+                    fields={**failure.fields, "credential_source": attempt.credential_source},
+                )
             outcome.failure = replace(
-                provider_failure_report(
-                    exc, provider=self.attempts[index].provider_name, operation="translate"
-                ).diagnostics,
+                failure,
                 **current_diagnostic_operation(),
                 turn_id=turn_id,
             )

@@ -162,6 +162,7 @@ COMMANDS = {
     "overlay.position.reset": "Reset desktop overlay position",
     "overlay.calibrate": "Begin, change, apply or cancel overlay calibration",
     "osc.discovery.retry": "Refresh or recover automatic OSC discovery without changing settings",
+    "accounts.managed.refresh": "Re-read the managed credential's allowance without a translation request",
 }
 QUERIES = {
     "app.status",
@@ -251,6 +252,7 @@ COMMAND_ARGUMENTS = {
     "gemma.cancel": {},
     "overlay.position.reset": {},
     "osc.discovery.retry": {},
+    "accounts.managed.refresh": {},
     "overlay.calibrate": {
         "action": ["begin", "change", "apply", "cancel"],
         "field": "required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha",
@@ -2805,6 +2807,11 @@ class ApplicationControlOwner:
             return await app.apply_loopback_capture_option(value)
         if command == "audio.retry":
             return await app.retry_peer_process_capture()
+        if command == "accounts.managed.refresh":
+            refresh = getattr(app, "refresh_managed_account_usage", None)
+            if not callable(refresh):
+                return {"status": "failed", "error": {"code": "managed_account_unavailable"}}
+            return await refresh()
         if command == "settings.apply":
             return await self._apply_fields(args)
         if command == "provider.apply":

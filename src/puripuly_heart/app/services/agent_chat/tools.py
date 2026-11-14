@@ -560,6 +560,8 @@ def project_operation_receipt(receipt: dict, tool: str) -> dict:
                 "failure_category",
                 "cleanup_complete",
                 "cleanup_outcome",
+                "managed_access",
+                "managed_remaining_percent",
             ),
         )
     )

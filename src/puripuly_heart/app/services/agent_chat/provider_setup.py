@@ -71,7 +71,7 @@ class ProviderSetup:
             result["browser_authorization"] = {
                 "method": "oauth_pkce",
                 "entry": "user_action_in_app_settings",
-                "requires_selected_connection": f"{self.provider}_byok",
+                "requires_selected_connection": self.provider,
                 "applies_selection_on_success": True,
                 "manual_key_fallback": True,
             }

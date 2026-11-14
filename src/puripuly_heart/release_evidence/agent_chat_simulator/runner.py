@@ -1351,6 +1351,26 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                         )
                     },
                 )
+        elif cause == "managed_rejected":
+            if app.intent["translation"]["connection"] != "managed":
+                result = answer("승인된 공식 API 연결로 번역이 다시 들어왔어.")
+            elif not any("managed_access" in item.get("receipt", {}) for item in outputs):
+                result = tool("probe_app", {"target": "managed_access"})
+            elif body["allow_tools"]:
+                result = tool(
+                    "manage_proposal",
+                    {
+                        "action": "settings",
+                        "changes": {
+                            "translation.model": "index_translate_35b",
+                            "translation.connection": "public_api",
+                        },
+                    },
+                )
+            else:
+                result = answer(
+                    "관리형 키가 거부되고 있어. 키 없이 쓰는 공식 API로 바꾸는 카드를 확인해 줘."
+                )
         elif cause in {"slow_luna", "slow_gemma"}:
             replacement = "deepseek_v4_flash_41"
             result = (

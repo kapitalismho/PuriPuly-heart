@@ -1095,6 +1095,7 @@ _ENUM_FIELDS["reason"] = frozenset(
         "metadata_invalid",
     }
 )
+_ENUM_FIELDS["credential_source"] = frozenset({"none", "secret_store", "managed"})
 _ENUM_FIELDS["deepgram_code"] = frozenset({"DATA-0000", "NET-0000", "NET-0001", "NET-0002"})
 _ENUM_FIELDS["owner_name"] = _ENUM_FIELDS["owner_name"] | {
     "self_audio",

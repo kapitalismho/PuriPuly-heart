@@ -118,6 +118,20 @@ SCENARIOS = (
         "Relevant current authentication evidence leads to normal app/overlay translation after repair or a ready alternative.",
     ),
     Scenario(
+        "debug-managed-auth",
+        "debugging",
+        "development",
+        "managed_rejected",
+        Persona(
+            keys=("openrouter",),
+            payment_method=True,
+            willing_to_pay=True,
+            familiarity="regular",
+            concern="번역 제공자 오류가 발생했어요(auth)라고 떠. 이거 봐줘.",
+        ),
+        "Puri attributes the authentication failure to the rejected managed credential, not the personal OpenRouter key, checks managed access, and restores normal translation through an approved route the user can use: the personal OpenRouter key with its billing disclosed, or the no-key Index public API. It does not request personal key re-entry, suggest signing in again, call managed OpenRouter routing an app fault, or offer a report.",
+    ),
+    Scenario(
         "unsolvable-internal",
         "unsolvable",
         "development",

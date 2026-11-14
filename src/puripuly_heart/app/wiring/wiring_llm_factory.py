@@ -938,6 +938,7 @@ def create_llm_provider_from_resolved_config(
                 start_after_ms=config.attempts[0].start_after_ms,
                 provider_name=config.primary.provider,
                 model=config.primary.model,
+                credential_source=config.primary.credential.source,
             )
         ]
         for index, attempt_plan in enumerate(config.attempts[1:], start=1):
@@ -956,6 +957,7 @@ def create_llm_provider_from_resolved_config(
                         provider=base,
                         provider_name=attempt_plan.target.provider,
                         model=attempt_plan.target.model,
+                        credential_source=attempt_plan.target.credential.source,
                         start_after_ms=attempt_plan.start_after_ms,
                         start_on_primary_error=attempt_plan.start_on_primary_error,
                         log_summary=_fallback_attempt_log_summary(
@@ -987,6 +989,7 @@ def create_llm_provider_from_resolved_config(
                     ),
                     provider_name=attempt_plan.target.provider,
                     model=attempt_plan.target.model,
+                    credential_source=attempt_plan.target.credential.source,
                     start_after_ms=attempt_plan.start_after_ms,
                     start_on_primary_error=attempt_plan.start_on_primary_error,
                     log_summary=_fallback_attempt_log_summary(
