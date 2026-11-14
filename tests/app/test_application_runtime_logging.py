@@ -319,8 +319,7 @@ def test_composed_logging_persists_source_and_translation(composed_logging, capl
     assert "manual-turn" not in persisted
     assert "target_index" not in persisted
     assert [
-        (record.source_text, record.translated_text)
-        for record in conversation.conversation_records
+        (record.source_text, record.translated_text) for record in conversation.conversation_records
     ] == [
         ("안녕하세요", None),
         (None, "Hello"),

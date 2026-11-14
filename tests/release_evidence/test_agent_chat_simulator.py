@@ -2757,9 +2757,7 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["gemini_transcribe", "rolling_free"])
 async def test_free_signup_direct_and_rolling_reach_final_owner_code_judgment(provider):
-    setup = tool(
-        "setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini"})
-    )
+    setup = tool("setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini"}))
     setup["name"] = "open_app"
     change = tool(
         "change",

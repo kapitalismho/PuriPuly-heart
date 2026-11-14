@@ -84,7 +84,6 @@ class _FallbackCapture(logging.Handler):
         self.messages.append((record.levelno, record.getMessage()))
 
 
-
 def _fallback_logger() -> tuple[logging.Logger, _FallbackCapture]:
     logger = logging.getLogger(f"test.runtime_logging.fallback.{uuid4()}")
     logger.handlers.clear()

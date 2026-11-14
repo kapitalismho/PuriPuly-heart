@@ -280,13 +280,14 @@ async def test_real_dual_target_history_correlates_child_records_without_duplica
         if not accepted_before_snapshots:
             await eventually(lambda: len(presentation.logs.conversation_records) == 2)
             assert not presentation.runtime._conversation_record_keys
-            assert [record.target_language for record in presentation.logs.conversation_records] == [
+            assert [
+                record.target_language for record in presentation.logs.conversation_records
+            ] == [
                 "en",
                 "ja",
             ]
             assert all(
-                record.disposition == "pending"
-                for record in presentation.logs.conversation_records
+                record.disposition == "pending" for record in presentation.logs.conversation_records
             )
         await owner.close_source(source_id)
         await eventually(
@@ -633,10 +634,13 @@ async def test_newer_speech_keeps_dashboard_when_older_manual_completes(
         ]
         assert len(manual_records) == 1 + len(targets)
         assert all(record.accepted for record in manual_records)
-        assert sum(
-            record.translated_text == "en:older manual"
-            for record in presentation.logs.conversation_records
-        ) == 1
+        assert (
+            sum(
+                record.translated_text == "en:older manual"
+                for record in presentation.logs.conversation_records
+            )
+            == 1
+        )
         assert len(presentation.logs.conversation_records) == 1 + 2 * len(targets)
         assert len(presentation.runtime._conversation_record_keys) == 2 * (1 + len(targets))
         await owner.harness.self_owner.submit_text("future manual", source="You")
@@ -671,10 +675,13 @@ async def test_queued_new_manual_source_survives_its_own_admission(presentation)
         await eventually(
             lambda: presentation.dashboard.display_card._display_text.value == "en:queued manual"
         )
-        assert sum(
-            record.translated_text == "en:queued manual"
-            for record in presentation.logs.conversation_records
-        ) == 1
+        assert (
+            sum(
+                record.translated_text == "en:queued manual"
+                for record in presentation.logs.conversation_records
+            )
+            == 1
+        )
 
 
 @pytest.mark.asyncio
@@ -851,10 +858,13 @@ async def test_delayed_segmented_child_source_keeps_newer_managed_dashboard(
             )
             assert future_parent not in owner.snapshots
             for text in ("en:future first", "en:future second"):
-                assert sum(
-                    record.translated_text == text
-                    for record in presentation.logs.conversation_records
-                ) == 1
+                assert (
+                    sum(
+                        record.translated_text == text
+                        for record in presentation.logs.conversation_records
+                    )
+                    == 1
+                )
             await owner.source("future managed")
             await owner.idle()
             await eventually(
@@ -920,10 +930,13 @@ async def test_current_manual_result_replaces_speech_after_source_delivery_timeo
         )
         assert not old_release.is_set()
         assert card._input_field.value == "unsubmitted draft"
-        assert sum(
-            record.translated_text == "en:manual after dropped source"
-            for record in presentation.logs.conversation_records
-        ) == 1
+        assert (
+            sum(
+                record.translated_text == "en:manual after dropped source"
+                for record in presentation.logs.conversation_records
+            )
+            == 1
+        )
         assert len(presentation.logs.conversation_records) == 3
         assert (
             sum(call["text"] == "manual after dropped source" for call in owner.provider.calls) == 1
@@ -948,10 +961,13 @@ async def test_current_manual_result_replaces_speech_after_source_delivery_timeo
         await owner.harness.ui_events.join()
         assert card._display_text.value == "en:pressure successor"
         assert card._input_field.value == "unsubmitted draft"
-        assert sum(
-            record.translated_text == "en:manual after dropped source"
-            for record in presentation.logs.conversation_records
-        ) == 1
+        assert (
+            sum(
+                record.translated_text == "en:manual after dropped source"
+                for record in presentation.logs.conversation_records
+            )
+            == 1
+        )
         assert (
             sum(
                 "en:manual after dropped source" in message.text

@@ -71,8 +71,7 @@ class ConversationHistoryModel:
             and (
                 (record.target_index is None and record.target_language is None)
                 or (
-                    record.target_index is not None
-                    and previous.target_index == record.target_index
+                    record.target_index is not None and previous.target_index == record.target_index
                 )
                 or (
                     record.target_index is None
@@ -231,9 +230,7 @@ class ConversationHistory:
         max_entries: int = MAX_CONVERSATION_RECORDS,
         cleanup_batch: int = CLEANUP_BATCH,
     ) -> None:
-        self._model = ConversationHistoryModel(
-            max_entries=max_entries, cleanup_batch=cleanup_batch
-        )
+        self._model = ConversationHistoryModel(max_entries=max_entries, cleanup_batch=cleanup_batch)
         self._self_turn_observers: list[Callable[[SelfTurnPresentation, str], None]] = []
 
     @property
@@ -251,8 +248,7 @@ class ConversationHistory:
         revision = metadata.get("peer_caption_revision")
         self.append_conversation_record(
             source=str(
-                metadata.get("source")
-                or ("Listen" if record.speaker_channel == "peer" else "Mic")
+                metadata.get("source") or ("Listen" if record.speaker_channel == "peer" else "Mic")
             ),
             channel=record.speaker_channel,
             utterance_id=record.utterance_id,

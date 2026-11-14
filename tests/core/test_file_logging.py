@@ -45,7 +45,6 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
         ),
     )
 
-
     root_logger.info("root arbitrary prose")
     service.emit_basic("basic line")
     diagnostics = [

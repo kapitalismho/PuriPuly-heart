@@ -12,8 +12,8 @@ import pytest
 
 pytest.importorskip("flet")
 
-from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core import messages
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,

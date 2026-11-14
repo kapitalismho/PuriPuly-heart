@@ -29,7 +29,9 @@ def test_main_version_prints(capsys) -> None:
     assert capsys.readouterr().out.strip() == __version__
 
 
-@pytest.mark.skipif(os.name != "nt", reason="NumPy's bundled OpenBLAS runtime check is Windows-specific")
+@pytest.mark.skipif(
+    os.name != "nt", reason="NumPy's bundled OpenBLAS runtime check is Windows-specific"
+)
 def test_main_limits_openblas_before_numpy_import() -> None:
     import subprocess
 

@@ -79,4 +79,3 @@ def test_text_style_uses_the_current_ui_typeface() -> None:
         assert style.letter_spacing is None
     finally:
         set_locale(previous)
-

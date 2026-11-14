@@ -6204,14 +6204,10 @@ def test_text_subtab_shell_can_render_without_title_and_pin_subtab_bar_to_bottom
 def test_gemini_key_visibility_tracks_stt_selection(
     monkeypatch: pytest.MonkeyPatch, settings_events, channel: str
 ) -> None:
-    view, _ = _make_settings_view(
-        monkeypatch, settings_events, settings=AppSettingsVNext()
-    )
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=AppSettingsVNext())
     assert view._gemini_key.visible is False
     assert view._api_keys_card.visible is False
-    select_provider = (
-        view._on_stt_selected if channel == "self" else view._on_peer_stt_selected
-    )
+    select_provider = view._on_stt_selected if channel == "self" else view._on_peer_stt_selected
 
     select_provider(STTProviderName.GEMINI_TRANSCRIBE.value)
 

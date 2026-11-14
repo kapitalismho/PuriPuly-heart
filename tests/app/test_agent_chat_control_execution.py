@@ -514,9 +514,7 @@ async def test_production_key_deletion_card_removes_the_stored_key_across_restar
         await app.start()
         try:
             app.control().bind_instance("synthetic-restarted-instance")
-            return (await app.control().query("secrets.presence", {}))["presence"][
-                stored_key
-            ]
+            return (await app.control().query("secrets.presence", {}))["presence"][stored_key]
         finally:
             await app.stop()
 
