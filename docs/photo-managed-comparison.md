@@ -121,9 +121,13 @@ Applied-policy native SHA-256: `f29f5f600301b7bf91a83f95c4ef03cd52c2aceb4fb8b9cf
 | `maxBodyBytes` | 4194304 | Supplied-photo requests: 98,633–475,850 bytes; image base64: 98,524–473,576 bytes. Separate image allowance, not a copied text-chat cap. |
 | `maxOutputTokens` | 8192 | Supplied responses: 11–1328 tokens, 13–4772 JSON bytes; earlier dense synthetic probes reached 2556 tokens. Preserve full output headroom. |
 | `concurrency` | 1 | Existing photo owner processes one accepted translation at a time; isolate each installation. |
-| `allowance` | 25 | Installation admissions per UTC day, including failed or uncertain admitted work. The supplied run used 46 Relay admissions under the previous 50-request default. |
+| `allowance` | 100 | Temporary owner-directed pre-release policy (2026-11-13), increased from 25 until the real release. Counts installation admissions per UTC day, including failed or uncertain admitted work. The historical supplied run used 46 Relay admissions under the earlier 50-request default. |
 | `periodMs` | 86400000 | Installation allowance persists across tokens/connections within the period. |
 | `deadlineMs` | 240000 | Supplied schema completion: 1.64–11.84 s; earlier dense samples about 18–21 s. Cancellation and lease recovery remain bounded. |
+
+The temporary allowance is a policy change, not a new measured resource limit or a production rollout. The default resets at 00:00 UTC; custom `periodMs` retains its existing Unix-epoch-aligned windows. Token refresh, new connections, process restarts and retries do not reset the durable installation count, and an already-admitted request ID remains a duplicate across periods. No chatbot allowance, photo concurrency, output/body/deadline bound, retry policy or secondary-provider budget changes.
+
+`PHOTO_POLICY` continues to override only the explicitly configured fields. The tracked `wrangler.jsonc` has no allowance override; deployment preparation forwards an operator-supplied `PHOTO_POLICY` unchanged. A deployment with an explicit `allowance` keeps that value rather than adopting 100. Rollout therefore requires the normal reviewed Relay deployment and, if an operator override is present, changing only its `allowance` to 100 while preserving its other fields. No live configuration or deployment was changed.
 
 Hard bounds remain 20 MiB body, 32768 output tokens, concurrency 8, 300 s deadline, and a minimum 60 s period. Failed/uncertain admitted work is not a fresh allowance on retry. Chatbot limits were not relaxed.
 
@@ -146,3 +150,4 @@ Measured supplied-photo Worker versions: Broker `a1a7d11b-5857-44ef-8d1c-4c72a77
 Private raw responses, native exports, and replay exports remain under `C:/tmp/puri_capture_probe/runs/issue386-bb48cd2fcf`; they are not committed. Required next evidence is real first display, resolved personal quota, a management-authorized restricted OpenRouter test, and usable-output assessment. The measured Relay HTTP path is available for #389, but the missing prerequisites must not be represented as completed integration or production readiness.
 
 Protected documentation was intentionally not edited. Drift: `docs/architecture.md` says Luna photo access uses ChatGPT rather than API keys and lacks the new hosted/secondary ownership and bounded clipping/quarantine outcomes; `native/overlay/README.md` lacks explicit preparation cancellation and the distinct photo completion outcomes, and its personal-Luna-only description predates hosted access; `agent-relay/README.md` lacks the photo endpoint/policy/migration; `broker/README.md` lacks the photo-specific disabled-before-ACK and period-reservation lifecycle; `PRIVACY.md` describes audio/text external processing and direct managed OpenRouter translation without the new hosted-photo image path through Relay.
+

@@ -108,7 +108,7 @@ async def test_real_secure_field_completion_keeps_settings_in_place_and_unbinds(
         persist_api_key_verification=lambda *_: None,
     )
     app._open_settings_tab = lambda: opened.append("settings")
-    view.on_view_logs = lambda: opened.append("agent")
+    view.on_open_agent = lambda: opened.append("agent")
     before = view._provider_snapshot
 
     app._bind_agent_navigation()
@@ -205,7 +205,7 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
     app.content_area = SimpleNamespace(
         content=None, padding=None, update=lambda: opened.append("settings")
     )
-    view.on_view_logs = lambda: opened.append("agent")
+    view.on_open_agent = lambda: opened.append("agent")
     mutations = []
     view.on_providers_changed = lambda: mutations.append("provider")
     view.on_request_openrouter_pkce = lambda *_: mutations.append("authorization")

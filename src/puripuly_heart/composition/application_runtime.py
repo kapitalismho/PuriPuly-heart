@@ -16,7 +16,7 @@ from puripuly_heart.app.adapters.application_runtime_shutdown import (
 )
 from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicationSettings
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
-from puripuly_heart.app.adapters.photo_provider import PhotoProviderAdapter
+from puripuly_heart.app.adapters.photo_provider import PhotoProviderAdapter, photo_route_kind
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiAudioTestRuntimeAdapter,
@@ -42,6 +42,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
+from puripuly_heart.app.ports.settings_view import PhotoStatusSnapshot
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
@@ -272,7 +273,9 @@ from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.peer_capture import PeerCaptureSessionSnapshot
+from puripuly_heart.core.photo.recycle import recycle_captured_photo
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -1855,6 +1858,9 @@ def compose_application_runtime(
         + "/photo",
         allow_loopback_http=photo_source,
         benchmark_route=os.environ.get("PURIPULY_PHOTO_BENCHMARK_ROUTE") if photo_source else None,
+        selected_route=lambda: (
+            settings.canonical.intent.photo.route if settings.canonical is not None else "managed"
+        ),
     )
 
     def photo_diagnostic(stage: str, fields: dict) -> None:
@@ -1896,8 +1902,28 @@ def compose_application_runtime(
         )
         runtime_logging.emit_diagnostic(f"[Photo] {stage} {values}")
 
+    async def resolve_photo_route():
+        current = settings.canonical
+        if current is not None and not current.intent.photo.enabled:
+            return None
+        return await photo_provider.resolve_route()
+
+    async def discard_translated_photo(capture) -> None:
+        current = settings.canonical
+        if current is None or not current.intent.photo.delete_translated:
+            return
+        await run_owned_thread_call(lambda: recycle_captured_photo(capture))
+
+    async def photo_status() -> PhotoStatusSnapshot:
+        kind = photo_route_kind(await photo_provider.resolve_route())
+        allowance = await photo_provider.allowance()
+        if allowance is None:
+            return PhotoStatusSnapshot(kind)
+        return PhotoStatusSnapshot(kind, remaining=allowance[0], allowance=allowance[1])
+
     photo_owner = PhotoApplicationOwner(
-        resolve_route=photo_provider.resolve_route,
+        resolve_route=resolve_photo_route,
+        discard_translated=discard_translated_photo,
         target_language=lambda: (
             settings.canonical.intent.languages.source_language
             if settings.canonical is not None
@@ -2433,6 +2459,7 @@ def compose_application_runtime(
             cycle_capture_fault=audio_owner.cycle_capture_fault_profile,
             cycle_stt_fault=audio_owner.cycle_stt_fault_profile,
             clear_audio_faults=audio_owner.clear_fault_profiles,
+            toggle_photo_limited=photo_owner.toggle_debug_limited,
         ),
         state=UiApplicationStateOwner(
             ApplicationUiStateAdapter(
@@ -2455,6 +2482,7 @@ def compose_application_runtime(
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,
+        photo_status_provider=photo_status,
         output_status_provider=lambda: {
             "overlay": {
                 **overlay_owner.output_snapshot(),

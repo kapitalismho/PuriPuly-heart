@@ -62,9 +62,14 @@ fn gradient(p: usize, offset: usize, state: &[u8], time: &[f32]) -> f32 {
     }
 }
 
-fn square_dilate(mask: &[u8], width: usize, height: usize, radius: usize) -> Vec<u8> {
-    let mut horizontal = vec![0; mask.len()];
-    let mut result = vec![0; mask.len()];
+fn square_dilate(
+    mask: &[u8],
+    width: usize,
+    height: usize,
+    radius: usize,
+    horizontal: &mut [u8],
+    result: &mut [u8],
+) {
     for y in 0..height {
         let mut count = 0;
         for x in 0..width + radius {
@@ -93,23 +98,59 @@ fn square_dilate(mask: &[u8], width: usize, height: usize, radius: usize) -> Vec
             }
         }
     }
-    result
 }
 
-pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbImage, &'static str> {
-    if source.dimensions() != mask.dimensions() || source.width() == 0 || source.height() == 0 {
+#[derive(Default)]
+pub struct Workspace {
+    state: Vec<u8>,
+    time: Vec<f32>,
+    heap: BinaryHeap<Entry>,
+    band: Vec<usize>,
+    outside: Vec<u8>,
+    horizontal: Vec<u8>,
+    distance_weights: Vec<f32>,
+}
+
+pub fn inpaint(
+    mut output: RgbImage,
+    mask: &GrayImage,
+    radius: u32,
+    workspace: &mut Workspace,
+) -> Result<RgbImage, &'static str> {
+    if output.dimensions() != mask.dimensions() || output.width() == 0 || output.height() == 0 {
         return Err("telea_invalid_dimensions");
     }
-    let width = source.width() as usize;
-    let height = source.height() as usize;
+    let width = output.width() as usize;
+    let height = output.height() as usize;
     let stride = width + 2;
     let rows = height + 2;
     let radius = radius.clamp(1, 100) as usize;
-    let mut output = source.clone();
     if !mask.as_raw().iter().any(|&value| value != 0) {
         return Ok(output);
     }
-    let mut state = vec![0; stride * rows];
+    workspace.distance_weights.extend(
+        (workspace.distance_weights.len()..=radius * radius).map(|squared| {
+            let squared = squared as f64;
+            (1.0 / (squared * squared.sqrt())) as f32
+        }),
+    );
+    workspace.state.clear();
+    workspace.state.resize(stride * rows, 0);
+    workspace.time.clear();
+    workspace.time.resize(workspace.state.len(), 1.0e6_f32);
+    workspace.heap.clear();
+    workspace.band.clear();
+    workspace.outside.resize(workspace.state.len(), 0);
+    workspace.horizontal.resize(workspace.state.len(), 0);
+    let Workspace {
+        state,
+        time,
+        heap,
+        band,
+        outside,
+        horizontal,
+        distance_weights,
+    } = workspace;
     for y in 0..height {
         for x in 0..width {
             state[(y + 1) * stride + x + 1] = if mask.as_raw()[y * width + x] != 0 {
@@ -119,10 +160,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
             };
         }
     }
-    let mut time = vec![1.0e6_f32; state.len()];
-    let mut heap = BinaryHeap::new();
     let mut order = 0;
-    let mut band = Vec::new();
     for y in 1..=height {
         for x in 1..=width {
             let p = y * stride + x;
@@ -142,7 +180,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
             }
         }
     }
-    let mut outside = square_dilate(&state, stride, rows, radius);
+    square_dilate(state, stride, rows, radius, horizontal, outside);
     for p in 0..outside.len() {
         outside[p] = if outside[p] != 0 && state[p] == 0 {
             INSIDE
@@ -150,7 +188,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
             0
         };
     }
-    for &p in &band {
+    for &p in band.iter() {
         outside[p] = 0;
     }
     for x in 0..stride {
@@ -166,7 +204,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
         outside[p] = CHANGE;
         for q in [p - stride, p - 1, p + stride, p + 1] {
             if outside[q] == INSIDE {
-                let value = distance(q, stride, &outside, &time);
+                let value = distance(q, stride, outside, time);
                 time[q] = value;
                 outside[q] = BAND;
                 heap.push(Entry {
@@ -183,7 +221,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
             time[p] = -time[p];
         }
     }
-    for &p in &band {
+    for &p in band.iter() {
         heap.push(Entry {
             distance: 0.0,
             order,
@@ -198,10 +236,10 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
             if state[q] != INSIDE {
                 continue;
             }
-            let value = distance(q, stride, &state, &time);
+            let value = distance(q, stride, state, time);
             time[q] = value;
-            let gx = gradient(q, 1, &state, &time);
-            let gy = gradient(q, stride, &state, &time);
+            let gx = gradient(q, 1, state, time);
+            let gy = gradient(q, stride, state, time);
             let y = q / stride;
             let x = q % stride;
             let mut intensity = [0.0_f32; 3];
@@ -221,7 +259,7 @@ pub fn inpaint(source: &RgbImage, mask: &GrayImage, radius: u32) -> Result<RgbIm
                     }
                     let rx = dx as f32;
                     let ry = dy as f32;
-                    let dst = (1.0 / (f64::from(squared) * f64::from(squared).sqrt())) as f32;
+                    let dst = distance_weights[squared as usize];
                     let lev = (1.0 / (1.0 + f64::from((time[n] - time[q]).abs()))) as f32;
                     let direction = rx * gx + ry * gy;
                     let direction = if direction.abs() <= 0.01 {

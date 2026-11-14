@@ -18,9 +18,11 @@ from puripuly_heart.app.services.application_shutdown import (
 from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FINAL_DIAGNOSTICS
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 class RecordingRuntimeLogging:
@@ -69,7 +71,7 @@ def _owner() -> tuple[ApplicationRuntimeLoggingOwner, list[object]]:
     attached: list[object] = []
     owner = ApplicationRuntimeLoggingOwner(
         presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda service: attached.append(service),
+            bind_conversation_history=lambda service: attached.append(service),
         ),
         service_factory=RecordingRuntimeLogging,
         fallback_logger=logging.getLogger("test.application-runtime-logging"),
@@ -130,7 +132,7 @@ def test_owner_fallback_preserves_audience_and_never_forwards_raw_diagnostics() 
     fallback.setLevel(logging.INFO)
     fallback.addHandler(Capture())
     owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        presentation=SimpleNamespace(bind_conversation_history=lambda _service: None),
         service_factory=FailingRuntimeLogging,
         fallback_logger=fallback,
     )
@@ -169,7 +171,7 @@ def test_owner_diagnostic_fallback_reports_failed_delivery_without_handlers() ->
     fallback.handlers.clear()
     fallback.propagate = False
     owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        presentation=SimpleNamespace(bind_conversation_history=lambda _service: None),
         service_factory=FailingRuntimeLogging,
         fallback_logger=fallback,
     )
@@ -282,15 +284,9 @@ def composed_logging(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(root, "level", root.level)
     log_file = tmp_path / "conversation.log"
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    conversation = []
-    realtime = SimpleNamespace(
-        append_log=lambda line: None,
-        append_conversation_record=lambda **record: conversation.append(record),
-    )
+    conversation = ConversationHistory()
     owner = compose_application_runtime_logging(
-        presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda service: service.attach_realtime_sink(realtime),
-        ),
+        presentation=FletUiPresentationAdapter(SimpleNamespace(conversation_history=conversation)),
         sinks=RuntimeLoggingSinks(logging.NullHandler(), file_handler, log_file),
     )
     try:
@@ -322,7 +318,10 @@ def test_composed_logging_persists_source_and_translation(composed_logging, capl
     assert "→ English" in persisted and '"Hello"' in persisted
     assert "manual-turn" not in persisted
     assert "target_index" not in persisted
-    assert [(record["source_text"], record["translated_text"]) for record in conversation] == [
+    assert [
+        (record.source_text, record.translated_text)
+        for record in conversation.conversation_records
+    ] == [
         ("안녕하세요", None),
         (None, "Hello"),
     ]
@@ -342,7 +341,7 @@ def test_composed_logging_persists_request_context_without_conversation_view(
     persisted = log_file.read_text(encoding="utf-8")
     assert "[Context] utterance_id=manual-turn context_count=2" in persisted
     assert '"어제 뭐 했어"' in persisted
-    assert conversation == []
+    assert conversation.conversation_records == ()
 
 
 def test_composed_logging_ignores_conversation_after_close(composed_logging, caplog) -> None:
@@ -360,7 +359,7 @@ def test_composed_logging_ignores_conversation_after_close(composed_logging, cap
     )
 
     assert log_file.read_text(encoding="utf-8") == before
-    assert conversation == []
+    assert conversation.conversation_records == ()
     assert "record_rejected" not in caplog.text
     assert "private late" not in caplog.text
 
@@ -390,3 +389,53 @@ def test_conversation_failure_reports_type_without_private_payload(caplog) -> No
     assert "private source" not in caplog.text
     assert "private translation" not in caplog.text
     assert "provider secret" not in caplog.text
+
+
+def test_composed_gui_history_excludes_technical_diagnostics(composed_logging) -> None:
+    owner, log_file, conversation = composed_logging
+    owner.emit_basic("Synthetic runtime state changed.")
+    owner.emit_diagnostic("[Diagnostic] synthetic metadata")
+    assert conversation.conversation_records == ()
+    owner.record_conversation_observation(
+        utterance_id="synthetic-turn",
+        speaker_channel="self",
+        transcript_text="synthetic conversation",
+        translation_text=None,
+        source_language="en",
+        target_language=None,
+        metadata={"turn_kind": "manual"},
+    )
+    before = conversation.conversation_records
+    owner.emit_basic("Synthetic runtime stopped.")
+    persisted = log_file.read_text(encoding="utf-8")
+    assert "Synthetic runtime state changed." in persisted
+    assert "Synthetic runtime stopped." in persisted
+    assert "synthetic conversation" in persisted
+    assert conversation.conversation_records == before
+    assert len(before) == 1
+
+
+def test_failed_history_delivery_keeps_file_conversation_and_private_errors_separate(
+    composed_logging,
+) -> None:
+    owner, log_file, conversation = composed_logging
+    runtime = owner.service
+
+    def reject(record) -> None:
+        raise ValueError("private history failure detail")
+
+    runtime.set_conversation_history_observer(reject)
+    runtime.record_conversation_observation(
+        utterance_id="failed-history-turn",
+        speaker_channel="self",
+        transcript_text="synthetic accepted source",
+        translation_text=None,
+        source_language="en",
+        target_language=None,
+    )
+    persisted = log_file.read_text(encoding="utf-8")
+    assert "synthetic accepted source" in persisted
+    assert "conversation_history_delivery_failed" in persisted
+    assert "exception_type=ValueError" in persisted
+    assert "private history failure detail" not in persisted
+    assert conversation.conversation_records == ()

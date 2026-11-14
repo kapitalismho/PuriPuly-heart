@@ -24,6 +24,7 @@ from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
+    PhotoStatusSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
     TelemetrySettingsIntent,
@@ -43,6 +44,7 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.config.provider_values import QwenRegion
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core.diagnostics import (
     diagnostic_operation,
     emit_failure,
@@ -92,6 +94,7 @@ from puripuly_heart.ui.i18n import (
     language_name,
     t,
 )
+from puripuly_heart.ui.log_folder import open_log_folder
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.settings.contract import (
     SettingsChatGptIntents,
@@ -115,7 +118,6 @@ from puripuly_heart.ui.theme import (
 from puripuly_heart.ui.views.about import AboutView
 from puripuly_heart.ui.views.agent_chat import AgentChatHooks, AgentChatView
 from puripuly_heart.ui.views.dashboard import DashboardView
-from puripuly_heart.ui.views.logs import LogsView
 from puripuly_heart.ui.views.settings import SettingsView
 
 logger = logging.getLogger(__name__)
@@ -173,7 +175,7 @@ class _AgentDictationSource:
             seen.add(identity)
             callback(identity, snapshot.source_text, bool(snapshot.source_closed))
 
-        return self._app.view_logs.observe_self_turns(turn)
+        return self._app.conversation_history.observe_self_turns(turn)
 
     def ensure_capture(self):  # noqa: ANN201
         dashboard = self._app.view_dashboard
@@ -349,6 +351,7 @@ class TranslatorApp:
                 apply_loopback_capture_option=self._on_apply_loopback_capture_option,
                 loopback_capture_summary=(lambda: self.application.loopback_capture_summary()),
                 osc_effective_ports=self._effective_osc_ports,
+                photo_status=self._photo_status,
             ),
             prompt=SettingsPromptIntents(
                 prompt_apply_settings=self._on_prompt_apply_settings,
@@ -359,7 +362,7 @@ class TranslatorApp:
                 desktop_overlay_size_change=self._on_desktop_overlay_size_change,
                 desktop_overlay_recovery_action=self._on_desktop_overlay_recovery_action,
                 desktop_overlay_position_reset=self._on_desktop_overlay_position_reset,
-                view_logs=self._open_agent_tab,
+                open_agent=self._open_agent_tab,
                 calibration_begin=(calibration_begin if callable(calibration_begin) else None),
                 calibration_change=(calibration_change if callable(calibration_change) else None),
                 calibration_apply=(calibration_apply if callable(calibration_apply) else None),
@@ -389,6 +392,9 @@ class TranslatorApp:
             if not hasattr(self, "_boundary_failures"):
                 self._boundary_failures: dict[str, ErrorDiagnostics] = {}
             self._boundary_failures[operation] = diagnostics
+
+    async def _photo_status(self) -> PhotoStatusSnapshot:
+        return await self.application.photo_status()
 
     def _effective_osc_ports(self) -> tuple[int | None, int | None]:
         try:
@@ -563,7 +569,7 @@ class TranslatorApp:
             http_extension_registry=self.application.http_extension_registry()
         )
         self.view_settings.bind_recent_language_queue(self.view_dashboard)
-        self.view_logs = LogsView()
+        self.conversation_history = ConversationHistory()
         agent_chat = self.application.agent_chat()
         if agent_chat is None:
             raise RuntimeError("Agent Chat is not composed")
@@ -571,9 +577,9 @@ class TranslatorApp:
         self.view_agent = AgentChatView(
             agent_chat,
             AgentChatHooks(
-                open_folder=lambda: self.view_logs._open_log_folder(None),
+                open_folder=open_log_folder,
                 show_snackbar=self._show_snackbar,
-                conversation_records=lambda: self.view_logs.conversation_records,
+                conversation_records=lambda: self.conversation_history.conversation_records,
                 dictation=_AgentDictationSource(self),
             ),
         )
@@ -635,6 +641,7 @@ class TranslatorApp:
             on_audio_fault_clear=self._preview_audio_fault_clear,
             on_gpu_state_cycle=self._cycle_debug_preview_gpu_state,
             on_stt_loading_button_cycle=self._cycle_debug_preview_stt_loading_button,
+            on_photo_limited_toggle=self._preview_photo_limited_toggle,
         )
 
     def _cycle_debug_agent_card(self, family: PreviewFamily) -> None:
@@ -993,6 +1000,13 @@ class TranslatorApp:
         profile = self.application.cycle_debug_stt_fault_profile()
         self._show_snackbar(t("debug_preview.stt_fault_snackbar", profile=profile), COLOR_WARNING)
 
+    def _preview_photo_limited_toggle(self) -> None:
+        enabled = self.application.toggle_debug_photo_limited()
+        self._show_snackbar(
+            t("debug_preview.photo_limited_on" if enabled else "debug_preview.photo_limited_off"),
+            COLOR_WARNING if enabled else COLOR_SUCCESS,
+        )
+
     def _preview_audio_fault_clear(self) -> None:
         self.application.clear_debug_audio_fault_profiles()
         self._show_snackbar(t("debug_preview.audio_fault_clear"), COLOR_SUCCESS)
@@ -1303,7 +1317,6 @@ class TranslatorApp:
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
         self.refresh_overlay_peer_contract()
-        self.view_logs.apply_locale()
         debug_preview_panel = getattr(self, "debug_preview_panel", None)
         apply_debug_locale = getattr(debug_preview_panel, "apply_locale", None)
         if callable(apply_debug_locale):

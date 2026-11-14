@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Protocol
 
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
     DIAGNOSTIC_SINK_DASHBOARD,
@@ -149,10 +150,10 @@ class AppHistoryEventDestination:
     def __init__(
         self,
         append_history_entry: object | None,
-        conversation_view: object | None = None,
+        conversation_history: ConversationHistory | None = None,
     ) -> None:
         self._append_history_entry = append_history_entry
-        self._conversation_view = conversation_view
+        self._conversation_history = conversation_history
 
     def append_entry(
         self,
@@ -168,12 +169,12 @@ class AppHistoryEventDestination:
             )
 
     def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
-        if self._conversation_view is not None:
-            self._conversation_view.update_self_turn(snapshot, source=source)
+        if self._conversation_history is not None:
+            self._conversation_history.update_self_turn(snapshot, source=source)
 
     def publish_peer_caption(self, history: HistoryProjection) -> None:
-        if self._conversation_view is not None:
-            self._conversation_view.append_conversation_record(
+        if self._conversation_history is not None:
+            self._conversation_history.append_conversation_record(
                 source=history.source,
                 channel="peer",
                 utterance_id=str(history.utterance_id),

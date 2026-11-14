@@ -97,7 +97,7 @@ def _approval_groups(changes: dict) -> list[dict]:
     return groups
 
 
-NAVIGATION_SECTIONS = ("api", "general", "overlay", "prompts")
+NAVIGATION_SECTIONS = ("api", "general", "overlay", "photo", "prompts")
 _OSC_ENUMS = {
     "configured_mode": frozenset({"automatic", "manual", "off", None}),
     "effective_mode": frozenset({"automatic", "manual", "off"}),

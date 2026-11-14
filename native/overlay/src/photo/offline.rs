@@ -42,6 +42,7 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
     let start = Instant::now();
     std::fs::create_dir_all(&job.output_dir).map_err(|_| PhotoError::Image)?;
     let output_dir = job.output_dir.clone();
+    let source_key = job.source_path.to_string_lossy().into_owned();
     let (sender, mut results) = tokio::sync::mpsc::channel(8);
     let worker = tokio::task::spawn_blocking(move || -> Result<(), PhotoError> {
         let original = recover_original(&job.source_path).map_err(|_| PhotoError::Image)?;
@@ -154,9 +155,9 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
                 compositor.set_font(font);
             }
             PhotoImageOutput::Original { working, .. } => {
-                compositor.set_original(working)?;
+                compositor.set_original(working, &source_key)?;
                 compositor.render(Instant::now(), false)?;
-                compositor.ready().await?;
+                compositor.wait_for_completion().await?;
                 compositor.save(&output_dir.join("original.png"))?;
             }
             PhotoImageOutput::Block {
@@ -174,11 +175,11 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
     worker.await.map_err(|_| PhotoError::Image)??;
     let final_time = Instant::now() + BLOCK_FADE;
     compositor.render(final_time, true)?;
-    compositor.ready().await?;
+    compositor.wait_for_completion().await?;
     let erased_gpu_ms = compositor.frame_gpu_ms;
     compositor.save(&output_dir.join("erased.png"))?;
     compositor.render(final_time, false)?;
-    compositor.ready().await?;
+    compositor.wait_for_completion().await?;
     let composite_gpu_ms = compositor.frame_gpu_ms;
     compositor.save(&output_dir.join("composite.png"))?;
     let mut metadata = compositor.metadata();

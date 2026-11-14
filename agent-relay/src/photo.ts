@@ -3,7 +3,7 @@ import { beforeAbort, requestLifetime } from './lifetime';
 import { readRequestJson } from './requests';
 import { responseStream } from './stream';
 import { isRecord } from './type-guards';
-import { checkPhotoAllowance, photoPolicy, UsageEnv } from './usage';
+import { checkPhotoAllowance, photoAllowanceUsed, photoPolicy, UsageEnv } from './usage';
 
 export type PhotoEnv = UsageEnv & {
   OPENAI_API_KEY?: string;
@@ -11,10 +11,28 @@ export type PhotoEnv = UsageEnv & {
   PHOTO_POLICY?: string;
 };
 
-function error(status: number, code: string): Response {
+function error(status: number, code: string, retryAfter?: number): Response {
   return Response.json({ error: { code } }, {
-    status, headers: { 'cache-control': 'no-store', ...(code === 'service_busy' ? { 'retry-after': '1' } : {}) },
+    status,
+    headers: {
+      'cache-control': 'no-store',
+      ...(code === 'service_busy' ? { 'retry-after': '1' } : {}),
+      ...(retryAfter === undefined ? {} : { 'retry-after': String(retryAfter) }),
+    },
   });
+}
+
+export async function receivePhotoAllowance(env: PhotoEnv, installation: string): Promise<Response> {
+  if (env.PHOTO_SERVICE_ENABLED !== 'true' || !env.OPENAI_API_KEY) return error(503, 'service_shutdown');
+  let policy;
+  try { policy = photoPolicy(env.PHOTO_POLICY); } catch { return error(503, 'service_shutdown'); }
+  let status;
+  try { status = await photoAllowanceUsed(env, installation, policy); } catch { return error(503, 'service_shutdown'); }
+  return Response.json({
+    allowance: policy.allowance,
+    remaining: Math.max(0, policy.allowance - status.used),
+    reset_after_s: status.resetAfter,
+  }, { headers: { 'cache-control': 'no-store' } });
 }
 
 export async function receivePhoto(
@@ -45,7 +63,9 @@ export async function receivePhoto(
   let admission;
   try { admission = await checkPhotoAllowance(env, installation, body.request_id, policy); }
   catch { return error(503, 'service_shutdown'); }
-  if ('error' in admission) return error(admission.error === 'photo_request_already_admitted' ? 409 : 429, admission.error);
+  if ('error' in admission) {
+    return error(admission.error === 'photo_request_already_admitted' ? 409 : 429, admission.error, admission.retryAfter);
+  }
   const { abort, release } = requestLifetime(admission.deadline, request.signal);
   const settle = (result: unknown) => {
     const pending = admission.settle(result);

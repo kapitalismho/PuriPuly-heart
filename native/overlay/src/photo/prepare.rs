@@ -1,11 +1,11 @@
 use image::{codecs::jpeg::JpegEncoder, imageops, Rgb, RgbImage};
 use serde::Deserialize;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{BufReader, BufWriter, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    mpsc, Arc,
+    mpsc, Arc, Mutex,
 };
 use std::time::{Duration, Instant, SystemTime};
 use super::processing::WorkingPhoto;
@@ -61,7 +61,13 @@ pub struct SourceCompletion {
     pub result: Result<Arc<LoadedSource>, &'static str>,
 }
 
+pub struct SourceMetadataCompletion {
+    pub request: SourceRequest,
+    pub result: Result<[u32; 2], &'static str>,
+}
+
 pub enum PreparationCompletion {
+    Metadata(SourceMetadataCompletion),
     Source(SourceCompletion),
     Prepared(PrepareCompletion),
 }
@@ -102,9 +108,15 @@ pub struct PrepareCompletion {
 }
 
 enum Work {
-    Source(SourceRequest, Arc<AtomicBool>),
+    Metadata,
+    Source(SourceRequest, Arc<AtomicBool>, bool),
     Prepare(PrepareRequest, Arc<AtomicBool>),
     Clear,
+}
+
+struct MetadataJob {
+    request: SourceRequest,
+    cancel: Arc<AtomicBool>,
 }
 
 pub struct PreparationWorker {
@@ -113,22 +125,53 @@ pub struct PreparationWorker {
     thread: Option<std::thread::JoinHandle<()>>,
     cancellation: Option<Arc<AtomicBool>>,
     source_cancellation: Option<(SourceRequest, Arc<AtomicBool>)>,
+    metadata: Arc<Mutex<Option<MetadataJob>>>,
+    metadata_wakeup: Arc<AtomicBool>,
+    metadata_cancellation: Option<(SourceRequest, Arc<AtomicBool>)>,
 }
 
 impl PreparationWorker {
     pub fn new() -> Result<Self, &'static str> {
-        let (sender, receiver) = mpsc::sync_channel::<Work>(2);
+        let (sender, receiver) = mpsc::sync_channel::<Work>(3);
         let (completed, results) = tokio::sync::mpsc::unbounded_channel();
+        let metadata = Arc::new(Mutex::new(None::<MetadataJob>));
+        let metadata_wakeup = Arc::new(AtomicBool::new(false));
+        let pending_metadata = metadata.clone();
+        let wake_metadata = metadata_wakeup.clone();
         let thread = std::thread::Builder::new()
             .name("photo-image".into())
             .spawn(move || {
                 let mut cached: Option<(SourceRequest, Arc<LoadedSource>, Arc<AtomicBool>)> = None;
-                while let Ok(work) = receiver.recv() {
+                loop {
                     if cached.as_ref().is_some_and(|(_, _, cancel)| cancel.load(Ordering::Relaxed)) {
                         cached = None;
                     }
+                    let work = match receiver.try_recv() {
+                        Ok(work) => work,
+                        Err(_) => {
+                            let job = pending_metadata.lock().unwrap().take();
+                            if let Some(MetadataJob { request, cancel }) = job {
+                                let result = load_source_metadata(&request.source_path, &request.expected_file_id, &cancel);
+                                if completed.send(PreparationCompletion::Metadata(SourceMetadataCompletion { request, result })).is_err() {
+                                    break;
+                                }
+                                continue;
+                            }
+                            match receiver.recv() {
+                                Ok(work) => work,
+                                Err(_) => break,
+                            }
+                        }
+                    };
                     match work {
-                        Work::Source(request, cancel) => {
+                        Work::Metadata => wake_metadata.store(false, Ordering::Relaxed),
+                        Work::Source(request, cancel, metadata) => {
+                            if metadata {
+                                let result = read_source_metadata(&request.source_path, &request.expected_file_id, &cancel);
+                                if completed.send(PreparationCompletion::Metadata(SourceMetadataCompletion { request: request.clone(), result })).is_err() {
+                                    break;
+                                }
+                            }
                             let result = if let Some((_, source, _)) = cached.as_ref().filter(|(key, _, _)| key == &request) {
                                 Ok(source.clone())
                             } else {
@@ -159,6 +202,9 @@ impl PreparationWorker {
                             } else {
                                 prepare(&request, &cancel)
                             };
+                            if result.is_ok() {
+                                cached = None;
+                            }
                             if completed.send(PreparationCompletion::Prepared(PrepareCompletion { request, result })).is_err() {
                                 break;
                             }
@@ -174,10 +220,14 @@ impl PreparationWorker {
             thread: Some(thread),
             cancellation: None,
             source_cancellation: None,
+            metadata,
+            metadata_wakeup,
+            metadata_cancellation: None,
         })
     }
 
     pub fn start(&mut self, request: PrepareRequest) -> Result<(), &'static str> {
+        self.cancel_metadata();
         self.cancel_prepare();
         let cancel = Arc::new(AtomicBool::new(false));
         self.sender
@@ -189,7 +239,35 @@ impl PreparationWorker {
         Ok(())
     }
 
+    pub fn start_metadata(&mut self, request: SourceRequest) -> Result<(), &'static str> {
+        self.cancel_metadata();
+        let sender = self.sender.as_ref().ok_or("worker_unavailable")?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.metadata_cancellation = Some((request.clone(), cancel.clone()));
+        *self.metadata.lock().unwrap() = Some(MetadataJob { request, cancel });
+        if !self.metadata_wakeup.swap(true, Ordering::Relaxed) {
+            match sender.try_send(Work::Metadata) {
+                Ok(()) => {}
+                Err(mpsc::TrySendError::Full(_)) => self.metadata_wakeup.store(false, Ordering::Relaxed),
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    self.metadata_wakeup.store(false, Ordering::Relaxed);
+                    self.cancel_metadata();
+                    return Err("worker_unavailable");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn cancel_metadata(&mut self) {
+        if let Some((_, cancel)) = self.metadata_cancellation.take() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+    }
+
     pub fn start_source(&mut self, request: SourceRequest) -> Result<(), &'static str> {
+        let metadata = self.metadata_cancellation.as_ref().is_some_and(|(key, _)| key == &request);
+        self.cancel_metadata();
         let cancel = match &self.source_cancellation {
             Some((key, cancel)) if key == &request => cancel.clone(),
             _ => {
@@ -200,7 +278,7 @@ impl PreparationWorker {
             }
         };
         self.sender.as_ref().ok_or("worker_unavailable")?
-            .try_send(Work::Source(request, cancel))
+            .try_send(Work::Source(request, cancel, metadata))
             .map_err(|_| "preparation_busy")
     }
 
@@ -216,6 +294,7 @@ impl PreparationWorker {
     pub fn cancel(&mut self) {
         self.cancel_prepare();
         self.cancel_source();
+        self.cancel_metadata();
     }
 
     pub fn cancel_prepare(&mut self) {
@@ -312,6 +391,89 @@ fn read_source(path: &str, expected_file_id: &[String; 2]) -> Result<(Vec<u8>, S
         return Err("source_incomplete");
     }
     Ok((bytes, after))
+}
+
+fn jpeg_header(reader: &mut impl Read, cancel: &AtomicBool) -> Result<Vec<u8>, &'static str> {
+    let mut signature = [0; 2];
+    reader.read_exact(&mut signature).map_err(|_| "source_incomplete")?;
+    if signature != [0xff, 0xd8] {
+        return Err("source_incomplete");
+    }
+    let mut bytes = signature.to_vec();
+    loop {
+        cancelled(cancel)?;
+        let mut marker = [0; 2];
+        reader.read_exact(&mut marker).map_err(|_| "source_incomplete")?;
+        if marker[0] != 0xff {
+            return Err("source_incomplete");
+        }
+        bytes.extend_from_slice(&marker);
+        while marker[1] == 0xff {
+            reader.read_exact(&mut marker[1..]).map_err(|_| "source_incomplete")?;
+            cancelled(cancel)?;
+            bytes.push(marker[1]);
+        }
+        match marker[1] {
+            0x00 | 0xd8 | 0xd9 => return Err("source_incomplete"),
+            0x01 | 0xd0..=0xd7 => continue,
+            _ => {}
+        }
+        let mut length = [0; 2];
+        reader.read_exact(&mut length).map_err(|_| "source_incomplete")?;
+        let length = usize::from(u16::from_be_bytes(length));
+        if length < 2 {
+            return Err("source_incomplete");
+        }
+        bytes.extend_from_slice(&(length as u16).to_be_bytes());
+        let start = bytes.len();
+        bytes.resize(start + length - 2, 0);
+        reader.read_exact(&mut bytes[start..]).map_err(|_| "source_incomplete")?;
+        if marker[1] == 0xda {
+            return Ok(bytes);
+        }
+    }
+}
+
+fn read_source_metadata(path: &str, expected_file_id: &[String; 2], cancel: &AtomicBool) -> Result<[u32; 2], &'static str> {
+    let file = File::open(path).map_err(|_| "source_unavailable")?;
+    if file_identity(&file)? != *expected_file_id {
+        return Err("source_replaced");
+    }
+    let before = SourceSignature::read(&file)?;
+    let reader = image::ImageReader::new(BufReader::with_capacity(1, &file))
+        .with_guessed_format()
+        .map_err(|_| "source_incomplete")?;
+    let (width, height) = if reader.format() == Some(image::ImageFormat::Jpeg) {
+        let bytes = jpeg_header(&mut reader.into_inner(), cancel)?;
+        image::ImageReader::with_format(Cursor::new(bytes), image::ImageFormat::Jpeg)
+            .into_dimensions()
+    } else {
+        reader.into_dimensions()
+    }.map_err(|_| "source_incomplete")?;
+    cancelled(cancel)?;
+    let current = File::open(path).map_err(|_| "source_unavailable")?;
+    if file_identity(&file)? != *expected_file_id || file_identity(&current)? != *expected_file_id {
+        return Err("source_replaced");
+    }
+    let after = SourceSignature::read(&file)?;
+    if before != after || after != SourceSignature::read(&current)? {
+        return Err("source_incomplete");
+    }
+    Ok([width, height])
+}
+
+fn load_source_metadata(path: &str, expected_file_id: &[String; 2], cancel: &AtomicBool) -> Result<[u32; 2], &'static str> {
+    let start = Instant::now();
+    loop {
+        cancelled(cancel)?;
+        match read_source_metadata(path, expected_file_id, cancel) {
+            Ok(dimensions) => return Ok(dimensions),
+            Err("source_replaced") => return Err("source_replaced"),
+            Err("preparation_cancelled") => return Err("preparation_cancelled"),
+            Err(code) if start.elapsed() >= Duration::from_secs(2) => return Err(code),
+            Err(_) => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
 }
 
 fn revalidate_source(request: &PrepareRequest, source: &LoadedSource) -> Result<(), &'static str> {
@@ -430,9 +592,12 @@ fn prepare_loaded(
             .open(&jpeg_path)
             .map_err(|_| "output_unavailable")?;
         jpeg_created = true;
-        JpegEncoder::new_with_quality(jpeg, 85)
+        let mut jpeg = BufWriter::new(jpeg);
+        JpegEncoder::new_with_quality(&mut jpeg, 85)
             .encode_image(canvas.as_ref().unwrap_or(original.as_ref()))
             .map_err(|_| "jpeg_failed")?;
+        jpeg.flush().map_err(|_| "jpeg_failed")?;
+        drop(jpeg);
         let jpeg_ms = jpeg_start.elapsed().as_secs_f64() * 1000.0;
         cancelled(cancel)?;
         revalidate_source(request, source)?;

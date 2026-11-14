@@ -234,9 +234,21 @@ export function photoPolicy(raw?: string): PhotoPolicy {
   return policy;
 }
 
+export async function photoAllowanceUsed(
+  env: UsageEnv, installation: string, policy: PhotoPolicy, now = Date.now(),
+): Promise<{ used: number; resetAfter: number }> {
+  if (!env.AGENT_USAGE_DB) throw new Error('accounting_unavailable');
+  const period = Math.floor(now / policy.periodMs) * policy.periodMs;
+  const row = await env.AGENT_USAGE_DB.prepare(
+    'SELECT COUNT(*) AS used FROM photo_admissions WHERE installation_hash = ? AND period_start = ?',
+  ).bind(installation, period).first<{ used: number }>();
+  if (!row || !Number.isSafeInteger(row.used)) throw new Error('accounting_unavailable');
+  return { used: row.used, resetAfter: Math.ceil((period + policy.periodMs - now) / 1000) };
+}
+
 export async function checkPhotoAllowance(
   env: UsageEnv, installation: string, requestId: string, policy: PhotoPolicy, now = Date.now(),
-): Promise<{ settle: (result: unknown) => Promise<void>; deadline: number } | { error: string }> {
+): Promise<{ settle: (result: unknown) => Promise<void>; deadline: number } | { error: string; retryAfter?: number }> {
   if (!env.AGENT_USAGE_DB) throw new Error('accounting_unavailable');
   const db = env.AGENT_USAGE_DB;
   const rates = usageRates(env);
@@ -265,7 +277,9 @@ export async function checkPhotoAllowance(
         ELSE 'service_busy' END AS code
     `).bind(installation, requestId, installation, period, policy.allowance).first<{ code: string }>();
     if (!reason) throw new Error('accounting_unavailable');
-    return { error: reason.code };
+    return reason.code === 'service_allowance_exhausted'
+      ? { error: reason.code, retryAfter: Math.ceil((period + policy.periodMs - now) / 1000) }
+      : { error: reason.code };
   }
   if (admitted.results.length !== 1 || admitted.results[0].owner !== owner) {
     throw new Error('accounting_unavailable');

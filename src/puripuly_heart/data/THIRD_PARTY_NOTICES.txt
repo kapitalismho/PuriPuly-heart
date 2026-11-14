@@ -49,14 +49,19 @@ The native photo process uses the Rust ort/ort-sys 2.0.0-rc.10 bindings
 https://github.com/microsoft/onnxruntime/blob/v1.22.0/LICENSE .
 The photo implementation does not link or distribute OpenCV.
 
-The selected MobileNetV4 text-segmentation weights are not bundled or
-automatically downloaded. Distribution permission for the upstream
-mbnet_manga_text_seg.pth and its derived mbnv4_text_seg.onnx remains unresolved.
-The upstream project's README asserts MIT but does not clearly identify the
-release weights' license scope or applicable copyright/third-party notices.
-Source: https://github.com/daominhwysi/manga-translator/tree/3fd406347926b3edfc90e837fe127df6a69decbe .
-Do not distribute these weights until their redistribution/conversion rights
-and required notices have been established.
+Windows Setup downloads the MobileNetV4 text-segmentation ONNX conversion.
+Original model: daominhwysi/manga-translator
+Source: https://github.com/daominhwysi/manga-translator/tree/3fd406347926b3edfc90e837fe127df6a69decbe
+Checkpoint: https://huggingface.co/daominhwysi/mobilenet-manga-text-seg/tree/b4893287bcbcac197f496449e53e8045ad4d6976
+ONNX conversion: https://huggingface.co/salee1233/mobilenetv4-text-seg-onnx/tree/12c0ab260ba27a0bffb5d7a51ced06e36b04a1c0
+
+mbnet_manga_text_seg.pth was converted to mbnv4_text_seg.onnx with normalization
+and sigmoid included. No additional training is claimed.
+
+The upstream README declares MIT. Its application to the released weights is
+not separately documented and has not been independently confirmed. This notice
+records that declaration, not a new license grant. This is an unofficial
+conversion; upstream rights remain with their holders.
 
 The Rust Telea implementation is derived from OpenCV 4.12.0
 modules/photo/src/inpaint.cpp:

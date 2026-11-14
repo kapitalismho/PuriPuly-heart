@@ -31,7 +31,7 @@ fn region(scale: f32) -> PreparedRegion {
     for (x, y, pixel) in core.enumerate_pixels_mut() {
         let x = x as f32 / scale;
         let y = y as f32 / scale;
-        if (20.0..380.0).contains(&x) && ((10.0..30.0).contains(&y) || (60.0..80.0).contains(&y)) {
+        if (20.0..380.0).contains(&x) && ((8.0..36.0).contains(&y) || (52.0..80.0).contains(&y)) {
             *pixel = Luma([255]);
         }
     }
@@ -40,7 +40,7 @@ fn region(scale: f32) -> PreparedRegion {
     PreparedRegion {
         bbox: rect(
             x as f32 + 20.0 * scale,
-            y as f32 + 10.0 * scale,
+            y as f32 + 8.0 * scale,
             x as f32 + 380.0 * scale,
             y as f32 + 80.0 * scale,
         ),
@@ -50,10 +50,11 @@ fn region(scale: f32) -> PreparedRegion {
             width: core.width(),
             height: core.height(),
         },
+        recovered: core.clone(),
         core,
-        glyph_size: 20.0 * scale,
+        glyph_size: 28.0 * scale,
+        source_lines: 2,
         fill: [220, 160, 40],
-        plate: false,
         erase: None,
         mask_ms: 0.0,
         erase_ms: 0.0,
@@ -119,8 +120,26 @@ fn windows_graphics_real_bundled_metrics_fit_and_preserve_position() {
         assert!(metrics.width > 0.0);
         assert!(contains(region.bbox, run.ink));
     }
+    assert!(!typesetter.metrics.cache.is_empty());
+    assert!(!typesetter.metrics.formats.is_empty());
+    assert!(!typesetter.metrics.layouts.is_empty());
+    let factory = typesetter.metrics.factory.as_raw();
+    let normalized_format = typesetter.metrics.normalized_format.as_raw();
     typesetter.reset();
     assert!(typesetter.placed_boxes().is_empty());
+    assert!(typesetter.metrics.cache.is_empty());
+    assert!(typesetter.metrics.formats.is_empty());
+    assert!(typesetter.metrics.layouts.is_empty());
+    assert_eq!(typesetter.metrics.factory.as_raw(), factory);
+    assert_eq!(
+        typesetter.metrics.normalized_format.as_raw(),
+        normalized_format
+    );
+    for run in &first.runs {
+        let mut metrics = DWRITE_TEXT_METRICS::default();
+        unsafe { run.layout.GetMetrics(&mut metrics).unwrap() };
+        assert!(metrics.width > 0.0);
+    }
     let replay = typesetter
         .typeset(&photo, &region, "한글가나다라\n한글가나다라")
         .unwrap();
@@ -144,7 +163,8 @@ fn windows_graphics_dynamic_scale_uses_actual_height_once() {
         let result = typesetter
             .typeset(&photo(height), &region(scale), "번역 문장\n다음 문장")
             .unwrap();
-        assert!((result.floor - 0.015 * height as f32).abs() < 0.001);
+        let long = (height * 4 / 3) as f32;
+        assert!((result.floor - FLOOR_RATIO * long).abs() < 0.001);
         assert!(!result.runs.is_empty());
         for run in &result.runs {
             let mut actual_size = 0.0;
@@ -163,23 +183,11 @@ fn windows_graphics_dynamic_scale_uses_actual_height_once() {
         assert!(result.selected_size <= result.source_cap);
         assert!(!result.region_overflow);
         assert_eq!(result.style.outline.as_ref().unwrap().color, [0, 0, 0]);
-        let mut plate = region(scale);
-        plate.plate = true;
-        typesetter.reset();
-        let plate_result = typesetter
-            .typeset(&photo(height), &plate, "번역 문장\n다음 문장")
-            .unwrap();
-        assert_eq!(plate_result.style.fill, [245, 245, 240]);
-        assert!(plate_result.style.outline.is_none());
-        let style = plate_result.style.plate.unwrap();
-        assert!((style.rect.left - (plate.bbox.left - 8.0 * scale)).abs() < 0.001);
-        assert_eq!(style.color, [16, 20, 28]);
-        assert!((style.alpha - 238.0 / 255.0).abs() < 0.00001);
     }
 }
 
 #[test]
-fn windows_graphics_floor_fallback_never_renders_below_readable_floor() {
+fn windows_graphics_text_too_long_for_a_tiny_box_spills_past_it_at_the_floor_without_a_plate() {
     let mut typesetter = typesetter();
     for height in [720, 1080, 1440, 2160] {
         typesetter.reset();
@@ -193,12 +201,14 @@ fn windows_graphics_floor_fallback_never_renders_below_readable_floor() {
         let block = typesetter
             .typeset(&photo(height), &region, "작은 칸에 들어가지 않는 긴 문장")
             .unwrap();
-        let expected_floor = 0.015 * height as f32;
+        let expected_floor = FLOOR_RATIO * (height * 4 / 3) as f32;
         assert!((block.floor - expected_floor).abs() < 0.001);
         assert_eq!(block.selected_size, block.floor);
         assert!(block.source_cap < block.floor);
-        assert!(block.region_overflow);
-        assert!(block.collision);
+        assert!(!block.region_overflow);
+        assert!(!block.collision);
+        assert!(spills(&block, &region));
+        assert_spilled_text_keeps_source_style(&block, &region);
         assert!(!block.runs.is_empty());
         for run in &block.runs {
             let mut actual_size = 0.0;
@@ -239,8 +249,9 @@ fn windows_graphics_floor_rescue_wraps_complete_paragraph_without_moving_prior_i
     assert_eq!(block.kind, LayoutKind::Horizontal);
     assert_eq!(block.selected_size, block.floor);
     assert!(block.source_cap < block.floor);
-    assert!(block.runs.len() >= 3);
-    assert!(block.region_overflow);
+    assert!(block.runs.len() >= 2);
+    assert!(spills(&block, &paragraph));
+    assert_spilled_text_keeps_source_style(&block, &paragraph);
     let compact = |text: &str| {
         text.chars()
             .filter(|c| !c.is_whitespace())
@@ -276,8 +287,8 @@ fn windows_graphics_floor_rescue_wraps_complete_paragraph_without_moving_prior_i
 #[test]
 fn windows_graphics_floor_rescue_margin_is_bounded_and_clamped_to_photo() {
     let mut typesetter = typesetter();
-    let extent = rect(1.0, 10.0, 75.0, 20.0);
-    let model_box = rect(0.0, 5.0, 75.0, 25.0);
+    let extent = rect(1.0, 10.0, 70.0, 20.0);
+    let model_box = rect(0.0, 5.0, 70.0, 25.0);
     let info = SourceMeasurement {
         angle_degrees: 0.0,
         direction: Direction::Horizontal,
@@ -287,12 +298,13 @@ fn windows_graphics_floor_rescue_margin_is_bounded_and_clamped_to_photo() {
         center: [38.0, 15.0],
     };
     let text = "가나다라마바사아자차카타파하";
-    let photo_bounds = rect(0.0, 0.0, 85.0, 200.0);
+    let photo_bounds = rect(0.0, 0.0, 85.0, 30.0);
     let block = layout::choose(
         &mut typesetter.metrics,
         text,
         &info,
         model_box,
+        20.0,
         20.0,
         10.0,
         &[],
@@ -305,13 +317,74 @@ fn windows_graphics_floor_rescue_margin_is_bounded_and_clamped_to_photo() {
     assert!(block
         .runs
         .iter()
-        .all(|run| run.ink.left >= 0.0 && run.ink.right <= 85.0));
+        .all(|run| run.ink.left >= 0.0 && run.ink.right <= 80.0));
+    assert_eq!(block.runs.len(), 4);
     let ink = block.runs.iter().map(|run| run.ink).reduce(union).unwrap();
-    assert!(((ink.left + ink.right) * 0.5 - 42.5).abs() < 0.001);
-    assert!(((ink.top + ink.bottom) * 0.5 - 17.5).abs() < 0.001);
+    assert!(((ink.left + ink.right) * 0.5 - 40.0).abs() < 0.001);
+    assert!(((ink.top + ink.bottom) * 0.5 - 15.0).abs() < 0.001);
     assert_eq!(info.extent, extent);
     assert_eq!(info.slots, vec![extent]);
     assert_eq!(info.center, [38.0, 15.0]);
+}
+
+fn spills(block: &TypesetBlock, region: &PreparedRegion) -> bool {
+    block.runs.iter().any(|run| !contains(region.bbox, run.ink))
+}
+
+fn assert_spilled_text_keeps_source_style(block: &TypesetBlock, region: &PreparedRegion) {
+    assert_eq!(block.style.fill, region.fill);
+    assert!(block.style.outline.is_some());
+}
+
+#[test]
+fn windows_graphics_spill_grows_only_as_needed_and_keeps_prior_blocks_clear() {
+    let mut typesetter = typesetter();
+    let photo = photo(1080);
+    let mut neighbor = region(0.75);
+    neighbor.roi = PixelRect {
+        x: 400,
+        y: 280,
+        width: 300,
+        height: 75,
+    };
+    neighbor.bbox = rect(415.0, 287.0, 685.0, 347.0);
+    neighbor.core = GrayImage::from_fn(300, 75, |x, y| {
+        Luma([if (15..285).contains(&x) && ((7..22).contains(&y) || (45..60).contains(&y)) {
+            255
+        } else {
+            0
+        }])
+    });
+    let fits = typesetter
+        .typeset(&photo, &neighbor, "그대로 들어가는 문장
+두 번째 줄")
+        .unwrap();
+    assert!(!spills(&fits, &neighbor));
+    let prior = typesetter.placed_boxes().to_vec();
+    let mut tight = region(0.75);
+    tight.roi = PixelRect {
+        x: 470,
+        y: 360,
+        width: 120,
+        height: 40,
+    };
+    tight.bbox = rect(480.0, 368.0, 580.0, 392.0);
+    tight.core = GrayImage::from_fn(120, 40, |x, y| {
+        Luma([if (10..110).contains(&x) && (10..30).contains(&y) { 255 } else { 0 }])
+    });
+    let block = typesetter
+        .typeset(&photo, &tight, "짧은 원문에 비해 훨씬 긴 번역 문장입니다")
+        .unwrap();
+    assert_eq!(block.selected_size, block.floor);
+    assert!(spills(&block, &tight));
+    assert!(!block.region_overflow);
+    assert!(!block.collision);
+    assert!(!hits(&block.collision_boxes, &prior));
+    assert_spilled_text_keeps_source_style(&block, &tight);
+    let ink = block.collision_boxes.iter().copied().reduce(union).unwrap();
+    let reach = 4.0 * block.floor;
+    assert!(ink.left >= tight.bbox.left - reach && ink.right <= tight.bbox.right + reach);
+    assert!(ink.top >= tight.bbox.top - reach && ink.bottom <= tight.bbox.bottom + reach);
 }
 
 #[test]
@@ -335,6 +408,7 @@ fn windows_graphics_floor_fallback_retains_slots_when_not_every_candidate_overfl
         extent,
         20.0,
         20.0,
+        20.0,
         &placed,
         photo_bounds,
     )
@@ -348,6 +422,7 @@ fn windows_graphics_floor_fallback_retains_slots_when_not_every_candidate_overfl
         "회전된 긴 문장은 기존 줄 배치를 유지합니다",
         &info,
         extent,
+        20.0,
         20.0,
         10.0,
         &[],
@@ -366,9 +441,10 @@ fn windows_graphics_floor_fallback_retains_slots_when_not_every_candidate_overfl
         &info,
         info.extent,
         20.0,
+        20.0,
         10.0,
         &[],
-        photo_bounds,
+        info.extent,
     )
     .unwrap();
     assert_eq!(vertical.kind, LayoutKind::Lines);
@@ -431,11 +507,11 @@ fn windows_graphics_native_vertical_forms_tate_chu_yoko_and_fallback_smoke() {
 #[test]
 fn source_measurement_deskews_and_returns_two_refined_slots() {
     let source = region(1.0);
-    let measured = measure_source(&source.core, [80.0, 100.0], 1.0).unwrap();
+    let measured = measure_source(&source.core, [80.0, 100.0], 1.0, 2).unwrap();
     assert_eq!(measured.angle_degrees, 0.0);
     assert_eq!(measured.direction, Direction::Horizontal);
     assert_eq!(measured.slots.len(), 2);
-    assert_eq!(measured.glyph_size, 20.0);
+    assert_eq!(measured.glyph_size, 28.0);
     let mut tilted = GrayImage::new(400, 180);
     let (s, c) = 12.0f32.to_radians().sin_cos();
     for (x, y, pixel) in tilted.enumerate_pixels_mut() {
@@ -448,7 +524,7 @@ fn source_measurement_deskews_and_returns_two_refined_slots() {
             *pixel = Luma([255]);
         }
     }
-    let rotated = measure_source(&tilted, [10.0, 20.0], 1.0).unwrap();
+    let rotated = measure_source(&tilted, [10.0, 20.0], 1.0, 2).unwrap();
     assert!(
         (rotated.angle_degrees - 12.0).abs() <= 1.0,
         "{}",
@@ -457,6 +533,91 @@ fn source_measurement_deskews_and_returns_two_refined_slots() {
     assert_eq!(rotated.slots.len(), 2);
     assert!((rotated.glyph_size - 20.0).abs() <= 2.0);
     assert_eq!(rotated.center, [210.0, 110.0]);
+}
+
+fn glyph_grid(lines: u32, per_line: u32, vertical: bool, line_gap: u32, tilt: f32) -> GrayImage {
+    let (glyph, glyph_gap, margin) = (30.0f32, 3.0f32, 40.0f32);
+    let along = per_line as f32 * (glyph + glyph_gap) - glyph_gap;
+    let across = lines as f32 * (glyph + line_gap as f32) - line_gap as f32;
+    let (width, height) = if vertical {
+        (across + 2.0 * margin, along + 2.0 * margin)
+    } else {
+        (along + 2.0 * margin, across + 2.0 * margin)
+    };
+    let mut core = GrayImage::new(width as u32, height as u32);
+    let center = [width / 2.0, height / 2.0];
+    let (s, c) = tilt.to_radians().sin_cos();
+    for (x, y, pixel) in core.enumerate_pixels_mut() {
+        let dx = x as f32 - center[0];
+        let dy = y as f32 - center[1];
+        let sx = c * dx + s * dy + center[0] - margin;
+        let sy = -s * dx + c * dy + center[1] - margin;
+        let (a, b) = if vertical {
+            (sy, across - sx)
+        } else {
+            (sx, sy)
+        };
+        if a < 0.0 || b < 0.0 || a >= along || b >= across {
+            continue;
+        }
+        let line = (b / (glyph + line_gap as f32)) as u32;
+        let slot = (a / (glyph + glyph_gap)) as u32;
+        let u = a - slot as f32 * (glyph + glyph_gap);
+        let v = b - line as f32 * (glyph + line_gap as f32);
+        let stroke = |t: f32| t < 4.0 || (13.0..17.0).contains(&t) || (26.0..30.0).contains(&t);
+        if u < glyph && v < glyph && (stroke(u) || stroke(v)) && slot < per_line - line % 3 {
+            *pixel = Luma([255]);
+        }
+    }
+    core
+}
+
+#[test]
+fn tall_horizontal_source_lines_override_aspect_biased_vertical_projection() {
+    for lines in [7, 14, 20] {
+        let core = glyph_grid(lines, 7, false, 10, 0.0);
+        assert_eq!(
+            measure_source(&core, [0.0, 0.0], 1.0, 1).unwrap().direction,
+            Direction::Vertical
+        );
+        let measured = measure_source(&core, [5.0, 7.0], 1.0, lines).unwrap();
+        assert_eq!(measured.direction, Direction::Horizontal, "lines={lines}");
+        assert_eq!(measured.angle_degrees, 0.0);
+        assert_eq!(measured.slots.len(), lines as usize);
+        assert!((measured.glyph_size - 30.0).abs() <= 1.0);
+        assert_eq!(measured.slots[0].top, 47.0);
+    }
+    let tilted = measure_source(&glyph_grid(14, 7, false, 10, 6.0), [0.0, 0.0], 1.0, 14).unwrap();
+    assert_eq!(tilted.direction, Direction::Horizontal);
+    assert!(
+        (tilted.angle_degrees - 6.0).abs() <= 1.0,
+        "{}",
+        tilted.angle_degrees
+    );
+}
+
+#[test]
+fn vertical_sources_and_unconfirmed_line_counts_keep_projection_direction() {
+    for (columns, per_column, gap) in [(1, 8, 10), (2, 8, 10), (3, 8, 10), (6, 8, 10), (6, 8, 4)] {
+        let core = glyph_grid(columns, per_column, true, gap, 0.0);
+        let measured = measure_source(&core, [0.0, 0.0], 1.0, columns).unwrap();
+        assert_eq!(
+            measured.direction,
+            Direction::Vertical,
+            "columns={columns} gap={gap}"
+        );
+    }
+    let touching = glyph_grid(14, 7, false, 0, 0.0);
+    let mismatched = glyph_grid(14, 7, false, 10, 0.0);
+    for (core, lines) in [(&touching, 14), (&mismatched, 13), (&mismatched, 1)] {
+        assert_eq!(
+            measure_source(core, [0.0, 0.0], 1.0, lines)
+                .unwrap()
+                .direction,
+            Direction::Vertical,
+            "lines={lines}"
+        );
+    }
 }
 
 #[test]
@@ -470,7 +631,7 @@ fn source_projection_uses_all_foreground_without_periodic_stride_aliasing() {
         }
     }
     assert_eq!(core.as_raw().iter().filter(|&&v| v != 0).count(), 45_550);
-    let measured = measure_source(&core, [0.0, 0.0], 1.0).unwrap();
+    let measured = measure_source(&core, [0.0, 0.0], 1.0, 1).unwrap();
     assert_eq!(measured.direction, Direction::Horizontal);
     assert_eq!(measured.angle_degrees, -11.0);
 }
@@ -488,7 +649,7 @@ fn original_angle_masks_match_full_foreground_reference() {
             .unwrap()
             .into_luma8();
         let start = std::time::Instant::now();
-        let measured = measure_source(&core, [0.0, 0.0], 1.0).unwrap();
+        let measured = measure_source(&core, [0.0, 0.0], 1.0, 1).unwrap();
         let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
         assert_eq!(
             measured.angle_degrees,
@@ -569,8 +730,8 @@ fn source_slots_scale_fixed_two_pixel_merge_and_discard_thresholds() {
             *pixel = Luma([255]);
         }
     }
-    let full = measure_source(&core, [0.0, 0.0], 1.0).unwrap();
-    let half = measure_source(&core, [0.0, 0.0], 0.5).unwrap();
+    let full = measure_source(&core, [0.0, 0.0], 1.0, 1).unwrap();
+    let half = measure_source(&core, [0.0, 0.0], 0.5, 1).unwrap();
     assert_eq!(full.slots.len(), 2);
     assert_eq!(half.slots.len(), 3);
     assert_eq!(full.slots[0].height(), 5.0);
@@ -674,3 +835,40 @@ impl windows::Win32::Graphics::DirectWrite::IDWriteTextRenderer_Impl for GlyphOb
         Ok(())
     }
 }
+
+#[test]
+fn windows_graphics_crowded_text_shrinks_toward_the_hard_floor_instead_of_overlapping() {
+    let mut typesetter = typesetter();
+    let extent = rect(100.0, 100.0, 300.0, 130.0);
+    let info = SourceMeasurement {
+        angle_degrees: 0.0,
+        direction: Direction::Horizontal,
+        extent,
+        slots: vec![extent],
+        glyph_size: 20.0,
+        center: [200.0, 115.0],
+    };
+    let photo_bounds = rect(0.0, 0.0, 1920.0, 1080.0);
+    let placed = [
+        rect(0.0, 0.0, 1920.0, 99.0),
+        rect(0.0, 131.0, 1920.0, 1080.0),
+        rect(0.0, 99.0, 99.0, 131.0),
+        rect(301.0, 99.0, 1920.0, 131.0),
+    ];
+    let block = layout::choose(
+        &mut typesetter.metrics,
+        "한글한글한글한글한글한글",
+        &info,
+        extent,
+        20.0,
+        12.0,
+        20.0,
+        &placed,
+        photo_bounds,
+    )
+    .unwrap();
+    assert!((12.0..20.0).contains(&block.size), "size={}", block.size);
+    assert!(!block.overflow);
+    assert!(!hits(&block.boxes(&info), &placed));
+}
+

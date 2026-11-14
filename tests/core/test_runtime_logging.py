@@ -625,7 +625,7 @@ def test_support_log_snapshot_real_service_smoke_preserves_masked_conversation(t
     )
     service = RuntimeLoggingService(session_service=session)
     owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        presentation=SimpleNamespace(bind_conversation_history=lambda _service: None),
         service_factory=lambda: service,
         fallback_logger=root,
     )

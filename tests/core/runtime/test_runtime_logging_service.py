@@ -29,14 +29,11 @@ class FakeSessionRuntimeLogging:
         self.detailed_messages: list[tuple[int, str]] = []
         self.persisted_messages: list[tuple[int, str]] = []
         self.events: list[str] = []
-        self.attached_sinks: list[object] = []
+        self.conversation_observers: list[object] = []
         self.close_calls = 0
 
-    def attach_realtime_sink(self, sink: object) -> None:
-        self.attached_sinks.append(sink)
-
-    def detach_realtime_sink(self) -> None:
-        self.events.append("detach_realtime_sink")
+    def set_conversation_history_observer(self, observer: object) -> None:
+        self.conversation_observers.append(observer)
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         self.basic_messages.append((level, message))
@@ -86,28 +83,6 @@ class _FallbackCapture(logging.Handler):
         self.records.append(record)
         self.messages.append((record.levelno, record.getMessage()))
 
-
-class _RealtimeSink:
-    def __init__(self) -> None:
-        self.lines: list[str] = []
-
-    def append_log(self, line: str) -> None:
-        self.lines.append(line)
-
-
-class _RealtimeHandler(logging.Handler):
-    def __init__(self, sink: _RealtimeSink) -> None:
-        super().__init__()
-        self._sink = sink
-        self.closed = False
-        self.setFormatter(logging.Formatter("%(message)s"))
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self._sink.append_log(self.format(record))
-
-    def close(self) -> None:
-        self.closed = True
-        super().close()
 
 
 def _fallback_logger() -> tuple[logging.Logger, _FallbackCapture]:
@@ -214,7 +189,7 @@ def test_final_shutdown_summary_is_metadata_only_and_emitted_before_close() -> N
     assert "api-key-looking" not in summary
 
 
-def test_close_detaches_realtime_sink_closes_queue_and_is_idempotent(
+def test_close_releases_history_observer_closes_queue_and_is_idempotent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -223,12 +198,10 @@ def test_close_detaches_realtime_sink_closes_queue_and_is_idempotent(
     root_logger.propagate = False
     monkeypatch.setattr("puripuly_heart.core.runtime_logging.user_config_dir", lambda: tmp_path)
 
-    session = SessionRuntimeLoggingService(
-        root_logger=root_logger, ui_handler_factory=_RealtimeHandler
-    )
+    session = SessionRuntimeLoggingService(root_logger=root_logger)
     service = RuntimeLoggingService(session_service=session)
-    sink = _RealtimeSink()
-    service.attach_realtime_sink(sink)
+    observations = []
+    service.set_conversation_history_observer(observations.append)
 
     service.emit_basic("before terminal close")
     service.close_after_producers_stop()
@@ -240,7 +213,9 @@ def test_close_detaches_realtime_sink_closes_queue_and_is_idempotent(
     assert file_health["shutdown_complete"] is True
     assert file_health["queue_pending"] == 0
     assert not any(isinstance(handler, QueueHandler) for handler in root_logger.handlers)
-    assert sink.lines == ["before terminal close"]
+    service.set_conversation_history_observer(observations.append)
+    assert session._conversation_history_observer is None
+    assert observations == []
 
 
 def test_terminal_close_force_closes_preconfigured_main_queue_and_persists_summary(

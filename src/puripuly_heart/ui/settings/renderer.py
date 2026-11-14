@@ -12,8 +12,8 @@ from puripuly_heart.ui.settings.contract import (
     SettingsGeneralSurfaceSlots,
     SettingsOverlaySurfaceRegions,
     SettingsOverlaySurfaceSlots,
-    SettingsPromptSurfaceRegions,
-    SettingsPromptSurfaceSlots,
+    SettingsPhotoSurfaceRegions,
+    SettingsPhotoSurfaceSlots,
 )
 
 SETTINGS_ROW_SPACING = FOUNDATION_DESIGN_TOKENS.spacing.page
@@ -64,6 +64,11 @@ def compose_settings_api_surface(
         rows.insert(rows.index(slots.managed_key), slots.chatgpt_account)
     if slots.http_extension is not None:
         rows.insert(2, slots.http_extension)
+    rows.extend(
+        control
+        for control in (slots.custom_vocabulary, slots.peer_expected_language)
+        if control is not None
+    )
 
     return SettingsApiSurfaceRegions(
         rows=tuple(rows),
@@ -125,8 +130,9 @@ def compose_settings_general_surface(
         slots.activation_notice_middle,
         slots.activation_notice_trailing,
     )
+    rows = (primary_row, audio_row, vad_row, clipboard_row, activation_notice_row)
     return SettingsGeneralSurfaceRegions(
-        rows=(primary_row, audio_row, vad_row, clipboard_row, activation_notice_row),
+        rows=rows if slots.persona is None else (*rows, slots.persona),
         primary_row=primary_row,
         audio_row=audio_row,
         vad_row=vad_row,
@@ -136,11 +142,25 @@ def compose_settings_general_surface(
     )
 
 
-def compose_settings_prompt_surface(
-    slots: SettingsPromptSurfaceSlots,
-) -> SettingsPromptSurfaceRegions:
-    return SettingsPromptSurfaceRegions(
-        rows=(slots.custom_vocabulary, slots.peer_expected_language, slots.persona)
+def compose_settings_photo_surface(
+    slots: SettingsPhotoSurfaceSlots,
+    *,
+    placeholder_factory: Callable[[], ft.Control],
+) -> SettingsPhotoSurfaceRegions:
+    return SettingsPhotoSurfaceRegions(
+        rows=(
+            compose_settings_triple_row(slots.enabled, slots.route, slots.remaining),
+            compose_settings_triple_row(
+                slots.delete_translated,
+                placeholder_factory(),
+                placeholder_factory(),
+            ),
+            *(
+                control
+                for control in (slots.chatgpt_account, slots.gemini_key)
+                if control is not None
+            ),
+        )
     )
 
 
@@ -196,6 +216,6 @@ __all__ = [
     "compose_settings_api_surface",
     "compose_settings_general_surface",
     "compose_settings_overlay_surface",
-    "compose_settings_prompt_surface",
+    "compose_settings_photo_surface",
     "compose_settings_triple_row",
 ]

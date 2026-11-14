@@ -533,8 +533,10 @@ fn missing_invalid_or_replaced_handgrips_cancel_and_require_fresh_ready_grip() {
         }))
         .unwrap();
         let start = Instant::now();
+        let mut wrist_base = IDENTITY;
+        wrist_base[2][3] = -0.03;
         let mut interaction = PhotoInteraction::new(TemporaryInteractionConfig {
-            wrist_transform: Some(IDENTITY),
+            wrist_transform: Some(wrist_base),
             ..Default::default()
         });
         interaction.snapshot(Some(&photo), start, 1000);
@@ -679,7 +681,7 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
                             .iter()
                             .rev()
                             .find(|(handle, _)| *handle == 2),
-                        Some(&(2, configured_width.unwrap_or(0.375))),
+                        Some(&(2, configured_width.unwrap_or(crate::photo::interaction::DEFAULT_PHOTO_WIDTH_M))),
                     );
                 })
             },
@@ -692,6 +694,10 @@ async fn windows_graphics_controlled_held_photo_runtime_reports_first_draw_once_
                 })
             },
             |expected| LEGACY.with(|calls| assert_eq!(calls.borrow().pulses, expected)),
+            |expected| CALLS.with(|calls| {
+                let calls = calls.borrow();
+                assert_eq!(calls.textures.iter().rev().find(|(handle, _)| *handle == 2), Some(&(2, expected)));
+            }),
         )
         .await;
         CALLS.with(|calls| {

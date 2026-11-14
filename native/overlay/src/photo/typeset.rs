@@ -18,6 +18,9 @@ use crate::renderer::{
 mod layout;
 mod measurement;
 
+const FLOOR_RATIO: f32 = 0.0100;
+const HARD_FLOOR_RATIO: f32 = 0.0084;
+
 pub use measurement::{measure_source, SourceMeasurement};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,17 +52,9 @@ pub struct OutlineStyle {
 }
 
 #[derive(Clone, Debug)]
-pub struct PlateStyle {
-    pub rect: Rect,
-    pub color: [u8; 3],
-    pub alpha: f32,
-}
-
-#[derive(Clone, Debug)]
 pub struct TextStyle {
     pub fill: [u8; 3],
     pub outline: Option<OutlineStyle>,
-    pub plate: Option<PlateStyle>,
 }
 
 #[derive(Clone, Debug)]
@@ -72,6 +67,7 @@ pub struct TypesetBlock {
     pub selected_size: f32,
     pub source_cap: f32,
     pub floor: f32,
+    pub hard_floor: f32,
     pub collision: bool,
     pub overlap_area: f32,
     pub region_overflow: bool,
@@ -116,6 +112,9 @@ impl PhotoTypesetter {
 
     pub fn reset(&mut self) {
         self.placed.clear();
+        self.metrics.cache.clear();
+        self.metrics.formats.clear();
+        self.metrics.layouts.clear();
     }
 
     pub fn font_metrics(&self) -> &FontMetrics {
@@ -141,11 +140,14 @@ impl PhotoTypesetter {
         self.metrics.layouts.clear();
         let height = photo.pixels.width().min(photo.pixels.height()) as f32;
         let scale = height / 1440.0;
-        let floor = (8.0 * scale).max(0.015 * height);
+        let long = photo.pixels.width().max(photo.pixels.height()) as f32;
+        let floor = FLOOR_RATIO * long;
+        let hard_floor = (HARD_FLOOR_RATIO * long).min(floor);
         let measured = measure_source(
             &region.core,
             [region.roi.x as f32, region.roi.y as f32],
             scale,
+            region.source_lines,
         );
         let info = measured.unwrap_or_else(|| SourceMeasurement {
             angle_degrees: 0.0,
@@ -170,10 +172,11 @@ impl PhotoTypesetter {
                 collision_boxes: Vec::new(),
                 angle_degrees: info.angle_degrees,
                 center: info.center,
-                style: style(region, floor, scale),
+                style: style(region, floor),
                 selected_size: 0.0,
                 source_cap: cap,
                 floor,
+                hard_floor,
                 collision: false,
                 overlap_area: 0.0,
                 region_overflow: false,
@@ -187,6 +190,7 @@ impl PhotoTypesetter {
             &info,
             region.bbox,
             floor,
+            hard_floor,
             cap,
             &self.placed,
             rect(0.0, 0.0, photo.pixels.width() as f32, height),
@@ -210,10 +214,11 @@ impl PhotoTypesetter {
             collision_boxes,
             angle_degrees: info.angle_degrees,
             center: info.center,
-            style: style(region, best.size, scale),
+            style: style(region, best.size),
             selected_size: best.size,
             source_cap: cap,
             floor,
+            hard_floor,
             collision,
             overlap_area,
             region_overflow: best.overflow,
@@ -503,24 +508,7 @@ fn image_bounds(bounds: Rect, info: &SourceMeasurement) -> Rect {
     result
 }
 
-fn style(region: &PreparedRegion, size: f32, scale: f32) -> TextStyle {
-    if region.plate {
-        let padding = 8.0 * scale;
-        return TextStyle {
-            fill: [245, 245, 240],
-            outline: None,
-            plate: Some(PlateStyle {
-                rect: rect(
-                    region.bbox.left - padding,
-                    region.bbox.top - padding,
-                    region.bbox.right + padding,
-                    region.bbox.bottom + padding,
-                ),
-                color: [16, 20, 28],
-                alpha: 238.0 / 255.0,
-            }),
-        };
-    }
+fn style(region: &PreparedRegion, size: f32) -> TextStyle {
     let luminance = region
         .fill
         .iter()
@@ -546,7 +534,6 @@ fn style(region: &PreparedRegion, size: f32, scale: f32) -> TextStyle {
             color,
             width: (0.08 * size).round().max(1.0),
         }),
-        plate: None,
     }
 }
 

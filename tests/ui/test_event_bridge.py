@@ -12,13 +12,13 @@ import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core import messages
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
     ManagedOpenRouterUserFacingError,
 )
 from puripuly_heart.core.runtime_logging import (
-    RealtimeLogHandler,
     RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
 )
@@ -79,18 +79,10 @@ class FailingTranslationDashboard(DummyDashboard):
         raise RuntimeError("dashboard setter failed")
 
 
-class DummyLogs:
-    def __init__(self) -> None:
-        self.lines: list[str] = []
-
-    def append_log(self, line: str) -> None:
-        self.lines.append(line)
-
-
 class DummyApp:
     def __init__(self) -> None:
         self.view_dashboard = DummyDashboard()
-        self.view_logs = DummyLogs()
+        self.conversation_history = ConversationHistory()
         self.snackbar_calls: list[tuple[str, object]] = []
         self.clear_managed_auth_pending_calls = 0
         self.history: list[tuple[str, str, bool, str | None]] = []
@@ -1183,9 +1175,7 @@ async def test_event_bridge_handles_error_and_soniox_shutdown_suppression(tmp_pa
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=RealtimeLogHandler,
     )
-    runtime_logging.attach_realtime_sink(app.view_logs)
     bridge = make_bridge(
         app,
         event_queue=asyncio.Queue(),
@@ -1202,8 +1192,8 @@ async def test_event_bridge_handles_error_and_soniox_shutdown_suppression(tmp_pa
         await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="General failure"))
         await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload=None))
 
-        assert len(app.view_logs.lines) == 3
-        assert all("[ERROR]" in line for line in app.view_logs.lines)
+        assert len(stream_handler.stream.getvalue().splitlines()) == 3
+        assert app.conversation_history.conversation_records == ()
         assert app.view_dashboard.display_calls[-2:] == [
             ("General failure", None, True),
             (t("error.unknown"), None, True),
@@ -1237,9 +1227,7 @@ async def test_event_bridge_skips_duplicate_runtime_log_for_already_logged_error
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=RealtimeLogHandler,
     )
-    runtime_logging.attach_realtime_sink(app.view_logs)
     bridge = make_bridge(
         app,
         event_queue=asyncio.Queue(),
@@ -1257,8 +1245,8 @@ async def test_event_bridge_skips_duplicate_runtime_log_for_already_logged_error
             )
         )
 
-        assert len(app.view_logs.lines) == 1
-        assert "already logged failure" in app.view_logs.lines[0]
+        assert stream_handler.stream.getvalue().splitlines() == ["already logged failure"]
+        assert app.conversation_history.conversation_records == ()
         assert app.view_dashboard.display_calls[-1] == ("already logged failure", None, True)
     finally:
         runtime_logging.close()
@@ -1296,7 +1284,7 @@ async def test_event_bridge_error_without_runtime_logging_uses_standard_logger(
     await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="plain failure"))
 
     assert seen == ["plain failure"]
-    assert app.view_logs.lines == []
+    assert app.conversation_history.conversation_records == ()
     assert app.view_dashboard.display_calls[-1] == ("plain failure", None, True)
 
 
@@ -1322,7 +1310,7 @@ async def test_event_bridge_error_with_broken_runtime_logging_uses_safe_standard
     await bridge._handle_event(UIEvent(type=UIEventType.ERROR, payload="broken runtime"))
 
     assert seen == ["A user interface operation failed."]
-    assert app.view_logs.lines == []
+    assert app.conversation_history.conversation_records == ()
     assert app.view_dashboard.display_calls[-1] == ("broken runtime", None, True)
 
 

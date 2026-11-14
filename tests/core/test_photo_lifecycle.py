@@ -68,7 +68,7 @@ def capture(path, clock=0):
 
 
 class Harness:
-    def __init__(self, tmp_path, scripts, *, google=False, prepare=None):
+    def __init__(self, tmp_path, scripts, *, google=False, prepare=None, discard=None):
         self.time = 0.0
         self.connections = []
         self.snapshots = []
@@ -99,6 +99,7 @@ class Harness:
             prepare=prepare_image,
             clock=lambda: self.time,
             temporary_root=tmp_path,
+            discard_translated=discard,
         )
 
     def connect(self, model):
@@ -152,6 +153,55 @@ async def test_offer_preopens_without_preparation_or_send_then_reopen_reuses_res
     finally:
         await h.owner.close()
     assert list(tmp_path.iterdir()) == []
+
+
+async def test_translated_photo_is_discarded_only_after_retention_ends(tmp_path):
+    discarded = []
+
+    async def discard(photo_capture):
+        discarded.append(photo_capture)
+
+    h = Harness(tmp_path, [[block(), PhotoStreamCompleted({}, "gpt-6-luna")]], discard=discard)
+    try:
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        h.time = 599
+        await h.owner.refresh(h.route)
+        assert discarded == []
+        h.time = 600
+        await h.owner.refresh(h.route)
+        assert [item.path for item in discarded] == [Path("capture.png")]
+        await h.owner.refresh(h.route)
+        assert len(discarded) == 1
+    finally:
+        await h.owner.close()
+    assert len(discarded) == 1
+
+
+@pytest.mark.parametrize("outcome", ["unpulled", "failed", "no_text"])
+async def test_photos_without_a_translation_are_never_discarded(tmp_path, outcome):
+    discarded = []
+
+    async def discard(photo_capture):
+        discarded.append(photo_capture)
+
+    script = {
+        "unpulled": [],
+        "failed": [PhotoProviderError("photo_authentication_failed", retryable=False)],
+        "no_text": [PhotoTextDelta('{"blocks":[]}'), PhotoStreamCompleted({}, "gpt-6-luna")],
+    }[outcome]
+    h = Harness(tmp_path, [script], discard=discard)
+    try:
+        photo_id = await h.offer()
+        if outcome != "unpulled":
+            assert h.owner.pull(photo_id, "pull")
+            await eventually(lambda: h.photo["phase"] in {"failed", "no_text"})
+        h.time = 600
+        await h.owner.refresh(h.route)
+    finally:
+        await h.owner.close()
+    assert discarded == []
 
 
 async def test_capture_identity_is_immutable_through_prepare_reopen_and_replacement(tmp_path):
@@ -308,6 +358,102 @@ async def test_nonretryable_failures_immediately_fail_with_safe_diagnostics(tmp_
         assert all(
             "capture.png" not in str(item) and "jpeg" not in str(item) for item in h.measurements
         )
+    finally:
+        await h.owner.close()
+
+
+async def test_allowance_exhaustion_disables_later_offers_until_reset_without_requests(tmp_path):
+    h = Harness(
+        tmp_path,
+        [
+            [PhotoProviderError("photo_allowance_exhausted", retryable=False, retry_after=60)],
+            [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+        ],
+    )
+    try:
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == "failed")
+        assert h.photo["failure_code"] == "photo_allowance_exhausted"
+        assert h.owner.request_starts == 1
+        h.time = 30
+        assert await h.owner.captured(capture(Path("capture.png"), h.time))
+        limited_id = h.photo["photo_id"]
+        assert limited_id != photo_id
+        assert h.photo["phase"] == "limited"
+        assert not h.photo["offer_open"]
+        assert not h.owner.pull(limited_id, "pull-limited")
+        assert not h.photo["visible"]
+        assert h.photo["attempt_id"] == 0
+        assert len(h.connections) == 1
+        h.time = 40
+        await h.owner.refresh(h.route)
+        assert h.photo["phase"] == "expired"
+        h.time = 61
+        renewed_id = await h.offer()
+        assert h.photo["phase"] == "offer"
+        assert h.owner.pull(renewed_id, "pull-renewed")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        assert len(h.connections) == 2
+    finally:
+        await h.owner.close()
+
+
+async def test_debug_limited_disables_new_offers_until_turned_off(tmp_path):
+    h = Harness(tmp_path, [[block(), PhotoStreamCompleted({}, "gpt-6-luna")]])
+    try:
+        h.owner.debug_limited = True
+        assert await h.owner.captured(capture(Path("capture.png"), h.time))
+        limited_id = h.photo["photo_id"]
+        assert h.photo["phase"] == "limited"
+        assert not h.photo["offer_open"]
+        assert not h.owner.pull(limited_id, "pull-limited")
+        assert h.connections == []
+        h.owner.debug_limited = False
+        renewed_id = await h.offer()
+        assert h.photo["phase"] == "offer"
+        assert h.owner.pull(renewed_id, "pull-renewed")
+        await eventually(lambda: h.photo["phase"] == "completed")
+    finally:
+        await h.owner.close()
+
+
+async def test_allowance_exhaustion_is_scoped_to_its_route(tmp_path):
+    h = Harness(
+        tmp_path,
+        [
+            [PhotoProviderError("photo_allowance_exhausted", retryable=False, retry_after=60)],
+            [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+        ],
+    )
+    try:
+        h.owner.pull(await h.offer(), "pull")
+        await eventually(lambda: h.photo["phase"] == "failed")
+        h.route = PhotoRoute("own-key", h.connect)
+        other_id = await h.offer()
+        assert h.photo["phase"] == "offer"
+        assert h.owner.pull(other_id, "pull-other")
+        await eventually(lambda: h.photo["phase"] == "completed")
+    finally:
+        await h.owner.close()
+
+
+@pytest.mark.parametrize("code", ["photo_quota_exhausted", "photo_usage_limit"])
+async def test_other_rate_limits_fail_only_the_current_photo(tmp_path, code):
+    h = Harness(
+        tmp_path,
+        [
+            [PhotoProviderError(code, retryable=False, quota=True)],
+            [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
+        ],
+    )
+    try:
+        h.owner.pull(await h.offer(), "pull")
+        await eventually(lambda: h.photo["phase"] == "failed")
+        next_id = await h.offer()
+        assert h.photo["phase"] == "offer"
+        assert h.owner.pull(next_id, "pull-next")
+        await eventually(lambda: h.photo["phase"] == "completed")
     finally:
         await h.owner.close()
 

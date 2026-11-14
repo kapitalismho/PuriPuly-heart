@@ -12,12 +12,62 @@ pub struct SourceMeasurement {
     pub center: [f32; 2],
 }
 
-pub fn measure_source(core: &GrayImage, offset: [f32; 2], scale: f32) -> Option<SourceMeasurement> {
+pub fn measure_source(
+    core: &GrayImage,
+    offset: [f32; 2],
+    scale: f32,
+    source_lines: u32,
+) -> Option<SourceMeasurement> {
     let count = core.as_raw().iter().filter(|&&v| v != 0).count();
     if count < 20 {
         return None;
     }
-    let (angle_degrees, direction) = projection_angle(core, count);
+    let projection = projection_angle(core, count);
+    let measured = measure(
+        core,
+        offset,
+        scale,
+        projection.angle(projection.direction),
+        projection.direction,
+        3.0,
+    )?;
+    if measured.direction == Direction::Vertical && source_lines >= 2 {
+        let lines = source_lines as f32;
+        let horizontal = measure(
+            core,
+            offset,
+            scale,
+            projection.angle(Direction::Horizontal),
+            Direction::Horizontal,
+            lines,
+        );
+        let vertical = measure(
+            core,
+            offset,
+            scale,
+            projection.angle(Direction::Vertical),
+            Direction::Vertical,
+            lines,
+        );
+        if let (Some(horizontal), Some(vertical)) = (horizontal, vertical) {
+            if horizontal.slots.len() == source_lines as usize
+                && vertical.slots.len() != source_lines as usize
+            {
+                return Some(horizontal);
+            }
+        }
+    }
+    Some(measured)
+}
+
+fn measure(
+    core: &GrayImage,
+    offset: [f32; 2],
+    scale: f32,
+    angle_degrees: f32,
+    direction: Direction,
+    lines: f32,
+) -> Option<SourceMeasurement> {
     let width = core.width();
     let height = core.height();
     let center = [width as f32 / 2.0, height as f32 / 2.0];
@@ -57,7 +107,7 @@ pub fn measure_source(core: &GrayImage, offset: [f32; 2], scale: f32) -> Option<
     } else {
         bounds[3] - bounds[1]
     } as f32
-        / 3.0;
+        / lines;
     let mut slots = Vec::new();
     for _ in 0..2 {
         slots = measure_slots(&deskewed, bounds, vertical, glyph_size, scale);
@@ -103,7 +153,18 @@ pub fn measure_source(core: &GrayImage, offset: [f32; 2], scale: f32) -> Option<
     })
 }
 
-fn projection_angle(core: &GrayImage, count: usize) -> (f32, Direction) {
+struct Projection {
+    direction: Direction,
+    angles: [f32; 2],
+}
+
+impl Projection {
+    fn angle(&self, direction: Direction) -> f32 {
+        self.angles[usize::from(direction == Direction::Vertical)]
+    }
+}
+
+fn projection_angle(core: &GrayImage, count: usize) -> Projection {
     let mut points = Vec::with_capacity(count);
     for (x, y, pixel) in core.enumerate_pixels() {
         if pixel[0] != 0 {
@@ -155,20 +216,21 @@ fn projection_angle(core: &GrayImage, count: usize) -> (f32, Direction) {
     } else {
         best_v.0 > best_h.0
     };
-    let best = if vertical { best_v } else { best_h };
-    let angle = if best.1.abs() < 3.0 || best.0 < 1.1 * zero[usize::from(vertical)] {
-        0.0
-    } else {
-        best.1
+    let angle = |best: (f64, f32), zero: f64| {
+        if best.1.abs() < 3.0 || best.0 < 1.1 * zero {
+            0.0
+        } else {
+            best.1
+        }
     };
-    (
-        angle,
-        if vertical {
+    Projection {
+        direction: if vertical {
             Direction::Vertical
         } else {
             Direction::Horizontal
         },
-    )
+        angles: [angle(best_h, zero[0]), angle(best_v, zero[1])],
+    }
 }
 
 fn measure_slots(

@@ -46,6 +46,9 @@ from puripuly_heart.app.ports.settings_view import (
     PeerVadHangoverIntent,
     PeerVadPreRollIntent,
     PeerVadSpeechThresholdIntent,
+    PhotoDeleteTranslatedSettingsIntent,
+    PhotoEnabledSettingsIntent,
+    PhotoRouteSettingsIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenBeijingApiHostEdit,
@@ -80,7 +83,7 @@ from puripuly_heart.config.provider_values import (
     STTProviderName,
     normalize_stt_provider,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import PHOTO_ROUTES, AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -261,6 +264,9 @@ COMMAND_ARGUMENTS = {
 IMMEDIATE = {
     "locale": lambda v: LocaleSettingsIntent(v),
     "clipboard.enabled": lambda v: ClipboardSettingsIntent(v),
+    "photo.enabled": lambda v: PhotoEnabledSettingsIntent(v),
+    "photo.route": lambda v: PhotoRouteSettingsIntent(v),
+    "photo.delete_translated": lambda v: PhotoDeleteTranslatedSettingsIntent(v),
     "chatbox.source.enabled": lambda v: ChatboxSourceSettingsIntent(v),
     "chatbox.activation_notice.enabled": lambda v: ActivationNoticeSettingsIntent(v),
     "vrc_mic_intercept.enabled": lambda v: VrcMicInterceptSettingsIntent(v),
@@ -318,6 +324,8 @@ SETTINGS_FIELDS = (
 BOOLEAN_FIELDS = frozenset(
     {
         "clipboard.enabled",
+        "photo.enabled",
+        "photo.delete_translated",
         "chatbox.source.enabled",
         "chatbox.activation_notice.enabled",
         "vrc_mic_intercept.enabled",
@@ -1204,6 +1212,7 @@ class ApplicationControlOwner:
             "audio.input_device": input_devices,
             "audio.output_device": output_devices,
             "overlay.target": list(OVERLAY_TARGETS),
+            "photo.route": list(PHOTO_ROUTES),
             "overlay.desktop_size": list(DESKTOP_FLET_SIZE_PRESET_ORDER),
             "osc.connection.mode": list(OSC_CONNECTION_MODES),
         }
@@ -3982,6 +3991,8 @@ def _validate_settings_field(
         valid = value == "" or (parsed is not None and parsed[0] == name.split(".")[2])
     elif name == "overlay.target":
         valid = value in OVERLAY_TARGETS
+    elif name == "photo.route":
+        valid = value in PHOTO_ROUTES
     elif name == "overlay.desktop_size":
         valid = value in DESKTOP_FLET_SIZE_PRESET_ORDER
     elif name == "overlay.background_alpha":

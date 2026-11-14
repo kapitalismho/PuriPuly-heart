@@ -116,7 +116,6 @@ class ApplicationStartupAdapter:
                 disposition="degraded",
                 stage="startup_presentation",
             )
-        self.presentation.attach_runtime_log_sink(self.runtime_logging)
 
     async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:
         await self.start_photo()

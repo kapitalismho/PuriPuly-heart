@@ -65,7 +65,6 @@ from puripuly_heart.core.observability import (
     ProviderObservationEvent,
     ProviderObservationOutcome,
     ProviderObservationSink,
-    RealtimeLogSink,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
 from puripuly_heart.core.photo.protocol import PHOTO_FAILURE_CODES
@@ -199,28 +198,6 @@ LATENCY_TRACE_POINT_CONTRACTS: dict[str, LatencyTracePointContract] = {
         acceptance_expectation="This is a local renderer observation, not compositor, physical HMD, or VRChat display acknowledgement.",
     ),
 }
-
-
-class RealtimeLogHandler(logging.Handler):
-    def __init__(self, sink: RealtimeLogSink):
-        super().__init__()
-        self._sink = sink
-        self.delivery_failures = 0
-        self.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
-        )
-
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            message = self.format(record)
-            append_threadsafe = getattr(self._sink, "append_log_threadsafe", None)
-            if callable(append_threadsafe):
-                append_threadsafe(message)
-            else:
-                self._sink.append_log(message)
-        except Exception:
-            self.delivery_failures += 1
-            return
 
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
@@ -1078,7 +1055,6 @@ class SessionRuntimeLoggingService:
         root_logger: logging.Logger | None = None,
         session_logger: logging.Logger | None = None,
         sinks: RuntimeLoggingSinks | None = None,
-        ui_handler_factory: Callable[[RealtimeLogSink], logging.Handler] | None = None,
         provider_observation_sink: ProviderObservationSink | None = None,
         conversation_record_sink: ConversationRecordSink | None = None,
         observability_runner: ObservabilityRunner | None = None,
@@ -1090,12 +1066,10 @@ class SessionRuntimeLoggingService:
         self._root_logger.setLevel(logging.INFO)
         self._session_logger.setLevel(logging.INFO)
         self._session_logger.propagate = False
-        self._ui_handler_factory = ui_handler_factory
         self._provider_observation_sink = provider_observation_sink
         self._conversation_record_sink = conversation_record_sink
         self._observability_runner = observability_runner
-        self._realtime_sink: RealtimeLogSink | None = None
-        self._ui_handler: logging.Handler | None = None
+        self._conversation_history_observer: Callable[[ConversationRecord], None] | None = None
         self._session_handlers: list[logging.Handler] = []
         self._closed = False
         self._conversation_record_keys: set[tuple[str, str, int | None, int | None, str]] = set()
@@ -1231,10 +1205,6 @@ class SessionRuntimeLoggingService:
         )
         written = getattr(file_handler, "written_records", None)
         cleanup_failures = len(getattr(listener, "cleanup_failures", ()))
-        health["basic"] = {
-            "ui_attached": self._ui_handler is not None,
-            "delivery_failures": getattr(self._ui_handler, "delivery_failures", None),
-        }
         health["history"]["subscriber_dispatch_pending"] = len(self._pending_diagnostic_events)
         health["history"]["subscriber_dispatch_capacity"] = self._pending_diagnostic_events.maxlen
         health["file"] = {
@@ -1396,10 +1366,8 @@ class SessionRuntimeLoggingService:
                 None,
                 extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
             )
-            for handler in (self._sinks.stream_handler, self._ui_handler):
-                if handler is not None:
-                    with contextlib.suppress(Exception):
-                        handler.handle(basic_record)
+            with contextlib.suppress(Exception):
+                self._sinks.stream_handler.handle(basic_record)
         return record
 
     def configure_structured_observability(
@@ -1416,48 +1384,11 @@ class SessionRuntimeLoggingService:
         if observability_runner is not None:
             self._observability_runner = observability_runner
 
-    def attach_realtime_sink(self, sink: RealtimeLogSink) -> None:
-        if self._closed:
-            return
-        if self._realtime_sink is sink:
-            return
-
-        self.detach_realtime_sink()
-        self._realtime_sink = sink
-        if self._ui_handler_factory is None:
-            return
-
-        handler = self._ui_handler_factory(sink)
-        _ensure_redaction_filter(handler, DIAGNOSTIC_SINK_BASIC_LOGS)
-        _ensure_live_audience_filter(handler)
-        self._ui_handler = handler
-        _ensure_handler(self._root_logger, handler)
-        _ensure_handler(self._session_logger, handler)
-
-    def detach_realtime_sink(self) -> None:
-        self._detach_realtime_sink(suppress_errors=True)
-
-    def _detach_realtime_sink(self, *, suppress_errors: bool) -> None:
-        failures: list[Exception] = []
-        if self._ui_handler is not None:
-            try:
-                self._root_logger.removeHandler(self._ui_handler)
-            except Exception as exc:
-                if not suppress_errors:
-                    failures.append(exc)
-            try:
-                self._session_logger.removeHandler(self._ui_handler)
-            except Exception as exc:
-                if not suppress_errors:
-                    failures.append(exc)
-            try:
-                self._ui_handler.close()
-            except Exception as exc:
-                if not suppress_errors:
-                    failures.append(exc)
-        self._realtime_sink = None
-        self._ui_handler = None
-        _raise_close_failures("Runtime logging realtime sink close failed", failures)
+    def set_conversation_history_observer(
+        self, observer: Callable[[ConversationRecord], None] | None
+    ) -> None:
+        if not self._closed:
+            self._conversation_history_observer = observer
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
@@ -1716,7 +1647,7 @@ class SessionRuntimeLoggingService:
             line,
             extra={_CONTENT_CATEGORY_ATTR: _CONVERSATION_CATEGORY},
         )
-        self._append_realtime_conversation(record, disposition=disposition)
+        self._publish_conversation_history(record)
         self._dispatch_observability(
             self._conversation_record_sink,
             lambda sink: sink.record_conversation(record),
@@ -1786,45 +1717,15 @@ class SessionRuntimeLoggingService:
             expired = self._request_context_order.popleft()
             self._request_context_keys.discard(expired)
 
-    def _append_realtime_conversation(
-        self,
-        record: ConversationRecord,
-        *,
-        disposition: str,
-    ) -> None:
-        sink = self._realtime_sink
-        append = getattr(sink, "append_conversation_record", None)
-        if not callable(append):
+    def _publish_conversation_history(self, record: ConversationRecord) -> None:
+        observer = self._conversation_history_observer
+        if observer is None:
             return
-        metadata = record.metadata
         try:
-            append(
-                source=str(
-                    metadata.get("source")
-                    or ("Listen" if record.speaker_channel == "peer" else "Mic")
-                ),
-                channel=record.speaker_channel,
-                utterance_id=record.utterance_id,
-                parent_utterance_id=metadata.get("parent_utterance_id"),
-                source_text=record.transcript_text,
-                translated_text=record.translation_text,
-                source_language=record.source_language,
-                target_language=record.target_language,
-                target_index=metadata.get("target_index"),
-                disposition=disposition,
-                origin_wall_clock_ms=metadata.get("origin_wall_clock_ms"),
-                turn_kind=metadata.get("turn_kind"),
-                **(
-                    {"peer_caption_revision": metadata["peer_caption_revision"]}
-                    if record.speaker_channel == "peer"
-                    and isinstance(metadata.get("peer_caption_revision"), int)
-                    and metadata["peer_caption_revision"] > 0
-                    else {}
-                ),
-            )
+            observer(record)
         except Exception as exc:
             self.emit_basic(
-                "[Logging] conversation_ui_delivery_failed "
+                "[Logging] conversation_history_delivery_failed "
                 f"cause=unclassified exception_type={type(exc).__name__}",
                 level=logging.ERROR,
             )
@@ -1879,10 +1780,7 @@ class SessionRuntimeLoggingService:
         self._root_logger.removeHandler(self._diagnostic_ingress)
         self._session_logger.removeHandler(self._diagnostic_ingress)
         failures: list[Exception] = []
-        try:
-            self._detach_realtime_sink(suppress_errors=False)
-        except Exception as exc:
-            failures.append(exc)
+        self._conversation_history_observer = None
         for handler in self._session_handlers:
             try:
                 self._session_logger.removeHandler(handler)

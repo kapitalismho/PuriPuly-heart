@@ -11,6 +11,7 @@ PHOTO_FAILURE_CODES = frozenset(
     {
         "photo_authentication_failed",
         "photo_quota_exhausted",
+        "photo_allowance_exhausted",
         "photo_provider_unavailable",
         "photo_request_rejected",
         "photo_usage_limit",
@@ -51,10 +52,18 @@ class PhotoStreamCompleted:
 
 
 class PhotoProviderError(Exception):
-    def __init__(self, code: str, *, retryable: bool = True, quota: bool = False) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        retryable: bool = True,
+        quota: bool = False,
+        retry_after: float | None = None,
+    ) -> None:
         self.code = code if code in PHOTO_FAILURE_CODES else "photo_provider_failed"
         self.retryable = retryable
         self.quota = quota
+        self.retry_after = retry_after
         super().__init__(self.code)
 
 

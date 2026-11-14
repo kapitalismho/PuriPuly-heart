@@ -739,6 +739,10 @@ class ConstructionDummyController:
     def clear_debug_audio_fault_profiles(self) -> None:
         self.audio_faults_cleared = True
 
+    def toggle_debug_photo_limited(self) -> bool:
+        self.photo_limited = not getattr(self, "photo_limited", False)
+        return self.photo_limited
+
     def _save_settings(self) -> None:
         return None
 
@@ -829,7 +833,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
         self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
-        self.on_view_logs = overlay.view_logs
+        self.on_open_agent = overlay.open_agent
         self.on_overlay_calibration_begin = overlay.calibration_begin
         self.on_overlay_calibration_change = overlay.calibration_change
         self.on_overlay_calibration_apply = overlay.calibration_apply
@@ -852,25 +856,6 @@ class ConstructionDummySettingsView(ft.Container):
 
     def refresh_prompt_if_empty(self) -> None:
         return None
-
-
-class ConstructionDummyLogsView(ft.Container):
-    conversation_records = ()
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def apply_locale(self) -> None:
-        return None
-
-    async def scroll_to_bottom(self) -> None:
-        return None
-
-    def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-        _ = (message, level)
-
-    def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-        _ = (message, level)
 
 
 _construction_backends: list[ConstructionDummyController] = []
@@ -899,7 +884,6 @@ def _construction_application_factory(
 def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "DashboardView", ConstructionDummyDashboardView)
     monkeypatch.setattr(app_module, "SettingsView", ConstructionDummySettingsView)
-    monkeypatch.setattr(app_module, "LogsView", ConstructionDummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
     monkeypatch.setattr(
         app_module,
@@ -960,7 +944,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.on_desktop_overlay_position_reset == (
         app._on_desktop_overlay_position_reset
     )
-    assert app.view_settings.on_view_logs == app._open_agent_tab
+    assert app.view_settings.on_open_agent == app._open_agent_tab
     assert app.view_settings.runtime_log_basic == app.application.log_basic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
@@ -1407,6 +1391,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_audio_fault_clear",
         "on_gpu_state_cycle",
         "on_stt_loading_button_cycle",
+        "on_photo_limited_toggle",
     }
     preview_calls: list[bool] = []
     monkeypatch.setattr(
@@ -1548,6 +1533,12 @@ def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
         "debug_preview.stt_fault_snackbar", profile="stt_input_low_snr_vad_pass"
     )
     assert snackbars[2][0] == app_module.t("debug_preview.audio_fault_clear")
+    captured_kwargs["on_photo_limited_toggle"]()
+    assert backend.photo_limited is True
+    assert snackbars[3][0] == app_module.t("debug_preview.photo_limited_on")
+    captured_kwargs["on_photo_limited_toggle"]()
+    assert backend.photo_limited is False
+    assert snackbars[4][0] == app_module.t("debug_preview.photo_limited_off")
 
 
 def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypatch) -> None:
@@ -2955,7 +2946,6 @@ def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     app.page = DummyPage()
     app._current_tab = 2
     app.view_dashboard = object()
-    app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
     app.view_settings = SimpleNamespace(
         has_provider_changes=True,
@@ -3363,7 +3353,6 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
         has_provider_changes=False,
         refresh_prompt_if_empty=lambda: None,
     )
-    app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
     app.content_area = RecordingContent(app.view_dashboard)
     controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
@@ -3386,7 +3375,6 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     view_calls: list[str] = []
     app.view_dashboard = SimpleNamespace(apply_locale=lambda: view_calls.append("dash"))
     app.view_settings = SimpleNamespace(apply_locale=lambda: view_calls.append("settings"))
-    app.view_logs = SimpleNamespace(apply_locale=lambda: view_calls.append("logs"))
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
     monkeypatch.setattr(app_module, "font_for_language", lambda _code: "font")
     monkeypatch.setattr(app_module, "get_locale", lambda: "en")
@@ -3394,7 +3382,7 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     app.apply_locale()
 
     assert app.page.title == app_module.t("app.title")
-    assert view_calls == ["dash", "settings", "logs"]
+    assert view_calls == ["dash", "settings"]
     assert app.page.updated == 1
 
 

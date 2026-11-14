@@ -221,6 +221,10 @@ class RecordingBackend:
     def clear_debug_audio_fault_profiles(self) -> None:
         self.events.append(("fault-clear",))
 
+    def toggle_debug_photo_limited(self) -> bool:
+        self.events.append(("photo-limited",))
+        return True
+
     def handle_gpu_notice_action(self, action: str) -> object:
         self.events.append(("gpu-retry", action))
         return "retrying"

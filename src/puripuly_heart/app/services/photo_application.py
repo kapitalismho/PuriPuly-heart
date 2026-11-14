@@ -8,7 +8,7 @@ from pathlib import Path
 
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.photo.bridge import PhotoBridge, valid_wrist_calibration
-from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
+from puripuly_heart.core.photo.capture import PhotoCapture, PhotoCaptureWatcher
 from puripuly_heart.core.photo.image import PreparedPhoto, load_prepared_photo
 from puripuly_heart.core.photo.lifecycle import PhotoLifecycle, PhotoRoute
 from puripuly_heart.core.photo.process import PhotoProcessRunner, PhotoProcessSupervisor
@@ -27,6 +27,7 @@ class PhotoApplicationOwner:
         temporary_root: Path | None = None,
         poll_interval: float = 0.25,
         wrist_calibration_path: Path | None = None,
+        discard_translated: Callable[[PhotoCapture], Awaitable[None]] | None = None,
     ) -> None:
         self._resolve_route = resolve_route
         self._wrist_calibration_path = wrist_calibration_path
@@ -44,6 +45,7 @@ class PhotoApplicationOwner:
             diagnostic=diagnostic,
             temporary_root=temporary_root,
             prepare=self._prepare,
+            discard_translated=discard_translated,
         )
         self.supervisor = PhotoProcessSupervisor(
             bridge=self.bridge,
@@ -80,6 +82,10 @@ class PhotoApplicationOwner:
                     {"photo_id": photo_id, "attempt_id": attempt_id, "duration_ms": duration},
                 )
         return await load_prepared_photo(result, directory=directory)
+
+    def toggle_debug_limited(self) -> bool:
+        self.lifecycle.debug_limited = not self.lifecycle.debug_limited
+        return self.lifecycle.debug_limited
 
     def _interaction(self) -> dict | None:
         if self._wrist_calibration_path is None:

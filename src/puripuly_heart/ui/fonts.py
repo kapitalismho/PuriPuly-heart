@@ -95,9 +95,6 @@ class TypeFace:
     letter_spacing: float | None
 
 
-LOG_TYPEFACE = TypeFace("Consolas", 0)
-
-
 def typeface_for_language(code: str | None) -> TypeFace:
     return TypeFace(font_for_language(code), locale_body_letter_spacing(code))
 

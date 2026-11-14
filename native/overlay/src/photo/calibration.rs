@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::interaction::{compose, inverse, valid_transform, InteractionFrame, Placement, TemporaryInteractionConfig, Transform, IDENTITY};
+use super::interaction::{compose, inverse, valid_transform, InteractionFrame, Placement, TemporaryInteractionConfig, Transform, IDENTITY, WRIST_FLOAT_M};
 use crate::openvr::LegacyVrInput;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -62,7 +62,11 @@ impl WristAdjustment {
             if !input.grip {
                 let world = compose(input.left, relative);
                 let right_local = compose(inverse(input.right), world);
-                committed = Some(compose(inverse(input.right_handgrip), right_local));
+                let mut base = compose(inverse(input.right_handgrip), right_local);
+                for row in &mut base {
+                    row[3] -= row[2] * WRIST_FLOAT_M;
+                }
+                committed = Some(base);
                 self.relative = None;
                 (input.right_index, right_local)
             } else {
@@ -106,13 +110,15 @@ mod tests {
         let mut wrist = IDENTITY;
         wrist[0][3] = 0.04;
         let config = TemporaryInteractionConfig { wrist_transform: Some(wrist), ..Default::default() };
+        let mut floating = wrist;
+        floating[2][3] = 0.03;
         adjustment.step(Some(input(false)), &config);
         let (grab, saved) = adjustment.step(Some(input(true)), &config);
         assert!(saved.is_none());
         assert!(!grab.pull && !grab.grab && grab.photo.is_none());
-        close(grab.icon.unwrap().transform, wrist);
+        close(grab.icon.unwrap().transform, floating);
         let mut moved = input(true);
-        moved.left = [[0.0,-1.0,0.0,0.2],[1.0,0.0,0.0,0.1],[0.0,0.0,1.0,0.03]];
+        moved.left = [[0.0,0.0,1.0,0.2],[0.0,1.0,0.0,0.1],[-1.0,0.0,0.0,0.03]];
         moved.right[1][3] = 0.05;
         moved.right_handgrip[2][3] = 0.02;
         let (drag, saved) = adjustment.step(Some(moved), &config);
@@ -121,8 +127,35 @@ mod tests {
         let (released, saved) = adjustment.step(Some(moved), &config);
         let saved = saved.unwrap();
         close(compose(compose(moved.right, moved.right_handgrip), saved), compose(moved.left, wrist));
-        close(compose(moved.right, released.icon.unwrap().transform), compose(moved.left, wrist));
+        close(compose(moved.right, released.icon.unwrap().transform), compose(moved.left, floating));
         assert!(valid_transform(saved));
+        let mut calibration = WristCalibration {
+            transform: saved,
+            reference: WristReference {
+                model: "synthetic".into(),
+                serial: "synthetic".into(),
+                handgrip_transform: moved.right_handgrip,
+            },
+        };
+        for _ in 0..3 {
+            let persisted = serde_json::to_string(&calibration).unwrap();
+            let restored = TemporaryInteractionConfig {
+                wrist_calibration: Some(serde_json::from_str(&persisted).unwrap()),
+                ..Default::default()
+            };
+            let expected = released.icon.unwrap().transform;
+            close(restored.effective_wrist_transform(moved.right_handgrip), expected);
+            let mut adjustment = WristAdjustment::default();
+            adjustment.step(Some(moved), &restored);
+            moved.grip = true;
+            let (grab, _) = adjustment.step(Some(moved), &restored);
+            close(compose(moved.left, grab.icon.unwrap().transform), compose(moved.right, expected));
+            moved.grip = false;
+            let (released_again, saved_again) = adjustment.step(Some(moved), &restored);
+            close(released_again.icon.unwrap().transform, expected);
+            calibration.transform = saved_again.unwrap();
+            close(calibration.transform, saved);
+        }
     }
 
     #[test]

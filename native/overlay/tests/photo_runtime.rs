@@ -496,7 +496,7 @@ async fn actual_photo_process_rejects_authentication_and_unknown_messages() {
 }
 
 #[tokio::test]
-async fn decoded_source_is_retained_without_copy_for_retry_and_fenced_on_replacement() {
+async fn decoded_source_transfers_once_to_current_attempt_and_drops_on_replacement() {
     let (mut boundary, mut worker) = PhotoImageBoundary::channel();
     let mut state = PhotoState::default();
     let mut current = requested();
@@ -511,22 +511,27 @@ async fn decoded_source_is_retained_without_copy_for_retry_and_fenced_on_replace
     );
     boundary.publish(state.snapshot().unwrap());
     let input = worker.next_input().await.unwrap();
-    assert!(std::sync::Arc::ptr_eq(
-        &worker.decoded_original(&input).unwrap().pixels,
-        &pixels
-    ));
+    let original = std::sync::Arc::downgrade(&pixels);
+    drop(pixels);
     current.attempt_id = 2;
     state.apply(2, Some(current)).unwrap();
     boundary.publish(state.snapshot().unwrap());
     let retry_input = worker.next_input().await.unwrap();
     assert!(worker.is_cancelled(&input));
-    assert!(std::sync::Arc::ptr_eq(
-        &worker.decoded_original(&retry_input).unwrap().pixels,
-        &pixels
-    ));
+    assert!(worker.take_original(&input).is_none());
+    let retained = worker.take_original(&retry_input).unwrap();
+    let puripuly_heart_overlay::photo::image::SourcePixels::Original(pixels) = retained.pixels else {
+        panic!("Unresized source must transfer to the worker");
+    };
+    assert!(std::sync::Arc::ptr_eq(&pixels, &original.upgrade().unwrap()));
+    assert!(worker.take_original(&retry_input).is_none());
+    boundary.retain_original(
+        retained.photo_id, retained.attempt_id, retained.path, pixels, None,
+    );
     state.apply(3, None).unwrap();
     boundary.publish(state.snapshot().unwrap());
-    assert!(worker.decoded_original(&retry_input).is_none());
+    assert!(worker.take_original(&retry_input).is_none());
+    assert!(original.upgrade().is_none());
 }
 
 #[tokio::test]
@@ -670,15 +675,16 @@ async fn actual_openvr_hidden_texture_submission_survives_surface_and_child_sess
     let adapter = surfaces.photo().unwrap().output_adapter();
     let mut compositor = PhotoCompositor::new(Some(&adapter)).unwrap();
     compositor
-        .set_original(std::sync::Arc::new(
-            WorkingPhoto::new(std::sync::Arc::new(image::RgbImage::new(8, 8)), [8, 8]).unwrap(),
-        ))
+        .set_original(
+            std::sync::Arc::new(
+                WorkingPhoto::new(std::sync::Arc::new(image::RgbImage::new(8, 8)), [8, 8]).unwrap(),
+            ),
+            "hidden-session",
+        )
         .unwrap();
-    let texture = compositor
-        .render(std::time::Instant::now(), false)
-        .unwrap()
-        .unwrap();
-    compositor.ready().await.unwrap();
+    assert!(compositor.render(std::time::Instant::now(), false).unwrap());
+    compositor.wait_for_completion().await.unwrap();
+    let texture = compositor.completed_texture().unwrap();
     surfaces.close_icon();
     surfaces
         .photo()
@@ -795,7 +801,7 @@ async fn actual_native_pipeline() {
     let prepared = receive(&mut socket).await;
     assert_eq!(prepared["type"], "photo_prepared");
     let retained_source = std::path::PathBuf::from(prepared["source_path"].as_str().unwrap());
-    std::fs::remove_file(&retained_source).unwrap();
+    std::fs::remove_file(&source).unwrap();
     current.image = Some(PhotoImage {
         path: retained_source.to_string_lossy().into_owned(),
         width: 320,
@@ -899,6 +905,7 @@ async fn actual_native_pipeline() {
         .contains("Noto Sans CJK"));
     assert_eq!(metadata["font"]["source"], "BundledNotoCjkMedium");
     assert!(metadata["font"]["hangul_ink_ratio"].as_f64().unwrap() > 0.0);
+    current.phase = PhotoPhase::Completed;
     current.visible = true;
     send(
         &mut socket,
@@ -906,6 +913,7 @@ async fn actual_native_pipeline() {
     )
     .await;
     assert_eq!(receive(&mut socket).await["revision"], 8);
+    image_stage(&mut stage_receiver, "processing_released", None).await;
     current.visible = false;
     send(
         &mut socket,
@@ -920,23 +928,8 @@ async fn actual_native_pipeline() {
     )
     .await;
     assert_eq!(receive(&mut socket).await["revision"], 10);
-    send(
-        &mut socket,
-        json!({"type":"photo_debug_original","photo_id":current.photo_id,"enabled":true}),
-    )
-    .await;
-    send(
-        &mut socket,
-        json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"peek"}),
-    )
-    .await;
-    assert_eq!(wait_export(&exports, "peek").await.0, original);
-    send(
-        &mut socket,
-        json!({"type":"photo_debug_original","photo_id":current.photo_id,"enabled":false}),
-    )
-    .await;
     current.attempt_id = 2;
+    current.phase = PhotoPhase::Requesting;
     current.preparations.clear();
     current.blocks.clear();
     current.first_block_drawn = false;
@@ -946,7 +939,8 @@ async fn actual_native_pipeline() {
     )
     .await;
     assert_eq!(receive(&mut socket).await["revision"], 11);
-    image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    let recovered = image_stage(&mut stage_receiver, "display_source_ready", None).await;
+    assert_eq!(recovered["recovered"], true);
     send(
         &mut socket,
         json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":"retry"}),
@@ -1278,36 +1272,42 @@ async fn local_original_survives_offer_preparing_and_matching_raw_image_only() {
     let mut state = PhotoState::default();
     let mut current = photo();
     state.apply(1, Some(current.clone())).unwrap();
-    let pixels = Arc::new(image::RgbImage::new(320, 180));
+    let pixels = Arc::new(image::RgbImage::new(640, 360));
     let working = Arc::new(WorkingPhoto::new(pixels.clone(), [320, 180]).unwrap());
     boundary.retain_original(current.photo_id.clone(), 0, current.path.clone(), pixels.clone(), Some(working.clone()));
+    let original = Arc::downgrade(&pixels);
+    drop(pixels);
+    assert!(original.upgrade().is_none());
     boundary.publish(state.snapshot().unwrap());
     let offer = worker.next_input().await.unwrap();
-    assert!(worker.decoded_original(&offer).is_none());
+    assert!(worker.take_original(&offer).is_none());
     current.attempt_id = 1;
     current.phase = PhotoPhase::Preparing;
     current.offer_open = false;
     state.apply(2, Some(current.clone())).unwrap();
     boundary.publish(state.snapshot().unwrap());
     let preparing = worker.next_input().await.unwrap();
-    assert!(worker.decoded_original(&preparing).is_none());
+    assert!(worker.take_original(&preparing).is_none());
     current.phase = PhotoPhase::Completed;
-    current.image = Some(PhotoImage { path:current.path.clone(), width:320, height:180 });
+    current.image = Some(PhotoImage { path:current.path.clone(), width:640, height:360 });
     state.apply(3, Some(current.clone())).unwrap();
     boundary.publish(state.snapshot().unwrap());
     let completed = worker.next_input().await.unwrap();
-    let retained = worker.decoded_original(&completed).unwrap();
-    assert!(Arc::ptr_eq(&retained.pixels, &pixels));
-    assert!(Arc::ptr_eq(retained.working.as_ref().unwrap(), &working));
+    let retained = worker.take_original(&completed).unwrap();
+    let puripuly_heart_overlay::photo::image::SourcePixels::Working(transferred) = retained.pixels else {
+        panic!("Only display pixels must cross the image boundary");
+    };
+    assert!(Arc::ptr_eq(&transferred, &working));
+    assert!(worker.take_original(&completed).is_none());
     current.attempt_id = 2;
     current.image.as_mut().unwrap().path = "different-source.png".into();
     state.apply(4, Some(current)).unwrap();
     boundary.publish(state.snapshot().unwrap());
     let different = worker.next_input().await.unwrap();
-    assert!(worker.decoded_original(&different).is_none());
+    assert!(worker.take_original(&different).is_none());
     state.apply(5, None).unwrap();
     boundary.publish(state.snapshot().unwrap());
-    assert!(worker.decoded_original(&completed).is_none());
+    assert!(worker.take_original(&completed).is_none());
 }
 
 #[tokio::test]
@@ -1368,4 +1368,85 @@ fn no_text_photo_remains_reopenable_without_a_translation_layer() {
     state.apply(1, Some(current)).unwrap();
     assert!(state.photo().unwrap().can_pull());
     assert!(state.photo().unwrap().blocks.is_empty());
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn actual_same_photo_retry_with_a_distinct_equal_size_source_replaces_gpu_pixels() {
+    use std::io::BufRead;
+    let mut config = manifest();
+    config.backend = PhotoBackend::Offscreen;
+    config.image.debug_controls = true;
+    config.image.max_size = [64, 48];
+    config.image.model_path = Some("not-needed-for-original-only-retry.onnx".into());
+    let name = "equal-size-source-retry";
+    let root = std::env::temp_dir().join(format!("puri339-native-{}-{name}", std::process::id()));
+    let exports = root.join("exports");
+    config.image.export_dir = Some(exports.clone());
+    let (mut child, mut socket, directory) = start_child(&config, name).await;
+    let (stages, mut stage_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let stdout = child.0.stdout.take().unwrap();
+    let reader = std::thread::spawn(move || {
+        for line in std::io::BufReader::new(stdout).lines() {
+            let value: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            let _ = stages.send(value);
+        }
+    });
+    assert_eq!(receive(&mut socket).await["type"], "photo_auth");
+    let first = directory.join("first.png");
+    let second = directory.join("second.png");
+    image::RgbImage::from_pixel(64, 48, image::Rgb([210, 30, 40])).save(&first).unwrap();
+    image::RgbImage::from_pixel(64, 48, image::Rgb([20, 70, 220])).save(&second).unwrap();
+    let mut current = photo();
+    current.path = first.to_string_lossy().into_owned();
+    current.file_size = std::fs::metadata(&first).unwrap().len();
+    current.expected_file_id = puripuly_heart_overlay::photo::prepare::file_identity(
+        &std::fs::File::open(&first).unwrap(),
+    ).unwrap();
+    current.shutter_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+    current.phase = PhotoPhase::Completed;
+    current.offer_open = false;
+    current.visible = true;
+    for (attempt, source, expected, label) in [
+        (1, &first, [210, 30, 40, 255], "first"),
+        (2, &second, [20, 70, 220, 255], "second"),
+    ] {
+        current.attempt_id = attempt;
+        current.image = Some(PhotoImage {
+            path: source.to_string_lossy().into_owned(), width: 64, height: 48,
+        });
+        send(&mut socket, json!({"type":"photo_snapshot","revision":attempt,"photo":current})).await;
+        assert_eq!(receive(&mut socket).await["revision"], attempt);
+        if attempt == 1 {
+            assert_eq!(receive(&mut socket).await["type"], "photo_ready");
+        }
+        image_stage(&mut stage_receiver, "display_source_ready", None).await;
+        send(&mut socket, json!({"type":"photo_debug_export","photo_id":current.photo_id,"label":label})).await;
+        let (pixels, metadata) = wait_export(&exports, label).await;
+        assert!(pixels.pixels().all(|pixel| pixel.0 == expected));
+        assert_eq!(metadata["original_uploads"], attempt);
+        assert_eq!(metadata["blocks"], json!([]));
+    }
+    send(&mut socket, json!({"type":"shutdown"})).await;
+    assert_eq!(receive(&mut socket).await["type"], "photo_shutdown_complete");
+    assert!(child.0.wait().unwrap().success());
+    reader.join().unwrap();
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn limited_offer_is_never_pullable_and_cannot_claim_an_open_or_visible_request() {
+    let mut limited = photo();
+    limited.phase = PhotoPhase::Limited;
+    limited.offer_open = false;
+    assert!(!limited.can_pull());
+    PhotoState::default().apply(1, Some(limited.clone())).unwrap();
+    for invalid in [
+        Photo { offer_open: true, ..limited.clone() },
+        Photo { visible: true, ..limited.clone() },
+        Photo { attempt_id: 1, ..limited },
+    ] {
+        assert_eq!(PhotoState::default().apply(1, Some(invalid)), Err(PhotoError::Protocol));
+    }
 }

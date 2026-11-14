@@ -11,15 +11,16 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app.adapters import photo_provider
+from puripuly_heart.app.ports.settings_view import PhotoStatusSnapshot
 from puripuly_heart.app.services.photo_application import PhotoApplicationOwner
 from puripuly_heart.app.wiring import wiring_runtime_pipeline
 from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.headless_application import HeadlessApplicationPresentation
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, PhotoIntent, SecretsIntent
 from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.session import ChatGptSession
-from puripuly_heart.core.photo.capture import PhotoCaptureWatcher
+from puripuly_heart.core.photo.capture import PhotoCapture, PhotoCaptureWatcher
 from puripuly_heart.core.photo.process import PhotoProcessRunner
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
@@ -309,5 +310,71 @@ async def test_composed_default_route_uses_relay_and_reads_the_local_wrist_calib
         assert owner._interaction() == {"wrist_calibration": calibration}
         (tmp_path / "photo-wrist-calibration.json").write_text("{broken", encoding="utf-8")
         assert owner._interaction() is None
+    finally:
+        await app.stop()
+
+
+async def test_composed_photo_settings_gate_offers_report_status_and_discard_only_when_enabled(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", raising=False)
+    monkeypatch.setattr(
+        application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
+    )
+    monkeypatch.setattr(ChatGptSession, "status", lambda self: SimpleNamespace(signed_in=False))
+    monkeypatch.setattr(application_runtime, "create_secret_store", lambda *args, **kwargs: {})
+
+    async def allowance(self):
+        return 72, 100
+
+    monkeypatch.setattr(photo_provider.PhotoProviderAdapter, "allowance", allowance)
+    recycled = []
+    monkeypatch.setattr(
+        application_runtime,
+        "recycle_captured_photo",
+        lambda photo_capture: recycled.append(photo_capture) or True,
+    )
+    owners = []
+
+    def make_owner(**kwargs):
+        owner = PhotoApplicationOwner(
+            **kwargs,
+            watcher=PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs"),
+            temporary_root=tmp_path,
+        )
+        owners.append(owner)
+        return owner
+
+    monkeypatch.setattr(application_runtime, "PhotoApplicationOwner", make_owner)
+    app = application_runtime.compose_application_runtime(
+        presentation=HeadlessApplicationPresentation(), config_path=tmp_path / "settings.json"
+    )
+    canonical = AppSettingsVNext()
+    photo = PhotoCapture(tmp_path / "shot.png", 1, (1, 2), 0, 0.0)
+
+    def apply_photo(**values):
+        app._settings.settings.canonical = replace(
+            canonical, intent=replace(canonical.intent, photo=PhotoIntent(**values))
+        )
+
+    try:
+        owner = owners[0]
+        apply_photo()
+        assert (await owner._resolve_route()).identity == "managed-luna"
+        assert await app.photo_status() == PhotoStatusSnapshot("managed", 72, 100)
+        await owner.lifecycle._discard_translated(photo)
+        assert recycled == []
+
+        apply_photo(route="chatgpt")
+        assert await owner._resolve_route() is None
+        assert (await app.photo_status()).route is None
+        apply_photo(route="gemini")
+        assert await owner._resolve_route() is None
+
+        apply_photo(enabled=False, delete_translated=True)
+        assert await owner._resolve_route() is None
+        assert (await app.photo_status()).route == "managed"
+        await owner.lifecycle._discard_translated(photo)
+        assert recycled == [photo]
     finally:
         await app.stop()

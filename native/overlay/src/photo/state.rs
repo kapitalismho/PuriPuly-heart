@@ -15,6 +15,7 @@ pub enum PhotoPhase {
     Partial,
     NoText,
     Failed,
+    Limited,
     Expired,
 }
 
@@ -95,6 +96,8 @@ impl Photo {
                     || !self.excluded_blocks.is_empty()
                     || self.first_block_drawn))
             || (self.phase == PhotoPhase::Expired && (self.offer_open || self.visible))
+            || (self.phase == PhotoPhase::Limited
+                && (self.attempt_id != 0 || self.offer_open || self.visible))
         {
             return Err(PhotoError::Protocol);
         }

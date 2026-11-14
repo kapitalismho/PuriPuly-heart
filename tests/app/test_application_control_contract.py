@@ -516,6 +516,54 @@ async def test_cli_model_only_selection_restores_saved_luna_connection(
         await restarted.stop()
 
 
+@pytest.mark.asyncio
+async def test_cli_photo_settings_apply_and_survive_restart(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    app = compose_headless_application(path)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("photo-settings-control")
+        assert (await control.query("settings.current", {}))["settings"]["intent"]["photo"] == {
+            "enabled": True,
+            "route": "managed",
+            "delete_translated": False,
+        }
+        submitted = await control.submit(
+            "settings.apply",
+            {
+                "changes": {
+                    "photo.enabled": False,
+                    "photo.route": "gemini",
+                    "photo.delete_translated": True,
+                }
+            },
+            request_id="photo-settings",
+        )
+        result = await control.wait(submitted["operation_id"], timeout=10)
+        assert result["status"] in {"applied", "degraded"}
+        rejected = await control.submit(
+            "settings.apply",
+            {"changes": {"photo.route": "openai"}},
+            request_id="photo-settings-invalid",
+        )
+        rejected_result = await control.wait(rejected["operation_id"], timeout=10)
+        assert rejected_result["status"] == "rejected"
+    finally:
+        await app.stop()
+    restarted = compose_headless_application(path)
+    try:
+        await restarted.start()
+        restored = restarted.control()
+        restored.bind_instance("photo-settings-restarted")
+        photo = (await restored.query("settings.current", {}))["settings"]["intent"]["photo"]
+        assert photo == {"enabled": False, "route": "gemini", "delete_translated": True}
+    finally:
+        await restarted.stop()
+
+
 def test_headless_runtime_error_is_localized_in_dashboard_state(caplog) -> None:
     from puripuly_heart.ui.i18n import t
 

@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, watch};
 
 use super::state::{Photo, PhotoSnapshot};
@@ -80,36 +80,34 @@ pub struct PhotoImageResult {
     pub output: PhotoImageOutput,
 }
 
+pub enum SourcePixels {
+    Original(Arc<image::RgbImage>),
+    Working(Arc<super::processing::WorkingPhoto>),
+}
+
 pub struct DecodedOriginal {
     pub photo_id: String,
     pub attempt_id: u64,
     pub path: String,
-    pub pixels: Arc<image::RgbImage>,
-    pub working: Option<Arc<super::processing::WorkingPhoto>>,
+    pub pixels: SourcePixels,
 }
 
 pub struct PhotoImageWorker {
     input: watch::Receiver<Option<Arc<PhotoSnapshot>>>,
     output: mpsc::Sender<PhotoImageResult>,
-    original: watch::Receiver<Option<Arc<DecodedOriginal>>>,
+    original: Arc<Mutex<Option<DecodedOriginal>>>,
 }
 
 impl PhotoImageWorker {
-    pub fn decoded_original(&self, input: &PhotoSnapshot) -> Option<Arc<DecodedOriginal>> {
-        let original = self.original.borrow();
-        let original = original.as_ref()?;
-        input
-            .photo
-            .as_ref()
-            .filter(|photo| {
-                photo.photo_id == original.photo_id
-                    && photo.attempt_id == original.attempt_id
-                    && photo
-                        .image
-                        .as_ref()
-                        .is_some_and(|image| image.path == original.path)
-            })
-            .map(|_| original.clone())
+    pub fn take_original(&self, input: &PhotoSnapshot) -> Option<DecodedOriginal> {
+        let mut retained = self.original.lock().unwrap();
+        let original = retained.as_ref()?;
+        let matches = input.photo.as_ref().is_some_and(|photo| {
+            photo.photo_id == original.photo_id
+                && photo.attempt_id == original.attempt_id
+                && photo.image.as_ref().is_some_and(|image| image.path == original.path)
+        });
+        if matches { retained.take() } else { None }
     }
 
     pub async fn next_input(&mut self) -> Option<Arc<PhotoSnapshot>> {
@@ -137,25 +135,25 @@ pub struct PhotoImageBoundary {
     input: watch::Sender<Option<Arc<PhotoSnapshot>>>,
     output: mpsc::Receiver<PhotoImageResult>,
     prepared: HashSet<(u64, PreparationStage)>,
-    original: watch::Sender<Option<Arc<DecodedOriginal>>>,
+    original: Arc<Mutex<Option<DecodedOriginal>>>,
 }
 
 impl PhotoImageBoundary {
     pub fn channel() -> (Self, PhotoImageWorker) {
         let (input, receiver) = watch::channel(None);
         let (sender, output) = mpsc::channel(8);
-        let (original, original_receiver) = watch::channel(None);
+        let original = Arc::new(Mutex::new(None));
         (
             Self {
                 input,
                 output,
                 prepared: HashSet::new(),
-                original,
+                original: original.clone(),
             },
             PhotoImageWorker {
                 input: receiver,
                 output: sender,
-                original: original_receiver,
+                original,
             },
         )
     }
@@ -168,40 +166,31 @@ impl PhotoImageBoundary {
         pixels: Arc<image::RgbImage>,
         working: Option<Arc<super::processing::WorkingPhoto>>,
     ) {
-        self.original.send_replace(Some(Arc::new(DecodedOriginal {
+        *self.original.lock().unwrap() = Some(DecodedOriginal {
             photo_id,
             attempt_id,
             path,
-            pixels,
-            working,
-        })));
+            pixels: match working {
+                Some(working) => SourcePixels::Working(working),
+                None => SourcePixels::Original(pixels),
+            },
+        });
     }
 
     pub fn publish(&mut self, snapshot: &PhotoSnapshot) {
-        let retained = self.original.borrow().clone();
-        if let Some(original) = retained {
-            match snapshot.photo.as_ref().filter(|photo| {
-                photo.photo_id == original.photo_id
-                    && photo.phase != super::state::PhotoPhase::Expired
-                    && photo
-                        .image
-                        .as_ref()
-                        .map_or(photo.path == original.path || photo.attempt_id == original.attempt_id, |image| {
-                            image.path == original.path
-                        })
-            }) {
-                Some(photo) if photo.attempt_id != original.attempt_id => {
-                    self.retain_original(
-                        original.photo_id.clone(),
-                        photo.attempt_id,
-                        original.path.clone(),
-                        original.pixels.clone(),
-                        original.working.clone(),
-                    );
-                }
-                Some(_) => {}
-                None => {
-                    self.original.send_replace(None);
+        {
+            let mut retained = self.original.lock().unwrap();
+            if let Some(original) = retained.as_mut() {
+                match snapshot.photo.as_ref().filter(|photo| {
+                    photo.photo_id == original.photo_id
+                        && photo.phase != super::state::PhotoPhase::Expired
+                        && photo.image.as_ref().map_or(
+                            photo.path == original.path || photo.attempt_id == original.attempt_id,
+                            |image| image.path == original.path,
+                        )
+                }) {
+                    Some(photo) => original.attempt_id = photo.attempt_id,
+                    None => *retained = None,
                 }
             }
         }
@@ -285,7 +274,7 @@ impl PhotoImageBoundary {
 
     pub fn close(&mut self) {
         self.input.send_replace(None);
-        self.original.send_replace(None);
+        *self.original.lock().unwrap() = None;
         self.output.close();
     }
 }

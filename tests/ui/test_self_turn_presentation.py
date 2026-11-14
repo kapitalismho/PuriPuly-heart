@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.core.conversation_history import ConversationHistory, ConversationHistoryModel
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionRuntimeLoggingService
 from puripuly_heart.domain.events import (
     SelfTurnPresentation,
@@ -19,10 +20,9 @@ from puripuly_heart.domain.events import (
 )
 from puripuly_heart.domain.models import Transcript, Translation
 from puripuly_heart.ui.event_projection import EventProjectionService
-from puripuly_heart.ui.i18n import get_locale, set_locale, t
+from puripuly_heart.ui.i18n import get_locale, set_locale
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
-from puripuly_heart.ui.views.logs import ConversationViewModel, LogsView
 from tests.helpers.self_turn_presentation import (
     ControlledSourceOverlay,
     OwnerPresentation,
@@ -70,7 +70,7 @@ def presentation():
     locale = get_locale()
     set_locale("en")
     dashboard = DashboardView()
-    logs = LogsView()
+    logs = ConversationHistory()
     root = logging.Logger(f"self-turn-root-{uuid4()}")
     session = logging.Logger(f"self-turn-session-{uuid4()}")
     session.propagate = False
@@ -84,17 +84,15 @@ def presentation():
             log_file=Path("synthetic-self-turn.log"),
         ),
     )
-    host = SimpleNamespace(view_dashboard=dashboard, view_logs=logs)
+    host = SimpleNamespace(view_dashboard=dashboard, conversation_history=logs)
     adapter = FletUiPresentationAdapter(host)
-    adapter.attach_runtime_log_sink(runtime)
+    adapter.bind_conversation_history(runtime)
     bridge = adapter.create_ui_event_bridge(
         event_queue=asyncio.Queue(maxsize=4), runtime_logging=runtime
     )
-    logs._on_conversation_button_click(None)
     yield SimpleNamespace(dashboard=dashboard, logs=logs, runtime=runtime, bridge=bridge)
     bridge.close()
     runtime.close()
-    logs.will_unmount()
     set_locale(locale)
 
 
@@ -150,7 +148,8 @@ async def test_one_visible_turn_progresses_without_final_translation_flicker(
     extended = replace(first, revision=3, source_revision=2, source_text="最初の続き")
     await publish(presentation, extended)
     assert card._display_text.value == "最初の続き"
-    assert "earlier source r1 (current source r2)" in presentation.logs._log_text.value
+    assert presentation.logs.conversation_records[0].translation_source_revision == 1
+    assert presentation.logs.conversation_records[0].source_revision == 2
     second = ready(extended, "extended translation")
     await publish(presentation, second)
     assert card._display_text.value == "extended translation"
@@ -167,7 +166,7 @@ async def test_one_visible_turn_progresses_without_final_translation_flicker(
     record = presentation.logs.conversation_records[0]
     assert record.timestamp_label == timestamp
     assert record.accepted and record.turn_status == "complete"
-    assert presentation.logs._log_text.value.count("extended translation") == 1
+    assert record.translated_text == "extended translation"
     assert len(presentation.runtime._conversation_record_keys) == 1
 
 
@@ -205,7 +204,6 @@ async def test_terminal_disposition_fences_revival_and_preserves_valid_partial_s
 ):
     preview = ready(draft())
     await publish(presentation, preview)
-    assert t("display.turn.complete") not in presentation.logs._log_text.value
     ended = replace(
         preview,
         revision=3,
@@ -227,10 +225,6 @@ async def test_terminal_disposition_fences_revival_and_preserves_valid_partial_s
     assert presentation.dashboard.display_card._display_text.value == expected
     assert presentation.logs.conversation_records[0].turn_status == terminal
     assert not presentation.logs.conversation_records[0].accepted
-    row_status = "complete" if terminal == "failed" and retain_ready_target else terminal
-    assert t(f"display.turn.{row_status}") in presentation.logs._log_text.value.splitlines()[0]
-    if row_status != "complete":
-        assert t("display.turn.complete") not in presentation.logs._log_text.value
     await publish(presentation, replace(preview, revision=4))
     await publish(
         presentation,
@@ -271,7 +265,7 @@ async def test_secondary_result_cannot_replace_an_unavailable_current_primary(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("accepted_before_snapshots", [False, True])
-async def test_real_dual_target_logs_correlate_child_records_without_duplicate_rows(
+async def test_real_dual_target_history_correlates_child_records_without_duplicate_rows(
     presentation, accepted_before_snapshots
 ):
     async with OwnerPresentation(
@@ -286,10 +280,14 @@ async def test_real_dual_target_logs_correlate_child_records_without_duplicate_r
         if not accepted_before_snapshots:
             await eventually(lambda: len(presentation.logs.conversation_records) == 2)
             assert not presentation.runtime._conversation_record_keys
-            rows = presentation.logs._log_text.value.split("\n\n")
-            assert "Mic → English" in rows[0].splitlines()[0]
-            assert "Mic → Japanese" in rows[1].splitlines()[0]
-            assert all(t("logs.conversation.target.pending") in row for row in rows)
+            assert [record.target_language for record in presentation.logs.conversation_records] == [
+                "en",
+                "ja",
+            ]
+            assert all(
+                record.disposition == "pending"
+                for record in presentation.logs.conversation_records
+            )
         await owner.close_source(source_id)
         await eventually(
             lambda: {call["target_language"] for call in owner.provider.calls} == {"en", "ja"}
@@ -306,12 +304,10 @@ async def test_real_dual_target_logs_correlate_child_records_without_duplicate_r
             await eventually(
                 lambda: any("ja:dual source" in message.text for message in owner.chatbox.messages)
             )
-            rows = presentation.logs._log_text.value.split("\n\n")
-            assert "Mic → English" in rows[0].splitlines()[0]
-            assert t("logs.conversation.target.pending") in rows[0]
-            assert "Mic → Japanese" in rows[1].splitlines()[0]
-            assert "ja:dual source" in rows[1]
-            assert t("display.turn.complete") not in rows[1].splitlines()[0]
+            primary_record, secondary_record = presentation.logs.conversation_records
+            assert primary_record.disposition == "pending"
+            assert secondary_record.translated_text == "ja:dual source"
+            assert secondary_record.turn_status == "active"
         primary.set()
         await owner.idle()
         if accepted_before_snapshots:
@@ -342,11 +338,10 @@ async def test_real_dual_target_logs_correlate_child_records_without_duplicate_r
             "en",
             "ja",
         ]
-        assert presentation.logs._log_text.value.count("ja:dual source") == 1
-        assert presentation.logs._log_text.value.count("en:dual source") == 1
-        headers = [row.splitlines()[0] for row in presentation.logs._log_text.value.split("\n\n")]
-        assert "Mic → English" in headers[0]
-        assert "Mic → Japanese" in headers[1]
+        assert [record.translated_text for record in presentation.logs.conversation_records] == [
+            "en:dual source",
+            "ja:dual source",
+        ]
         assert presentation.dashboard.display_card._display_text.value == "en:dual source"
         await eventually(
             lambda: any(
@@ -375,7 +370,7 @@ async def test_delivery_authority_retains_history_without_stealing_current_slot(
     await publish(presentation, blocked, authority=HistoryOnlyAuthority())
     assert presentation.dashboard.display_card._display_text.value == "first"
     assert len(presentation.logs.conversation_records) == 2
-    assert "history only" in presentation.logs._log_text.value
+    assert presentation.logs.conversation_records[1].translated_text == "history only"
 
 
 @pytest.mark.asyncio
@@ -414,7 +409,7 @@ async def test_queue_consumer_applies_newest_revision_after_blocked_delivery(pre
 @pytest.mark.asyncio
 async def test_generation_revision_fences_and_retention_do_not_reinsert_evicted_turn(presentation):
     presentation.bridge.projection_service = EventProjectionService(max_turns=2)
-    presentation.logs._conversation_model = ConversationViewModel(max_entries=2, cleanup_batch=1)
+    presentation.logs._model = ConversationHistoryModel(max_entries=2, cleanup_batch=1)
     old = ready(draft())
     await publish(presentation, old)
     for changed in (
@@ -489,7 +484,7 @@ async def test_source_only_final_and_late_accepted_record_update_one_provisional
     )
     await publish(presentation, final)
     assert presentation.dashboard.display_card._display_text.value == source.source_text
-    assert "Source only" in presentation.logs._log_text.value
+    assert presentation.logs.conversation_records[0].disposition == "source_only"
     assert len(presentation.logs.conversation_records) == 1
     assert not presentation.logs.conversation_records[0].accepted
     accept(presentation, final)
@@ -539,7 +534,10 @@ async def test_manual_owns_dashboard_while_late_speech_final_updates_history(
             )
         )
         assert (older_id, "complete") not in applied
-        assert "en:older speech" in presentation.logs._log_text.value
+        assert any(
+            record.translated_text == "en:older speech"
+            for record in presentation.logs.conversation_records
+        )
         assert presentation.dashboard.display_card._display_text.value == "en:manual"
         await owner.source("successor speech")
         await owner.idle()
@@ -599,7 +597,10 @@ async def test_newer_speech_keeps_dashboard_when_older_manual_completes(
         owner.delivery_gate.set()
         await eventually(
             lambda: presentation.dashboard.display_card._display_text.value == expected
-            and "en:older manual" in presentation.logs._log_text.value
+            and any(
+                record.translated_text == "en:older manual"
+                for record in presentation.logs.conversation_records
+            )
             and any("en:older manual" in message.text for message in owner.chatbox.messages)
         )
         await owner.harness.ui_events.join()
@@ -632,7 +633,10 @@ async def test_newer_speech_keeps_dashboard_when_older_manual_completes(
         ]
         assert len(manual_records) == 1 + len(targets)
         assert all(record.accepted for record in manual_records)
-        assert presentation.logs._log_text.value.count("en:older manual") == 1
+        assert sum(
+            record.translated_text == "en:older manual"
+            for record in presentation.logs.conversation_records
+        ) == 1
         assert len(presentation.logs.conversation_records) == 1 + 2 * len(targets)
         assert len(presentation.runtime._conversation_record_keys) == 2 * (1 + len(targets))
         await owner.harness.self_owner.submit_text("future manual", source="You")
@@ -667,7 +671,10 @@ async def test_queued_new_manual_source_survives_its_own_admission(presentation)
         await eventually(
             lambda: presentation.dashboard.display_card._display_text.value == "en:queued manual"
         )
-        assert presentation.logs._log_text.value.count("en:queued manual") == 1
+        assert sum(
+            record.translated_text == "en:queued manual"
+            for record in presentation.logs.conversation_records
+        ) == 1
 
 
 @pytest.mark.asyncio
@@ -699,7 +706,10 @@ async def test_pending_manual_source_rejects_old_completion_before_its_admission
             await owner.idle()
             await owner.harness.ui_events.join()
             assert presentation.dashboard.display_card._display_text.value == "pending manual"
-            assert "en:older manual" in presentation.logs._log_text.value
+            assert any(
+                record.translated_text == "en:older manual"
+                for record in presentation.logs.conversation_records
+            )
             assert any("en:older manual" in message.text for message in owner.chatbox.messages)
             assert not pending.done()
             overlay.release.set()
@@ -738,7 +748,9 @@ async def test_real_secondary_fallback_failure_keeps_primary_and_failed_conversa
             lambda: "en:partial source" in presentation.dashboard.display_card._display_text.value
         )
         assert not presentation.runtime._conversation_record_keys
-        assert t("display.turn.complete") not in presentation.logs._log_text.value
+        assert all(
+            record.turn_status == "active" for record in presentation.logs.conversation_records
+        )
         await owner.close_source(source_id)
         await owner.idle()
         await eventually(
@@ -754,16 +766,14 @@ async def test_real_secondary_fallback_failure_keeps_primary_and_failed_conversa
         assert sum(call["target_language"] == "ja" for call in owner.provider.calls) == 2
         assert "en:partial source" in presentation.dashboard.display_card._display_text.value
         assert len(presentation.logs.conversation_records) == 2
-        assert presentation.logs._log_text.value.count("en:partial source") == 1
-        assert t("logs.conversation.target.failed") in presentation.logs._log_text.value
-        rows = presentation.logs._log_text.value.split("\n\n")
-        assert "Mic → English" in rows[0].splitlines()[0]
-        assert "en:partial source" in rows[0]
-        assert t("display.turn.complete") in rows[0].splitlines()[0]
-        assert t("display.turn.failed") not in rows[0].splitlines()[0]
-        assert "Mic → Japanese" in rows[1].splitlines()[0]
-        assert t("logs.conversation.target.failed") in rows[1]
-        assert t("display.turn.failed") in rows[1].splitlines()[0]
+        primary, secondary = presentation.logs.conversation_records
+        assert (primary.target_language, primary.translated_text, primary.disposition) == (
+            "en",
+            "en:partial source",
+            "ready",
+        )
+        assert primary.translation_source_revision == primary.source_revision
+        assert (secondary.target_language, secondary.disposition) == ("ja", "failed")
         assert all(
             record.turn_status == "failed" for record in presentation.logs.conversation_records
         )
@@ -821,8 +831,10 @@ async def test_delayed_segmented_child_source_keeps_newer_managed_dashboard(
             translations = [record for record in records if record.translated_text is not None]
             assert len({record.utterance_id for record in translations}) == 2
             assert all(record.utterance_id != str(parent) for record in translations)
-            assert presentation.logs._log_text.value.count("en:first") == 1
-            assert presentation.logs._log_text.value.count("en:second") == 1
+            assert sorted(record.translated_text for record in translations) == [
+                "en:first",
+                "en:second",
+            ]
             assert len(presentation.runtime._conversation_record_keys) == 6
             assert parent not in owner.snapshots
             assert len(owner.snapshots) == 1
@@ -838,8 +850,11 @@ async def test_delayed_segmented_child_source_keeps_newer_managed_dashboard(
                 == "en:future second"
             )
             assert future_parent not in owner.snapshots
-            assert presentation.logs._log_text.value.count("en:future first") == 1
-            assert presentation.logs._log_text.value.count("en:future second") == 1
+            for text in ("en:future first", "en:future second"):
+                assert sum(
+                    record.translated_text == text
+                    for record in presentation.logs.conversation_records
+                ) == 1
             await owner.source("future managed")
             await owner.idle()
             await eventually(
@@ -905,7 +920,10 @@ async def test_current_manual_result_replaces_speech_after_source_delivery_timeo
         )
         assert not old_release.is_set()
         assert card._input_field.value == "unsubmitted draft"
-        assert presentation.logs._log_text.value.count("en:manual after dropped source") == 1
+        assert sum(
+            record.translated_text == "en:manual after dropped source"
+            for record in presentation.logs.conversation_records
+        ) == 1
         assert len(presentation.logs.conversation_records) == 3
         assert (
             sum(call["text"] == "manual after dropped source" for call in owner.provider.calls) == 1
@@ -930,7 +948,10 @@ async def test_current_manual_result_replaces_speech_after_source_delivery_timeo
         await owner.harness.ui_events.join()
         assert card._display_text.value == "en:pressure successor"
         assert card._input_field.value == "unsubmitted draft"
-        assert presentation.logs._log_text.value.count("en:manual after dropped source") == 1
+        assert sum(
+            record.translated_text == "en:manual after dropped source"
+            for record in presentation.logs.conversation_records
+        ) == 1
         assert (
             sum(
                 "en:manual after dropped source" in message.text
@@ -948,7 +969,7 @@ async def test_current_manual_result_replaces_speech_after_source_delivery_timeo
 
 
 @pytest.mark.asyncio
-async def test_true_source_only_and_legacy_original_headers_keep_source_language(presentation):
+async def test_source_only_speech_and_manual_history_keep_source_language(presentation):
     async with OwnerPresentation(
         presentation.dashboard, presentation.logs, presentation.runtime
     ) as owner:
@@ -960,17 +981,23 @@ async def test_true_source_only_and_legacy_original_headers_keep_source_language
             lambda: len(presentation.logs.conversation_records) == 1
             and presentation.logs.conversation_records[0].turn_status == "complete"
         )
-        managed = presentation.logs._log_text.value
-        assert "Mic · French" in managed.splitlines()[0]
-        assert "→ English" not in managed
-        assert "source only" in managed
+        managed = presentation.logs.conversation_records[0]
+        assert (managed.source, managed.source_language, managed.source_text) == (
+            "Mic",
+            "fr",
+            "source only",
+        )
+        assert managed.translated_text is None
         await owner.harness.self_owner.submit_text("manual original", source="You")
         await owner.idle()
         await eventually(lambda: len(presentation.logs.conversation_records) == 2)
-        legacy = presentation.logs._log_text.value.split("\n\n")[1]
-        assert "You · French" in legacy.splitlines()[0]
-        assert "→ English" not in legacy
-        assert "manual original" in legacy
+        manual = presentation.logs.conversation_records[1]
+        assert (manual.source, manual.source_language, manual.source_text) == (
+            "You",
+            "fr",
+            "manual original",
+        )
+        assert manual.translated_text is None
         assert not owner.provider.calls
         assert len(presentation.runtime._conversation_record_keys) == 2
 
@@ -993,13 +1020,11 @@ async def test_failed_aggregate_does_not_complete_an_earlier_source_translation(
         ),
     )
     await publish(presentation, ended)
-    rows = presentation.logs._log_text.value.split("\n\n")
-    assert "Mic → English" in rows[0].splitlines()[0]
-    assert t("display.turn.failed") in rows[0].splitlines()[0]
-    assert t("display.turn.complete") not in rows[0].splitlines()[0]
-    assert "earlier English" in rows[0]
-    assert "earlier source r1 (current source r2)" in rows[0]
-    assert "Mic → Japanese" in rows[1].splitlines()[0]
+    primary, secondary = presentation.logs.conversation_records
+    assert (primary.target_language, primary.translated_text) == ("en", "earlier English")
+    assert primary.translation_source_revision == 1
+    assert primary.source_revision == 2
+    assert secondary.target_language == "ja"
     assert presentation.dashboard.display_card._display_text.value == "extended source"
     assert all(record.turn_status == "failed" for record in presentation.logs.conversation_records)
     assert not presentation.runtime._conversation_record_keys

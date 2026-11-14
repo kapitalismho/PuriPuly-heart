@@ -5,7 +5,6 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.ui.fonts import (
-    LOG_TYPEFACE,
     TypeFace,
     font_for_language,
     metrics_strut_typeface,
@@ -28,7 +27,6 @@ def test_typeface_pairs_each_locale_font_with_its_tracking() -> None:
     assert english == TypeFace(font_for_language("en"), None)
     assert russian == TypeFace(None, None)
     assert metrics_strut_typeface() == TypeFace(font_for_language("ko"), 0)
-    assert LOG_TYPEFACE == TypeFace("Consolas", 0)
 
 
 def test_theme_replaces_body_medium_only_when_tracking_is_part_of_the_face() -> None:
@@ -82,6 +80,3 @@ def test_text_style_uses_the_current_ui_typeface() -> None:
     finally:
         set_locale(previous)
 
-    style = text_style(LOG_TYPEFACE)
-    assert style.font_family == "Consolas"
-    assert style.letter_spacing == 0

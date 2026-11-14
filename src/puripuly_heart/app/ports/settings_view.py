@@ -145,6 +145,10 @@ class GeneralSettingsSnapshot:
     clipboard_auto_translate_enabled: bool
     telemetry_enabled: bool
     peer_expected_languages: tuple[str, ...]
+    photo_enabled: bool = True
+    photo_route: str = "managed"
+    photo_delete_translated: bool = False
+    peer_source_mode: str = "manual"
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,6 +253,28 @@ class ClipboardSettingsIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class PhotoEnabledSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PhotoRouteSettingsIntent:
+    route: str
+
+
+@dataclass(frozen=True, slots=True)
+class PhotoDeleteTranslatedSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PhotoStatusSnapshot:
+    route: str | None
+    remaining: int | None = None
+    allowance: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PeerExpectedLanguagesIntent:
     languages: tuple[str, ...]
     recent_languages: tuple[str, ...] | None = None
@@ -312,6 +338,9 @@ ImmediateSettingsIntent: TypeAlias = (
     | ChatboxSourceSettingsIntent
     | ActivationNoticeSettingsIntent
     | ClipboardSettingsIntent
+    | PhotoEnabledSettingsIntent
+    | PhotoRouteSettingsIntent
+    | PhotoDeleteTranslatedSettingsIntent
     | PeerExpectedLanguagesIntent
     | CustomVocabularySettingsIntent
     | OverlayTargetSettingsIntent
@@ -497,6 +526,10 @@ __all__ = [
     "PeerVadHangoverIntent",
     "PeerVadPreRollIntent",
     "PeerVadSpeechThresholdIntent",
+    "PhotoDeleteTranslatedSettingsIntent",
+    "PhotoEnabledSettingsIntent",
+    "PhotoRouteSettingsIntent",
+    "PhotoStatusSnapshot",
     "PromptApplyIntent",
     "PromptSettingsSnapshot",
     "ProviderApplyIntent",

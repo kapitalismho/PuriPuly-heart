@@ -75,6 +75,8 @@ class ControlledGoogle:
         self.headers_gate = asyncio.Event()
         self.headers_gate.set()
         self.pause_after = None
+        self.error_body = None
+        self.error_headers = ""
         self.post_received = asyncio.Event()
         self.disconnected = asyncio.Event()
         self.writers = set()
@@ -128,6 +130,14 @@ class ControlledGoogle:
                     continue
                 self.post_received.set()
                 await self.headers_gate.wait()
+                if self.error_body is not None:
+                    data = json.dumps(self.error_body).encode()
+                    writer.write(
+                        f"HTTP/1.1 {self.status} Error\r\nContent-Type: application/json\r\n{self.error_headers}Content-Length: {len(data)}\r\n\r\n".encode()
+                        + data
+                    )
+                    await writer.drain()
+                    continue
                 writer.write(
                     f"HTTP/1.1 {self.status} Stream\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n".encode()
                 )
@@ -658,6 +668,40 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         assert sent["image_base64"] == photo.jpeg_base64
         assert sent["target_language"] == "ko"
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-puri-token"
+
+
+@pytest.mark.parametrize(
+    ("code", "headers", "expected"),
+    [
+        ("service_allowance_exhausted", "Retry-After: 3600\r\n", "photo_allowance_exhausted"),
+        ("service_allowance_exhausted", "", "photo_allowance_exhausted"),
+        ("service_busy", "Retry-After: 1\r\n", "photo_quota_exhausted"),
+    ],
+)
+async def test_relay_allowance_exhaustion_is_distinct_from_transient_rate_limits(
+    tmp_path, code, headers, expected
+):
+    photo = await synthetic_photo(tmp_path)
+
+    async def token():
+        return "synthetic-puri-token"
+
+    async with ControlledGoogle([], status=429) as server:
+        server.error_body = {"error": {"code": code}}
+        server.error_headers = headers
+        endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/photo"
+        connection = RelayPhotoConnection(endpoint, token, allow_loopback_http=True)
+        await connection.preopen()
+        with pytest.raises(PhotoProviderError) as failure:
+            async for _ in connection.stream(photo, "ko"):
+                pass
+    error = failure.value
+    assert error.code == expected
+    if expected == "photo_allowance_exhausted":
+        assert not error.retryable
+        assert 0 < error.retry_after <= (3600 if headers else 86400)
+    else:
+        assert error.retry_after is None
 
 
 async def test_api_completion_drains_sse_terminator_and_reuses_the_connection(tmp_path):

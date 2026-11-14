@@ -82,6 +82,17 @@ async def _http_error(response: httpx.Response) -> PhotoProviderError:
     error = payload.get("error") if isinstance(payload, dict) else None
     if not isinstance(error, dict):
         return default
+    if response.status_code == 429 and error.get("code") == "service_allowance_exhausted":
+        header = response.headers.get("retry-after", "")
+        return PhotoProviderError(
+            "photo_allowance_exhausted",
+            retryable=False,
+            retry_after=(
+                min(int(header), 7 * 86400)
+                if header.isascii() and header.isdigit()
+                else 86400 - time.time() % 86400
+            ),
+        )
     for detail in error.get("details") or []:
         if isinstance(detail, dict) and detail.get("reason") in (
             "API_KEY_INVALID",

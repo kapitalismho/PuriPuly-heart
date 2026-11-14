@@ -850,6 +850,7 @@ class UiDiagnosticsRuntimeAdapter:
     cycle_capture_fault: Callable[[], str]
     cycle_stt_fault: Callable[[], str]
     clear_audio_faults: Callable[[], None]
+    toggle_photo_limited: Callable[[], bool]
 
     def cycle_debug_capture_fault_profile(self) -> str:
         return self.cycle_capture_fault()
@@ -859,3 +860,6 @@ class UiDiagnosticsRuntimeAdapter:
 
     def clear_debug_audio_fault_profiles(self) -> None:
         self.clear_audio_faults()
+
+    def toggle_debug_photo_limited(self) -> bool:
+        return self.toggle_photo_limited()

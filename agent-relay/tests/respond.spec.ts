@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { appTools } from '../src/app-tools';
 import { isRespondRequest } from '../src/requests';
+import { photoPolicy } from '../src/usage';
 import relay from '../src/index';
 import { authHeaders, installationHash, relayEvents, responseEvents, testEnv, turnId, usageDatabase } from './fixtures';
 
@@ -311,6 +312,18 @@ describe('authenticated agent relay', () => {
     expect(sentNext.reasoning.effort).toBe('high');
     expect(sentNext.prompt_cache_options).toEqual(sent.prompt_cache_options);
     expect(sentNext.parallel_tool_calls).toBe(true);
+  });
+
+  it('states the configured photo allowance in the work instructions', async () => {
+    const fetch = mockUpstream();
+    for (const [policy, allowance] of [[undefined, photoPolicy().allowance], ['{"allowance":7}', 7]] as const) {
+      const response = await relay.fetch(request(), { ...testEnv(), ...(policy ? { PHOTO_POLICY: policy } : {}) });
+      expect(response.status).toBe(200);
+      await response.text();
+      const text = JSON.parse(fetch.mock.calls.at(-1)![1]?.body as string).input[0].content[0].text;
+      expect(text).toContain(`allows ${allowance} photos per installation per UTC day`);
+      expect(text).not.toContain('{{');
+    }
   });
 
   it('disables further tools and preserves authoritative incomplete terminal output', async () => {

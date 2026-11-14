@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::image::{PhotoImageOutput, PhotoImageResult, PhotoImageWorker, PreparationStage};
+use super::image::{PhotoImageOutput, PhotoImageResult, PhotoImageWorker, PreparationStage, SourcePixels};
 use super::manifest::{PhotoError, PhotoImageConfig};
 use super::prepare::recover_original;
 use super::processing::{
@@ -35,20 +35,23 @@ impl RunningImageWorker {
                     {
                         continue;
                     }
-                    let retained = boundary.decoded_original(&input);
-                    if let (Some(source), Some(photo)) = (&retained, &input.photo) {
-                        if let Some(working) = &source.working {
-                            let key = (photo.photo_id.clone(), source.path.clone());
-                            if pipeline.source_key.as_ref() != Some(&key) {
-                                pipeline.source_key = Some(key);
-                                pipeline.working = Some(working.clone());
-                                pipeline.clear_attempt(0);
+                    let retained = boundary.take_original(&input).and_then(|source| {
+                        match source.pixels {
+                            SourcePixels::Working(working) => {
+                                let key = (source.photo_id, source.path);
+                                if pipeline.source_key.as_ref() != Some(&key) {
+                                    pipeline.source_key = Some(key);
+                                    pipeline.clear_attempt(0);
+                                    pipeline.working = Some(working);
+                                }
+                                None
                             }
+                            SourcePixels::Original(pixels) => Some(pixels),
                         }
-                    }
+                    });
                     let outcome = pipeline.process(
                         &input,
-                        retained.map(|source| source.pixels.clone()),
+                        retained,
                         || !boundary.is_cancelled(&input),
                         |output| {
                             if boundary.is_cancelled(&input) {
@@ -101,6 +104,7 @@ pub(crate) struct ImagePipeline {
     typesetter: Option<super::typeset::PhotoTypesetter>,
     failed: bool,
     erase_source: Option<image::RgbImage>,
+    telea: super::telea::Workspace,
     commit_revision: u64,
     changes: Vec<(u64, Vec<PixelRect>)>,
     font_reported: bool,
@@ -122,6 +126,7 @@ impl ImagePipeline {
             failed: false,
             erase_source: None,
             commit_revision: 0,
+            telea: super::telea::Workspace::default(),
             changes: Vec::new(),
             font_reported: false,
         }
@@ -141,7 +146,6 @@ impl ImagePipeline {
         else {
             self.source_key = None;
             self.working = None;
-            self.processor = None;
             self.clear_attempt(0);
             return Ok(());
         };
@@ -149,7 +153,25 @@ impl ImagePipeline {
             return Ok(());
         };
         let key = (photo.photo_id.clone(), image.path.clone());
-        if self.source_key.as_ref() != Some(&key) {
+        let terminal = matches!(
+            photo.phase,
+            PhotoPhase::Completed
+                | PhotoPhase::CompletedCorrected
+                | PhotoPhase::Partial
+                | PhotoPhase::NoText
+                | PhotoPhase::Failed
+        );
+        if self.source_key.as_ref() == Some(&key)
+            && self.attempt == photo.attempt_id
+            && terminal
+            && photo.blocks.iter().all(|block| self.completed.contains(&block.block_id))
+        {
+            if is_current() {
+                self.finish_attempt();
+            }
+            return Ok(());
+        }
+        if self.source_key.as_ref() != Some(&key) || self.working.is_none() {
             let recovered = retained.is_none();
             let original = match retained {
                 Some(pixels) => pixels,
@@ -182,6 +204,15 @@ impl ImagePipeline {
             self.candidates.remove(id);
         }
         if self.failed {
+            if terminal
+                && photo
+                    .blocks
+                    .iter()
+                    .all(|block| self.completed.contains(&block.block_id))
+                && is_current()
+            {
+                self.finish_attempt();
+            }
             return Ok(());
         }
         let working = self.working.as_ref().unwrap().clone();
@@ -222,30 +253,28 @@ impl ImagePipeline {
                     }
                 };
                 let mut region = pending.region;
-                if !region.plate {
-                    let dependency = erase_input_rect(&working, region.roi);
-                    if self.changes.iter().any(|(revision, runs)| {
-                        *revision > pending.context_revision
-                            && runs.iter().any(|run| intersects(*run, dependency))
+                let dependency = erase_input_rect(&working, region.roi);
+                if self.changes.iter().any(|(revision, runs)| {
+                    *revision > pending.context_revision
+                        && runs.iter().any(|run| intersects(*run, dependency))
+                }) {
+                    let before = region.erase_ms;
+                    refresh_erase(&working, &mut region, self.erase_source.as_ref().unwrap(), &mut self.telea)
+                        .map_err(|_| "erase_refresh_failed")?;
+                    if !emit(PhotoImageOutput::Timing {
+                        block_id: block.block_id,
+                        stage: "erase",
+                        elapsed_ms: region.erase_ms - before,
                     }) {
-                        let before = region.erase_ms;
-                        refresh_erase(&working, &mut region, self.erase_source.as_ref().unwrap())
-                            .map_err(|_| "erase_refresh_failed")?;
-                        if !emit(PhotoImageOutput::Timing {
-                            block_id: block.block_id,
-                            stage: "erase",
-                            elapsed_ms: region.erase_ms - before,
-                        }) {
-                            return Ok(());
-                        }
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "type":"photo_image_stage","stage":"erase_refreshed","block_id":block.block_id,
-                                "elapsed_ms":region.erase_ms-before,"mask_reused":true,
-                            })
-                        );
+                        return Ok(());
                     }
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "type":"photo_image_stage","stage":"erase_refreshed","block_id":block.block_id,
+                            "elapsed_ms":region.erase_ms-before,"mask_reused":true,
+                        })
+                    );
                 }
                 if !is_current() {
                     return Ok(());
@@ -315,6 +344,13 @@ impl ImagePipeline {
             }
             self.completed.insert(block.block_id);
         }
+        if terminal {
+            drop(working);
+            if is_current() {
+                self.finish_attempt();
+            }
+            return Ok(());
+        }
         for preparation in &photo.preparations {
             if self.completed.contains(&preparation.block_id) {
                 continue;
@@ -373,14 +409,30 @@ impl ImagePipeline {
 
     fn clear_attempt(&mut self, attempt: u64) {
         self.attempt = attempt;
-        self.candidates.clear();
-        self.prepared.clear();
+        self.release_processing();
         self.completed.clear();
         self.failed = false;
+        self.font_reported = false;
+    }
+
+    fn finish_attempt(&mut self) {
+        let released = self.working.take().is_some();
+        self.release_processing();
+        if released {
+            println!("{}", serde_json::json!({
+                "type":"photo_image_stage", "stage":"processing_released", "attempt_id":self.attempt,
+            }));
+        }
+    }
+
+    fn release_processing(&mut self) {
+        self.processor = None;
+        self.telea = super::telea::Workspace::default();
+        self.candidates.clear();
+        self.prepared.clear();
         self.erase_source = None;
         self.commit_revision = 0;
         self.changes.clear();
-        self.font_reported = false;
         #[cfg(windows)]
         if let Some(typesetter) = &mut self.typesetter {
             typesetter.reset();
@@ -417,14 +469,12 @@ impl ImagePipeline {
                 self.erase_source
                     .as_ref()
                     .unwrap_or(working.pixels.as_ref()),
+                &mut self.telea,
             )
             .map_err(|_| "mask_processing_failed")
     }
 
     fn commit_erase(&mut self, region: &PreparedRegion) {
-        if region.plate {
-            return;
-        }
         let Some(patch) = &region.erase else {
             return;
         };

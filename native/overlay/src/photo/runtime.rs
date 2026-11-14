@@ -2,7 +2,7 @@
 use super::compositor::PhotoCompositor;
 use super::worker::RunningImageWorker;
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -11,7 +11,7 @@ use super::image::{
     PhotoImageBoundary, PhotoImageOutput, PhotoImageResult, PhotoImageWorker, PhotoTexture,
 };
 use super::manifest::{PhotoBackend, PhotoError, PhotoManifest, PHOTO_PROTOCOL_VERSION};
-use super::prepare::{PreparationCompletion, PreparationWorker, PrepareCompletion, SourceCompletion, SourceRequest};
+use super::prepare::{PreparationCompletion, PreparationWorker, PrepareCompletion, SourceCompletion, SourceMetadataCompletion, SourceRequest};
 use super::state::{PhotoState, SnapshotAdmission};
 use super::interaction::{HapticCue, PhotoInteraction};
 use super::calibration::{WristAdjustment, WristCalibration};
@@ -126,6 +126,14 @@ enum Backend {
     Offscreen,
 }
 
+#[cfg(windows)]
+struct PendingPhotoFrame {
+    epoch: u64,
+    started: Instant,
+    block_count: usize,
+    timing_blocks: usize,
+}
+
 pub struct PhotoRuntime {
     state: PhotoState,
     images: PhotoImageBoundary,
@@ -138,6 +146,8 @@ pub struct PhotoRuntime {
     preparation: PreparationWorker,
     preparation_started: bool,
     source_request: Option<SourceRequest>,
+    metadata_request: Option<SourceRequest>,
+    source_dimensions: Option<[u32; 2]>,
     source_max_size: [u32; 2],
     live_drawn_block: Option<u64>,
     #[cfg(windows)]
@@ -145,7 +155,13 @@ pub struct PhotoRuntime {
     #[cfg(windows)]
     export_dir: Option<std::path::PathBuf>,
     debug_controls: bool,
-    pending_gpu_block: Option<u64>,
+    pending_gpu_blocks: VecDeque<u64>,
+    #[cfg(windows)]
+    pending_frame: Option<PendingPhotoFrame>,
+    #[cfg(windows)]
+    frame_epoch: u64,
+    #[cfg(windows)]
+    texture_updated: bool,
     interaction: PhotoInteraction,
     pull_sequence: u64,
     #[cfg(windows)]
@@ -165,6 +181,8 @@ pub struct PhotoRuntime {
     #[cfg(windows)]
     card_material: Option<PhotoTexture>,
     card_submitted: bool,
+    #[cfg(windows)]
+    placeholder_submitted: bool,
     #[cfg(windows)]
     calibration_label: Option<PhotoTexture>,
 }
@@ -191,10 +209,10 @@ impl PhotoRuntime {
         }
         #[cfg(windows)]
         let icons = if let Some(compositor) = &compositor {
-            let textures = [IconState::Idle, IconState::Grab, IconState::Failed]
+            let textures = [IconState::Idle, IconState::Grab, IconState::Unavailable]
                 .map(|state| compositor.icon_texture(&icon::pixels(state), icon::ICON_SIZE));
-            let [idle, grab, failed] = textures;
-            Some([idle?, grab?, failed?])
+            let [idle, grab, unavailable] = textures;
+            Some([idle?, grab?, unavailable?])
         } else {
             None
         };
@@ -230,13 +248,21 @@ impl PhotoRuntime {
                 preparation: PreparationWorker::new().map_err(|_| PhotoError::Protocol)?,
                 preparation_started: false,
                 source_request: None,
+                metadata_request: None,
+                source_dimensions: None,
                 source_max_size: manifest.image.max_size,
                 #[cfg(windows)]
                 compositor,
                 debug_controls: manifest.image.debug_controls,
                 #[cfg(windows)]
                 export_dir: manifest.image.export_dir.clone(),
-                pending_gpu_block: None,
+                pending_gpu_blocks: VecDeque::new(),
+                #[cfg(windows)]
+                pending_frame: None,
+                #[cfg(windows)]
+                frame_epoch: 0,
+                #[cfg(windows)]
+                texture_updated: false,
                 interaction: PhotoInteraction::new(manifest.interaction.clone()),
                 pull_sequence: 0,
                 #[cfg(windows)]
@@ -256,6 +282,8 @@ impl PhotoRuntime {
                 #[cfg(windows)]
                 card_material,
                 card_submitted: false,
+                #[cfg(windows)]
+                placeholder_submitted: false,
                 #[cfg(windows)]
                 calibration_label,
             },
@@ -278,7 +306,7 @@ impl PhotoRuntime {
     ) -> Result<(), PhotoError> {
         #[cfg(windows)]
         if let Some(compositor) = &mut self.compositor {
-            compositor.ready().await?;
+            compositor.warm_up().await?;
         }
         let (mut bridge, first) =
             tokio::time::timeout(Duration::from_secs(10), PhotoBridge::connect(manifest))
@@ -298,33 +326,7 @@ impl PhotoRuntime {
         } else {
             Some(RunningImageWorker::start(worker, manifest.image.clone())?)
         };
-        let mut outcome: Result<(), PhotoError> = async {
-            let mut tick = tokio::time::interval(Duration::from_millis(20));
-            loop {
-                tokio::select! {
-                    incoming = bridge.next() => {
-                        if !self.receive(incoming?, &mut bridge).await? { break; }
-                    }
-                    Some(result) = self.images.next_result() => {
-                        self.image_result(result, &mut bridge).await?;
-                    }
-                    Some(completion) = self.preparation.next_result() => {
-                        match completion {
-                            PreparationCompletion::Prepared(completion) => self.prepared(completion, &mut bridge).await?,
-                            PreparationCompletion::Source(completion) => self.preview_source(completion, &mut bridge).await?,
-                        }
-                    }
-                    _ = tick.tick() => {
-                        if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
-                        self.interaction_tick(&mut bridge).await?;
-                        self.render_frame(&mut bridge).await?;
-                        self.ack_quiescent(&mut bridge).await?;
-                    }
-                }
-            }
-            Ok(())
-        }
-        .await;
+        let mut outcome = self.run_events(&mut bridge).await;
         self.preparation.shutdown().await;
         while let Some(completion) = self.preparation.try_result() {
             let PreparationCompletion::Prepared(completion) = completion else { continue };
@@ -360,6 +362,81 @@ impl PhotoRuntime {
         Ok(())
     }
 
+    async fn run_events(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        let mut tick = tokio::time::interval(Duration::from_millis(20));
+        let mut gpu_tick = tokio::time::interval(Duration::from_millis(2));
+        gpu_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                incoming = bridge.next() => {
+                    if !self.receive(incoming?, bridge).await? { break; }
+                }
+                Some(result) = self.images.next_result() => {
+                    self.image_result(result, bridge).await?;
+                }
+                Some(completion) = self.preparation.next_result() => {
+                    match completion {
+                        PreparationCompletion::Prepared(completion) => self.prepared(completion, bridge).await?,
+                        PreparationCompletion::Source(completion) => self.preview_source(completion, bridge).await?,
+                        PreparationCompletion::Metadata(completion) => self.source_metadata(completion, bridge).await?,
+                    }
+                }
+                _ = gpu_tick.tick(), if self.gpu_pending() => {
+                    self.complete_gpu(bridge).await?;
+                    self.render_frame(bridge).await?;
+                }
+                _ = tick.tick() => {
+                    if let Backend::OpenVr(surfaces) = &mut self.backend { surfaces.poll()?; }
+                    self.interaction_tick(bridge).await?;
+                    self.render_frame(bridge).await?;
+                    self.ack_quiescent(bridge).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn gpu_pending(&self) -> bool {
+        #[cfg(windows)]
+        if let Some(compositor) = &self.compositor {
+            return compositor.has_pending_completion();
+        }
+        false
+    }
+
+    async fn complete_gpu(&mut self, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        #[cfg(windows)]
+        {
+            let Some(compositor) = &mut self.compositor else { return Ok(()) };
+            if !compositor.poll_completion(Instant::now())? {
+                return Ok(());
+            }
+            let Some(pending) = self.pending_frame.take() else { return Ok(()) };
+            if pending.epoch != self.frame_epoch {
+                return Ok(());
+            }
+            let Some(texture) = compositor.completed_texture() else { return Ok(()) };
+            self.texture = Some(texture);
+            self.texture_updated = true;
+            if let Some(photo) = self.state.photo() {
+                println!("{}", json!({
+                    "type":"photo_image_stage", "photo_id":photo.photo_id, "attempt_id":photo.attempt_id,
+                    "stage":"composed", "elapsed_ms":pending.started.elapsed().as_secs_f64() * 1000.0,
+                    "block_count":pending.block_count, "original_uploads":compositor.original_uploads,
+                    "gpu_ms":compositor.frame_gpu_ms, "gpu_timing_valid":compositor.frame_gpu_ms.is_some(),
+                    "submitted":matches!(self.backend, Backend::OpenVr(_)),
+                }));
+                for _ in 0..pending.timing_blocks {
+                    let block_id = self.pending_gpu_blocks.pop_front().ok_or(PhotoError::Graphics)?;
+                    if let Some(gpu_ms) = compositor.frame_gpu_ms {
+                        bridge.send_timing(&photo.photo_id, photo.attempt_id, block_id, "compose_gpu", gpu_ms).await?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     async fn receive(
         &mut self,
         incoming: PhotoIncoming,
@@ -381,13 +458,23 @@ impl PhotoRuntime {
                     .filter(|photo| photo.phase != super::state::PhotoPhase::Expired)
                     .map(|photo| (photo.photo_id.clone(), photo.attempt_id));
                 if prior != current {
+                    if !prior.as_ref().zip(current.as_ref()).is_some_and(|(old, new)| old.0 == new.0) {
+                        self.texture = None;
+                        #[cfg(windows)]
+                        {
+                            self.texture_updated = false;
+                            self.placeholder_submitted = false;
+                        }
+                    }
                     self.pulls.clear();
                     self.preparation.cancel_prepare();
                     self.preparation_started = false;
                     if prior.as_ref().map(|key| &key.0) != current.as_ref().map(|key| &key.0) {
                         self.preparation.cancel_source();
                         self.source_request = None;
-                        self.texture = None;
+                        self.preparation.cancel_metadata();
+                        self.metadata_request = None;
+                        self.source_dimensions = None;
                     }
                     #[cfg(windows)]
                     if let Some(compositor) = &mut self.compositor {
@@ -404,6 +491,13 @@ impl PhotoRuntime {
                 if !self.interaction.quiescing() {
                     self.quiesce_request = None;
                 }
+                if self.source_dimensions.is_none() {
+                    if let Some(image) = self.state.photo().and_then(|photo| photo.image.as_ref()) {
+                        self.source_dimensions = Some([image.width, image.height]);
+                        self.interaction.photo_pixels = [image.width, image.height];
+                    }
+                }
+                self.enqueue_source_metadata();
                 let snapshot = self.state.snapshot().ok_or(PhotoError::Protocol)?;
                 self.images.publish(snapshot);
                 let photo = snapshot.photo.as_deref();
@@ -527,12 +621,24 @@ impl PhotoRuntime {
                     .is_some_and(|photo| photo.photo_id == photo_id)
                 {
                     #[cfg(windows)]
+                    {
+                        if self.export_dir.is_none() {
+                            return Ok(true);
+                        }
+                        if let Some(compositor) = &mut self.compositor {
+                            if compositor.has_pending_completion() {
+                                compositor.wait_for_completion().await?;
+                            }
+                        }
+                        self.complete_gpu(bridge).await?;
+                    }
+                    #[cfg(windows)]
                     if let (Some(compositor), Some(directory)) =
                         (&mut self.compositor, &self.export_dir)
                     {
                         std::fs::create_dir_all(directory).map_err(|_| PhotoError::Image)?;
                         compositor.render(Instant::now(), false)?;
-                        compositor.ready().await?;
+                        compositor.wait_for_completion().await?;
                         compositor.save(&directory.join(format!("{label}.png")))?;
                         if let Some(texture) = &self.grab_ring {
                             let size = super::interaction::GRAB_RING_SIZE;
@@ -558,6 +664,8 @@ impl PhotoRuntime {
                                 .map_err(|_| PhotoError::Image)?,
                         )
                         .map_err(|_| PhotoError::Image)?;
+                        self.texture = compositor.completed_texture();
+                        self.texture_updated = self.texture.is_some();
                     }
                 }
             }
@@ -595,7 +703,11 @@ impl PhotoRuntime {
         self.haptic_granted = false;
         self.haptic_accepted = false;
         self.live_drawn_block = None;
-        self.pending_gpu_block = None;
+        self.pending_gpu_blocks.clear();
+        #[cfg(windows)]
+        {
+            self.frame_epoch += 1;
+        }
         self.drawn_reported = self.state.photo().is_some_and(|photo| {
             photo.first_block_drawn || (recovering && !photo.blocks.is_empty())
         });
@@ -613,6 +725,56 @@ impl PhotoRuntime {
             self.haptic_granted = true;
             self.haptic_accepted = true;
         }
+    }
+
+    fn enqueue_source_metadata(&mut self) {
+        let Some(photo) = self.state.photo().filter(|photo| {
+            photo.image.is_none() && photo.can_pull() && self.interaction.active(photo, Instant::now())
+        }) else {
+            return;
+        };
+        if self.metadata_request.is_some() || self.interaction.quiescing() {
+            return;
+        }
+        let request = SourceRequest {
+            photo_id: photo.photo_id.clone(),
+            source_path: photo.path.clone(),
+            expected_file_id: photo.expected_file_id.clone(),
+            max_size: self.source_max_size,
+        };
+        match self.preparation.start_metadata(request.clone()) {
+            Ok(()) => self.metadata_request = Some(request),
+            Err(code) => eprintln!("{}", json!({"type":"photo_image_failed","stage":"source_metadata","code":code})),
+        }
+    }
+
+    async fn source_metadata(&mut self, completion: SourceMetadataCompletion, bridge: &mut PhotoBridge) -> Result<(), PhotoError> {
+        if self.metadata_request.as_ref() != Some(&completion.request)
+            || !self.state.photo().is_some_and(|photo| {
+                photo.photo_id == completion.request.photo_id
+                    && photo.path == completion.request.source_path
+                    && photo.expected_file_id == completion.request.expected_file_id
+                    && self.interaction.active(photo, Instant::now())
+            })
+        {
+            return Ok(());
+        }
+        match completion.result {
+            Ok(dimensions) => {
+                self.preparation.cancel_metadata();
+                self.source_dimensions = Some(dimensions);
+                self.interaction.photo_pixels = dimensions;
+                if self.input.is_some() {
+                    self.interaction_input(self.input, Instant::now(), bridge).await?;
+                }
+                self.render_frame(bridge).await?;
+            }
+            Err(code) if code != "preparation_cancelled" => {
+                eprintln!("{}", json!({"type":"photo_image_failed","stage":"source_metadata","code":code}));
+            }
+            Err(_) => {}
+        }
+        Ok(())
     }
 
     fn enqueue_preview_source(&mut self) {
@@ -643,6 +805,7 @@ impl PhotoRuntime {
                     && photo.path == completion.request.source_path
                     && photo.expected_file_id == completion.request.expected_file_id
                     && self.interaction.active(photo, Instant::now())
+                    && photo.image.as_ref().is_none_or(|image| image.path == completion.request.source_path)
             })
         {
             return Ok(());
@@ -650,18 +813,24 @@ impl PhotoRuntime {
         match completion.result {
             Ok(source) => {
                 let photo = self.state.photo().ok_or(PhotoError::Protocol)?;
-                if photo.image.as_ref().is_none_or(|image| image.path == completion.request.source_path) {
-                    self.images.retain_original(
-                        completion.request.photo_id,
-                        photo.attempt_id,
-                        completion.request.source_path,
-                        source.original.clone(),
-                        source.working.clone(),
-                    );
-                }
                 #[cfg(windows)]
                 if let Some(compositor) = &mut self.compositor {
-                    compositor.set_original(source.working.as_ref().ok_or(PhotoError::Image)?.clone())?;
+                    compositor.set_original(
+                        source.working.as_ref().ok_or(PhotoError::Image)?.clone(),
+                        &completion.request.source_path,
+                    )?;
+                }
+                self.images.retain_original(
+                    completion.request.photo_id,
+                    photo.attempt_id,
+                    completion.request.source_path,
+                    source.original.clone(),
+                    source.working.clone(),
+                );
+                self.source_dimensions = Some([source.original.width(), source.original.height()]);
+                self.interaction.photo_pixels = self.source_dimensions.unwrap();
+                if self.input.is_some() {
+                    self.interaction_input(self.input, Instant::now(), bridge).await?;
                 }
                 println!("{}", json!({
                     "type":"photo_image_stage", "stage":"display_source_ready", "local_preview":true,
@@ -674,6 +843,7 @@ impl PhotoRuntime {
                 if code != "preparation_cancelled" {
                     eprintln!("{}", json!({"type":"photo_image_failed","stage":"local_source","code":code}));
                 }
+                self.render_frame(bridge).await?;
             }
         }
         Ok(())
@@ -689,6 +859,8 @@ impl PhotoRuntime {
             photo.photo_id == request.photo_id
                 && photo.attempt_id == request.attempt_id
                 && photo.phase == super::state::PhotoPhase::Preparing
+                && photo.path == request.source_path
+                && photo.expected_file_id == request.expected_file_id
         }) {
             drop(completion.result);
             bridge
@@ -718,10 +890,17 @@ impl PhotoRuntime {
                         "resize_ms": prepared.resize_ms, "jpeg_ms": prepared.jpeg_ms,
                     })
                 );
+                let prepared_source = prepared.source_path.to_string_lossy().into_owned();
+                #[cfg(windows)]
+                if prepared.working.is_some() {
+                    if let Some(compositor) = &mut self.compositor {
+                        compositor.accept_prepared_source(&request.source_path, &prepared_source);
+                    }
+                }
                 self.images.retain_original(
                     request.photo_id,
                     request.attempt_id,
-                    prepared.source_path.to_string_lossy().into_owned(),
+                    prepared_source,
                     prepared.original.clone(),
                     prepared.working.clone(),
                 );
@@ -815,7 +994,10 @@ impl PhotoRuntime {
             PhotoImageOutput::Original { working, recovered } => {
                 #[cfg(windows)]
                 if let Some(compositor) = &mut self.compositor {
-                    compositor.set_original(working)?;
+                    let source_key = &snapshot.photo.as_deref()
+                        .and_then(|photo| photo.image.as_ref())
+                        .ok_or(PhotoError::Protocol)?.path;
+                    compositor.set_original(working, source_key)?;
                 }
                 println!(
                     "{}",
@@ -842,7 +1024,7 @@ impl PhotoRuntime {
                         Instant::now(),
                     )?;
                     if translated {
-                        self.pending_gpu_block = Some(block_id);
+                        self.pending_gpu_blocks.push_back(block_id);
                     }
                     if has_patch {
                         let photo = snapshot.photo.as_deref().ok_or(PhotoError::Protocol)?;
@@ -883,6 +1065,8 @@ impl PhotoRuntime {
         if !self.state.photo().is_some_and(|photo| self.interaction.active(photo, Instant::now())) {
             self.preparation.cancel_source();
             self.source_request = None;
+            self.preparation.cancel_metadata();
+            self.metadata_request = None;
         }
         let Backend::OpenVr(surfaces) = &self.backend else {
             return Ok(());
@@ -929,9 +1113,13 @@ impl PhotoRuntime {
         bridge: &mut PhotoBridge,
     ) -> Result<(), PhotoError> {
         self.input = input;
-        #[cfg(windows)]
-        if let Some(pixels) = self.compositor.as_ref().and_then(|compositor| compositor.dimensions()) {
-            self.interaction.photo_pixels = pixels;
+        if let Some(dimensions) = self.source_dimensions {
+            self.interaction.photo_pixels = dimensions;
+        } else {
+            #[cfg(windows)]
+            if let Some(pixels) = self.compositor.as_ref().and_then(|compositor| compositor.dimensions()) {
+                self.interaction.photo_pixels = pixels;
+            }
         }
         let frame = self.interaction.step(self.state.photo(), input, now);
         let records: Vec<_> = self.state.photo().map(|photo| {
@@ -985,18 +1173,20 @@ impl PhotoRuntime {
         #[cfg(windows)]
         {
             let now = Instant::now();
-            let start = now;
+            let updated = self.texture_updated;
             let Some(compositor) = &mut self.compositor else {
                 return Ok(());
             };
-            let updated = compositor.needs_frame(now);
-            if updated {
-                if let Some(texture) = compositor.render(now, false)? {
-                    compositor.ready().await?;
-                    self.texture = Some(texture);
+            if !updated && !compositor.has_pending_completion() && compositor.needs_frame(now) {
+                if compositor.render(now, false)? {
+                    self.pending_frame = Some(PendingPhotoFrame {
+                        epoch: self.frame_epoch,
+                        started: now,
+                        block_count: compositor.block_count(),
+                        timing_blocks: self.pending_gpu_blocks.len(),
+                    });
                 }
             }
-            let block_count = compositor.block_count();
             let photo = self.state.photo();
             let mut drawn = false;
             if let Backend::OpenVr(surfaces) = &mut self.backend {
@@ -1005,7 +1195,7 @@ impl PhotoRuntime {
                 let icon = surfaces.icon().ok_or(PhotoError::OpenVr)?;
                 if let Some(placement) = frame.icon.filter(|_| active) {
                     let state =
-                        if photo.is_some_and(|p| p.phase == super::state::PhotoPhase::Failed) {
+                        if photo.is_some_and(|p| !p.can_pull()) {
                             2
                         } else if frame.glow {
                             1
@@ -1069,19 +1259,40 @@ impl PhotoRuntime {
                 }
                 let surface = surfaces.photo.as_mut().ok_or(PhotoError::OpenVr)?;
                 if updated {
-                    if let Some(texture) = &self.texture { compositor.submit_texture(surface, texture)?; }
+                    if let Some(texture) = &self.texture {
+                        compositor.submit_texture(surface, texture)?;
+                        compositor.mark_presented(texture);
+                        self.placeholder_submitted = false;
+                    }
+                    self.texture_updated = false;
                 }
-                if let (Some(placement), Some(_), Some(input), Some(pixels)) =
-                    (frame.photo.filter(|_| active), &self.texture, self.input, compositor.dimensions())
+                let card_available = self.texture.is_some() || photo.is_some_and(|photo| {
+                    photo.can_pull() && (self.source_request.is_some() || photo.image.is_some())
+                });
+                if let (Some(placement), Some(input), Some(pixels)) = (
+                    frame.photo.filter(|_| active && card_available),
+                    self.input,
+                    self.source_dimensions.or_else(|| compositor.dimensions()),
+                )
                 {
                     let device = (!frame.photo_world).then_some(placement.device);
                     let holder = if placement.device == input.right_index { input.right } else { input.left };
                     let world = if frame.photo_world { placement.transform } else { compose(holder, placement.transform) };
                     let front_visible = super::card::front_facing(world, input.head);
-                    surface.set_card_presentation(device, placement.transform, placement.width, placement.alpha, 1.0, [0.0, 0.0, frame.photo_extent, 1.0])
+                    let [full_width, height] = super::card::card_size(self.interaction.config.photo_width_m, pixels);
+                    let (texel_aspect, bounds) = if self.texture.is_some() {
+                        let [width, rows] = compositor.dimensions().ok_or(PhotoError::Graphics)?;
+                        (full_width * rows as f32 / (height * width as f32), [0.0, 0.0, frame.photo_extent, 1.0])
+                    } else {
+                        if !self.placeholder_submitted {
+                            compositor.submit_texture(surface, self.card_material.as_ref().ok_or(PhotoError::Graphics)?)?;
+                            self.placeholder_submitted = true;
+                        }
+                        (placement.width / height, [0.0, 0.0, 1.0, 1.0])
+                    };
+                    surface.set_card_presentation(device, placement.transform, placement.width, placement.alpha, texel_aspect, bounds)
                         .map_err(|_| PhotoError::OpenVr)?;
                     surface.set_overlay_visible(front_visible).map_err(|_| PhotoError::OpenVr)?;
-                    let height = super::card::card_size(self.interaction.config.photo_width_m, pixels)[1];
                     let back = surfaces.back.as_mut().ok_or(PhotoError::OpenVr)?;
                     if !self.card_submitted {
                         compositor.submit_texture(back, self.card_material.as_ref().ok_or(PhotoError::Graphics)?)?;
@@ -1090,7 +1301,7 @@ impl PhotoRuntime {
                     back.set_card_presentation(device, super::card::back(placement.transform), placement.width, placement.alpha, placement.width / height, [0.0, 0.0, 1.0, 1.0])
                         .map_err(|_| PhotoError::OpenVr)?;
                     back.set_overlay_visible(!front_visible).map_err(|_| PhotoError::OpenVr)?;
-                    drawn = front_visible && placement.alpha > 0.0;
+                    drawn = self.texture.is_some() && front_visible && placement.alpha > 0.0;
                 } else {
                     surface.set_overlay_visible(false).map_err(|_| PhotoError::OpenVr)?;
                     if let Some(back) = &mut surfaces.back {
@@ -1098,36 +1309,14 @@ impl PhotoRuntime {
                     }
                 }
             }
+            if !matches!(self.backend, Backend::OpenVr(_)) {
+                self.texture_updated = false;
+            }
             let Some(photo) = photo else {
                 return Ok(());
             };
-            if updated {
-                println!(
-                    "{}",
-                    json!({
-                        "type": "photo_image_stage", "photo_id": photo.photo_id,
-                        "attempt_id": photo.attempt_id, "stage": "composed", "elapsed_ms": start.elapsed().as_secs_f64() * 1000.0,
-                        "block_count": block_count, "original_uploads": compositor.original_uploads,
-                        "gpu_ms": compositor.frame_gpu_ms, "gpu_timing_valid": compositor.frame_gpu_ms.is_some(),
-                        "submitted": matches!(self.backend, Backend::OpenVr(_)),
-                    })
-                );
-                if let Some(block_id) = self.pending_gpu_block.take() {
-                    if let Some(gpu_ms) = compositor.frame_gpu_ms {
-                        bridge
-                            .send_timing(
-                                &photo.photo_id,
-                                photo.attempt_id,
-                                block_id,
-                                "compose_gpu",
-                                gpu_ms,
-                            )
-                            .await?;
-                    }
-                }
-            }
             let visible_block = if drawn && !self.drawn_reported && !photo.first_block_drawn {
-                compositor.first_visible_block_in(now, [0.0, 0.0, self.interaction.frame.photo_extent, 1.0])
+                compositor.first_drawn_block_in([0.0, 0.0, self.interaction.frame.photo_extent, 1.0])
             } else {
                 None
             };

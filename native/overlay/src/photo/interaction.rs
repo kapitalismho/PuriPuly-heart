@@ -14,6 +14,10 @@ pub const IDENTITY: Transform = [
 
 pub const PULL_FADE_M: f32 = 0.03;
 const PULL_M: f32 = 0.12;
+const APPROACH_SHOW_MARGIN_M: f32 = 0.10;
+const APPROACH_HIDE_MARGIN_M: f32 = 0.15;
+pub(super) const WRIST_FLOAT_M: f32 = 0.03;
+pub const DEFAULT_PHOTO_WIDTH_M: f32 = 0.4125;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -21,9 +25,7 @@ pub struct TemporaryInteractionConfig {
     pub grab_m: f32,
     pub icon_width_m: f32,
     pub photo_width_m: f32,
-    pub facing_show_deg: f32,
     pub forward_show_deg: f32,
-    pub facing_hide_deg: f32,
     pub forward_hide_deg: f32,
     pub dwell_ms: u64,
     pub wrist_transform: Option<Transform>,
@@ -40,10 +42,8 @@ impl Default for TemporaryInteractionConfig {
         Self {
             grab_m: 0.10,
             icon_width_m: 0.03,
-            photo_width_m: 0.375,
-            facing_show_deg: 45.0,
+            photo_width_m: DEFAULT_PHOTO_WIDTH_M,
             forward_show_deg: 40.0,
-            facing_hide_deg: 55.0,
             forward_hide_deg: 45.0,
             dwell_ms: 50,
             wrist_transform: None,
@@ -63,14 +63,11 @@ impl TemporaryInteractionConfig {
             .iter()
             .all(|v| v.is_finite() && *v > 0.0)
             || self.photo_width_m < self.icon_width_m
-            || ![
-                (self.facing_show_deg, self.facing_hide_deg),
-                (self.forward_show_deg, self.forward_hide_deg),
-            ]
-            .iter()
-            .all(|(show, hide)| {
-                show.is_finite() && hide.is_finite() && *show > 0.0 && show < hide && *hide < 90.0
-            })
+            || !(self.forward_show_deg.is_finite()
+                && self.forward_hide_deg.is_finite()
+                && self.forward_show_deg > 0.0
+                && self.forward_show_deg < self.forward_hide_deg
+                && self.forward_hide_deg < 90.0)
             || self.dwell_ms > 5000
             || self.wrist_transform.is_some_and(|t| !valid_transform(t))
             || self.wrist_handgrip_point_m.is_some_and(|p| !p.iter().all(|v| v.is_finite()))
@@ -93,19 +90,24 @@ impl TemporaryInteractionConfig {
     }
 
     pub fn effective_wrist_transform(&self, handgrip: Transform) -> Transform {
-        if let Some(calibration) = &self.wrist_calibration {
-            return compose(handgrip, calibration.transform);
+        let mut wrist = if let Some(calibration) = &self.wrist_calibration {
+            compose(handgrip, calibration.transform)
+        } else {
+            self.wrist_transform.unwrap_or_else(|| {
+                let point = self
+                    .wrist_handgrip_point_m
+                    .unwrap_or([0.035, 0.10153344, 0.03473191]);
+                compose(handgrip, [
+                    [0.0, 0.0, 1.0, point[0]],
+                    [-0.268297781, -0.963336027, 0.0, point[1]],
+                    [0.963336027, -0.268297781, 0.0, point[2]],
+                ])
+            })
+        };
+        for row in &mut wrist {
+            row[3] += row[2] * WRIST_FLOAT_M;
         }
-        self.wrist_transform.unwrap_or_else(|| {
-            let point = self
-                .wrist_handgrip_point_m
-                .unwrap_or([0.035, 0.10153344, 0.03473191]);
-            compose(handgrip, [
-                [0.0, 0.0, 1.0, point[0]],
-                [-0.268297781, -0.963336027, 0.0, point[1]],
-                [0.963336027, -0.268297781, 0.0, point[2]],
-            ])
-        })
+        wrist
     }
 }
 
@@ -223,27 +225,31 @@ fn rotation([w, x, y, z]: [f32; 4]) -> Transform {
     ]
 }
 
-fn photo_edge_anchor(input: LegacyVrInput) -> Transform {
-    let pivot = compose(input.left, input.left_handgrip);
-    let toward_head = subtract(column(input.head, 3), column(pivot, 3));
+fn head_facing(position: [f32; 3], head: Transform) -> Transform {
+    let toward_head = subtract(column(head, 3), position);
     let normal = if dot(toward_head, toward_head) > 0.000001 {
         normalized(toward_head)
     } else {
-        column(input.head, 2)
+        column(head, 2)
     };
-    let head_up = column(input.head, 1);
+    let head_up = column(head, 1);
     let projected_up = subtract(head_up, normal.map(|value| value * dot(head_up, normal)));
     let right = if dot(projected_up, projected_up) > 0.000001 {
         normalized(cross(projected_up, normal))
     } else {
-        column(input.head, 0)
+        column(head, 0)
     };
     let up = cross(normal, right);
     let mut world = IDENTITY;
     for i in 0..3 {
-        world[i] = [right[i], up[i], normal[i], pivot[i][3]];
+        world[i] = [right[i], up[i], normal[i], position[i]];
     }
-    compose(inverse(input.left), world)
+    world
+}
+
+fn photo_edge_anchor(input: LegacyVrInput) -> Transform {
+    let pivot = compose(input.left, input.left_handgrip);
+    compose(inverse(input.left), head_facing(column(pivot, 3), input.head))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -599,20 +605,25 @@ impl PhotoInteraction {
         self.right_grip = input.right_grip;
         let wrist_local = self.config.effective_wrist_transform(input.right_handgrip);
         let wrist = compose(input.right, wrist_local);
+        let icon_world = head_facing(column(wrist, 3), input.head);
+        let icon_local = compose(inverse(input.right), icon_world);
+        let photo = photo.unwrap();
+        let current_distance = distance(compose(input.left, input.left_handgrip), wrist);
+        let offering = photo.attempt_id == 0 && !self.offer_pulled;
         let head_to_icon = subtract(column(wrist, 3), column(input.head, 3));
         let facing = subtract(column(input.head, 3), column(wrist, 3));
         let forward = column(input.head, 2).map(|v| -v);
         let facing_deg = angle_deg(column(wrist, 2), facing);
         let forward_deg = angle_deg(forward, head_to_icon);
-        let looking = within(
-            column(wrist, 2),
-            facing,
-            if self.gaze {
-                self.config.facing_hide_deg
-            } else {
-                self.config.facing_show_deg
-            },
-        ) && within(
+        let approached = offering
+            || current_distance
+                <= self.config.grab_m
+                    + if self.gaze {
+                        APPROACH_HIDE_MARGIN_M
+                    } else {
+                        APPROACH_SHOW_MARGIN_M
+                    };
+        let looking = approached && within(
             forward,
             head_to_icon,
             if self.gaze {
@@ -656,13 +667,11 @@ impl PhotoInteraction {
             && self.shown_at.is_some_and(|shown| {
                 now.saturating_duration_since(shown) >= Duration::from_millis(200)
             });
-        let photo = photo.unwrap();
-        let current_distance = distance(compose(input.left, input.left_handgrip), wrist);
         let near = current_distance <= self.config.grab_m;
         if !self.gaze
             && !looking
             && photo.can_pull()
-            && facing_deg <= self.config.facing_show_deg + NEAR_MISS_MARGIN_DEG
+            && (offering || current_distance <= self.config.grab_m + APPROACH_HIDE_MARGIN_M)
             && forward_deg <= self.config.forward_show_deg + NEAR_MISS_MARGIN_DEG
             && self.last_near_miss.is_none_or(|last| now.saturating_duration_since(last) >= NEAR_MISS_INTERVAL)
         {
@@ -712,7 +721,7 @@ impl PhotoInteraction {
         {
             self.grab = Some(Grab {
                 start_distance: current_distance,
-                relative: compose(inverse(input.left), wrist),
+                relative: compose(inverse(input.left), icon_world),
             });
             self.photo_anchor = Some(photo_edge_anchor(input));
             self.photo_release = None;
@@ -834,17 +843,17 @@ impl PhotoInteraction {
                     / 0.225)
                     .min(1.0);
                 let ease = 1.0 - (1.0 - t) * (1.0 - t);
-                let mut transform = rotation(slerp(quaternion(returning.from), quaternion(wrist_local), ease));
+                let mut transform = rotation(slerp(quaternion(returning.from), quaternion(icon_local), ease));
                 for i in 0..3 {
                     transform[i][3] =
-                        returning.from[i][3] + (wrist_local[i][3] - returning.from[i][3]) * ease;
+                        returning.from[i][3] + (icon_local[i][3] - returning.from[i][3]) * ease;
                 }
                 if t >= 1.0 {
                     self.returning = None;
                 }
                 (input.right_index, transform)
             } else {
-                (input.right_index, wrist_local)
+                (input.right_index, icon_local)
             };
             out.icon = Some(Placement {
                 device,
@@ -865,7 +874,7 @@ impl PhotoInteraction {
                 offset[1][3] = -(if self.config.debug_grab_volume { self.config.grab_m } else { self.config.icon_width_m * 0.5 } + 0.045);
                 out.case_label = Some(Placement {
                     device: input.right_index,
-                    transform: compose(wrist_local, offset),
+                    transform: compose(icon_local, offset),
                     width: 0.24,
                     alpha: self.icon_alpha,
                 });

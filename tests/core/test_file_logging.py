@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from puripuly_heart.app.services.application_runtime_logging import ApplicationRuntimeLoggingOwner
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.core.llm.latency import observe_attempt, observe_request
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
@@ -16,24 +17,6 @@ from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
-
-
-class _RealtimeSink:
-    def __init__(self) -> None:
-        self.lines: list[str] = []
-
-    def append_log(self, line: str) -> None:
-        self.lines.append(line)
-
-
-class _RealtimeHandler(logging.Handler):
-    def __init__(self, sink: _RealtimeSink) -> None:
-        super().__init__()
-        self._sink = sink
-        self.setFormatter(logging.Formatter("%(message)s"))
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self._sink.append_log(self.format(record))
 
 
 def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared_sinks(tmp_path):
@@ -60,11 +43,8 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=_RealtimeHandler,
     )
 
-    sink = _RealtimeSink()
-    service.attach_realtime_sink(sink)
 
     root_logger.info("root arbitrary prose")
     service.emit_basic("basic line")
@@ -99,7 +79,7 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
         diagnostic.diagnostic_id for diagnostic in diagnostics
     ]
     assert [record["code"] for record in records] == ["provider.network", "provider.timeout"]
-    assert sink.lines == ["basic line"]
+    assert stream.getvalue().splitlines() == ["basic line"]
 
 
 def test_configure_main_logging_reuses_existing_root_stream_handler(tmp_path):
@@ -257,11 +237,8 @@ def test_session_runtime_logging_service_persists_file_only_events_in_basic_mode
             file_handler=file_handler,
             log_file=log_file,
         ),
-        ui_handler_factory=_RealtimeHandler,
     )
 
-    sink = _RealtimeSink()
-    service.attach_realtime_sink(sink)
     service.emit_basic("basic line")
     service.emit_persisted(
         '[Persisted][Fallback] {"dual_bill_candidate": true, "event": "race_finished", '
@@ -274,7 +251,6 @@ def test_session_runtime_logging_service_persists_file_only_events_in_basic_mode
     service.close()
 
     assert stream.getvalue().splitlines() == ["basic line"]
-    assert sink.lines == ["basic line"]
     log_lines = log_file.read_text(encoding="utf-8").splitlines()
     assert log_lines[0] == "basic line"
     assert log_lines[1].startswith("[Logging] untrusted_record_redacted ")
@@ -294,13 +270,14 @@ def test_translation_latency_uses_async_file_writer_without_ui_console_or_late_f
         root_logger=root_logger,
         session_logger=logging.getLogger(f"test.runtime.latency.session.{uuid4()}"),
         sinks=sinks,
-        ui_handler_factory=_RealtimeHandler,
     )
     runtime_logging = RuntimeLoggingService(session_service=session)
-    live_sink = _RealtimeSink()
+    history = ConversationHistory()
     owner = ApplicationRuntimeLoggingOwner(
         presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda service: service.attach_realtime_sink(live_sink),
+            bind_conversation_history=lambda service: service.set_conversation_history_observer(
+                history.observe_conversation
+            ),
         ),
         service_factory=lambda: runtime_logging,
         fallback_logger=root_logger,
@@ -343,6 +320,6 @@ def test_translation_latency_uses_async_file_writer_without_ui_console_or_late_f
     assert "request_end" in latency_lines[1]
     assert "prompt=secret" not in content
     assert "[LlmLatency]" not in stream.getvalue()
-    assert live_sink.lines == ["basic line"]
+    assert history.conversation_records == ()
     captured = capsys.readouterr()
     assert "[LlmLatency]" not in captured.out + captured.err

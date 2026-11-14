@@ -87,7 +87,14 @@ MODULE_FIELDS = {
         "chatbox.activation_notice.enabled",
         "vrc_mic_intercept.enabled",
     ),
-    "general": ("locale", "clipboard.enabled", "telemetry.enabled"),
+    "general": (
+        "locale",
+        "clipboard.enabled",
+        "telemetry.enabled",
+        "photo.enabled",
+        "photo.route",
+        "photo.delete_translated",
+    ),
 }
 MODULE_KEYS = {
     "recognition": (

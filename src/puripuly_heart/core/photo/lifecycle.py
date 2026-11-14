@@ -24,6 +24,8 @@ from .protocol import (
     PhotoTextDelta,
 )
 
+_TRANSLATED_PHASES = frozenset({"completed", "completed_corrected", "partial"})
+
 
 @dataclass(frozen=True, slots=True)
 class PhotoRoute:
@@ -65,8 +67,10 @@ class PhotoLifecycle:
         prepare: Callable[..., Awaitable[PreparedPhoto]],
         clock: Callable[[], float] = time.monotonic,
         temporary_root: Path | None = None,
+        discard_translated: Callable[[PhotoCapture], Awaitable[None]] | None = None,
     ) -> None:
         self._resolve_route = resolve_route
+        self._discard_translated = discard_translated
         self._target_language = target_language
         self._publish = publish
         self._diagnostic = diagnostic
@@ -80,6 +84,8 @@ class PhotoLifecycle:
         self._frozen = False
         self._renderer_generation = 0
         self._draw_eligible: set[tuple[str, int]] = set()
+        self._limited_until: dict[str, float] = {}
+        self.debug_limited = False
 
     @property
     def request_starts(self) -> int:
@@ -151,7 +157,11 @@ class PhotoLifecycle:
             return False
         photo = _Photo(capture=capture, route=route)
         self._current = photo
-        photo.task = self._scope.create_task(self._run(photo), name=photo.photo_id)
+        if self.debug_limited or self._clock() < self._limited_until.get(route.identity, 0):
+            photo.phase = "limited"
+        else:
+            self._limited_until.pop(route.identity, None)
+            photo.task = self._scope.create_task(self._run(photo), name=photo.photo_id)
         self._changed()
         return True
 
@@ -170,7 +180,7 @@ class PhotoLifecycle:
             if self._age(photo) >= 600 or route is None or route.identity != photo.route.identity:
                 self._retire_current()
                 self._changed()
-            elif photo.phase == "offer" and self._age(photo) >= 10:
+            elif photo.phase in ("offer", "limited") and self._age(photo) >= 10:
                 photo.phase = "expired"
                 if photo.task is not None:
                     photo.task.cancel()
@@ -187,7 +197,9 @@ class PhotoLifecycle:
         if not event_id or len(event_id) > 128 or event_id in photo.events:
             return False
         photo.events.append(event_id)
-        if photo.phase == "expired" or (photo.attempt_id == 0 and self._age(photo) >= 10):
+        if photo.phase in ("expired", "limited") or (
+            photo.attempt_id == 0 and self._age(photo) >= 10
+        ):
             return False
         photo.visible = True
         if photo.phase == "offer":
@@ -492,6 +504,8 @@ class PhotoLifecycle:
                 photo.failure_code = (
                     exc.code if isinstance(exc, PhotoProviderError) else "photo_preparation_failed"
                 )
+                if isinstance(exc, PhotoProviderError) and exc.retry_after is not None:
+                    self._limited_until[photo.route.identity] = self._clock() + exc.retry_after
                 self._discard_unfinished(photo)
                 self._measure(photo, "failed", failure_code=photo.failure_code)
                 self._changed()
@@ -508,6 +522,11 @@ class PhotoLifecycle:
         if photo.directory is not None:
             await run_owned_thread_call(photo.directory.cleanup)
             photo.directory = None
+        if self._discard_translated is not None and photo.phase in _TRANSLATED_PHASES:
+            try:
+                await self._discard_translated(photo.capture)
+            except Exception:
+                self._measure(photo, "cleanup_failed", failure_code="photo_discard_failed")
 
     async def close(self) -> None:
         self.stop_ingress()

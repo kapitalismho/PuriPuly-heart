@@ -92,11 +92,9 @@ Keep offline outputs private when inputs contain personal photos. Use the recove
 
 ### Selected model distribution
 
-The selected export is `mbnv4_text_seg.onnx`, 48,103,781 bytes (45.88 MiB), SHA-256 `bfe95d72db1eea72101074293c8d27b77eb87663fa48a23e8258e59249510bcf`, derived from upstream `mbnet_manga_text_seg.pth`, SHA-256 `371ad2c07453e6f52da6c042fb2bcdc6eeb9520ca386f4616b6526ae8483e140`. This export accepts RGB uint8 NCHW and already contains ImageNet normalization and sigmoid; applying those again changes inference.
+The selected `mbnv4_text_seg.onnx` export accepts RGB uint8 NCHW and includes ImageNet normalization and sigmoid; applying those again changes inference.
 
-The [upstream README](https://github.com/daominhwysi/manga-translator/tree/3fd406347926b3edfc90e837fe127df6a69decbe) asserts MIT, but the inspected release has no clear weight-specific redistribution/conversion grant or applicable copyright/third-party notice inventory. **M4 distribution permission remains unresolved.** No weights are bundled or automatically downloaded. Obtain an authoritative permission basis covering the identified checkpoint and converted ONNX before shipping either. The external local artifacts used for parity do not establish distribution rights. Rust Telea/resize attribution is retained in the [third-party notices](../../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt); the product has no OpenCV dependency.
-
-The model-distribution decision, owner responsibilities and installer resumption criteria are tracked in [#340](https://github.com/kapitalismho/PuriPuly-heart/issues/340). Installer integration remains deferred; the current product code and download behavior are unchanged.
+[Windows Setup](../../installer/photo-model.iss) downloads the required model. The application supplies the installed model and ONNX Runtime paths to the native photo child, which does not own downloads. Model provenance, license declarations and native image-processing attribution are retained in the [third-party notices](../../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt).
 
 
 ### Issue #340 verification snapshot — 2026-10-31

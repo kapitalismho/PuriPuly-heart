@@ -609,8 +609,8 @@ def _layout_cards(control: ft.Control) -> list[ft.Control]:
     return []
 
 
-def _prompt_tab_cards(view: settings_view.SettingsView) -> list[ft.Control]:
-    return list(_subtab_controls(view, "prompt"))
+def _full_width_cards(view: settings_view.SettingsView) -> list[ft.Control]:
+    return [*_subtab_controls(view, "api"), *_subtab_controls(view, "general")]
 
 
 def _overlay_tab_cards(view: settings_view.SettingsView) -> list[ft.Control]:
@@ -699,11 +699,15 @@ def _row_card_titles(control: ft.Control) -> list[str]:
     return [title for card in _layout_cards(control) if (title := _card_title(card)) is not None]
 
 
-def _prompt_tab_card(view: settings_view.SettingsView, title: str) -> ft.Control:
-    for card in _prompt_tab_cards(view):
-        if _card_title(card) == title:
+def _full_width_card(view: settings_view.SettingsView, title: str) -> ft.Control:
+    for card in _full_width_cards(view):
+        try:
+            card_title = _card_title(card)
+        except Exception:
+            continue
+        if card_title == title:
             return card
-    raise AssertionError(f"prompt tab card not found: {title}")
+    raise AssertionError(f"settings card not found: {title}")
 
 
 def _overlay_tab_card_titles(view: settings_view.SettingsView) -> list[str]:
@@ -3826,25 +3830,123 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
     assert "api_keys_column" in api_key_updates
 
 
-def test_peer_auto_detection_languages_card_stays_on_prompt_tab(
+@pytest.mark.parametrize(
+    ("route", "chatgpt", "gemini", "remaining"),
+    [
+        ("managed", False, False, True),
+        ("chatgpt", True, False, False),
+        ("gemini", False, True, False),
+    ],
+)
+def test_photo_route_shows_only_its_credential_card(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    route: str,
+    chatgpt: bool,
+    gemini: bool,
+    remaining: bool,
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(settings.intent, photo=replace(settings.intent.photo, route=route)),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    photo_controls = _subtab_controls(view, "photo")
+    assert view._photo_chatgpt_view.card in photo_controls
+    assert view._photo_gemini_card in photo_controls
+    assert view._photo_chatgpt_view.card is not view._chatgpt_account_card
+    assert view._photo_chatgpt_view.card.visible is chatgpt
+    assert view._photo_gemini_card.visible is gemini
+    assert view._photo_remaining_text.visible is remaining
+    assert view._photo_route_text.content.value == t(f"settings.photo.route.{route}")
+
+
+def test_agent_navigation_opens_the_tab_that_holds_each_section(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    opened = []
+
+    for section, tab in (("photo", "photo"), ("prompts", "general"), ("api", "api")):
+        result = view.open_agent_section(section, None, show_settings=lambda: opened.append(1))
+        assert result["opened"] is True
+        assert view._settings_subtab_shell.active_key == tab
+    assert len(opened) == 3
+
+
+def test_photo_gemini_field_shares_the_gemini_secret(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    saved = []
+    monkeypatch.setattr(view, "_on_secret_change", lambda key, value: saved.append((key, value)))
+
+    view._on_gemini_secret_change("gemini_api_key", "synthetic-gemini")
+
+    assert view._gemini_key.value == "synthetic-gemini"
+    assert view._photo_gemini_key.value == "synthetic-gemini"
+    assert saved == [("gemini_api_key", "synthetic-gemini")]
+
+
+def test_speech_hint_cards_follow_api_keys_and_system_prompt_ends_general_tab(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
-    prompt_cards = _prompt_tab_cards(view)
-    assert prompt_cards[0] is _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
-    assert prompt_cards[1] is view._peer_auto_languages_card
-    assert prompt_cards[2] is _prompt_tab_card(view, t("settings.section.persona"))
-    assert view._peer_auto_languages_card.visible is True
-    assert view._peer_auto_languages_card not in _subtab_controls(view, "api")
+    api_controls = _subtab_controls(view, "api")
+    assert api_controls[-2] is _full_width_card(view, t("settings.section.custom_vocabulary"))
+    assert api_controls[-1] is view._peer_auto_languages_card
+    general_controls = _subtab_controls(view, "general")
+    assert general_controls[-1] is _full_width_card(view, t("settings.section.persona"))
+    assert settings_view._SETTINGS_SUBTAB_ORDER == ("api", "general", "photo", "overlay")
+
+
+@pytest.mark.parametrize(
+    ("stt_provider", "peer_stt_provider", "peer_source_mode", "vocabulary", "hints"),
+    [
+        (STTProviderName.SONIOX, STTProviderName.SONIOX, "auto", True, True),
+        (STTProviderName.DEEPGRAM, STTProviderName.GEMINI_TRANSCRIBE, "auto", True, True),
+        (STTProviderName.SONIOX, STTProviderName.SONIOX, "manual", True, False),
+        (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.LOCAL_CPU_AUTO, "auto", False, False),
+        (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.ELEVENLABS_SCRIBE, "auto", False, False),
+    ],
+)
+def test_speech_hint_cards_appear_only_when_the_selected_recognizer_uses_them(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    stt_provider: STTProviderName,
+    peer_stt_provider: STTProviderName,
+    peer_source_mode: str,
+    vocabulary: bool,
+    hints: bool,
+) -> None:
+    settings = _vnext(
+        AppSettingsVNext(),
+        stt_provider=stt_provider,
+        peer_stt_provider=peer_stt_provider.value,
+        peer_source_mode=peer_source_mode,
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    assert view._custom_vocab_card.visible is vocabulary
+    assert view._peer_auto_languages_card.visible is hints
 
 
 def test_peer_auto_detection_languages_card_loads_saved_hints(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_expected_languages=["ja", "zh-TW"])
+    settings = _vnext(
+        settings,
+        peer_expected_languages=["ja", "zh-TW"],
+        peer_stt_provider=STTProviderName.SONIOX.value,
+        peer_source_mode="auto",
+    )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
@@ -4636,7 +4738,7 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         view, _ = _make_settings_view(monkeypatch, settings_events)
         settings_events.load(view, settings, config_path=Path("settings.json"))
         view.on_desktop_overlay_recovery_action = recovery_actions.append
-        view.on_view_logs = lambda: details_opened.append(True)
+        view.on_open_agent = lambda: details_opened.append(True)
 
         view.set_overlay_runtime_state(
             "failed",
@@ -4663,7 +4765,7 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         ]
 
         view._on_desktop_overlay_primary_action(None)
-        view._on_desktop_overlay_view_logs(None)
+        view._on_desktop_overlay_open_agent(None)
 
         assert recovery_actions == ["reopen"]
         assert details_opened == [True]
@@ -4836,7 +4938,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch, settings_events)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 9
+    assert len(api_controls) == 11
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -4871,6 +4973,8 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[7]) == [t("settings.managed_key.title")]
     assert api_controls[8] is not view._api_keys_column
     assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
+    assert api_controls[9] is view._custom_vocab_card
+    assert api_controls[10] is view._peer_auto_languages_card
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
@@ -5062,7 +5166,7 @@ def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
             view._overlay_vr_reset_button,
             view._overlay_desktop_reset_button,
             view._desktop_overlay_primary_action,
-            view._desktop_overlay_view_logs_action,
+            view._desktop_overlay_open_agent_action,
         ):
             assert control.content.font_family == zh_font
     finally:
@@ -5498,7 +5602,7 @@ def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
-    custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
+    custom_vocab_card = _full_width_card(view, t("settings.section.custom_vocabulary"))
 
     assert _tree_contains_control(custom_vocab_card, view._custom_vocab_tag_editor)
     assert not hasattr(view, "_custom_vocab_terms")
@@ -5534,7 +5638,7 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
+    custom_vocab_card = _full_width_card(view, t("settings.section.custom_vocabulary"))
     custom_vocab_column = _wrapped_card_column(custom_vocab_card)
 
     assert custom_vocab_column.controls[0] is view._custom_vocab_header
@@ -5549,16 +5653,19 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
 
-def test_prompt_tab_uses_shared_full_width_cards(
+def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    prompt_cards = _subtab_controls(view, "prompt")
+    prompt_cards = [
+        view._custom_vocab_card,
+        view._peer_auto_languages_card,
+        _subtab_controls(view, "general")[-1],
+    ]
 
-    assert len(prompt_cards) == 3
     assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
     assert all(card.height is None for card in prompt_cards)
     assert all(card.expand is False for card in prompt_cards)
@@ -6377,7 +6484,6 @@ def _make_provider_apply_app(
     app._current_tab = 2
     app.view_settings = view
     app.view_dashboard = object()
-    app.view_logs = object()
     app.view_about = object()
     app.content_area = SimpleNamespace(content=None, padding=None, update=lambda: None)
     app._close_open_dialog_for_navigation = lambda: None

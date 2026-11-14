@@ -3,6 +3,8 @@ use super::{
     LayoutKind, Rect, SourceMeasurement,
 };
 
+const SPILL_STEPS: [f32; 5] = [0.5, 1.0, 2.0, 3.0, 4.0];
+
 #[derive(Clone)]
 pub(super) struct Run {
     pub text: String,
@@ -35,6 +37,7 @@ pub(super) fn choose(
     info: &SourceMeasurement,
     model_box: Rect,
     floor: f32,
+    hard_floor: f32,
     cap: f32,
     placed: &[Rect],
     photo_bounds: Rect,
@@ -52,6 +55,7 @@ pub(super) fn choose(
     }
     let mut free = Vec::new();
     let mut fallback = Vec::new();
+    let mut tried = Vec::new();
     let lines: Vec<&str> = text
         .lines()
         .map(str::trim)
@@ -66,10 +70,11 @@ pub(super) fn choose(
             kinds.push(LayoutKind::Vertical);
         }
         for kind in kinds {
+            tried.push((region, kind));
             let make = |metrics: &mut DirectWriteMetrics, size: f32, strict: bool| {
                 layout(metrics, text, &lines, info, region, kind, size, strict)
             };
-            let forced = make(metrics, floor, false)?;
+            let forced = make(metrics, hard_floor, false)?;
             if let Some(candidate) = forced {
                 fallback.push(candidate);
             }
@@ -94,16 +99,7 @@ pub(super) fn choose(
             }
         }
     }
-    let score = |candidate: &Candidate| {
-        let vertical = candidate.kind == LayoutKind::Vertical
-            || (candidate.kind == LayoutKind::Lines && info.direction == Direction::Vertical);
-        candidate.size
-            * if vertical == (info.direction == Direction::Vertical) {
-                1.0
-            } else {
-                0.85
-            }
-    };
+    let score = |candidate: &Candidate| score(candidate, info);
     if let Some(best) = free.into_iter().max_by(|a, b| {
         score(a)
             .total_cmp(&score(b))
@@ -111,12 +107,34 @@ pub(super) fn choose(
     }) {
         return Ok(best);
     }
+    if let Some(best) = spill(metrics, text, &lines, info, model_box, floor, placed, photo_bounds)? {
+        return Ok(best);
+    }
+    let mut shrunk = Vec::new();
+    for (region, kind) in tried {
+        if let Some(candidate) = bisect(metrics, hard_floor, floor, |metrics, size| {
+            Ok(layout(metrics, text, &lines, info, region, kind, size, true)?
+                .filter(|candidate| !hits(&candidate.boxes(info), placed)))
+        })? {
+            shrunk.push(candidate);
+        }
+    }
+    if let Some(best) = shrunk.into_iter().max_by(|a, b| score(a).total_cmp(&score(b))) {
+        return Ok(best);
+    }
+    if hard_floor < floor {
+        if let Some(best) =
+            spill(metrics, text, &lines, info, model_box, hard_floor, placed, photo_bounds)?
+        {
+            return Ok(best);
+        }
+    }
     let rescue = info.angle_degrees == 0.0
         && info.direction == Direction::Horizontal
         && fallback.iter().all(|candidate| candidate.overflow);
     if rescue {
         let base = union(info.extent, model_box);
-        let margin = floor * 0.5;
+        let margin = hard_floor * 0.5;
         let expanded = rect(
             (base.left - margin).max(photo_bounds.left),
             (base.top - margin).max(photo_bounds.top),
@@ -130,7 +148,7 @@ pub(super) fn choose(
             info,
             expanded,
             LayoutKind::Horizontal,
-            floor,
+            hard_floor,
             false,
         )? {
             fallback.push(candidate);
@@ -177,6 +195,61 @@ pub(super) fn choose(
         })
         .map(|(candidate, _)| candidate)
         .ok_or_else(|| "photo translation has no drawable text".into())
+}
+
+fn score(candidate: &Candidate, info: &SourceMeasurement) -> f32 {
+    let vertical = candidate.kind == LayoutKind::Vertical
+        || (candidate.kind == LayoutKind::Lines && info.direction == Direction::Vertical);
+    candidate.size
+        * if vertical == (info.direction == Direction::Vertical) {
+            1.0
+        } else {
+            0.85
+        }
+}
+
+fn spill(
+    metrics: &mut DirectWriteMetrics,
+    text: &str,
+    lines: &[&str],
+    info: &SourceMeasurement,
+    model_box: Rect,
+    size: f32,
+    placed: &[Rect],
+    photo_bounds: Rect,
+) -> Result<Option<Candidate>, String> {
+    if info.angle_degrees != 0.0 {
+        return Ok(None);
+    }
+    let base = union(info.extent, model_box);
+    let mut kinds = vec![LayoutKind::Horizontal];
+    if info.direction == Direction::Vertical {
+        kinds.push(LayoutKind::Vertical);
+    }
+    for step in SPILL_STEPS {
+        let margin = size * step;
+        let region = rect(
+            (base.left - margin).max(photo_bounds.left),
+            (base.top - margin).max(photo_bounds.top),
+            (base.right + margin).min(photo_bounds.right),
+            (base.bottom + margin).min(photo_bounds.bottom),
+        );
+        let mut spread = Vec::new();
+        for &kind in &kinds {
+            if let Some(candidate) = layout(metrics, text, lines, info, region, kind, size, true)? {
+                if !hits(&candidate.boxes(info), placed) {
+                    spread.push(candidate);
+                }
+            }
+        }
+        if let Some(best) = spread
+            .into_iter()
+            .max_by(|a, b| score(a, info).total_cmp(&score(b, info)))
+        {
+            return Ok(Some(best));
+        }
+    }
+    Ok(None)
 }
 
 fn bisect(

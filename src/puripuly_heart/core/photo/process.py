@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import cast
 
 from puripuly_heart.core.lifecycle import LifecycleScope
+from puripuly_heart.core.local_asr.local_sherpa_runtime import resolve_local_sherpa_runtime_dir
 from puripuly_heart.core.overlay.manifest import OverlayLaunchManifest
 from puripuly_heart.core.overlay.process_adapter import (
     OverlayManagedProcess,
@@ -17,6 +18,7 @@ from puripuly_heart.core.overlay.process_adapter import (
 )
 from puripuly_heart.core.overlay.process_runners import DefaultOverlayProcessRunner
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .bridge import PhotoBridge
 
@@ -26,9 +28,15 @@ class PhotoProcessRunner:
         self.executable_path = executable_path
 
     def prepare(self, manifest: dict) -> Path:
-        return DefaultOverlayProcessRunner(executable_path=self.executable_path).prepare(
+        executable = DefaultOverlayProcessRunner(executable_path=self.executable_path).prepare(
             cast(OverlayLaunchManifest, manifest)
         )
+        if current_runtime_layout().host_kind == "native":
+            manifest["image"] = {
+                "model_path": str(executable.parent / "assets/photo/mbnv4_text_seg.onnx"),
+                "runtime_path": str(resolve_local_sherpa_runtime_dir() / "onnxruntime.dll"),
+            }
+        return executable
 
     async def spawn(
         self, executable: Path, manifest_path: Path, *, task_factory: Callable
@@ -132,8 +140,8 @@ class PhotoProcessSupervisor:
             process: OverlayManagedProcess | None = None
             try:
                 manifest_path = Path(directory.name) / "launch.json"
-                await run_owned_thread_call(lambda: self._write_manifest(manifest_path, manifest))
                 executable = await run_owned_thread_call(lambda: self._runner.prepare(manifest))
+                await run_owned_thread_call(lambda: self._write_manifest(manifest_path, manifest))
                 if self._stop.is_set():
                     return
                 process = await self._runner.spawn(

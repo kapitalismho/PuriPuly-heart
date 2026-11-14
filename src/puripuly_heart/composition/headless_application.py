@@ -116,7 +116,7 @@ class HeadlessApplicationPresentation:
             return
         logger.warning("Application message: %s", message_key)
 
-    def attach_runtime_log_sink(self, runtime_logging: object) -> None:
+    def bind_conversation_history(self, runtime_logging: object) -> None:
         self._remember("runtime_logging", runtime_logging)
 
     def schedule_task(self, coroutine_factory: object, *args: object) -> bool:

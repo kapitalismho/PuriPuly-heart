@@ -33,12 +33,14 @@ fn chosen_model_infers_original_photo_against_offline_reference() {
         bottom: bbox[3].as_f64().unwrap() as f32,
     };
     let mut processor = MaskProcessor::new(&model, Some(&runtime)).unwrap();
+    let mut workspace = puripuly_heart_overlay::photo::processing::Workspace::default();
     let prepared = processor
         .prepare(
             &work,
             bbox,
             fixture["lines"].as_u64().unwrap() as u32,
             &work.pixels,
+            &mut workspace,
         )
         .unwrap();
     let expected = image::open(root.join("mask_expected_core.png"))
@@ -62,14 +64,13 @@ fn chosen_model_infers_original_photo_against_offline_reference() {
     assert!(union > 100, "real source text must be detected");
     let iou = intersection as f64 / union as f64;
     eprintln!(
-        "Chosen model: core_iou={iou:.6}, plate={}, mask_ms={:.3}, erase_ms={:.3}, ROI={:?}",
-        prepared.plate, prepared.mask_ms, prepared.erase_ms, prepared.roi
+        "Chosen model: core_iou={iou:.6}, mask_ms={:.3}, erase_ms={:.3}, ROI={:?}",
+        prepared.mask_ms, prepared.erase_ms, prepared.roi
     );
     assert!(
         iou >= 0.98,
         "selected export mask diverges from original offline preprocessing: IoU {iou}"
     );
-    assert!(!prepared.plate, "fixture is a positive erasing case");
     assert!(prepared
         .erase
         .as_ref()

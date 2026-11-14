@@ -15,6 +15,7 @@ from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
+    PhotoStatusSnapshot,
     PromptApplyIntent,
     PromptSettingsSnapshot,
     ProviderApplyIntent,
@@ -66,6 +67,7 @@ class SettingsGeneralIntents:
     apply_loopback_capture_option: Callable[[str], None]
     loopback_capture_summary: Callable[[], str]
     osc_effective_ports: Callable[[], tuple[int | None, int | None]] | None = None
+    photo_status: Callable[[], Awaitable[PhotoStatusSnapshot]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +82,7 @@ class SettingsOverlayIntents:
     desktop_overlay_size_change: Callable[[str], None]
     desktop_overlay_recovery_action: Callable[[str], None]
     desktop_overlay_position_reset: Callable[[], None]
-    view_logs: Callable[[], None]
+    open_agent: Callable[[], None]
     calibration_begin: Callable[[], object] | None = None
     calibration_change: Callable[[str, object], object] | None = None
     calibration_apply: Callable[[], object] | None = None
@@ -196,6 +198,8 @@ class SettingsApiSurfaceSlots:
     api_keys: ft.Control
     http_extension: ft.Control | None = None
     chatgpt_account: ft.Control | None = None
+    custom_vocabulary: ft.Control | None = None
+    peer_expected_language: ft.Control | None = None
 
     @classmethod
     def from_slot_provider(cls, provider: SettingsApiSlotProvider) -> SettingsApiSurfaceSlots:
@@ -247,13 +251,17 @@ class SettingsGeneralSurfaceSlots:
     activation_notice: ft.Control
     activation_notice_middle: ft.Control
     activation_notice_trailing: ft.Control
+    persona: ft.Control | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class SettingsPromptSurfaceSlots:
-    custom_vocabulary: ft.Control
-    peer_expected_language: ft.Control
-    persona: ft.Control
+class SettingsPhotoSurfaceSlots:
+    enabled: ft.Control
+    route: ft.Control
+    remaining: ft.Control
+    delete_translated: ft.Control
+    chatgpt_account: ft.Control | None = None
+    gemini_key: ft.Control | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,7 +297,7 @@ class SettingsGeneralSurfaceRegions:
 
 
 @dataclass(frozen=True, slots=True)
-class SettingsPromptSurfaceRegions:
+class SettingsPhotoSurfaceRegions:
     rows: tuple[ft.Control, ...]
 
 
@@ -315,9 +323,9 @@ __all__ = [
     "SettingsOverlayIntents",
     "SettingsOverlaySurfaceRegions",
     "SettingsOverlaySurfaceSlots",
+    "SettingsPhotoSurfaceRegions",
+    "SettingsPhotoSurfaceSlots",
     "SettingsPromptIntents",
-    "SettingsPromptSurfaceRegions",
-    "SettingsPromptSurfaceSlots",
     "SettingsChatGptIntents",
     "SettingsProviderIntents",
     "SettingsProviderStateSink",

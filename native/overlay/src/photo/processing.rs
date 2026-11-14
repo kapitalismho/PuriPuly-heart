@@ -8,6 +8,7 @@ use std::time::Instant;
 use unicode_normalization::UnicodeNormalization;
 
 use super::telea;
+pub use super::telea::Workspace;
 
 pub const DEFAULT_MAX_DIMENSIONS: [u32; 2] = [1920, 1080];
 pub const MASK_MODEL_SHA256: &str =
@@ -103,9 +104,10 @@ pub struct PreparedRegion {
     pub bbox: Rect,
     pub roi: PixelRect,
     pub core: GrayImage,
+    pub recovered: GrayImage,
     pub glyph_size: f32,
+    pub source_lines: u32,
     pub fill: [u8; 3],
-    pub plate: bool,
     pub erase: Option<ErasePatch>,
     pub mask_ms: f64,
     pub erase_ms: f64,
@@ -128,7 +130,7 @@ pub fn candidate_region(photo: &WorkingPhoto, bbox: Rect) -> Result<PixelRect, S
     Ok(pixel_bounds(
         photo.pixels.dimensions(),
         bbox,
-        40.0 * photo.reference_scale,
+        80.0 * photo.reference_scale,
     ))
 }
 
@@ -185,9 +187,9 @@ fn geometry(
         bbox.height()
     };
     let glyph = (extent / source_line_count as f32).max(8.0 * photo.reference_scale);
-    let padding = (0.3 * glyph)
+    let padding = (RECOVERY_REACH * glyph)
         .round_ties_even()
-        .clamp(6.0 * photo.reference_scale, 40.0 * photo.reference_scale)
+        .clamp(6.0 * photo.reference_scale, 80.0 * photo.reference_scale)
         .round_ties_even()
         .max(1.0);
     Ok((
@@ -249,6 +251,44 @@ fn resize_tile(source: &RgbImage, rect: PixelRect, input: &mut [u8]) {
     }
 }
 
+fn merge_tile_mask(
+    core: &mut GrayImage,
+    roi: PixelRect,
+    tile: PixelRect,
+    bbox: Rect,
+    values: &[f32],
+) {
+    let xs: Vec<_> = (0..tile.width)
+        .map(|x| linear_coordinate(x, MODEL_SIZE as u32, tile.width))
+        .collect();
+    for y in 0..tile.height {
+        let local_y = tile.y - roi.y + y;
+        let photo_y = local_y as f32 + roi.y as f32 + 0.5;
+        if photo_y < bbox.top || photo_y >= bbox.bottom {
+            continue;
+        }
+        let (y0, y1, fy) = linear_coordinate(y, MODEL_SIZE as u32, tile.height);
+        for (x, &(x0, x1, fx)) in xs.iter().enumerate() {
+            let local_x = tile.x - roi.x + x as u32;
+            let photo_x = local_x as f32 + roi.x as f32 + 0.5;
+            if photo_x < bbox.left || photo_x >= bbox.right {
+                continue;
+            }
+            let pixel = &mut core.as_mut()[(local_y * roi.width + local_x) as usize];
+            if *pixel != 0 {
+                continue;
+            }
+            let a = values[y0 as usize * MODEL_SIZE + x0 as usize] * (1.0 - fx)
+                + values[y0 as usize * MODEL_SIZE + x1 as usize] * fx;
+            let b = values[y1 as usize * MODEL_SIZE + x0 as usize] * (1.0 - fx)
+                + values[y1 as usize * MODEL_SIZE + x1 as usize] * fx;
+            if a * (1.0 - fy) + b * fy > 0.3 {
+                *pixel = 255;
+            }
+        }
+    }
+}
+
 pub struct MaskProcessor {
     session: Session,
     input: Vec<u8>,
@@ -271,6 +311,8 @@ impl MaskProcessor {
         let session = Session::builder()
             .map_err(|e| e.to_string())?
             .with_intra_threads(2)
+            .map_err(|e| e.to_string())?
+            .with_intra_op_spinning(false)
             .map_err(|e| e.to_string())?
             .with_inter_threads(1)
             .map_err(|e| e.to_string())?
@@ -307,6 +349,7 @@ impl MaskProcessor {
         bbox: Rect,
         source_line_count: u32,
         erase_source: &RgbImage,
+        workspace: &mut telea::Workspace,
     ) -> Result<PreparedRegion, String> {
         let mask_start = Instant::now();
         if erase_source.dimensions() != photo.pixels.dimensions() {
@@ -314,7 +357,13 @@ impl MaskProcessor {
         }
         let (bbox, roi, glyph_size) = geometry(photo, bbox, source_line_count)?;
         let horizontal = roi.width >= roi.height;
-        let mut probability = vec![0.0_f32; roi.width as usize * roi.height as usize];
+        let mut foreground = GrayImage::new(roi.width, roi.height);
+        let whole = Rect {
+            left: roi.x as f32,
+            top: roi.y as f32,
+            right: (roi.x + roi.width) as f32,
+            bottom: (roi.y + roi.height) as f32,
+        };
         for (start, end) in tiles(roi.width.max(roi.height), roi.width.min(roi.height)) {
             let tile = if horizontal {
                 PixelRect {
@@ -351,61 +400,154 @@ impl MaskProcessor {
             {
                 return Err("mask_invalid_probability".into());
             }
-            let xs: Vec<_> = (0..tile.width)
-                .map(|x| linear_coordinate(x, MODEL_SIZE as u32, tile.width))
-                .collect();
-            for y in 0..tile.height {
-                let (y0, y1, fy) = linear_coordinate(y, MODEL_SIZE as u32, tile.height);
-                for (x, &(x0, x1, fx)) in xs.iter().enumerate() {
-                    let a = values[y0 as usize * MODEL_SIZE + x0 as usize] * (1.0 - fx)
-                        + values[y0 as usize * MODEL_SIZE + x1 as usize] * fx;
-                    let b = values[y1 as usize * MODEL_SIZE + x0 as usize] * (1.0 - fx)
-                        + values[y1 as usize * MODEL_SIZE + x1 as usize] * fx;
-                    let p = a * (1.0 - fy) + b * fy;
-                    let index =
-                        ((tile.y - roi.y + y) * roi.width + tile.x - roi.x + x as u32) as usize;
-                    probability[index] = probability[index].max(p);
-                }
-            }
+            merge_tile_mask(&mut foreground, roi, tile, whole, values);
         }
         let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
-            let inside = x as f32 + roi.x as f32 + 0.5 >= bbox.left
-                && x as f32 + roi.x as f32 + 0.5 < bbox.right
-                && y as f32 + roi.y as f32 + 0.5 >= bbox.top
-                && y as f32 + roi.y as f32 + 0.5 < bbox.bottom;
-            Luma([
-                if inside && probability[(y * roi.width + x) as usize] > 0.3 {
-                    255
-                } else {
-                    0
-                },
-            ])
+            Luma([if inside(roi, bbox, x, y) {
+                foreground.get_pixel(x, y)[0]
+            } else {
+                0
+            }])
         });
-        let mask = dilate(&core, erase_radius(glyph_size, photo.reference_scale), true);
-        let (fill, leftover, count) =
-            colors_and_leftover(photo, bbox, roi, &core, &mask, glyph_size);
-        let plate =
-            (count as f32 / (bbox.width() * bbox.height()).max(1.0)) < 0.03 || leftover >= 0.3;
+        let vertical = bbox.height() > 1.6 * bbox.width();
+        let owned = owned_lines(&foreground, roi, bbox, glyph_size, vertical);
+        let recovered = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+            Luma([if owned.get_pixel(x, y)[0] != 0 || core.get_pixel(x, y)[0] != 0 {
+                255
+            } else {
+                0
+            }])
+        });
+        let mask = dilate(
+            &recovered,
+            erase_radius(glyph_size, photo.reference_scale),
+            true,
+        );
+        let (fill, _, _) = colors_and_leftover(photo, bbox, roi, &core, &mask, glyph_size);
         let mask_ms = mask_start.elapsed().as_secs_f64() * 1000.0;
         let erase_start = Instant::now();
-        let erase = if plate {
-            None
-        } else {
-            Some(erase_patch(photo, roi, &mask, erase_source)?)
-        };
+        let erase = Some(erase_patch(photo, roi, &mask, erase_source, workspace)?);
         let erase_ms = erase_start.elapsed().as_secs_f64() * 1000.0;
         Ok(PreparedRegion {
             bbox,
             roi,
             core,
+            recovered,
             glyph_size,
+            source_lines: source_line_count,
             fill,
-            plate,
             erase,
             mask_ms,
             erase_ms,
         })
     }
+}
+
+const RECOVERY_REACH: f32 = 0.8;
+
+fn inside(roi: PixelRect, bbox: Rect, x: u32, y: u32) -> bool {
+    let px = x as f32 + roi.x as f32 + 0.5;
+    let py = y as f32 + roi.y as f32 + 0.5;
+    px >= bbox.left && px < bbox.right && py >= bbox.top && py < bbox.bottom
+}
+
+struct Part {
+    bounds: [i64; 4],
+    inside: u32,
+    total: u32,
+}
+
+fn owned_lines(
+    foreground: &GrayImage,
+    roi: PixelRect,
+    bbox: Rect,
+    glyph: f32,
+    vertical: bool,
+) -> GrayImage {
+    let (width, height) = foreground.dimensions();
+    let mut labels = vec![u32::MAX; (width * height) as usize];
+    let mut parts: Vec<Part> = Vec::new();
+    let mut stack = Vec::new();
+    for start in 0..width * height {
+        if labels[start as usize] != u32::MAX
+            || foreground.as_raw()[start as usize] == 0
+        {
+            continue;
+        }
+        let label = parts.len() as u32;
+        let mut part = Part {
+            bounds: [i64::MAX, i64::MAX, i64::MIN, i64::MIN],
+            inside: 0,
+            total: 0,
+        };
+        labels[start as usize] = label;
+        stack.push(start);
+        while let Some(index) = stack.pop() {
+            let (x, y) = (index % width, index / width);
+            part.bounds[0] = part.bounds[0].min(i64::from(x));
+            part.bounds[1] = part.bounds[1].min(i64::from(y));
+            part.bounds[2] = part.bounds[2].max(i64::from(x) + 1);
+            part.bounds[3] = part.bounds[3].max(i64::from(y) + 1);
+            part.total += 1;
+            part.inside += u32::from(inside(roi, bbox, x, y));
+            for dy in -1i64..=1 {
+                for dx in -1i64..=1 {
+                    let (nx, ny) = (i64::from(x) + dx, i64::from(y) + dy);
+                    if nx < 0 || ny < 0 || nx >= i64::from(width) || ny >= i64::from(height) {
+                        continue;
+                    }
+                    let next = (ny as u32 * width + nx as u32) as usize;
+                    if labels[next] == u32::MAX && foreground.as_raw()[next] != 0 {
+                        labels[next] = label;
+                        stack.push(next as u32);
+                    }
+                }
+            }
+        }
+        parts.push(part);
+    }
+    let mut parent: Vec<usize> = (0..parts.len()).collect();
+    fn root(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    let (along, across) = if vertical { (1, 0) } else { (0, 1) };
+    let reach = (0.8 * glyph) as i64;
+    for i in 0..parts.len() {
+        for j in i + 1..parts.len() {
+            let (a, b) = (&parts[i].bounds, &parts[j].bounds);
+            let gap = a[along].max(b[along]) - a[along + 2].min(b[along + 2]);
+            let shared = a[across + 2].min(b[across + 2]) - a[across].max(b[across]);
+            let thin = (a[across + 2] - a[across]).min(b[across + 2] - b[across]);
+            if gap <= reach && shared * 5 >= thin * 2 {
+                let (ri, rj) = (root(&mut parent, i), root(&mut parent, j));
+                parent[ri] = rj;
+            }
+        }
+    }
+    let mut lines = vec![(0u32, 0u32); parts.len()];
+    for i in 0..parts.len() {
+        let r = root(&mut parent, i);
+        lines[r].0 += parts[i].inside;
+        lines[r].1 += parts[i].total;
+    }
+    let owned: Vec<bool> = (0..parts.len())
+        .map(|i| {
+            let (inside, total) = lines[root(&mut parent, i)];
+            inside > 0 && inside * 2 >= total
+        })
+        .collect();
+    GrayImage::from_fn(width, height, |x, y| {
+        let label = labels[(y * width + x) as usize];
+        Luma([if label != u32::MAX && owned[label as usize] {
+            255
+        } else {
+            0
+        }])
+    })
 }
 
 #[inline]
@@ -443,7 +585,7 @@ fn dilate(core: &GrayImage, radius: u32, ellipse: bool) -> GrayImage {
     output
 }
 
-fn lab(rgb: [u8; 3]) -> [f32; 3] {
+fn lab(rgb: [u8; 3]) -> [u8; 3] {
     static LINEAR: LazyLock<[f32; 256]> = LazyLock::new(|| {
         std::array::from_fn(|i| {
             let v = i as f32 / 255.0;
@@ -468,32 +610,57 @@ fn lab(rgb: [u8; 3]) -> [f32; 3] {
     [
         ((116.0 * y - 16.0) * 255.0 / 100.0)
             .round_ties_even()
-            .clamp(0.0, 255.0),
+            .clamp(0.0, 255.0) as u8,
         (500.0 * (x - y) + 128.0)
             .round_ties_even()
-            .clamp(0.0, 255.0),
+            .clamp(0.0, 255.0) as u8,
         (200.0 * (y - z) + 128.0)
             .round_ties_even()
-            .clamp(0.0, 255.0),
+            .clamp(0.0, 255.0) as u8,
     ]
 }
 
-fn median(mut values: Vec<f32>) -> f32 {
-    if values.is_empty() {
-        return 0.0;
-    }
-    let length = values.len();
-    let middle = length / 2;
-    let (left, upper, _) = values.select_nth_unstable_by(middle, f32::total_cmp);
-    if length % 2 == 0 {
-        (left.iter().copied().max_by(f32::total_cmp).unwrap() + *upper) * 0.5
-    } else {
-        *upper
-    }
+struct ColorHistogram {
+    channels: [[usize; 256]; 3],
+    count: usize,
 }
 
-fn median_color(values: &[[f32; 3]]) -> [f32; 3] {
-    std::array::from_fn(|channel| median(values.iter().map(|v| v[channel]).collect()))
+impl ColorHistogram {
+    fn new() -> Self {
+        Self {
+            channels: [[0; 256]; 3],
+            count: 0,
+        }
+    }
+
+    fn push(&mut self, color: [u8; 3]) {
+        for (channel, value) in self.channels.iter_mut().zip(color) {
+            channel[value as usize] += 1;
+        }
+        self.count += 1;
+    }
+
+    fn median(&self) -> [f32; 3] {
+        if self.count == 0 {
+            return [0.0; 3];
+        }
+        let low = (self.count - 1) / 2;
+        let high = self.count / 2;
+        std::array::from_fn(|channel| {
+            let mut total = 0;
+            let mut lower = 0;
+            for (value, &count) in self.channels[channel].iter().enumerate() {
+                if total <= low && total + count > low {
+                    lower = value;
+                }
+                total += count;
+                if total > high {
+                    return (lower + value) as f32 * 0.5;
+                }
+            }
+            unreachable!("color histogram count mismatch")
+        })
+    }
 }
 
 fn delta(a: [f32; 3], b: [f32; 3], normalized: bool) -> f32 {
@@ -520,9 +687,9 @@ fn colors_and_leftover(
         .round_ties_even()
         .max(1.0) as u32;
     let mut labs = Vec::with_capacity(core.as_raw().len());
-    let mut text = Vec::new();
-    let mut background = Vec::new();
-    let mut border = Vec::new();
+    let mut text = ColorHistogram::new();
+    let mut background = ColorHistogram::new();
+    let mut border = ColorHistogram::new();
     for y in 0..roi.height {
         for x in 0..roi.width {
             let value = lab(photo.pixels.get_pixel(roi.x + x, roi.y + y).0);
@@ -541,17 +708,22 @@ fn colors_and_leftover(
             }
         }
     }
-    if text.is_empty() {
+    if text.count == 0 {
         return ([245, 245, 240], 0.0, 0);
     }
-    let bg = median_color(if background.is_empty() {
-        &border
+    let bg = if background.count == 0 {
+        border.median()
     } else {
-        &background
-    });
-    let text_color = median_color(&text);
-    let border_color = median_color(&border);
-    let mut distances: Vec<_> = text.iter().map(|&v| delta(v, bg, false)).collect();
+        background.median()
+    };
+    let text_color = text.median();
+    let border_color = border.median();
+    let mut distances = Vec::with_capacity(text.count);
+    for (&value, &on) in labs.iter().zip(core.as_raw()) {
+        if on != 0 {
+            distances.push(delta(value.map(f32::from), bg, false));
+        }
+    }
     let position = (distances.len() - 1) as f64 * 0.6;
     let low = position.floor() as usize;
     let fraction = (position - position.floor()) as f32;
@@ -562,18 +734,18 @@ fn colors_and_leftover(
         .min_by(f32::total_cmp)
         .unwrap_or(*lower);
     let threshold = *lower + (upper - *lower) * fraction;
-    let mut fill_pixels = Vec::new();
+    let mut fill_pixels = ColorHistogram::new();
     let mut leftover = 0;
     for y in 0..roi.height {
         for x in 0..roi.width {
             let index = (y * roi.width + x) as usize;
-            if core.as_raw()[index] != 0 && delta(labs[index], bg, false) >= threshold {
+            let value = labs[index].map(f32::from);
+            if core.as_raw()[index] != 0 && delta(value, bg, false) >= threshold {
                 fill_pixels.push(
                     photo
                         .pixels
                         .get_pixel(roi.x + x, roi.y + y)
-                        .0
-                        .map(f32::from),
+                        .0,
                 );
             }
             let inside = x as f32 + roi.x as f32 + 0.5 >= bbox.left
@@ -582,17 +754,17 @@ fn colors_and_leftover(
                 && y as f32 + roi.y as f32 + 0.5 < bbox.bottom;
             if inside
                 && mask.as_raw()[index] == 0
-                && delta(labs[index], text_color, true) < 12.0
-                && delta(labs[index], border_color, true) > 20.0
+                && delta(value, text_color, true) < 12.0
+                && delta(value, border_color, true) > 20.0
             {
                 leftover += 1;
             }
         }
     }
     (
-        median_color(&fill_pixels).map(|v| v as u8),
-        leftover as f32 / text.len() as f32,
-        text.len(),
+        fill_pixels.median().map(|v| v as u8),
+        leftover as f32 / text.count as f32,
+        text.count,
     )
 }
 
@@ -600,17 +772,15 @@ pub fn refresh_erase(
     photo: &WorkingPhoto,
     region: &mut PreparedRegion,
     erase_source: &RgbImage,
+    workspace: &mut Workspace,
 ) -> Result<(), String> {
-    if region.plate {
-        return Ok(());
-    }
     let start = Instant::now();
     let mask = dilate(
-        &region.core,
+        &region.recovered,
         erase_radius(region.glyph_size, photo.reference_scale),
         true,
     );
-    region.erase = Some(erase_patch(photo, region.roi, &mask, erase_source)?);
+    region.erase = Some(erase_patch(photo, region.roi, &mask, erase_source, workspace)?);
     region.erase_ms += start.elapsed().as_secs_f64() * 1000.0;
     Ok(())
 }
@@ -642,6 +812,7 @@ fn erase_patch(
     roi: PixelRect,
     mask: &GrayImage,
     erase_source: &RgbImage,
+    workspace: &mut telea::Workspace,
 ) -> Result<ErasePatch, String> {
     if erase_source.dimensions() != photo.pixels.dimensions() {
         return Err("photo_erase_source_dimensions".into());
@@ -658,16 +829,19 @@ fn erase_patch(
         i64::from(roi.y - y),
     );
     let erased = telea::inpaint(
-        &crop,
+        crop,
         &expanded_mask,
         (5.0 * photo.reference_scale).round_ties_even().max(1.0) as u32,
+        workspace,
     )
     .map_err(str::to_string)?;
     let pixels = RgbaImage::from_fn(roi.width, roi.height, |px, py| {
         let ex = roi.x - x + px;
         let ey = roi.y - y + py;
         let rgb = erased.get_pixel(ex, ey).0;
-        let alpha = if mask.get_pixel(px, py)[0] != 0 && rgb != crop.get_pixel(ex, ey).0 {
+        let alpha = if mask.get_pixel(px, py)[0] != 0
+            && rgb != erase_source.get_pixel(roi.x + px, roi.y + py).0
+        {
             255
         } else {
             0

@@ -204,6 +204,34 @@ def adapter(control, *, watching=False):
 
 
 @pytest.mark.asyncio
+async def test_photo_settings_change_through_the_normal_approval_card(catalog):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        proposed = await tools.execute(
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {"photo.route": "gemini", "photo.delete_translated": True},
+            },
+        )
+        assert proposed["status"] == "needs_confirmation"
+        assert not control.submissions
+        applied = await tools.confirm(proposed["confirmation"]["id"], True)
+        assert applied["receipt"]["terminal"] is True
+        assert control.submissions[0]["changes"] == {
+            "photo.route": "gemini",
+            "photo.delete_translated": True,
+        }
+        rejected = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"photo.route": "openai"}}
+        )
+        assert rejected["status"] != "needs_confirmation"
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
 async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
     control = Control(catalog)
     tools, actions, events = adapter(control)

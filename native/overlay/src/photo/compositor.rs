@@ -13,7 +13,7 @@ use windows::Win32::Graphics::Direct2D::{
         D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_U,
     },
     D2D1CreateFactory, ID2D1Bitmap1, ID2D1CommandList, ID2D1DeviceContext, ID2D1Factory1,
-    ID2D1Layer, ID2D1SolidColorBrush, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+    ID2D1Layer, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
     D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_NONE, D2D1_BITMAP_OPTIONS_TARGET,
     D2D1_BITMAP_PROPERTIES1, D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE,
     D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_LAYER_OPTIONS1_NONE,
@@ -47,6 +47,26 @@ use crate::presentation::AdapterIdentity;
 use crate::renderer::glyph_run::render_text_layout_to_command_list;
 
 pub const BLOCK_FADE: Duration = Duration::from_millis(100);
+pub const GPU_POLL_INTERVAL: Duration = Duration::from_millis(2);
+pub const GPU_TIMEOUT: Duration = Duration::from_millis(50);
+
+struct OriginalMetadata {
+    source_key: String,
+    dimensions: [u32; 2],
+    reference_scale: f32,
+}
+
+struct PendingCompletion {
+    started: Instant,
+    upload_serial: u64,
+    frame_timed: bool,
+}
+
+struct RenderedFrame {
+    at: Instant,
+    block_count: usize,
+}
+
 
 struct RunVisual {
     commands: ID2D1CommandList,
@@ -61,7 +81,7 @@ struct BlockVisual {
     start: Instant,
     metadata: Value,
     roi_timer: Option<GpuTimer>,
-    plate: Option<(ID2D1SolidColorBrush, Rect)>,
+    upload_serial: u64,
 }
 
 pub struct PhotoCompositor {
@@ -70,10 +90,14 @@ pub struct PhotoCompositor {
     factory: ID2D1Factory1,
     d2d: ID2D1DeviceContext,
     opacity_layer: ID2D1Layer,
-    working: Option<Arc<WorkingPhoto>>,
+    original_metadata: Option<OriginalMetadata>,
     original: Option<ID2D1Bitmap1>,
     target: Option<ID2D1Bitmap1>,
     texture: Option<ID3D11Texture2D>,
+    spare_target: Option<(ID2D1Bitmap1, ID3D11Texture2D)>,
+    presented_texture: Option<usize>,
+    completed_text: Option<ID2D1Bitmap1>,
+    completed_prefix: usize,
     blocks: Vec<BlockVisual>,
     pub original_uploads: u64,
     pub adapter: AdapterIdentity,
@@ -84,7 +108,14 @@ pub struct PhotoCompositor {
     pub frame_gpu_ms: Option<f64>,
     font: Option<super::image::PhotoFont>,
     timings: HashMap<u64, [f64; 3]>,
-    frame_timing_started: bool,
+    pending: Option<PendingCompletion>,
+    rendered: Option<RenderedFrame>,
+    completed: Option<RenderedFrame>,
+    upload_serial: u64,
+    warming_up: bool,
+    warmed_up: bool,
+    #[cfg(test)]
+    pub(super) hold_completion: bool,
 }
 
 impl PhotoCompositor {
@@ -145,10 +176,14 @@ impl PhotoCompositor {
             factory,
             d2d,
             opacity_layer,
-            working: None,
+            original_metadata: None,
             original: None,
             target: None,
             texture: None,
+            spare_target: None,
+            presented_texture: None,
+            completed_text: None,
+            completed_prefix: 0,
             blocks: Vec::new(),
             original_uploads: 0,
             adapter: identity,
@@ -159,8 +194,97 @@ impl PhotoCompositor {
             frame_gpu_ms: None,
             font: None,
             timings: HashMap::new(),
-            frame_timing_started: false,
+            pending: None,
+            rendered: None,
+            completed: None,
+            upload_serial: 0,
+            warming_up: false,
+            warmed_up: false,
+            #[cfg(test)]
+            hold_completion: false,
         })
+    }
+
+    pub async fn warm_up(&mut self) -> Result<(), PhotoError> {
+        if self.warmed_up {
+            return Ok(());
+        }
+        if self.original.is_some() || self.pending.is_some() {
+            return Err(PhotoError::Graphics);
+        }
+        self.warming_up = true;
+        let result = async {
+            let working = Arc::new(
+                WorkingPhoto::new(
+                    Arc::new(image::RgbImage::from_pixel(
+                        128,
+                        72,
+                        image::Rgb([64, 80, 96]),
+                    )),
+                    [128, 72],
+                )
+                .map_err(|_| PhotoError::Graphics)?,
+            );
+            let bounds = Rect {
+                left: 16.0,
+                top: 16.0,
+                right: 112.0,
+                bottom: 56.0,
+            };
+            let roi = PixelRect {
+                x: 16,
+                y: 16,
+                width: 96,
+                height: 40,
+            };
+            let region = PreparedRegion {
+                bbox: bounds,
+                roi,
+                core: image::GrayImage::from_pixel(96, 40, image::Luma([255])),
+                recovered: image::GrayImage::from_pixel(96, 40, image::Luma([255])),
+                glyph_size: 40.0,
+                source_lines: 1,
+                fill: [240, 248, 255],
+                erase: Some(super::processing::ErasePatch {
+                    rect: roi,
+                    pixels: image::RgbaImage::from_pixel(
+                        96,
+                        40,
+                        image::Rgba([64, 80, 96, 255]),
+                    ),
+                }),
+                mask_ms: 0.0,
+                erase_ms: 0.0,
+            };
+            let mut typesetter = super::typeset::PhotoTypesetter::new()
+                .map_err(|_| PhotoError::Graphics)?;
+            let text = typesetter
+                .typeset(&working, &region, "한글 Warmup")
+                .map_err(|_| PhotoError::Graphics)?;
+            self.set_original(working, "photo-renderer-warmup")?;
+            let now = Instant::now();
+            self.render(now, false)?;
+            self.wait_for_completion().await?;
+            self.add_block(0, Some(region), Some(text), 0.0, now)?;
+            self.render(now + BLOCK_FADE / 2, false)?;
+            self.wait_for_completion().await?;
+            self.render(now + BLOCK_FADE, false)?;
+            self.wait_for_completion().await?;
+            self.render(now + BLOCK_FADE + GPU_POLL_INTERVAL, false)?;
+            self.wait_for_completion().await
+        }
+        .await;
+        if result.is_err() {
+            let _ = self.wait_for_completion().await;
+        }
+        self.clear_photo();
+        self.pending = None;
+        self.original_uploads = 0;
+        self.upload_serial = 0;
+        self.frame_gpu_ms = None;
+        self.warming_up = false;
+        self.warmed_up = result.is_ok();
+        result
     }
 
     pub fn icon_texture(&self, rgba: &[u8], size: u32) -> Result<PhotoTexture, PhotoError> {
@@ -262,49 +386,59 @@ impl PhotoCompositor {
         self.save_d3d_texture(texture.texture(), width, height, path)
     }
 
-    pub fn set_original(&mut self, working: Arc<WorkingPhoto>) -> Result<(), PhotoError> {
-        if self
-            .working
-            .as_ref()
-            .is_some_and(|old| Arc::ptr_eq(old, &working))
-        {
+    pub fn set_original(&mut self, working: Arc<WorkingPhoto>, source_key: &str) -> Result<(), PhotoError> {
+        let (width, height) = working.pixels.dimensions();
+        if self.original_metadata.as_ref().is_some_and(|old| {
+            old.source_key == source_key
+                && old.dimensions == [width, height]
+                && old.reference_scale == working.reference_scale
+        }) {
             return Ok(());
         }
-        let (width, height) = working.pixels.dimensions();
         let mut bgra = Vec::with_capacity(width as usize * height as usize * 4);
         for pixel in working.pixels.pixels() {
             bgra.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 255]);
         }
         self.original = Some(self.upload(width, height, &bgra)?);
-        let texture = self.create_texture(width, height, false)?;
-        let surface: IDXGISurface = texture.cast().map_err(|_| PhotoError::Graphics)?;
-        let target = unsafe {
-            self.d2d.CreateBitmapFromDxgiSurface(
-                &surface,
-                Some(&bitmap_properties(
-                    D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-                )),
-            )
-        }
-        .map_err(|_| PhotoError::Graphics)?;
+        let (target, texture) = self.create_render_target(width, height)?;
         unsafe {
             self.d2d.SetTarget(&target);
         }
         self.target = Some(target);
         self.texture = Some(texture);
-        self.working = Some(working);
+        self.original_metadata = Some(OriginalMetadata {
+            source_key: source_key.to_owned(),
+            dimensions: [width, height],
+            reference_scale: working.reference_scale,
+        });
+        self.rendered = None;
+        self.completed = None;
+        self.spare_target = None;
+        self.presented_texture = None;
         self.blocks.clear();
+        self.completed_text = None;
+        self.completed_prefix = 0;
         self.fade_until = None;
         self.original_uploads += 1;
         self.dirty = true;
         Ok(())
     }
 
+    pub fn accept_prepared_source(&mut self, camera_source: &str, prepared_source: &str) {
+        if let Some(original) = self.original_metadata.as_mut().filter(|original| original.source_key == camera_source) {
+            original.source_key = prepared_source.to_owned();
+        }
+    }
+
     pub fn clear_attempt(&mut self) {
         self.blocks.clear();
+        self.completed_text = None;
+        self.completed_prefix = 0;
         self.font = None;
         self.timings.clear();
         self.fade_until = None;
+        self.rendered = None;
+        self.completed = None;
         self.dirty = self.original.is_some();
     }
 
@@ -314,10 +448,16 @@ impl PhotoCompositor {
                 .SetTarget(None::<&windows::Win32::Graphics::Direct2D::ID2D1Image>);
         }
         self.blocks.clear();
+        self.completed_text = None;
+        self.completed_prefix = 0;
         self.original = None;
         self.target = None;
         self.texture = None;
-        self.working = None;
+        self.original_metadata = None;
+        self.rendered = None;
+        self.completed = None;
+        self.spare_target = None;
+        self.presented_texture = None;
         self.font = None;
         self.timings.clear();
         self.dirty = false;
@@ -335,7 +475,7 @@ impl PhotoCompositor {
     pub fn add_block(
         &mut self,
         id: u64,
-        region: Option<PreparedRegion>,
+        mut region: Option<PreparedRegion>,
         typeset: Option<TypesetBlock>,
         typeset_ms: f64,
         now: Instant,
@@ -346,22 +486,13 @@ impl PhotoCompositor {
         let upload_start = Instant::now();
         let mut roi_timer = None;
         let erase = region
-            .as_ref()
-            .and_then(|region| region.erase.as_ref())
+            .as_mut()
+            .and_then(|region| region.erase.as_mut())
             .map(|patch| {
-                let mut bgra = Vec::with_capacity(patch.pixels.as_raw().len());
-                for pixel in patch.pixels.pixels() {
-                    let a = u16::from(pixel[3]);
-                    bgra.extend_from_slice(&[
-                        ((u16::from(pixel[2]) * a + 127) / 255) as u8,
-                        ((u16::from(pixel[1]) * a + 127) / 255) as u8,
-                        ((u16::from(pixel[0]) * a + 127) / 255) as u8,
-                        pixel[3],
-                    ]);
-                }
+                premultiply_bgra(patch.pixels.as_mut());
                 let timer = GpuTimer::new(&self.device)?;
                 timer.begin(&self.d3d);
-                let bitmap = self.upload(patch.rect.width, patch.rect.height, &bgra)?;
+                let bitmap = self.upload(patch.rect.width, patch.rect.height, patch.pixels.as_raw())?;
                 timer.end(&self.d3d);
                 roi_timer = Some(timer);
                 Ok::<_, PhotoError>((bitmap, patch.rect))
@@ -418,21 +549,9 @@ impl PhotoCompositor {
                 });
             }
         }
-        let plate = typeset
-            .as_ref()
-            .and_then(|block| block.style.plate.as_ref())
-            .map(|plate| {
-                unsafe {
-                    self.d2d
-                        .CreateSolidColorBrush(&color(plate.color, plate.alpha), None)
-                }
-                .map(|brush| (brush, plate.rect))
-                .map_err(|_| PhotoError::Graphics)
-            })
-            .transpose()?;
         let costs = self.timings.remove(&id);
         let metadata = json!({
-            "block_id": id, "kept": region.is_none(), "plate": region.as_ref().is_some_and(|region| region.plate),
+            "block_id": id, "kept": region.is_none(),
             "mask_ms": costs.map_or_else(||region.as_ref().map_or(0.0,|region|region.mask_ms),|cost|cost[0]),
             "erase_ms": costs.map_or_else(||region.as_ref().map_or(0.0,|region|region.erase_ms),|cost|cost[1]),
             "typeset_ms": costs.map_or(typeset_ms,|cost|cost[2]), "roi_upload_ms": roi_upload_ms,
@@ -445,18 +564,21 @@ impl PhotoCompositor {
             "source_vertical": typeset.as_ref().map(|block| block.source_vertical), "angle_degrees": typeset.as_ref().map(|block| block.angle_degrees),
             "region_overflow": typeset.as_ref().is_some_and(|block| block.region_overflow),
         });
-        println!(
-            "{}",
-            json!({
-                "type":"photo_image_stage","stage":"block_ready","block_id":id,
-                "mask_ms":metadata["mask_ms"],"erase_ms":metadata["erase_ms"],
-                "typeset_ms":typeset_ms,"roi_upload_ms":roi_upload_ms,
-                "kept":metadata["kept"],"plate":metadata["plate"],"collision":metadata["collision"],
-            })
-        );
-        if erase.is_some() || plate.is_some() || !runs.is_empty() {
+        if !self.warming_up {
+            println!(
+                "{}",
+                json!({
+                    "type":"photo_image_stage","stage":"block_ready","block_id":id,
+                    "mask_ms":metadata["mask_ms"],"erase_ms":metadata["erase_ms"],
+                    "typeset_ms":typeset_ms,"roi_upload_ms":roi_upload_ms,
+                    "kept":metadata["kept"],"collision":metadata["collision"],
+                })
+            );
+        }
+        if erase.is_some() || !runs.is_empty() {
             self.fade_until = Some(now + BLOCK_FADE);
         }
+        self.upload_serial += 1;
         self.blocks.push(BlockVisual {
             id,
             erase,
@@ -465,7 +587,7 @@ impl PhotoCompositor {
             start: now,
             metadata,
             roi_timer,
-            plate,
+            upload_serial: self.upload_serial,
         });
         self.dirty = true;
         Ok(roi_upload_ms)
@@ -486,13 +608,23 @@ impl PhotoCompositor {
     }
 
     pub fn dimensions(&self) -> Option<[u32; 2]> {
-        self.working.as_ref().map(|photo| [photo.pixels.width(), photo.pixels.height()])
+        self.original_metadata.as_ref().map(|photo| photo.dimensions)
     }
 
     pub fn first_visible_block_in(&self, now: Instant, shown: [f32; 4]) -> Option<u64> {
         let [width, height] = self.dimensions()?.map(|value| value as f32);
+        self.visible_block_in(now, shown, [width, height], self.blocks.len())
+    }
+
+    pub fn first_drawn_block_in(&self, shown: [f32; 4]) -> Option<u64> {
+        let frame = self.completed.as_ref()?;
+        let dimensions = self.dimensions()?.map(|value| value as f32);
+        self.visible_block_in(frame.at, shown, dimensions, frame.block_count)
+    }
+
+    fn visible_block_in(&self, now: Instant, shown: [f32; 4], [width, height]: [f32; 2], block_count: usize) -> Option<u64> {
         let [left, top, right, bottom] = [shown[0] * width, shown[1] * height, shown[2] * width, shown[3] * height];
-        self.blocks.iter().find(|block| {
+        self.blocks.iter().take(block_count).find(|block| {
             !block.runs.is_empty() && fade_opacity(block.start, now) > 0.0
                 && block.typeset.as_ref().is_some_and(|text| text.collision_boxes.iter().any(|bounds| {
                     bounds.left < right && bounds.right > left && bounds.top < bottom && bounds.bottom > top
@@ -508,19 +640,37 @@ impl PhotoCompositor {
         &mut self,
         now: Instant,
         erased_only: bool,
-    ) -> Result<Option<PhotoTexture>, PhotoError> {
-        let Some(original) = &self.original else {
-            return Ok(None);
-        };
-        let working = self.working.as_ref().ok_or(PhotoError::Graphics)?;
+    ) -> Result<bool, PhotoError> {
+        if self.pending.is_some() {
+            return Err(PhotoError::Graphics);
+        }
+        if self.original.is_none() {
+            return Ok(false);
+        }
+        let [width, height] = self.dimensions().ok_or(PhotoError::Graphics)?;
+        if self.texture.as_ref().is_some_and(|texture| {
+            self.presented_texture == Some(texture.as_raw() as usize)
+        }) {
+            let (target, texture) = match self.spare_target.take() {
+                Some(target) => target,
+                None => self.create_render_target(width, height)?,
+            };
+            self.spare_target = Some((
+                self.target.replace(target).ok_or(PhotoError::Graphics)?,
+                self.texture.replace(texture).ok_or(PhotoError::Graphics)?,
+            ));
+        }
         let bounds = D2D_RECT_F {
             left: 0.0,
             top: 0.0,
-            right: working.pixels.width() as f32,
-            bottom: working.pixels.height() as f32,
+            right: width as f32,
+            bottom: height as f32,
         };
         self.frame_timer.begin(&self.d3d);
-        self.frame_timing_started = true;
+        if !erased_only {
+            self.cache_completed_text(now, bounds)?;
+        }
+        let original = self.original.as_ref().ok_or(PhotoError::Graphics)?;
         unsafe {
             self.d2d
                 .SetTarget(self.target.as_ref().ok_or(PhotoError::Graphics)?);
@@ -558,48 +708,20 @@ impl PhotoCompositor {
                         None,
                     );
                 }
-                if let Some((brush, rect)) = &block.plate {
-                    brush.SetOpacity(opacity);
-                    self.d2d.FillRectangle(&d2d_rect(*rect), brush);
-                }
             }
             if !erased_only {
-                for block in &self.blocks {
-                    let Some(typeset) = &block.typeset else {
-                        continue;
-                    };
-                    let opacity = fade_opacity(block.start, now);
-                    if opacity <= 0.0 {
-                        continue;
-                    }
-                    self.d2d.PushLayer(
-                        &D2D1_LAYER_PARAMETERS1 {
-                            contentBounds: bounds,
-                            geometricMask: ManuallyDrop::new(None),
-                            maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                            maskTransform: Matrix3x2::identity(),
-                            opacity,
-                            opacityBrush: ManuallyDrop::new(None),
-                            layerOptions: D2D1_LAYER_OPTIONS1_NONE,
-                        },
-                        &self.opacity_layer,
+                if let Some(text) = &self.completed_text {
+                    self.d2d.DrawBitmap(
+                        text,
+                        Some(&bounds),
+                        1.0,
+                        D2D1_INTERPOLATION_MODE_LINEAR,
+                        None,
+                        None,
                     );
-                    for run in &block.runs {
-                        self.d2d.SetTransform(&run_transform(
-                            run.origin,
-                            typeset.center,
-                            typeset.angle_degrees,
-                        ));
-                        self.d2d.DrawImage(
-                            &run.commands,
-                            None,
-                            None,
-                            D2D1_INTERPOLATION_MODE_LINEAR,
-                            D2D1_COMPOSITE_MODE_SOURCE_OVER,
-                        );
-                    }
-                    self.d2d.SetTransform(&Matrix3x2::identity());
-                    self.d2d.PopLayer();
+                }
+                for block in self.blocks.iter().skip(self.completed_prefix) {
+                    self.draw_text_block(block, bounds, fade_opacity(block.start, now));
                 }
             }
             self.d2d
@@ -611,66 +733,207 @@ impl PhotoCompositor {
         if self.fade_until.is_some_and(|until| now >= until) {
             self.fade_until = None;
         }
-        Ok(self
-            .texture
-            .as_ref()
-            .map(|texture| PhotoTexture::new(texture.clone())))
+        self.rendered = Some(RenderedFrame {
+            at: now,
+            block_count: if erased_only { 0 } else { self.blocks.len() },
+        });
+        self.fence(true)?;
+        Ok(true)
     }
 
-    pub async fn ready(&mut self) -> Result<(), PhotoError> {
+    fn cache_completed_text(&mut self, now: Instant, bounds: D2D_RECT_F) -> Result<(), PhotoError> {
+        let end = self.completed_prefix
+            + self.blocks[self.completed_prefix..]
+                .iter()
+                .take_while(|block| fade_opacity(block.start, now) == 1.0)
+                .count();
+        if end == self.completed_prefix {
+            return Ok(());
+        }
+        if self.blocks[self.completed_prefix..end].iter().all(|block| block.runs.is_empty()) {
+            self.completed_prefix = end;
+            return Ok(());
+        }
+        let clear = self.completed_text.is_none();
+        if clear {
+            self.completed_text = Some(unsafe {
+                self.d2d.CreateBitmap(
+                    D2D_SIZE_U {
+                        width: bounds.right as u32,
+                        height: bounds.bottom as u32,
+                    },
+                    None,
+                    0,
+                    &bitmap_properties(D2D1_BITMAP_OPTIONS_TARGET),
+                )
+            }.map_err(|_| PhotoError::Graphics)?);
+        }
+        let result = unsafe {
+            self.d2d.SetTarget(self.completed_text.as_ref().ok_or(PhotoError::Graphics)?);
+            self.d2d.SetTransform(&Matrix3x2::identity());
+            self.d2d.BeginDraw();
+            if clear {
+                self.d2d.Clear(Some(&color([0, 0, 0], 0.0)));
+            }
+            for block in &self.blocks[self.completed_prefix..end] {
+                self.draw_text_block(block, bounds, 1.0);
+            }
+            let result = self.d2d.EndDraw(None, None).map_err(|_| PhotoError::Graphics);
+            self.d2d.SetTarget(self.target.as_ref().ok_or(PhotoError::Graphics)?);
+            result
+        };
+        if result.is_ok() {
+            self.completed_prefix = end;
+        } else {
+            self.completed_text = None;
+            self.completed_prefix = 0;
+        }
+        result
+    }
+
+    fn draw_text_block(&self, block: &BlockVisual, bounds: D2D_RECT_F, opacity: f32) {
+        let Some(typeset) = &block.typeset else {
+            return;
+        };
+        if opacity <= 0.0 {
+            return;
+        }
+        unsafe {
+            self.d2d.PushLayer(
+                &D2D1_LAYER_PARAMETERS1 {
+                    contentBounds: bounds,
+                    geometricMask: ManuallyDrop::new(None),
+                    maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                    maskTransform: Matrix3x2::identity(),
+                    opacity,
+                    opacityBrush: ManuallyDrop::new(None),
+                    layerOptions: D2D1_LAYER_OPTIONS1_NONE,
+                },
+                &self.opacity_layer,
+            );
+            for run in &block.runs {
+                self.d2d.SetTransform(&run_transform(
+                    run.origin,
+                    typeset.center,
+                    typeset.angle_degrees,
+                ));
+                self.d2d.DrawImage(
+                    &run.commands,
+                    None,
+                    None,
+                    D2D1_INTERPOLATION_MODE_LINEAR,
+                    D2D1_COMPOSITE_MODE_SOURCE_OVER,
+                );
+            }
+            self.d2d.SetTransform(&Matrix3x2::identity());
+            self.d2d.PopLayer();
+        }
+    }
+
+    pub fn has_pending_completion(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    pub fn begin_completion(&mut self) -> Result<(), PhotoError> {
+        self.fence(false)
+    }
+
+    fn fence(&mut self, frame_timed: bool) -> Result<(), PhotoError> {
+        if self.pending.is_some() {
+            return Err(PhotoError::Graphics);
+        }
         unsafe {
             self.d3d.End(&self.readiness);
             self.d3d.Flush();
         }
-        let start = Instant::now();
-        loop {
-            let mut ready = BOOL::default();
-            unsafe {
-                self.d3d.GetData(
-                    &self.readiness,
-                    Some((&mut ready as *mut BOOL).cast()),
-                    std::mem::size_of::<BOOL>() as u32,
-                    D3D11_ASYNC_GETDATA_DONOTFLUSH.0 as u32,
-                )
-            }
-            .map_err(|_| PhotoError::Graphics)?;
-            if ready.as_bool() {
-                self.frame_gpu_ms = if self.frame_timing_started {
-                    self.frame_timer.elapsed_ms(&self.d3d)?
-                } else {
-                    None
-                };
-                for block in &mut self.blocks {
-                    if let Some(timer) = block.roi_timer.take() {
-                        let elapsed = timer.elapsed_ms(&self.d3d)?;
-                        block.metadata["roi_gpu_ms"] = json!(elapsed);
-                        block.metadata["roi_gpu_timing_valid"] = json!(elapsed.is_some());
-                        println!(
-                            "{}",
-                            json!({
-                                "type":"photo_image_stage","stage":"roi_updated","block_id":block.id,
-                                "gpu_ms":elapsed,"gpu_timing_valid":elapsed.is_some(),
-                            })
-                        );
-                    }
-                }
-                return Ok(());
-            }
-            if start.elapsed() >= Duration::from_millis(50) {
+        self.pending = Some(PendingCompletion {
+            started: Instant::now(),
+            upload_serial: self.upload_serial,
+            frame_timed,
+        });
+        Ok(())
+    }
+
+    pub fn poll_completion(&mut self, now: Instant) -> Result<bool, PhotoError> {
+        let Some(pending) = &self.pending else {
+            return Ok(true);
+        };
+        let mut ready = BOOL::default();
+        unsafe {
+            self.d3d.GetData(
+                &self.readiness,
+                Some((&mut ready as *mut BOOL).cast()),
+                std::mem::size_of::<BOOL>() as u32,
+                D3D11_ASYNC_GETDATA_DONOTFLUSH.0 as u32,
+            )
+        }
+        .map_err(|_| PhotoError::Graphics)?;
+        #[cfg(test)]
+        if self.hold_completion {
+            ready = BOOL(0);
+        }
+        if !ready.as_bool() {
+            if now.saturating_duration_since(pending.started) >= GPU_TIMEOUT {
                 return Err(PhotoError::Graphics);
             }
-            tokio::task::yield_now().await;
+            return Ok(false);
         }
+        if pending.frame_timed {
+            self.frame_gpu_ms = self.frame_timer.elapsed_ms(&self.d3d)?;
+        }
+        for block in &mut self.blocks {
+            if block.upload_serial > pending.upload_serial {
+                continue;
+            }
+            if let Some(timer) = block.roi_timer.take() {
+                let elapsed = timer.elapsed_ms(&self.d3d)?;
+                block.metadata["roi_gpu_ms"] = json!(elapsed);
+                block.metadata["roi_gpu_timing_valid"] = json!(elapsed.is_some());
+                if !self.warming_up {
+                    println!(
+                        "{}",
+                        json!({
+                            "type":"photo_image_stage","stage":"roi_updated","block_id":block.id,
+                            "gpu_ms":elapsed,"gpu_timing_valid":elapsed.is_some(),
+                        })
+                    );
+                }
+            }
+        }
+        if pending.frame_timed {
+            self.completed = self.rendered.take();
+        }
+        self.pending = None;
+        Ok(true)
+    }
+
+    pub async fn wait_for_completion(&mut self) -> Result<(), PhotoError> {
+        if !self.has_pending_completion() {
+            self.begin_completion()?;
+        }
+        while !self.poll_completion(Instant::now())? {
+            tokio::time::sleep(GPU_POLL_INTERVAL).await;
+        }
+        Ok(())
+    }
+
+    pub fn mark_presented(&mut self, texture: &PhotoTexture) {
+        self.presented_texture = Some(texture.pointer() as usize);
+    }
+
+    pub fn completed_texture(&self) -> Option<PhotoTexture> {
+        if self.pending.is_some() || self.completed.is_none() {
+            return None;
+        }
+        self.texture.as_ref().map(|texture| PhotoTexture::new(texture.clone()))
     }
 
     pub fn metadata(&self) -> Value {
-        json!({ "width": self.working.as_ref().map(|photo| photo.pixels.width()), "height": self.working.as_ref().map(|photo| photo.pixels.height()), "reference_scale": self.working.as_ref().map(|photo| photo.reference_scale), "blocks": self.blocks.iter().map(|block| &block.metadata).collect::<Vec<_>>(), "original_uploads": self.original_uploads, "adapter": format!("{:?}", self.adapter), "composition_gpu_ms": self.frame_gpu_ms, "gpu_timing_valid": self.frame_gpu_ms.is_some(), "font": self.font })
+        json!({ "width": self.original_metadata.as_ref().map(|photo| photo.dimensions[0]), "height": self.original_metadata.as_ref().map(|photo| photo.dimensions[1]), "reference_scale": self.original_metadata.as_ref().map(|photo| photo.reference_scale), "blocks": self.blocks.iter().map(|block| &block.metadata).collect::<Vec<_>>(), "original_uploads": self.original_uploads, "adapter": format!("{:?}", self.adapter), "composition_gpu_ms": self.frame_gpu_ms, "gpu_timing_valid": self.frame_gpu_ms.is_some(), "font": self.font })
     }
 
     pub fn save(&self, path: &Path) -> Result<(), PhotoError> {
-        let working = self.working.as_ref().ok_or(PhotoError::Graphics)?;
-        let width = working.pixels.width();
-        let height = working.pixels.height();
+        let [width, height] = self.dimensions().ok_or(PhotoError::Graphics)?;
         self.save_d3d_texture(
             self.texture.as_ref().ok_or(PhotoError::Graphics)?,
             width,
@@ -714,6 +977,18 @@ impl PhotoCompositor {
             self.d3d.Unmap(&staging, 0);
         }
         pixels.save(path).map_err(|_| PhotoError::Image)
+    }
+
+    fn create_render_target(&self, width: u32, height: u32) -> Result<(ID2D1Bitmap1, ID3D11Texture2D), PhotoError> {
+        let texture = self.create_texture(width, height, false)?;
+        let surface: IDXGISurface = texture.cast().map_err(|_| PhotoError::Graphics)?;
+        let target = unsafe {
+            self.d2d.CreateBitmapFromDxgiSurface(
+                &surface,
+                Some(&bitmap_properties(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW)),
+            )
+        }.map_err(|_| PhotoError::Graphics)?;
+        Ok((target, texture))
     }
 
     fn upload(&self, width: u32, height: u32, bgra: &[u8]) -> Result<ID2D1Bitmap1, PhotoError> {
@@ -768,6 +1043,16 @@ impl PhotoCompositor {
     }
 }
 
+fn premultiply_bgra(pixels: &mut [u8]) {
+    for pixel in pixels.chunks_exact_mut(4) {
+        let [r, g, b, alpha] = [pixel[0], pixel[1], pixel[2], pixel[3]];
+        let a = u16::from(alpha);
+        pixel[0] = ((u16::from(b) * a + 127) / 255) as u8;
+        pixel[1] = ((u16::from(g) * a + 127) / 255) as u8;
+        pixel[2] = ((u16::from(r) * a + 127) / 255) as u8;
+    }
+}
+
 pub fn fade_opacity(start: Instant, now: Instant) -> f32 {
     (now.saturating_duration_since(start).as_secs_f32() / BLOCK_FADE.as_secs_f32()).clamp(0.0, 1.0)
 }
@@ -782,14 +1067,6 @@ fn color(rgb: [u8; 3], alpha: f32) -> D2D1_COLOR_F {
 }
 fn rect_array(rect: Rect) -> [f32; 4] {
     [rect.left, rect.top, rect.right, rect.bottom]
-}
-fn d2d_rect(rect: Rect) -> D2D_RECT_F {
-    D2D_RECT_F {
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-    }
 }
 fn bitmap_properties(
     options: windows::Win32::Graphics::Direct2D::D2D1_BITMAP_OPTIONS,

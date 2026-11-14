@@ -40,9 +40,9 @@ fn supported_resolutions_scale_absolute_constants_once_not_derived_geometry() {
         };
         let (_, roi, glyph) = geometry(&work, bbox, 3).unwrap();
         assert_eq!(glyph, 40.0 * s);
-        let expected = (0.3 * glyph)
+        let expected = (0.8 * glyph)
             .round_ties_even()
-            .clamp(6.0 * s, 40.0 * s)
+            .clamp(6.0 * s, 80.0 * s)
             .round_ties_even()
             .max(1.0);
         assert_eq!(roi.x, (bbox.left - expected).floor() as u32);
@@ -115,6 +115,41 @@ fn long_side_tiles_cover_the_edge_and_keep_dimensionless_overlap() {
     assert_eq!(tiles(100, 50), vec![(0, 100)]);
     assert_eq!(tiles(251, 50), vec![(0, 100), (85, 185), (151, 251)]);
     assert_eq!(tiles(5, 1), vec![(0, 2), (1, 3), (2, 4), (3, 5)]);
+}
+
+#[test]
+fn overlapping_tile_masks_threshold_after_interpolation_and_clip_fractional_boxes() {
+    let roi = PixelRect {
+        x: 10,
+        y: 20,
+        width: 6,
+        height: 4,
+    };
+    let bbox = Rect {
+        left: 10.75,
+        top: 20.75,
+        right: 15.25,
+        bottom: 23.25,
+    };
+    let mut core = GrayImage::new(roi.width, roi.height);
+    let values: Vec<f32> = (0..MODEL_SIZE * MODEL_SIZE)
+        .map(|index| if index % MODEL_SIZE < MODEL_SIZE / 2 { 0.2 } else { 0.4 })
+        .collect();
+    let mut tile = PixelRect {
+        x: roi.x,
+        y: roi.y,
+        width: 3,
+        height: 4,
+    };
+    merge_tile_mask(&mut core, roi, tile, bbox, &values);
+    tile.x += 2;
+    merge_tile_mask(&mut core, roi, tile, bbox, &vec![0.3; MODEL_SIZE * MODEL_SIZE]);
+    tile.x += 1;
+    merge_tile_mask(&mut core, roi, tile, bbox, &vec![0.31; MODEL_SIZE * MODEL_SIZE]);
+    let expected = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        Luma([if (2..=4).contains(&x) && (1..=2).contains(&y) { 255 } else { 0 }])
+    });
+    assert_eq!(core, expected);
 }
 
 #[test]
@@ -244,6 +279,7 @@ fn wider_erase_preserves_core_fill_and_coverage_but_can_reduce_leftover_plate() 
 
 #[test]
 fn refreshed_erase_uses_actual_height_radius_and_preserves_prepared_measurements() {
+    let mut workspace = telea::Workspace::default();
     for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
         let work = WorkingPhoto::new(
             Arc::new(RgbImage::from_fn(height, height, |x, y| {
@@ -278,10 +314,11 @@ fn refreshed_erase_uses_actual_height_radius_and_preserves_prepared_measurements
                     bottom: 60.0,
                 },
                 roi,
+                recovered: core.clone(),
                 core: core.clone(),
                 glyph_size: glyph,
+                source_lines: 1,
                 fill: [7, 8, 9],
-                plate: false,
                 erase: None,
                 mask_ms: 17.0,
                 erase_ms: 19.0,
@@ -291,19 +328,19 @@ fn refreshed_erase_uses_actual_height_radius_and_preserves_prepared_measurements
                 roi,
                 &dilate(&core, baseline + extra, true),
                 &work.pixels,
+                &mut workspace,
             )
             .unwrap();
             let old =
-                erase_patch(&work, roi, &dilate(&core, baseline, true), &work.pixels).unwrap();
+                erase_patch(&work, roi, &dilate(&core, baseline, true), &work.pixels, &mut workspace).unwrap();
             assert_ne!(expected.pixels, old.pixels);
-            refresh_erase(&work, &mut region, &work.pixels).unwrap();
+            refresh_erase(&work, &mut region, &work.pixels, &mut workspace).unwrap();
             let actual = region.erase.as_ref().unwrap();
             assert_eq!(actual.rect, roi);
             assert_eq!(actual.pixels, expected.pixels);
             assert_eq!(region.core, core);
             assert_eq!(region.fill, [7, 8, 9]);
             assert_eq!(region.glyph_size, glyph);
-            assert!(!region.plate);
             assert_eq!(region.mask_ms, 17.0);
             assert!(region.erase_ms > 19.0);
         }
@@ -326,6 +363,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
     );
     let bbox: [f64; 4] = std::array::from_fn(|i| fixture["bbox"][i].as_f64().unwrap());
     let mut processor = MaskProcessor::new(&model, Some(&runtime)).unwrap();
+    let mut workspace = telea::Workspace::default();
     for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
         let width = (f64::from(original.width()) * f64::from(height) / f64::from(original.height()))
             .ceil() as u32;
@@ -337,12 +375,9 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
                 work.map_bbox(bbox),
                 fixture["lines"].as_u64().unwrap() as u32,
                 &work.pixels,
+                &mut workspace,
             )
             .unwrap();
-        assert!(
-            !region.plate,
-            "fixture must remain a positive erase case at {height}"
-        );
         let core = region.core.clone();
         assert!(core.pixels().filter(|p| p[0] != 0).count() > 100);
         let radius = (0.05 * region.glyph_size).round_ties_even().max(1.0) as u32 + extra;
@@ -351,23 +386,22 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
             region.roi,
             &dilate(&core, radius, true),
             &work.pixels,
+            &mut workspace,
         )
         .unwrap();
         assert_eq!(region.erase.as_ref().unwrap().pixels, expected.pixels);
         let measurements = (
             region.fill,
-            region.plate,
             region.mask_ms,
             region.bbox,
             region.roi,
         );
-        refresh_erase(&work, &mut region, &work.pixels).unwrap();
+        refresh_erase(&work, &mut region, &work.pixels, &mut workspace).unwrap();
         assert_eq!(region.erase.as_ref().unwrap().pixels, expected.pixels);
         assert_eq!(region.core, core);
         assert_eq!(
             (
                 region.fill,
-                region.plate,
                 region.mask_ms,
                 region.bbox,
                 region.roi
@@ -379,6 +413,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
 
 #[test]
 fn erase_patch_changes_only_masked_pixels_and_keeps_source_immutable() {
+    let mut workspace = telea::Workspace::default();
     let original = Arc::new(RgbImage::from_fn(100, 100, |x, y| {
         if (40..60).contains(&x) && (40..60).contains(&y) {
             Rgb([0, 0, 0])
@@ -405,7 +440,7 @@ fn erase_patch_changes_only_masked_pixels_and_keeps_source_immutable() {
             0
         }])
     });
-    let patch = erase_patch(&work, roi, &mask, &original).unwrap();
+    let patch = erase_patch(&work, roi, &mask, &original, &mut workspace).unwrap();
     let mut changed = 0;
     for (x, y, pixel) in patch.pixels.enumerate_pixels() {
         if mask.get_pixel(x, y)[0] == 0 {
@@ -422,12 +457,13 @@ fn erase_patch_changes_only_masked_pixels_and_keeps_source_immutable() {
 
 #[test]
 fn telea_rejects_mismatch_and_leaves_unmasked_image_unchanged() {
+    let mut workspace = telea::Workspace::default();
     let image = RgbImage::from_fn(17, 15, |x, y| Rgb([x as u8 * 10, y as u8 * 10, 70]));
     assert_eq!(
-        telea::inpaint(&image, &GrayImage::new(17, 15), 5).unwrap(),
+        telea::inpaint(image.clone(), &GrayImage::new(17, 15), 5, &mut workspace).unwrap(),
         image
     );
-    assert!(telea::inpaint(&image, &GrayImage::new(16, 15), 5).is_err());
+    assert!(telea::inpaint(image, &GrayImage::new(16, 15), 5, &mut workspace).is_err());
 }
 #[test]
 #[ignore = "requires controlled offline OpenCV reference fixtures via PURI_PHOTO340_REFERENCE"]
@@ -437,6 +473,7 @@ fn rust_telea_matches_controlled_opencv_reference() {
     );
     let cases: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("telea.json")).unwrap()).unwrap();
+    let mut workspace = telea::Workspace::default();
     for case in cases.as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let source = image::open(root.join(format!("{name}_input.png")))
@@ -449,8 +486,13 @@ fn rust_telea_matches_controlled_opencv_reference() {
             .unwrap()
             .into_rgb8();
         let start = std::time::Instant::now();
-        let actual =
-            telea::inpaint(&source, &mask, case["radius"].as_u64().unwrap() as u32).unwrap();
+        let actual = telea::inpaint(
+            source.clone(),
+            &mask,
+            case["radius"].as_u64().unwrap() as u32,
+            &mut workspace,
+        )
+        .unwrap();
         let elapsed = start.elapsed();
         let differences = actual
             .as_raw()
@@ -568,6 +610,38 @@ fn fill_uses_the_farthest_forty_percent_not_the_core_average() {
     );
 }
 
+#[test]
+fn fill_sampling_preserves_even_color_medians_and_threshold_ties() {
+    let mut pixels = RgbImage::from_pixel(40, 30, Rgb([240, 240, 240]));
+    let mut core = GrayImage::new(40, 30);
+    for x in 10..20 {
+        core.put_pixel(x, 15, Luma([255]));
+        pixels.put_pixel(
+            x,
+            15,
+            Rgb(if x < 16 {
+                [220, 220, 220]
+            } else if x < 18 {
+                [10, 20, 30]
+            } else {
+                [15, 25, 35]
+            }),
+        );
+    }
+    let work = WorkingPhoto {
+        pixels: Arc::new(pixels),
+        scale_x: 1.0,
+        scale_y: 1.0,
+        reference_scale: 1.0,
+    };
+    let roi = PixelRect { x: 0, y: 0, width: 40, height: 30 };
+    let bbox = Rect { left: 5.0, top: 5.0, right: 35.0, bottom: 25.0 };
+    let (fill, leftover, count) = colors_and_leftover(&work, bbox, roi, &core, &core, 10.0);
+    assert_eq!(fill, [12, 22, 32]);
+    assert_eq!(leftover, 0.0);
+    assert_eq!(count, 10);
+}
+
 fn apply_erase(background: &mut RgbImage, patch: &ErasePatch) {
     for (x, y, pixel) in patch.pixels.enumerate_pixels() {
         if pixel[3] != 0 {
@@ -617,6 +691,7 @@ fn erase_dependency_is_the_exact_scaled_expanded_input() {
 
 #[test]
 fn refresh_rejects_wrong_background_without_changing_region_and_skips_plates() {
+    let mut workspace = telea::Workspace::default();
     let work = photo(60, 40);
     let mut region = PreparedRegion {
         bbox: Rect {
@@ -631,36 +706,38 @@ fn refresh_rejects_wrong_background_without_changing_region_and_skips_plates() {
             width: 30,
             height: 30,
         },
+        recovered: GrayImage::new(30, 30),
         core: GrayImage::new(30, 30),
         glyph_size: 20.0,
+        source_lines: 1,
         fill: [1, 2, 3],
-        plate: false,
         erase: None,
         mask_ms: 17.0,
         erase_ms: 19.0,
     };
     assert_eq!(
-        refresh_erase(&work, &mut region, &RgbImage::new(59, 40)).unwrap_err(),
+        refresh_erase(&work, &mut region, &RgbImage::new(59, 40), &mut workspace).unwrap_err(),
         "photo_erase_source_dimensions"
     );
     assert_eq!(region.mask_ms, 17.0);
     assert_eq!(region.erase_ms, 19.0);
     assert!(region.erase.is_none());
-    region.plate = true;
-    refresh_erase(&work, &mut region, &RgbImage::new(59, 40)).unwrap();
-    assert!(region.erase.is_none());
-    assert_eq!(region.erase_ms, 19.0);
 }
 
 #[test]
 #[ignore = "requires controlled overlapping sequential OpenCV references"]
 fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
+    let mut workspace = telea::Workspace::default();
     let root = PathBuf::from(
         std::env::var_os("PURI_PHOTO340_REFERENCE").expect("reference fixture directory"),
     );
     let original = Arc::new(image::open(root.join("seq_input.png")).unwrap().into_rgb8());
-    let work = WorkingPhoto::new(original.clone(), [original.width(), original.height()]).unwrap();
-    assert_eq!(work.reference_scale, 1.0);
+    let work = WorkingPhoto {
+        pixels: original.clone(),
+        scale_x: 1.0,
+        scale_y: 1.0,
+        reference_scale: 1.0,
+    };
     let steps: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("sequential.json")).unwrap()).unwrap();
     let roi = |index: usize| {
@@ -678,9 +755,9 @@ fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
     let second_core = image::open(root.join("seq1_core.png"))
         .unwrap()
         .into_luma8();
-    let first_patch = erase_patch(&work, roi(0), &dilate(&first_core, 1, true), &original).unwrap();
+    let first_patch = erase_patch(&work, roi(0), &dilate(&first_core, 1, true), &original, &mut workspace).unwrap();
     let hidden_patch =
-        erase_patch(&work, roi(1), &dilate(&second_core, 1, true), &original).unwrap();
+        erase_patch(&work, roi(1), &dilate(&second_core, 1, true), &original, &mut workspace).unwrap();
     let mut committed = (*original).clone();
     apply_erase(&mut committed, &first_patch);
     let first_expected = image::open(root.join("seq0_expected.png"))
@@ -698,13 +775,13 @@ fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
         "fixture must distinguish original from committed Telea context"
     );
     let reference_patch =
-        erase_patch(&work, roi(1), &dilate(&second_core, 1, true), &committed).unwrap();
+        erase_patch(&work, roi(1), &dilate(&second_core, 1, true), &committed, &mut workspace).unwrap();
     let mut reference_result = committed.clone();
     apply_erase(&mut reference_result, &reference_patch);
     assert_eq!(reference_result.as_raw(), second_expected.as_raw());
     let wider_mask = dilate(&second_core, 2, true);
-    let expected_patch = erase_patch(&work, roi(1), &wider_mask, &committed).unwrap();
-    let stale_patch = erase_patch(&work, roi(1), &wider_mask, &original).unwrap();
+    let expected_patch = erase_patch(&work, roi(1), &wider_mask, &committed, &mut workspace).unwrap();
+    let stale_patch = erase_patch(&work, roi(1), &wider_mask, &original, &mut workspace).unwrap();
     let mut expected_result = committed.clone();
     apply_erase(&mut expected_result, &expected_patch);
     let mut stale_wider_result = committed.clone();
@@ -718,15 +795,16 @@ fn sequential_telea_reference_and_wider_refresh_preserve_committed_context() {
             bottom: 50.0,
         },
         roi: roi(1),
+        recovered: second_core.clone(),
         core: second_core.clone(),
         glyph_size: 20.0,
+        source_lines: 1,
         fill: [7, 8, 9],
-        plate: false,
         erase: Some(hidden_patch),
         mask_ms: 17.0,
         erase_ms: 19.0,
     };
-    refresh_erase(&work, &mut second, &committed).unwrap();
+    refresh_erase(&work, &mut second, &committed, &mut workspace).unwrap();
     assert_eq!(second.core, second_core);
     assert_eq!(second.fill, [7, 8, 9]);
     assert_eq!(second.mask_ms, 17.0);
@@ -750,4 +828,126 @@ fn portrait_photos_fit_the_default_bounds_turned_upright_with_short_side_scale()
         assert_eq!(work.pixels.dimensions(), (expected[0], expected[1]));
         assert!((work.reference_scale - expected[0].min(expected[1]) as f32 / 1440.0).abs() < 0.00001);
     }
+}
+
+#[test]
+fn telea_keeps_owned_storage_and_resets_workspace_across_masks_sizes_and_radii() {
+    let mut workspace = telea::Workspace::default();
+    for (width, height, radius, masked) in [
+        (31, 23, 5, true),
+        (9, 7, 1, true),
+        (13, 19, 8, true),
+        (5, 3, 4, false),
+        (31, 23, 3, true),
+    ] {
+        let source = RgbImage::from_fn(width, height, |x, y| {
+            Rgb([
+                ((x * 17 + y * 7) % 251) as u8,
+                ((y * 23 + x * 3) % 251) as u8,
+                ((x * y + 19) % 251) as u8,
+            ])
+        });
+        let mask = GrayImage::from_fn(width, height, |x, y| {
+            Luma([if masked && (x + 2 * y) % 7 < 2 { 13 } else { 0 }])
+        });
+        let original_mask = mask.clone();
+        let expected = telea::inpaint(
+            source.clone(),
+            &mask,
+            radius,
+            &mut telea::Workspace::default(),
+        )
+        .unwrap();
+        let owned = source.clone();
+        let allocation = owned.as_raw().as_ptr();
+        let actual = telea::inpaint(owned, &mask, radius, &mut workspace).unwrap();
+        assert_eq!(actual.as_raw().as_ptr(), allocation);
+        assert_eq!(actual, expected);
+        assert_eq!(mask, original_mask);
+        for (x, y, pixel) in actual.enumerate_pixels() {
+            if mask.get_pixel(x, y)[0] == 0 {
+                assert_eq!(pixel, source.get_pixel(x, y));
+            }
+        }
+    }
+}
+
+#[test]
+fn refreshed_erase_alpha_compares_unchanged_pixels_to_current_global_background() {
+    let roi = PixelRect { x: 40, y: 30, width: 12, height: 10 };
+    let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        Luma([if (3..9).contains(&x) && (2..8).contains(&y) { 255 } else { 0 }])
+    });
+    let original = Arc::new(RgbImage::from_fn(80, 60, |x, y| {
+        if (43..49).contains(&x) && (32..38).contains(&y) {
+            Rgb([0, 0, 0])
+        } else {
+            Rgb([160, 180, 200])
+        }
+    }));
+    let work = WorkingPhoto {
+        pixels: original.clone(),
+        scale_x: 1.0,
+        scale_y: 1.0,
+        reference_scale: 1.0,
+    };
+    let original_snapshot = (*original).clone();
+    let mut workspace = telea::Workspace::default();
+    let mask = dilate(&core, erase_radius(20.0, work.reference_scale), true);
+    let prepared = erase_patch(&work, roi, &mask, &original, &mut workspace).unwrap();
+    assert!(prepared.pixels.pixels().any(|pixel| pixel[3] != 0));
+    let mut region = PreparedRegion {
+        bbox: Rect { left: 43.0, top: 32.0, right: 49.0, bottom: 38.0 },
+        roi,
+        core: core.clone(),
+        recovered: core.clone(),
+        glyph_size: 20.0,
+        source_lines: 1,
+        fill: [7, 8, 9],
+        erase: Some(prepared),
+        mask_ms: 17.0,
+        erase_ms: 19.0,
+    };
+    let background = RgbImage::from_fn(80, 60, |x, y| {
+        Rgb(if x < roi.width && y < roi.height { [90, 80, 70] } else { [0, 0, 0] })
+    });
+    let background_snapshot = background.clone();
+    refresh_erase(&work, &mut region, &background, &mut workspace).unwrap();
+    let refreshed = region.erase.as_ref().unwrap();
+    assert_eq!(refreshed.rect, roi);
+    assert!(refreshed.pixels.pixels().all(|pixel| pixel.0 == [0, 0, 0, 0]));
+    assert_eq!(region.core, core);
+    assert_eq!(region.fill, [7, 8, 9]);
+    assert_eq!(region.mask_ms, 17.0);
+    assert!(region.erase_ms > 19.0);
+    assert_eq!(background, background_snapshot);
+    assert_eq!(*original, original_snapshot);
+}
+
+#[test]
+fn recovery_follows_owned_lines_past_a_short_box_but_leaves_neighbor_lines() {
+    let roi = PixelRect {
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 80,
+    };
+    let bbox = Rect {
+        left: 120.0,
+        top: 110.0,
+        right: 220.0,
+        bottom: 130.0,
+    };
+    let glyph = |x: u32| (x % 20) < 14;
+    let foreground = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        let own_line = (12..28).contains(&y) && (20..170).contains(&x) && glyph(x);
+        let detached = (12..28).contains(&y) && (178..192).contains(&x);
+        let neighbor = (40..56).contains(&y) && (20..170).contains(&x) && glyph(x);
+        Luma([if own_line || detached || neighbor { 255 } else { 0 }])
+    });
+    let owned = owned_lines(&foreground, roi, bbox, 20.0, false);
+    assert_ne!(owned.get_pixel(150, 20)[0], 0, "glyph past the box on the same line");
+    assert_ne!(owned.get_pixel(185, 20)[0], 0, "detached glyph continuing the line");
+    assert_eq!(owned.get_pixel(30, 48)[0], 0, "line below belongs to another block");
+    assert_ne!(owned.get_pixel(30, 20)[0], 0);
 }
