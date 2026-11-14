@@ -376,7 +376,7 @@ async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_
             replace_provider=replace,
             requires_secret=True,
             selection=("openai", "gpt_6_luna", "official_byok"),
-            previous_selection=("gemini", "gemini_flash", "official_byok"),
+            previous_selection=("qwen", "qwen38_flash", "official_byok"),
         ),
         provider_factory=lambda settings: (
             events.append(("create", settings)),
@@ -407,9 +407,9 @@ async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_
     fields = dict(token.split("=", 1) for token in events[4][1].split()[2:])
     assert fields == {
         "channel": "self,peer",
-        "previous_provider": "gemini",
+        "previous_provider": "qwen",
         "provider": "openai",
-        "previous_model": "gemini_flash",
+        "previous_model": "qwen38_flash",
         "model": "gpt_6_luna",
         "previous_connection": "official_byok",
         "connection": "official_byok",

@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from puripuly_heart.app.ports.agent_chat import AgentSetupAction
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentSetupAction
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
 from puripuly_heart.app.services.agent_chat.provider_setup import PROVIDER_SETUPS
 from puripuly_heart.app.services.agent_chat.tools import AgentTools
@@ -20,6 +21,7 @@ from puripuly_heart.config.translation_values import (
 )
 from puripuly_heart.release_evidence.agent_chat_simulator.app import (
     INJECTION_DEVICE_LABEL,
+    KEY_FIELDS,
     BrowserStepResult,
     ScenarioApp,
 )
@@ -69,7 +71,7 @@ def isolated_scenario(identity):
     if cause == "english_mismatch":
         persona = replace(persona, self_speech_language="en")
     elif cause == "signup_deepgram":
-        persona = replace(persona, obtainable_keys=("deepgram", "gemini_transcribe", "google"))
+        persona = replace(persona, obtainable_keys=("deepgram", "gemini"))
     if identity == "fixture-routing-microphone":
         microphone = select_scenarios(["recognition-vr-host"])[0]
         pending = select_scenarios(["routing-pending-approval"])[0]
@@ -1401,9 +1403,9 @@ async def test_rolling_free_requires_an_enabled_present_verified_member():
     await apply_settings(app, {"stt.provider": "rolling_free"})
     assert not app.recognition_ready()
     assert not app.resolved()
-    app.presence["gemini_transcribe_api_key"] = True
+    app.presence["gemini_api_key"] = True
     assert not app.recognition_ready()
-    app.verified.add("gemini_transcribe")
+    app.verified.add("gemini")
     assert app.recognition_ready()
     assert app.eligible_rolling_members() == ["gemini_transcribe"]
     app.intent["stt"]["cloud_free_tier_providers"] = []
@@ -1426,9 +1428,9 @@ async def test_obtainable_key_needs_actual_public_setup_and_secure_field_action(
         persona=replace(case.persona, existing_accounts=("google",) if existing_account else ()),
     )
     app = ScenarioApp(case)
-    app.navigate("api", "gemini_transcribe")
-    assert not app.enter_key("gemini_transcribe")
-    assert not app.presence["gemini_transcribe_api_key"]
+    app.navigate("api", "gemini")
+    assert not app.enter_key("gemini")
+    assert not app.presence["gemini_api_key"]
     result = await run_attempt(
         case,
         ControlledModels(),
@@ -1438,11 +1440,12 @@ async def test_obtainable_key_needs_actual_public_setup_and_secure_field_action(
     )
     assert result["status"] == "passed", result
     state = result["code"]["state"]
-    setup = state["provider_setups"]["gemini_transcribe"]
+    setup = state["provider_setups"]["gemini"]
     assert setup["links"]
     assert all(item["url"].startswith("https://") for item in setup["links"])
     assert setup["link_opened"] is False
-    assert setup["secure_field"]["secret_key"] == "gemini_transcribe_api_key"
+    assert setup["secure_field"]["provider"] == "gemini"
+    assert setup["secure_field"]["secret_key"] == "gemini_api_key"
     journey = state["provider_signup"]["journey"]
     assert [item["action"] for item in journey] == [
         "visit",
@@ -1452,11 +1455,14 @@ async def test_obtainable_key_needs_actual_public_setup_and_secure_field_action(
         "secure_verification",
     ]
     assert journey[-1]["success"]
+    assert all(item["provider"] == "gemini" for item in journey)
+    assert state["verified"] == ["gemini"]
+    assert set(state["provider_signup"]["accounts"]) == {"gemini"}
     assert not any(item["action"] == "add_credit" for item in journey)
     entries = [item for item in result["actions"] if item["action"] == "enter_key"]
     assert len(entries) == 1
-    assert entries[0]["provider"] == "gemini_transcribe"
-    assert entries[0]["visible_before"]["secure_key_field"] == "gemini_transcribe"
+    assert entries[0]["provider"] == "gemini"
+    assert entries[0]["visible_before"]["secure_key_field"] == "gemini"
     assert state["settings"]["stt"]["provider"] == "rolling_free"
     assert state["eligible_rolling_members"] == ["gemini_transcribe"]
     assert state["current_observations"]["usable_recognition"]
@@ -1786,7 +1792,7 @@ async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tm
         arguments.extend(["--case", identity])
     assert await cli.execute(cli.parser().parse_args(arguments)) == 0
     report = cli.load_json(str(output))
-    assert report["agent_protocol"] == 7
+    assert report["agent_protocol"] == AGENT_CHAT_PROTOCOL
     assert report["controlled_smoke"] is True
     assert report["live_pass"] is False
     assert {case["id"] for case in report["cases"]} == set(selected)
@@ -2707,13 +2713,14 @@ async def test_pending_same_settings_distinguishes_noop_from_real_transition(tra
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("identity", "provider"),
-    [("extra-reject-paid", "gemini_transcribe"), ("fixture-deepgram-signup", "deepgram")],
+    [("extra-reject-paid", "gemini"), ("fixture-deepgram-signup", "deepgram")],
 )
 @pytest.mark.parametrize("rolling", [True, False], ids=["rolling", "direct"])
 async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
     identity, provider, rolling
 ):
     app = ScenarioApp(scenario(identity))
+    recognition_provider = "gemini_transcribe" if provider == "gemini" else provider
     app.advance()
     assert not app.current_observations("self")["usable_recognition"]
     tools = fixture_tools(app)
@@ -2724,11 +2731,11 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
             control["id"] == "add_credit" for page in pages for control in page["controls"]
         )
         changes = {
-            "stt.provider": "rolling_free" if rolling else provider,
+            "stt.provider": "rolling_free" if rolling else recognition_provider,
             "stt.cloud_free_tier_providers": (
-                [provider]
+                [recognition_provider]
                 if rolling
-                else ["deepgram" if provider == "gemini_transcribe" else "gemini_transcribe"]
+                else ["deepgram" if provider == "gemini" else "gemini_transcribe"]
             ),
         }
         if provider == "deepgram":
@@ -2736,7 +2743,7 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
         changed = await approved_tool_change(app, tools, changes)
         assert changed["status"] == "applied"
         assert app.resolved()
-        assert app.eligible_rolling_members() == ([provider] if rolling else [])
+        assert app.eligible_rolling_members() == ([recognition_provider] if rolling else [])
         assert app.paid_rejections == 0
         assert not app.paid_without_approval
         recognition = app.current_observations("self")["usable_recognition"]
@@ -2750,9 +2757,7 @@ async def test_free_signup_recovers_on_verified_direct_or_rolling_provider(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider", ["gemini_transcribe", "rolling_free"])
 async def test_free_signup_direct_and_rolling_reach_final_owner_code_judgment(provider):
-    setup = tool(
-        "setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini_transcribe"})
-    )
+    setup = tool("setup", arguments=json.dumps({"view": "provider_setup", "provider": "gemini"}))
     setup["name"] = "open_app"
     change = tool(
         "change",
@@ -2795,7 +2800,7 @@ async def test_free_signup_direct_and_rolling_reach_final_owner_code_judgment(pr
         ({"available": False}, 0),
         ({"displayed": False}, 0),
         ({"action_id": "provider.openrouter.unknown"}, 0),
-        ({"provider": "google"}, 0),
+        ({"provider": "gemini"}, 0),
         ({}, -1),
         ({}, 1),
     ],
@@ -2837,7 +2842,7 @@ def test_setup_link_requires_matching_displayed_action_and_local_assistant_messa
 
 @pytest.mark.parametrize(
     "entry_change",
-    [{"available": False}, {"displayed": False}, {"provider": "google"}],
+    [{"available": False}, {"displayed": False}, {"provider": "gemini"}],
     ids=["unavailable", "undisplayed", "wrong-provider"],
 )
 def test_key_entry_requires_matching_rendered_secure_form_without_settings_navigation(entry_change):
@@ -3002,13 +3007,13 @@ def test_browser_rendered_quotes_preserve_visible_control_provider_and_guidance_
 )
 def test_browser_rejects_actor_paraphrases_even_with_rendered_bold_matching(guidance, quote):
     app = ScenarioApp(scenario("extra-reject-paid"))
-    app.provider_setups["gemini_transcribe"] = PROVIDER_SETUPS["gemini_transcribe"].snapshot()
+    app.provider_setups["gemini"] = PROVIDER_SETUPS["gemini"].snapshot()
     app.observe_assistant("Open https://aistudio.google.com/apikey")
-    present_fixture_setup_action(app, "gemini_transcribe")
+    present_fixture_setup_action(app, "gemini")
     app.observe_assistant(guidance)
-    assert app.open_link("gemini_transcribe")
+    assert app.open_link("gemini")
     before = deepcopy(app.accounts)
-    assert app.browser_step("gemini_transcribe", "sign_up", quote) is BrowserStepResult.INVALID
+    assert app.browser_step("gemini", "sign_up", quote) is BrowserStepResult.INVALID
     assert app.accounts == before
     assert len(app.signup_journey) == 1
 
@@ -3020,27 +3025,27 @@ def test_browser_rendered_quote_records_persona_constraint_without_bypassing_sig
             case, persona=replace(case.persona, obtainable_keys=("deepgram",), existing_accounts=())
         )
     )
-    app.provider_setups["google"] = PROVIDER_SETUPS["google"].snapshot()
+    app.provider_setups["gemini"] = PROVIDER_SETUPS["gemini"].snapshot()
     app.observe_assistant("Open https://aistudio.google.com/apikey")
-    present_fixture_setup_action(app, "google")
+    present_fixture_setup_action(app, "gemini")
     app.observe_assistant("계정이 없으면 **Sign up**을 눌러 가입해도 되고, 키는 무료로 만들어.")
-    assert app.open_link("google")
+    assert app.open_link("gemini")
     assert app.browser_page()["stage"] == "signed_out"
     assert app.browser_page()["controls"] == [{"id": "sign_up", "label": "Sign up"}]
-    assert app.accounts["google"]["region_eligible"]
+    assert app.accounts["gemini"]["region_eligible"]
     before = deepcopy(app.accounts)
     page = deepcopy(app.browser_page())
-    constraint = {"source": "persona", "code": "signup_unavailable", "provider": "google"}
+    constraint = {"source": "persona", "code": "signup_unavailable", "provider": "gemini"}
     snapshot = SimpleNamespace(confirmation=None, report_offers=())
     assert app.visible(snapshot)["browser_action_availability"] == {
-        "provider": "google",
+        "provider": "gemini",
         "signup_available": False,
         "constraint": constraint,
     }
     for quote in ("Sign up을 눌러 가입", "가입해도 되고"):
-        assert app.browser_step("google", "sign_up", quote) is BrowserStepResult.PERSONA_CONSTRAINT
+        assert app.browser_step("gemini", "sign_up", quote) is BrowserStepResult.PERSONA_CONSTRAINT
         assert app.signup_journey[-1] == {
-            "provider": "google",
+            "provider": "gemini",
             "action": "sign_up",
             "revision": app.revision,
             "status": "persona_constraint",
@@ -3052,15 +3057,15 @@ def test_browser_rendered_quote_records_persona_constraint_without_bypassing_sig
     assert app.accounts == before
     assert len(app.signup_journey) == 3
     assert app.browser_page() == page
-    assert not app.accounts["google"]["account_exists"]
-    assert not app.accounts["google"]["key_issued"]
-    assert not app.signup_completed("google")
+    assert not app.accounts["gemini"]["account_exists"]
+    assert not app.accounts["gemini"]["key_issued"]
+    assert not app.signup_completed("gemini")
     assert not app.resolved()
-    app.navigate("api", "google")
-    assert not app.enter_key("google")
+    app.navigate("api", "gemini")
+    assert not app.enter_key("gemini")
     assert not app.key_verifications
     assert not app.verified
-    assert not app.presence["google_api_key"]
+    assert not app.presence["gemini_api_key"]
 
 
 def test_persona_blocked_key_creation_cannot_count_owned_key_verification_as_signup():
@@ -3299,15 +3304,13 @@ async def test_persona_signup_restriction_never_masks_structural_browser_errors(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("provider", "other_provider"),
-    [("google", "gemini_transcribe"), ("gemini_transcribe", "google")],
-)
-async def test_browser_shared_console_url_preserves_observed_provider_and_secure_field_identity(
-    provider, other_provider
+@pytest.mark.parametrize("legacy_provider", ["google", "gemini_transcribe"])
+async def test_browser_gemini_console_uses_shared_credential_and_rejects_legacy_setup_identity(
+    legacy_provider,
 ):
+    provider = "gemini"
     case = scenario("extra-reject-paid")
-    app = ScenarioApp(replace(case, persona=replace(case.persona, obtainable_keys=(provider,))))
+    app = ScenarioApp(case)
     snapshot = SimpleNamespace(confirmation=None, report_offers=())
     guidance = (
         "Open https://aistudio.google.com/apikey and sign up, create a free project, "
@@ -3316,40 +3319,100 @@ async def test_browser_shared_console_url_preserves_observed_provider_and_secure
     app.observe_assistant(guidance)
     assert not app.visible(snapshot)["available_official_links"]
     assert not app.open_link(provider)
-    assert not app.open_link(other_provider)
+    assert not app.open_link(legacy_provider)
+    assert legacy_provider not in PROVIDER_SETUPS
     tools = fixture_tools(app)
     try:
+        legacy_setup = await tools.execute(
+            "open_app", {"view": "provider_setup", "provider": legacy_provider}
+        )
+        assert legacy_setup["status"] != "available"
         setup = await tools.execute("open_app", {"view": "provider_setup", "provider": provider})
     finally:
         await tools.close()
     assert setup["status"] == "available"
     assert setup["provider"] == provider
     assert setup["secure_field"]["provider"] == provider
+    assert setup["secure_field"]["secret_key"] == "gemini_api_key"
     app.provider_setups[provider] = deepcopy(setup)
     assert not app.visible(snapshot)["available_official_links"]
     assert not app.open_link(provider)
     action = present_fixture_setup_action(app, provider, message_index=0)
-    other_action_id = f"provider.{other_provider}.key_console"
-    assert app.activate_setup_action(other_action_id) == {"status": "unavailable"}
+    legacy_action_id = f"provider.{legacy_provider}.key_console"
+    assert app.activate_setup_action(legacy_action_id) == {"status": "unavailable"}
     assert app.visible(snapshot)["available_official_links"] == [
         {"provider": provider, "url": "https://aistudio.google.com/apikey"}
     ]
     assert set(app.state()["provider_signup"]["shown_official_links"]) == {provider}
-    assert not app.open_link(other_provider)
-    assert other_provider not in app.accounts
+    assert not app.open_link(legacy_provider)
+    assert legacy_provider not in app.accounts
     assert app.activate_setup_action(action.action_id) == {"status": "opened"}
     assert app.browser["guidance_start"] == 0
+    assert app.browser_page()["provider"] == provider
     for target in ("continue_account", "create_project", "create_key"):
         assert app.browser_step(provider, target, guidance) is BrowserStepResult.COMPLETED
-    app.navigate("api", other_provider)
+    assert not app.navigate("api", legacy_provider)["field_visible"]
     assert not app.enter_key(provider)
-    assert not app.enter_key(other_provider)
+    assert not app.enter_key(legacy_provider)
     app.navigate("api", provider)
     assert app.enter_key(provider)
     assert app.verified == {provider}
-    assert app.presence[setup["secure_field"]["secret_key"]]
-    other_secret = PROVIDER_SETUPS[other_provider].snapshot()["secure_field"]["secret_key"]
-    assert not app.presence[other_secret]
+    assert app.presence["gemini_api_key"]
+    assert "google_api_key" not in app.presence
+    assert "gemini_transcribe_api_key" not in app.presence
+    assert app.signup_completed(provider)
+    assert all(item["provider"] == provider for item in app.signup_journey)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("recognition_provider", ["gemini_transcribe", "rolling_free"])
+async def test_gemini_recognition_uses_present_verified_shared_credential(
+    channel, recognition_provider
+):
+    app = ScenarioApp(scenario("extra-reject-paid"))
+    assert KEY_FIELDS == {
+        provider: setup.secret_key.value for provider, setup in PROVIDER_SETUPS.items()
+    }
+    presence = (await app.query("secrets.presence", {}))["presence"]
+    assert set(presence) == {key.value for key in SettingsSecretKey}
+    assert not any(presence.values())
+    field = "stt" if channel == "self" else "peer_stt"
+    app.intent[field]["provider"] = recognition_provider
+    assert not app.recognition_ready(channel)
+    app.verified.add("gemini")
+    assert not app.recognition_ready(channel)
+    app.presence[SettingsSecretKey.GEMINI_API_KEY.value] = True
+    assert app.recognition_ready(channel)
+    assert app.eligible_rolling_members() == ["gemini_transcribe"]
+    settings = (await app.query("settings.current", {}))["settings"]
+    verification = settings["state"]["provider_verification"]
+    assert verification["gemini"]["status"] == "verified"
+    assert not {"google", "gemini_transcribe"} & verification.keys()
+    assert settings["intent"][field]["provider"] == recognition_provider
+    app.verified.clear()
+    assert not app.recognition_ready(channel)
+    assert not app.eligible_rolling_members()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recognition_provider", ["gemini_transcribe", "rolling_free"])
+async def test_gemini_owned_key_verification_alone_cannot_complete_free_signup(
+    recognition_provider,
+):
+    case = scenario("extra-reject-paid")
+    app = ScenarioApp(replace(case, persona=replace(case.persona, keys=("gemini",))))
+    app.intent["stt"]["provider"] = recognition_provider
+    app.navigate("api", "gemini")
+    assert app.enter_key("gemini")
+    assert app.recognition_ready()
+    assert app.current_observations("self")["usable_recognition"]
+    assert app.verified == {"gemini"}
+    assert [item["action"] for item in app.signup_journey] == ["secure_verification"]
+    assert app.key_verifications[-1]["provider"] == "gemini"
+    assert not app.signup_completed("gemini")
+    assert not app.resolved()
+    assert not code_judgment(app, [], [])["accepted_state"]
 
 
 def test_browser_keeps_console_after_later_docs_and_admits_later_observed_step_guidance():
@@ -3465,11 +3528,11 @@ def test_browser_credit_requires_both_payment_method_and_user_willingness(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("provider", ["google", "gemini_transcribe"])
-async def test_gemini_unavailable_region_has_no_key_or_paid_billing_escape(provider):
+async def test_gemini_unavailable_region_has_no_key_or_paid_billing_escape():
+    provider = "gemini"
     app = ScenarioApp(scenario("fixture-deepgram-signup"))
     snapshot = SimpleNamespace(confirmation=None, report_offers=())
-    assert not app.accounts["gemini_transcribe"]["region_eligible"]
+    assert not app.accounts[provider]["region_eligible"]
     assert not app.visible(snapshot)["account_notices"]
     assert app.visible(snapshot)["browser"] is None
     app.observe_assistant("Open https://console.deepgram.com/ for the free trial.")
@@ -3486,7 +3549,7 @@ async def test_gemini_unavailable_region_has_no_key_or_paid_billing_escape(provi
     assert app.open_link(provider)
     before = deepcopy(app.accounts)
     assert not app.accounts[provider]["region_eligible"]
-    assert app.accounts[provider]["signed_in"] is (provider == "gemini_transcribe")
+    assert app.accounts[provider]["signed_in"]
     page = app.browser_page()
     assert page["stage"] == "unavailable_region"
     assert page["billing"] == "free"
@@ -4269,6 +4332,7 @@ async def test_simulator_catalog_and_agent_context_preserve_production_route_cho
     assert choices["peer_stt.provider"] == choices["stt.provider"]
     assert catalog["providers"]["stt"] == choices["stt.provider"]
     assert choices["translation.model"] == [model.value for model in TranslationModel]
+    assert not any(model.startswith("gemini") for model in choices["translation.model"])
     assert choices["translation.connection"] == {
         model.value: [connection.value for connection in supported_translation_connections(model)]
         for model in TranslationModel

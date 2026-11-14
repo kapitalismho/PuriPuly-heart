@@ -14,6 +14,7 @@ from puripuly_heart.app.ports.agent_chat import (
     AgentSetupAction,
     AgentToolResult,
 )
+from puripuly_heart.core.conversation_history import ConversationRecord
 from puripuly_heart.ui.agent_chat_model import (
     active_status,
     applied_label,
@@ -24,7 +25,6 @@ from puripuly_heart.ui.agent_chat_model import (
     select_left,
 )
 from puripuly_heart.ui.i18n import get_locale, language_name, set_locale, t
-from puripuly_heart.ui.views.logs import ConversationRecord
 
 
 @pytest.fixture(autouse=True)

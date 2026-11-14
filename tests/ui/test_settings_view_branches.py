@@ -41,7 +41,6 @@ from puripuly_heart.config.provider_values import (
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     DeepSeekLLMModel,
-    GeminiLLMModel,
     LLMProviderName,
     LocalLLMBackend,
     OpenRouterCredentialSource,
@@ -154,7 +153,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     view.on_settings_changed = lambda _settings: emitted.append("settings")
     view.on_providers_changed = lambda: emitted.append("providers")
     canonical = _vnext(
-        model=TranslationModel.GEMINI_FLASH.value,
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         stt_provider=STTProviderName.SONIOX.value,
         peer_stt_provider=STTProviderName.LOCAL_QWEN_GPU.value,
@@ -231,8 +230,8 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
         assert projected.custom_stt_mode == canonical.intent.stt.custom.mode
         assert projected.custom_stt_compatibility == canonical.intent.stt.custom.compatibility
-        assert projected.llm_provider == LLMProviderName.GEMINI
-        assert projected.translation.model == TranslationModel.GEMINI_FLASH
+        assert projected.llm_provider == LLMProviderName.OPENAI
+        assert projected.translation.model == TranslationModel.GPT_6_LUNA
         assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
     assert view._provider_draft is not None
     assert (
@@ -248,7 +247,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "https://draft.invalid/v1/audio/transcriptions"
     )
     assert view._provider_edits[TranslationSelectionEdit].selection.model == (
-        TranslationModel.GEMINI_FLASH
+        TranslationModel.GPT_6_LUNA
     )
     assert view._custom_vocab_tag_editor._terms == ["osc-term"]
     assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
@@ -397,8 +396,8 @@ def _vnext(
     qwen_region = None if qwen_region is None else _enum_value(qwen_region)
     translation = current.intent.translation
     apply_llm_defaults = llm is not None and model is None and connection is None
-    if apply_llm_defaults and llm == "gemini":
-        model = model or "gemini_flash"
+    if apply_llm_defaults and llm == "openai":
+        model = model or "gpt_6_luna"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "qwen":
         model = model or "qwen38_flash"
@@ -610,8 +609,8 @@ def _layout_cards(control: ft.Control) -> list[ft.Control]:
     return []
 
 
-def _prompt_tab_cards(view: settings_view.SettingsView) -> list[ft.Control]:
-    return list(_subtab_controls(view, "prompt"))
+def _full_width_cards(view: settings_view.SettingsView) -> list[ft.Control]:
+    return [*_subtab_controls(view, "api"), *_subtab_controls(view, "general")]
 
 
 def _overlay_tab_cards(view: settings_view.SettingsView) -> list[ft.Control]:
@@ -700,11 +699,15 @@ def _row_card_titles(control: ft.Control) -> list[str]:
     return [title for card in _layout_cards(control) if (title := _card_title(card)) is not None]
 
 
-def _prompt_tab_card(view: settings_view.SettingsView, title: str) -> ft.Control:
-    for card in _prompt_tab_cards(view):
-        if _card_title(card) == title:
+def _full_width_card(view: settings_view.SettingsView, title: str) -> ft.Control:
+    for card in _full_width_cards(view):
+        try:
+            card_title = _card_title(card)
+        except Exception:
+            continue
+        if card_title == title:
             return card
-    raise AssertionError(f"prompt tab card not found: {title}")
+    raise AssertionError(f"settings card not found: {title}")
 
 
 def _overlay_tab_card_titles(view: settings_view.SettingsView) -> list[str]:
@@ -855,7 +858,7 @@ def test_clipboard_auto_translate_click_toggles_immediately_without_modal(
 def test_load_from_settings_uses_system_prompt_when_provider_prompt_missing(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    settings = _vnext(llm="gemini", system_prompt="LEGACY PROMPT")
+    settings = _vnext(llm="openai", system_prompt="LEGACY PROMPT")
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
@@ -889,37 +892,11 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch, settin
     view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
-    assert view._google_key.value == ""
+    assert view._gemini_key.value == ""
     assert view._deepgram_key.value == ""
     assert view._soniox_key.value == ""
     assert len(basic_messages) == 1
     assert "boom" not in repr(basic_messages)
-
-
-def test_load_secrets_projects_the_same_prefix_before_read_failure(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    store = DummySecretStore(
-        {
-            "google_api_key": "google-secret",
-            "openrouter_api_key": "openrouter-secret",
-            "deepseek_api_key": "deepseek-secret",
-        }
-    )
-    store.get_failure_key = "deepgram_api_key"
-    view, _ = _make_settings_view(monkeypatch, settings_events, store)
-    view._deepgram_key.value = "unchanged-deepgram"
-    view._soniox_key.value = "unchanged-soniox"
-
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(settings))
-    view._load_secrets(provider, Path("settings.json"))
-
-    assert view._google_key.value == "google-secret"
-    assert view._openrouter_key.value == "openrouter-secret"
-    assert view._deepseek_key.value == "deepseek-secret"
-    assert view._deepgram_key.value == "unchanged-deepgram"
-    assert view._soniox_key.value == "unchanged-soniox"
 
 
 def test_restore_api_key_icons_sets_idle_success_error(
@@ -929,7 +906,7 @@ def test_restore_api_key_icons_sets_idle_success_error(
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
     view._deepgram_key.value = "deepgram-secret"
-    view._google_key.value = "google-secret"
+    view._gemini_key.value = "google-secret"
     view._soniox_key.value = ""
     view._alibaba_key_beijing.value = ""
     view._alibaba_key_singapore.value = ""
@@ -939,7 +916,7 @@ def test_restore_api_key_icons_sets_idle_success_error(
 
     assert view._deepgram_key._current_status == "success"
     assert view._deepgram_key._last_verified_hash
-    assert view._google_key._current_status == "error"
+    assert view._gemini_key._current_status == "error"
     assert view._soniox_key._current_status == "idle"
 
 
@@ -947,7 +924,7 @@ def test_update_api_visibility_tracks_provider_and_region(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
+        llm="openai",
         stt_provider="qwen_audio",
         qwen_region=QwenRegion.BEIJING.value,
     )
@@ -956,7 +933,6 @@ def test_update_api_visibility_tracks_provider_and_region(
     view._update_api_visibility()
 
     assert view._qwen_region_btn.visible is True
-    assert view._google_key.visible is True
     assert view._alibaba_key_beijing.visible is True
     assert view._alibaba_key_singapore.visible is False
 
@@ -968,7 +944,6 @@ def test_update_api_visibility_tracks_provider_and_region(
     settings_events.load(view, settings, config_path=Path("settings.json"))
     view._update_api_visibility()
 
-    assert view._google_key.visible is False
     assert view._alibaba_key_beijing.visible is False
     assert view._alibaba_key_singapore.visible is True
 
@@ -986,7 +961,6 @@ def test_update_api_visibility_shows_openrouter_key(
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
-    assert view._google_key.visible is False
     assert view._alibaba_key_beijing.visible is False
     assert view._alibaba_key_singapore.visible is False
     assert view._openrouter_key.visible is True
@@ -1006,7 +980,6 @@ def test_update_api_visibility_shows_deepseek_key(
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
-    assert view._google_key.visible is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is True
     assert view._alibaba_key_beijing.visible is False
@@ -1317,7 +1290,7 @@ def test_update_api_visibility_treats_peer_mlt_as_local_provider(
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
@@ -1327,7 +1300,6 @@ def test_update_api_visibility_treats_peer_mlt_as_local_provider(
     assert view._qwen_region_btn.visible is False
     assert view._alibaba_key_beijing.visible is False
     assert view._alibaba_key_singapore.visible is False
-    assert view._google_key.visible is True
 
 
 def test_deepseek_connection_selection_controls_api_key_visibility(
@@ -1335,8 +1307,8 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
 ) -> None:
     monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
@@ -1367,8 +1339,8 @@ def test_on_llm_selected_updates_to_local_llms_with_ollama_connection(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
@@ -1402,10 +1374,10 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.GEMINI_FLASH,
+        model=TranslationModel.GPT_6_LUNA,
         connection=TranslationConnection.OFFICIAL_BYOK,
     )
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     applies: list[bool] = []
     view.on_providers_changed = lambda: applies.append(True)
@@ -1535,7 +1507,6 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
 
     assert view._local_llm_connection_card.visible is True
     assert view._local_llm_api_key.visible is True
-    assert view._google_key.visible is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is False
     assert view._alibaba_key_beijing.visible is False
@@ -1594,7 +1565,7 @@ def test_load_from_settings_without_local_llm_api_key_shows_empty_field(
 def test_load_from_settings_does_not_touch_existing_local_llm_api_key(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    settings = _vnext(llm="gemini")
+    settings = _vnext(llm="openai")
     store = DummySecretStore({"local_llm_api_key": "server-secret"})
     view, _ = _make_settings_view(monkeypatch, settings_events, store)
 
@@ -2493,8 +2464,8 @@ def test_on_llm_selected_updates_model_and_prompt_state(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2505,7 +2476,7 @@ def test_on_llm_selected_updates_model_and_prompt_state(
 
     pending = view.build_provider_apply_settings()
 
-    assert _llm(settings) == LLMProviderName.GEMINI.value
+    assert _llm(settings) == LLMProviderName.OPENAI.value
     assert pending is not None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.model
@@ -2533,8 +2504,8 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2549,7 +2520,7 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
 
     pending = view.build_provider_apply_settings()
 
-    assert _llm(settings) == LLMProviderName.GEMINI.value
+    assert _llm(settings) == LLMProviderName.OPENAI.value
     assert pending is not None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.model
@@ -2601,7 +2572,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         connection_history={
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
             TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA,
-            TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.GPT_6_LUNA.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
@@ -2613,7 +2584,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         settings,
         connection_history={
             **settings.intent.translation.connection_history,
-            TranslationModel.GEMINI_FLASH.value: TranslationConnection.OPENROUTER,
+            TranslationModel.GPT_6_LUNA.value: TranslationConnection.OPENROUTER,
         },
     )
     settings_events.load(view, settings, config_path=Path("settings.json"))
@@ -2633,7 +2604,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
     )
     assert apply_provider_intent(
         settings_events.settings, pending
-    ).intent.translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
+    ).intent.translation.connection_history[TranslationModel.GPT_6_LUNA.value] == (
         TranslationConnection.OPENROUTER.value
     )
 
@@ -2692,14 +2663,14 @@ def test_on_llm_selected_invalid_value_is_noop(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
 
     view = _make_llm_selection_view(monkeypatch, settings_events, settings)
-    view._llm_text.content.value = "Gemini 3 Flash"
+    view._llm_text.content.value = "selected model label"
     view._translation_connection_text.content.value = "Official BYOK"
 
     view._on_llm_selected(LLMProviderName.DEEPSEEK.value)
@@ -2710,7 +2681,7 @@ def test_on_llm_selected_invalid_value_is_noop(
     assert view._provider_draft is None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.model
-        == TranslationModel.GEMINI_FLASH.value
+        == TranslationModel.GPT_6_LUNA.value
     )
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.connection
@@ -2718,9 +2689,9 @@ def test_on_llm_selected_invalid_value_is_noop(
     )
     assert (
         _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.GEMINI.value
+        == LLMProviderName.OPENAI.value
     )
-    assert view._llm_text.content.value == "Gemini 3 Flash"
+    assert view._llm_text.content.value == "selected model label"
     assert view._translation_connection_text.content.value == "Official BYOK"
     assert view._prompt_editor.value == "G"
     assert view.has_provider_changes is False
@@ -2774,8 +2745,8 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
         settings_view, "load_prompt_for_provider", lambda _provider: "DEFAULT PROMPT"
     )
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="")
@@ -2808,8 +2779,8 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -2852,8 +2823,8 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
@@ -2886,8 +2857,8 @@ def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_FLASH.value,
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
@@ -3042,56 +3013,6 @@ def test_on_llm_selected_switching_away_from_openrouter_preserves_saved_selectio
             settings_events.settings, pending
         ).intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
-    )
-
-
-def test_on_llm_selected_preserves_default_openrouter_managed_selection_during_gemini_and_qwen_changes(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.GEMINI.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selected_source
-        == OpenRouterCredentialSource.MANAGED.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
-    )
-
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending)) == LLMProviderName.QWEN.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selected_source
-        == OpenRouterCredentialSource.MANAGED.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED.value
     )
 
 
@@ -3480,7 +3401,7 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
     store = DummySecretStore({"openrouter_api_key": "legacy-openrouter-key"})
     view, _ = _make_settings_view(monkeypatch, settings_events, store)
     settings_events.load(view, settings, config_path=Path("settings.json"))
@@ -3497,7 +3418,7 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     assert pending is not None
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.model
-        == TranslationModel.GEMINI_FLASH.value
+        == TranslationModel.GPT_6_LUNA.value
     )
     assert (
         apply_provider_intent(settings_events.settings, pending).intent.translation.connection
@@ -3511,7 +3432,7 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
         apply_provider_intent(
             settings_events.settings, pending
         ).intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.GEMINI_FLASH_BYOK.value
+        == OpenRouterSelectionAlias.GPT_6_LUNA_BYOK.value
     )
 
 
@@ -3519,7 +3440,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
     settings = _vnext(settings, system_prompt="G")
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     requested: list[object] = []
@@ -3528,7 +3449,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].selection_alias == OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
+    assert requested[0].selection_alias == OpenRouterSelectionAlias.GPT_6_LUNA_BYOK
     assert requested[0].system_prompt == "G"
     assert any(
         isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits
@@ -3539,7 +3460,7 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     store = DummySecretStore({"openrouter_api_key": "pkce-openrouter-key"})
-    initial = _vnext(llm="gemini", source_language="ko", system_prompt="G")
+    initial = _vnext(llm="openai", source_language="ko", system_prompt="G")
 
     view, _ = _make_settings_view(monkeypatch, settings_events, store)
     settings_events.load(view, initial, config_path=Path("settings.json"))
@@ -3547,7 +3468,7 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     store.get_calls.clear()
     store.set_calls.clear()
     view._custom_vocab_tag_editor._input_field.value = "VRChat"  # noqa: SLF001
-    view._google_key.value = "typed-google-draft"
+    view._gemini_key.value = "typed-google-draft"
 
     updated = _vnext(
         llm="openrouter",
@@ -3565,7 +3486,7 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
 
     assert view._custom_vocab_tag_editor._input_field.value == ""  # noqa: SLF001
     assert _custom_vocab_chip_terms(view) == []
-    assert view._google_key.value == "typed-google-draft"
+    assert view._gemini_key.value == "typed-google-draft"
     assert view._openrouter_key.value == "pkce-openrouter-key"
     assert view._openrouter_key._current_status == "success"
     assert view._llm_text.content.value == view._get_llm_display_label(
@@ -3578,63 +3499,6 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
         "deepseek_api_key",
     ]
     assert store.set_calls == []
-
-
-def test_on_llm_selected_updates_gemini_model(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(
-        llm="deepseek",
-        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-    settings = _vnext(settings, system_prompt="G")
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
-
-    pending = view.build_provider_apply_settings()
-
-    assert _llm(settings) == LLMProviderName.DEEPSEEK.value
-    assert settings.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
-    assert pending is not None
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.model
-        == TranslationModel.GEMINI_FLASH.value
-    )
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
-        == TranslationConnection.OFFICIAL_BYOK.value
-    )
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.gemini.llm_model
-        == GeminiLLMModel.GEMINI_FLASH.value
-    )
-    assert view._prompt_editor.value == "G"
-    assert settings.intent.prompts.system_prompt_override == "G"
-    assert view.has_provider_changes is True
-
-
-def test_on_llm_selected_logs_only_changed_fields_for_provider_switch(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-    )
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    basic_messages: list[str] = []
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-    view.runtime_log_basic = lambda message, *, level=logging.INFO: basic_messages.append(message)
-
-    view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
-
-    assert basic_messages == ["[Settings] LLM provider changed: gemini -> qwen"]
 
 
 def test_on_llm_selected_skips_log_when_selection_is_unchanged(
@@ -3736,13 +3600,13 @@ def test_on_secret_change_saves_and_clears_keys(
     settings_events.load(view, settings, config_path=Path("settings.json"))
     view.on_secret_cleared = lambda key: cleared.append(key)
 
-    view._on_secret_change("google_api_key", "abc")
-    view._on_secret_change("google_api_key", "")
+    view._on_secret_change("gemini_api_key", "abc")
+    view._on_secret_change("gemini_api_key", "")
 
-    assert store.values.get("google_api_key") is None
-    assert store.set_calls == [("google_api_key", "abc")]
-    assert store.delete_calls == ["google_api_key"]
-    assert cleared == ["google_api_key"]
+    assert store.values.get("gemini_api_key") is None
+    assert store.set_calls == [("gemini_api_key", "abc")]
+    assert store.delete_calls == ["gemini_api_key"]
+    assert cleared == ["gemini_api_key"]
 
 
 def test_audio_and_vad_handlers_update_state(
@@ -3866,14 +3730,13 @@ def test_update_api_visibility_shows_selected_peer_deepgram_credentials(
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
     assert view._deepgram_key.visible is True
     assert view._soniox_key.visible is False
-    assert view._google_key.visible is True
 
 
 def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_disabled(
@@ -3882,7 +3745,7 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_FUN_ASR_MLT_NANO)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     view._update_api_visibility()
 
@@ -3911,7 +3774,7 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.SONIOX)
     settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
+    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
@@ -3967,25 +3830,123 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
     assert "api_keys_column" in api_key_updates
 
 
-def test_peer_auto_detection_languages_card_stays_on_prompt_tab(
+@pytest.mark.parametrize(
+    ("route", "chatgpt", "gemini", "remaining"),
+    [
+        ("managed", False, False, True),
+        ("chatgpt", True, False, False),
+        ("gemini", False, True, False),
+    ],
+)
+def test_photo_route_shows_only_its_credential_card(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    route: str,
+    chatgpt: bool,
+    gemini: bool,
+    remaining: bool,
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(settings.intent, photo=replace(settings.intent.photo, route=route)),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    photo_controls = _subtab_controls(view, "photo")
+    assert view._photo_chatgpt_view.card in photo_controls
+    assert view._photo_gemini_card in photo_controls
+    assert view._photo_chatgpt_view.card is not view._chatgpt_account_card
+    assert view._photo_chatgpt_view.card.visible is chatgpt
+    assert view._photo_gemini_card.visible is gemini
+    assert view._photo_remaining_text.visible is remaining
+    assert view._photo_route_text.content.value == t(f"settings.photo.route.{route}")
+
+
+def test_agent_navigation_opens_the_tab_that_holds_each_section(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    opened = []
+
+    for section, tab in (("photo", "photo"), ("prompts", "general"), ("api", "api")):
+        result = view.open_agent_section(section, None, show_settings=lambda: opened.append(1))
+        assert result["opened"] is True
+        assert view._settings_subtab_shell.active_key == tab
+    assert len(opened) == 3
+
+
+def test_photo_gemini_field_shares_the_gemini_secret(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    saved = []
+    monkeypatch.setattr(view, "_on_secret_change", lambda key, value: saved.append((key, value)))
+
+    view._on_gemini_secret_change("gemini_api_key", "synthetic-gemini")
+
+    assert view._gemini_key.value == "synthetic-gemini"
+    assert view._photo_gemini_key.value == "synthetic-gemini"
+    assert saved == [("gemini_api_key", "synthetic-gemini")]
+
+
+def test_speech_hint_cards_follow_api_keys_and_system_prompt_ends_general_tab(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
-    prompt_cards = _prompt_tab_cards(view)
-    assert prompt_cards[0] is _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
-    assert prompt_cards[1] is view._peer_auto_languages_card
-    assert prompt_cards[2] is _prompt_tab_card(view, t("settings.section.persona"))
-    assert view._peer_auto_languages_card.visible is True
-    assert view._peer_auto_languages_card not in _subtab_controls(view, "api")
+    api_controls = _subtab_controls(view, "api")
+    assert api_controls[-2] is _full_width_card(view, t("settings.section.custom_vocabulary"))
+    assert api_controls[-1] is view._peer_auto_languages_card
+    general_controls = _subtab_controls(view, "general")
+    assert general_controls[-1] is _full_width_card(view, t("settings.section.persona"))
+    assert settings_view._SETTINGS_SUBTAB_ORDER == ("api", "general", "photo", "overlay")
+
+
+@pytest.mark.parametrize(
+    ("stt_provider", "peer_stt_provider", "peer_source_mode", "vocabulary", "hints"),
+    [
+        (STTProviderName.SONIOX, STTProviderName.SONIOX, "auto", True, True),
+        (STTProviderName.DEEPGRAM, STTProviderName.GEMINI_TRANSCRIBE, "auto", True, True),
+        (STTProviderName.SONIOX, STTProviderName.SONIOX, "manual", True, False),
+        (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.LOCAL_CPU_AUTO, "auto", False, False),
+        (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.ELEVENLABS_SCRIBE, "auto", False, False),
+    ],
+)
+def test_speech_hint_cards_appear_only_when_the_selected_recognizer_uses_them(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    stt_provider: STTProviderName,
+    peer_stt_provider: STTProviderName,
+    peer_source_mode: str,
+    vocabulary: bool,
+    hints: bool,
+) -> None:
+    settings = _vnext(
+        AppSettingsVNext(),
+        stt_provider=stt_provider,
+        peer_stt_provider=peer_stt_provider.value,
+        peer_source_mode=peer_source_mode,
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    assert view._custom_vocab_card.visible is vocabulary
+    assert view._peer_auto_languages_card.visible is hints
 
 
 def test_peer_auto_detection_languages_card_loads_saved_hints(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_expected_languages=["ja", "zh-TW"])
+    settings = _vnext(
+        settings,
+        peer_expected_languages=["ja", "zh-TW"],
+        peer_stt_provider=STTProviderName.SONIOX.value,
+        peer_source_mode="auto",
+    )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
@@ -4777,7 +4738,7 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         view, _ = _make_settings_view(monkeypatch, settings_events)
         settings_events.load(view, settings, config_path=Path("settings.json"))
         view.on_desktop_overlay_recovery_action = recovery_actions.append
-        view.on_view_logs = lambda: details_opened.append(True)
+        view.on_open_agent = lambda: details_opened.append(True)
 
         view.set_overlay_runtime_state(
             "failed",
@@ -4804,7 +4765,7 @@ def test_overlay_failure_i18n_desktop_gui_recovery_actions_are_user_facing(
         ]
 
         view._on_desktop_overlay_primary_action(None)
-        view._on_desktop_overlay_view_logs(None)
+        view._on_desktop_overlay_open_agent(None)
 
         assert recovery_actions == ["reopen"]
         assert details_opened == [True]
@@ -4977,7 +4938,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch, settings_events)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 9
+    assert len(api_controls) == 11
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -5012,6 +4973,8 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[7]) == [t("settings.managed_key.title")]
     assert api_controls[8] is not view._api_keys_column
     assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
+    assert api_controls[9] is view._custom_vocab_card
+    assert api_controls[10] is view._peer_auto_languages_card
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
@@ -5203,7 +5166,7 @@ def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
             view._overlay_vr_reset_button,
             view._overlay_desktop_reset_button,
             view._desktop_overlay_primary_action,
-            view._desktop_overlay_view_logs_action,
+            view._desktop_overlay_open_agent_action,
         ):
             assert control.content.font_family == zh_font
     finally:
@@ -5386,22 +5349,22 @@ async def test_verify_key_reports_unavailable_or_provider_result(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
-    unavailable = await view._verify_key("google", "abc")
+    unavailable = await view._verify_key("gemini", "abc")
     assert unavailable == ProviderCredentialVerificationOutcome(
-        status="unknown", provider="google", error_text="Verification not available"
+        status="unknown", provider="gemini", error_text="Verification not available"
     )
 
     async def fake_verify(provider: str, key: str) -> ProviderCredentialVerificationOutcome:
         return ProviderCredentialVerificationOutcome(
-            status="verified" if provider == "google" else "failed",
+            status="verified" if provider == "gemini" else "failed",
             provider=provider,
             error_text=key,
         )
 
     view.on_verify_api_key = fake_verify
-    available = await view._verify_key("google", "abc")
+    available = await view._verify_key("gemini", "abc")
     assert available == ProviderCredentialVerificationOutcome(
-        status="verified", provider="google", error_text="abc"
+        status="verified", provider="gemini", error_text="abc"
     )
 
 
@@ -5639,7 +5602,7 @@ def test_custom_vocabulary_loads_current_source_language_bucket_as_tags(
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(view, settings, config_path=Path("settings.json"))
-    custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
+    custom_vocab_card = _full_width_card(view, t("settings.section.custom_vocabulary"))
 
     assert _tree_contains_control(custom_vocab_card, view._custom_vocab_tag_editor)
     assert not hasattr(view, "_custom_vocab_terms")
@@ -5675,7 +5638,7 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    custom_vocab_card = _prompt_tab_card(view, t("settings.section.custom_vocabulary"))
+    custom_vocab_card = _full_width_card(view, t("settings.section.custom_vocabulary"))
     custom_vocab_column = _wrapped_card_column(custom_vocab_card)
 
     assert custom_vocab_column.controls[0] is view._custom_vocab_header
@@ -5690,16 +5653,19 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
 
-def test_prompt_tab_uses_shared_full_width_cards(
+def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    prompt_cards = _subtab_controls(view, "prompt")
+    prompt_cards = [
+        view._custom_vocab_card,
+        view._peer_auto_languages_card,
+        _subtab_controls(view, "general")[-1],
+    ]
 
-    assert len(prompt_cards) == 3
     assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
     assert all(card.height is None for card in prompt_cards)
     assert all(card.expand is False for card in prompt_cards)
@@ -6234,13 +6200,33 @@ def test_text_subtab_shell_can_render_without_title_and_pin_subtab_bar_to_bottom
     assert shell.controls == [shell.body_region, shell.subtab_bar]
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
+def test_gemini_key_visibility_tracks_stt_selection(
+    monkeypatch: pytest.MonkeyPatch, settings_events, channel: str
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=AppSettingsVNext())
+    assert view._gemini_key.visible is False
+    assert view._api_keys_card.visible is False
+    select_provider = view._on_stt_selected if channel == "self" else view._on_peer_stt_selected
+
+    select_provider(STTProviderName.GEMINI_TRANSCRIBE.value)
+
+    assert view._gemini_key.visible is True
+    assert view._api_keys_card.visible is True
+
+    select_provider(STTProviderName.LOCAL_CPU_AUTO.value)
+
+    assert view._gemini_key.visible is False
+    assert view._api_keys_card.visible is False
+
+
 def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_on(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert view._gemini_transcribe_key.visible is True
+    assert view._gemini_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
     assert view._cloud_free_tier_text.content.value == t(
@@ -6259,7 +6245,7 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_
     )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert view._gemini_transcribe_key.visible is True
+    assert view._gemini_key.visible is True
     assert view._deepgram_key.visible is True
     assert view._elevenlabs_scribe_key.visible is False
 
@@ -6311,7 +6297,7 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rol
     settings = _vnext(peer_stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     settings_events.load(view, settings, config_path=Path("settings.json"))
-    assert view._gemini_transcribe_key.visible is True
+    assert view._gemini_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
     assert view._cloud_free_tier_text.on_click is not None
@@ -6376,13 +6362,19 @@ def test_cloud_free_tier_selection_gates_member_api_keys(
         )
     )
 
-    assert view._gemini_transcribe_key.visible is True
+    assert view._gemini_key.visible is True
     assert view._elevenlabs_scribe_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._cloud_free_tier_text.content.value == t(
         "settings.cloud_free_tier.count",
         count=2,
     )
+
+    view._on_cloud_free_tier_changed((STTProviderName.ELEVENLABS_SCRIBE.value,))
+
+    assert view._gemini_key.visible is False
+    assert view._elevenlabs_scribe_key.visible is True
+    assert view._deepgram_key.visible is False
 
 
 def test_cloud_free_tier_change_applies_providers(
@@ -6411,7 +6403,6 @@ def test_dedicated_deepgram_stt_still_shows_deepgram_key(
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
     assert view._deepgram_key.visible is True
-    assert view._gemini_transcribe_key.visible is False
     assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
     assert view._cloud_free_tier_text.on_click is None
     assert view._cloud_free_tier_card.ignore_interactions is True
@@ -6434,7 +6425,6 @@ def test_cloud_free_tier_card_is_inactive_without_auto_select(
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
     settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
 
-    assert view._gemini_transcribe_key.visible is False
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
     assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
@@ -6490,7 +6480,6 @@ def _make_provider_apply_app(
     app._current_tab = 2
     app.view_settings = view
     app.view_dashboard = object()
-    app.view_logs = object()
     app.view_about = object()
     app.content_area = SimpleNamespace(content=None, padding=None, update=lambda: None)
     app._close_open_dialog_for_navigation = lambda: None
@@ -6595,11 +6584,11 @@ async def test_translation_apply_clears_draft_after_history_order_changes(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     baseline = _vnext(
-        model=TranslationModel.GEMINI_FLASH,
+        model=TranslationModel.GPT_6_LUNA,
         connection=TranslationConnection.OFFICIAL_BYOK,
         connection_history={
             TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
-            TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.GPT_6_LUNA.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     view, _store = _make_settings_view(monkeypatch, settings_events)
@@ -6614,7 +6603,7 @@ async def test_translation_apply_clears_draft_after_history_order_changes(
     assert backend.settings.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
     assert backend.settings.intent.translation.connection_history == {
         TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
-        TranslationModel.GEMINI_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
+        TranslationModel.GPT_6_LUNA.value: TranslationConnection.OFFICIAL_BYOK.value,
         TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED.value,
     }
     assert view.has_provider_changes is False

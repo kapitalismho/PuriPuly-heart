@@ -83,6 +83,8 @@ export function responseStream(
               if (event.type === 'response.failed') throw new Error('upstream_unavailable');
               code = 'service_shutdown';
               await settle(result);
+              delete result.instructions;
+              delete result.tools;
               emit({ type: 'completed', response: result });
               completed = true;
               return;

@@ -312,6 +312,8 @@ class UiDiagnosticsRuntimePort(Protocol):
 
     def clear_debug_audio_fault_profiles(self) -> None: ...
 
+    def toggle_debug_photo_limited(self) -> bool: ...
+
 
 __all__ = [
     "UiAudioTestRuntimePort",

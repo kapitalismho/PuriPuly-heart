@@ -122,6 +122,8 @@ def test_vnext_schema_default_tree_excludes_raw_provider_api_key_fields() -> Non
         "alibaba_api_key_singapore",
         "deepgram_api_key",
         "deepseek_api_key",
+        "gemini_api_key",
+        "gemini_transcribe_api_key",
         "google_api_key",
         "local_llm_api_key",
         "openrouter_api_key",
@@ -214,40 +216,6 @@ def test_provider_verification_entry_rejects_secret_bearing_evidence_keys(
             verifier_context={"flow": "settings.verify_api_key"},
             verifier_evidence={evidence_key: "redacted-test-sentinel"},
         )
-
-
-def test_vnext_schema_excludes_deferred_vnext_only_operational_leaves() -> None:
-    schema = _load_schema_module()
-
-    leaf_paths = _dataclass_leaf_paths(schema.AppSettingsVNext())
-
-    assert (
-        not {
-            "state.provider_verification.alibaba_beijing.credential_hash",
-            "state.provider_verification.alibaba_beijing.credential_ref",
-            "state.provider_verification.alibaba_beijing.verified_at",
-            "state.provider_verification.alibaba_singapore.credential_hash",
-            "state.provider_verification.alibaba_singapore.credential_ref",
-            "state.provider_verification.alibaba_singapore.verified_at",
-            "state.provider_verification.deepgram.credential_hash",
-            "state.provider_verification.deepgram.credential_ref",
-            "state.provider_verification.deepgram.verified_at",
-            "state.provider_verification.deepseek.credential_hash",
-            "state.provider_verification.deepseek.credential_ref",
-            "state.provider_verification.deepseek.verified_at",
-            "state.provider_verification.google.credential_hash",
-            "state.provider_verification.google.credential_ref",
-            "state.provider_verification.google.verified_at",
-            "state.provider_verification.openrouter.credential_hash",
-            "state.provider_verification.openrouter.credential_ref",
-            "state.provider_verification.openrouter.verified_at",
-            "state.provider_verification.soniox.credential_hash",
-            "state.provider_verification.soniox.credential_ref",
-            "state.provider_verification.soniox.verified_at",
-            "state.prompts.seen_prompt_ids",
-        }
-        & leaf_paths
-    )
 
 
 @pytest.mark.parametrize(

@@ -307,7 +307,7 @@ def _real_startup_logging_owner(
     service = RuntimeLoggingService(session_service=session)
 
     class Presentation:
-        def attach_runtime_log_sink(self, sink: object) -> None:
+        def bind_conversation_history(self, sink: object) -> None:
             _ = sink
 
     owner = ApplicationRuntimeLoggingOwner(

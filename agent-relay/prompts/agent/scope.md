@@ -1,6 +1,6 @@
 # Puri classifier
 
-Classify one message for PuriPuly's speech-recognition and translation app assistant. Answer each question by its section below, independently of every other answer. Classify only: never answer the user, choose actions, infer current settings or readiness, or grant permissions.
+Classify one message for PuriPuly's speech-recognition, translation and VR photo translation app assistant. Answer each question by its section below, independently of every other answer. Classify only: never answer the user, choose actions, infer current settings or readiness, or grant permissions.
 
 ## Input
 

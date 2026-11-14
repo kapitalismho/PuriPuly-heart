@@ -50,22 +50,27 @@ def create_secret_store(
     backend = _secrets_backend_value(settings.backend)
     if backend == SecretsBackend.KEYRING.value:
         try:
-            return KeyringSecretStore(service_name=keyring_service_name)
+            store = KeyringSecretStore(service_name=keyring_service_name)
         except Exception as exc:
             raise SecretStoreCreationError("settings_secret_failed", exc) from exc
-
-    if backend == SecretsBackend.ENCRYPTED_FILE.value:
+    elif backend == SecretsBackend.ENCRYPTED_FILE.value:
         if not passphrase:
             raise SecretStoreCreationError("secret_store_passphrase_missing")
         path = Path(settings.encrypted_file_path)
         if not path.is_absolute():
             path = config_path.parent / path
         try:
-            return EncryptedFileSecretStore(path=path, passphrase=passphrase)
+            store = EncryptedFileSecretStore(path=path, passphrase=passphrase)
         except Exception as exc:
             raise SecretStoreCreationError("settings_secret_failed", exc) from exc
+    else:
+        raise SecretStoreCreationError("secret_store_backend_unsupported")
 
-    raise SecretStoreCreationError("secret_store_backend_unsupported")
+    try:
+        store._migrate_gemini_api_key()
+    except Exception as exc:
+        raise SecretStoreCreationError("settings_secret_failed", exc) from None
+    return store
 
 
 def _secrets_backend_value(value: object) -> str:

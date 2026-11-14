@@ -29,6 +29,65 @@ def test_main_version_prints(capsys) -> None:
     assert capsys.readouterr().out.strip() == __version__
 
 
+@pytest.mark.skipif(
+    os.name != "nt", reason="NumPy's bundled OpenBLAS runtime check is Windows-specific"
+)
+def test_main_limits_openblas_before_numpy_import() -> None:
+    import subprocess
+
+    script = """
+import ctypes
+import os
+import psutil
+import sys
+
+os.environ["OPENBLAS_NUM_THREADS"] = "3"
+import puripuly_heart.main
+
+assert os.environ["OPENBLAS_NUM_THREADS"] == "1"
+assert "numpy" not in sys.modules
+
+import numpy
+
+libraries = {
+    row.path
+    for row in psutil.Process().memory_maps(grouped=False)
+    if "openblas" in row.path.lower()
+}
+threads = None
+for path in libraries:
+    library = ctypes.CDLL(path)
+    for prefix in ("", "scipy_"):
+        for suffix in ("", "64_", "_"):
+            try:
+                function = getattr(library, prefix + "openblas_get_num_threads" + suffix)
+            except AttributeError:
+                continue
+            function.restype = ctypes.c_int
+            threads = function()
+            break
+        if threads is not None:
+            break
+    if threads is not None:
+        break
+assert threads == 1, (numpy.__version__, libraries, threads)
+print(threads)
+"""
+    repo_root = Path(__file__).resolve().parents[2]
+    environment = os.environ.copy()
+    environment["OPENBLAS_NUM_THREADS"] = "3"
+    environment["PYTHONPATH"] = str(repo_root / "src")
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=repo_root,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "1"
+
+
 def test_main_gui_startup_check_imports_gui_runtime_without_starting_flet(monkeypatch) -> None:
     import flet
 

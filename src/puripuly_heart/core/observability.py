@@ -38,10 +38,6 @@ PROVIDER_OBSERVATION_OUTCOMES: Final[tuple[ProviderObservationOutcome, ...]] = (
 ConversationRecordChannel = Literal["self", "peer"]
 
 
-class RealtimeLogSink(Protocol):
-    def append_log(self, line: str) -> None: ...
-
-
 def _freeze_fields(
     values: Mapping[str, DiagnosticFieldValue],
 ) -> Mapping[str, DiagnosticFieldValue]:
@@ -193,7 +189,6 @@ __all__ = [
     "ProviderObservationPort",
     "ProviderObservationOutcome",
     "ProviderObservationSink",
-    "RealtimeLogSink",
     "RuntimeLogEvent",
     "RuntimeLogSink",
 ]

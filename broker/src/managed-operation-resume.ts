@@ -116,6 +116,9 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
     return c.json({ ok: false, code: 'invalid_request', message: 'unknown operation' }, 404);
   }
   let operation = auth.operation;
+  if (operation.issue_source === 'photo') {
+    return c.json({ ok: false, code: 'invalid_request', message: 'Photo access requires Puri authorization' }, 404);
+  }
   const deliveryConflict = await findConflictingOperationDelivery(db, {
     issueSource: operation.issue_source,
     subjectRef: operation.subject_ref,

@@ -59,6 +59,9 @@ class AgentRelayTokenOwner:
             raise ValueError("Agent token broker requires HTTPS or explicit source loopback HTTP")
         return base_url.rstrip("/") + "/v1/puri/token"
 
+    async def installation_id(self) -> str:
+        return (await self._identity()).installation_id
+
     async def get_token(self) -> str:
         if self._closed:
             raise AgentServiceError("service_authentication_failed")

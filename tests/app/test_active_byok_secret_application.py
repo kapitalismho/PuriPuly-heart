@@ -26,7 +26,6 @@ from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackendRequest
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
-from puripuly_heart.providers.llm.gemini import GEMINI_FLASH_GA_MODEL, GeminiLLMProvider
 from puripuly_heart.providers.llm.openai import OpenAILLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.ui.components.settings.api_key_verification_controller import (
@@ -60,14 +59,6 @@ ROUTES = (
         "openai_api_key",
         OpenAILLMProvider,
         "api.openai.com",
-    ),
-    Route(
-        "gemini_flash",
-        "official_byok",
-        "google",
-        "google_api_key",
-        GeminiLLMProvider,
-        "generativelanguage.googleapis.com",
     ),
     Route(
         "gemma4_26b_31b",
@@ -198,7 +189,7 @@ async def composed(tmp_path, monkeypatch):
     for handler in root.handlers:
         monkeypatch.setattr(handler, "filters", list(handler.filters))
     monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
-    for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"):
+    for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(
         application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
@@ -208,31 +199,8 @@ async def composed(tmp_path, monkeypatch):
     def local_response(request):
         host = request.url.host
         credential = request.headers.get("authorization", "").removeprefix("Bearer ")
-        if host == "generativelanguage.googleapis.com":
-            credential = request.headers.get("x-goog-api-key") or request.url.params.get("key")
         requests.append((host, request.method, request.url.path, _fingerprint(credential)))
-        if host == "generativelanguage.googleapis.com":
-            if request.method == "GET" and request.url.path.endswith("/models"):
-                return httpx.Response(
-                    200,
-                    json={"models": [{"name": f"models/{GEMINI_FLASH_GA_MODEL}"}]},
-                )
-            if request.method == "POST" and request.url.path.endswith(":generateContent"):
-                return httpx.Response(
-                    200,
-                    json={
-                        "candidates": [
-                            {
-                                "content": {
-                                    "role": "model",
-                                    "parts": [{"text": "translated locally"}],
-                                },
-                                "finishReason": "STOP",
-                            }
-                        ]
-                    },
-                )
-        elif host in {"api.deepseek.com", "api.openai.com", "openrouter.ai"}:
+        if host in {"api.deepseek.com", "api.openai.com", "openrouter.ai"}:
             if request.method == "POST" and request.url.path.endswith("/chat/completions"):
                 return httpx.Response(
                     200,
@@ -267,15 +235,11 @@ async def composed(tmp_path, monkeypatch):
         kwargs["trust_env"] = False
         return httpx.Client(transport=httpx.MockTransport(local_response), **kwargs)
 
-    def genai_options():
-        return {"httpx_client": sync_client(), "httpx_async_client": async_client()}
-
     def forbidden_network(*_args, **_kwargs):
         pytest.fail("isolated BYOK regression attempted a real network connection")
 
     monkeypatch.setattr(network_clients, "external_async_client", async_client)
     monkeypatch.setattr(network_clients, "external_client", sync_client)
-    monkeypatch.setattr(network_clients, "genai_http_options", genai_options)
     monkeypatch.setattr(network_clients, "external_websocket_connect", forbidden_network)
     monkeypatch.setattr(socket.socket, "connect", forbidden_network)
     monkeypatch.setattr(socket.socket, "connect_ex", forbidden_network)
@@ -457,7 +421,7 @@ async def test_inactive_byok_key_saves_do_not_rebuild_selected_provider(composed
 @pytest.mark.asyncio
 @pytest.mark.parametrize("connection", ("managed", "managed_china"))
 async def test_managed_route_excludes_all_ordinary_byok_key_saves(composed, connection):
-    route = ROUTES[3] if connection == "managed" else ROUTES[0]
+    route = ROUTES[-1] if connection == "managed" else ROUTES[0]
     async with composed(route, connection=connection) as (app, _store, requests, _path):
         runtime = _runtime(app)
         backend = runtime.provider
@@ -602,7 +566,7 @@ async def test_gui_key_flow_verifies_persisted_key_after_runtime_degradation(com
 
 @pytest.mark.asyncio
 async def test_failed_managed_to_byok_apply_clears_managed_usage_view(composed, monkeypatch):
-    route = ROUTES[3]
+    route = ROUTES[-1]
     async with composed(route, initial=OLD_CREDENTIAL, connection="managed") as (
         app,
         _store,

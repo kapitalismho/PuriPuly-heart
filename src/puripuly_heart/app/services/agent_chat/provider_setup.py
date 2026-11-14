@@ -60,10 +60,13 @@ class ProviderSetup:
                 for link in self.links
             ],
         }
-        if self.provider in RECOGNITION_ALLOWANCES:
+        allowance = RECOGNITION_ALLOWANCES.get(
+            "gemini_transcribe" if self.provider == "gemini" else self.provider
+        )
+        if allowance is not None:
             result["cost"] = {
                 "category": "free_credit_or_allowance",
-                "allowance_kind": RECOGNITION_ALLOWANCES[self.provider],
+                "allowance_kind": allowance,
                 "remaining": None,
                 "billing_state": "unknown",
             }
@@ -82,20 +85,6 @@ PROVIDER_SETUPS = MappingProxyType(
     {
         setup.provider: setup
         for setup in (
-            ProviderSetup(
-                "google",
-                SettingsSecretKey.GOOGLE_API_KEY,
-                (
-                    ProviderSetupLink(
-                        ProviderSetupLinkKind.KEY_CONSOLE,
-                        "https://aistudio.google.com/apikey",
-                    ),
-                    ProviderSetupLink(
-                        ProviderSetupLinkKind.KEY_DOCUMENTATION,
-                        "https://ai.google.dev/gemini-api/docs/api-key",
-                    ),
-                ),
-            ),
             ProviderSetup(
                 "openrouter",
                 SettingsSecretKey.OPENROUTER_API_KEY,
@@ -143,8 +132,8 @@ PROVIDER_SETUPS = MappingProxyType(
                 ),
             ),
             ProviderSetup(
-                "gemini_transcribe",
-                SettingsSecretKey.GEMINI_TRANSCRIBE_API_KEY,
+                "gemini",
+                SettingsSecretKey.GEMINI_API_KEY,
                 (
                     ProviderSetupLink(
                         ProviderSetupLinkKind.KEY_CONSOLE,

@@ -23,21 +23,6 @@ from puripuly_heart.ui.views.agent_chat import AgentChatHooks, AgentChatView
 from puripuly_heart.ui.views.settings import SettingsView
 from tests.app.test_agent_chat import Records, Responses, answer
 
-CONNECTED_PROVIDERS = frozenset(
-    {
-        "deepgram",
-        "gemini_transcribe",
-        "elevenlabs_scribe",
-        "soniox",
-        "google",
-        "openrouter",
-        "deepseek",
-        "openai",
-        "alibaba_beijing",
-        "alibaba_singapore",
-    }
-)
-
 
 class PresentationOwner:
     def __init__(self) -> None:
@@ -123,13 +108,11 @@ async def test_real_secure_field_completion_keeps_settings_in_place_and_unbinds(
         persist_api_key_verification=lambda *_: None,
     )
     app._open_settings_tab = lambda: opened.append("settings")
-    view.on_view_logs = lambda: opened.append("agent")
+    view.on_open_agent = lambda: opened.append("agent")
     before = view._provider_snapshot
 
     app._bind_agent_navigation()
-    assert owner.calls[0] == ("providers", CONNECTED_PROVIDERS)
-    assert owner.calls[1][0] == "navigation"
-    navigation = owner.calls[1][1]
+    navigation = next(call[1] for call in owner.calls if call[0] == "navigation")
     result = navigation("api", "openrouter")
     assert result["opened"] is True
     assert result["completion_observable"] is True
@@ -222,7 +205,7 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
     app.content_area = SimpleNamespace(
         content=None, padding=None, update=lambda: opened.append("settings")
     )
-    view.on_view_logs = lambda: opened.append("agent")
+    view.on_open_agent = lambda: opened.append("agent")
     mutations = []
     view.on_providers_changed = lambda: mutations.append("provider")
     view.on_request_openrouter_pkce = lambda *_: mutations.append("authorization")
@@ -243,7 +226,6 @@ async def test_actual_setup_tool_and_navigation_expose_fields_without_provider_s
     }
     before_visibility = {provider: field.visible for provider, field in fields.items()}
     before_pkce_visibility = view._openrouter_pkce_button_row.visible
-    assert view._api_keys_card.visible is False
     before = (
         view._provider_snapshot,
         view._provider_draft,

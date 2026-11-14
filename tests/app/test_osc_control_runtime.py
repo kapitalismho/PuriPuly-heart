@@ -677,7 +677,7 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
         ("PuriPuly_PeerDstLang", 7),
         ("PuriPuly_SelfASR", 7),
         ("PuriPuly_PeerASR", 4),
-        ("PuriPuly_Translator", 5),
+        ("PuriPuly_Translator", 7),
     ]
 
     for name, value in packets:
@@ -690,6 +690,10 @@ async def test_in_process_complete_control_matrix_projects_final_canonical_state
         assert projected[-1] == presentation_state(name)
 
     assert [state.changed_control for state in projected] == [name for name, _value in packets]
+    assert current[0].intent.translation.model == "qwen38_flash"
+    assert current[0].intent.translation.connection == "official_byok"
+    assert projected[-1].translation_model == "qwen38_flash"
+    assert projected[-1].translation_connection == "official_byok"
     assert len(runtime_calls) == 4
     assert translation_authorization_calls == [False]
     assert len(settings_apply_calls) == 11

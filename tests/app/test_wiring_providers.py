@@ -120,7 +120,6 @@ from puripuly_heart.core.openrouter.managed_openrouter_release import (
 from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
-from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
@@ -129,7 +128,6 @@ from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
-    "gemini": ("gemini_flash", "official_byok"),
     "qwen": ("qwen38_flash", "official_byok"),
     "deepseek": ("deepseek_v4_flash", "official_byok"),
     "local_llm": ("local_llm", "ollama"),
@@ -421,21 +419,6 @@ def _resolved_stt_config(
     )
 
 
-def test_create_llm_provider_gemini_uses_secret_and_concurrency_limit() -> None:
-    settings = _vnext(llm="gemini", concurrency_limit=3)
-    secrets = InMemorySecretStore()
-    secrets.set("google_api_key", "k")
-    runtime_logging = object()
-
-    provider = create_llm_provider(settings, secrets=secrets, runtime_logging=runtime_logging)
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner.primary, GeminiLLMProvider)
-    assert provider.inner.primary.api_key == "k"
-    assert provider.inner.primary.model == "gemini-3.8-flash"
-    assert provider.inner.primary.runtime_logging is runtime_logging
-    assert_bounded_concurrency(provider, 3)
-
-
 def test_create_llm_provider_qwen_uses_secret() -> None:
     settings = _vnext(llm="qwen")
     secrets = InMemorySecretStore()
@@ -618,35 +601,32 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
     assert_bounded_concurrency(provider, 4)
 
 
-def test_create_llm_provider_from_resolved_openrouter_gemini_byok_uses_google_latency_routing() -> (
-    None
-):
+@pytest.mark.parametrize(
+    "model", ["google/gemini-3.8-flash", "google/gemini-3.1-flash-lite", "unknown"]
+)
+@pytest.mark.parametrize("pooled", [False, True], ids=["primary", "pool-member"])
+def test_resolved_openrouter_target_rejects_retired_or_unknown_models(
+    model: str, pooled: bool
+) -> None:
+    primary_model = "google/gemma-4-26b-a4b-it" if pooled else model
     resolved = ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="openrouter",
-            model=OpenRouterLLMModel.GEMINI_FLASH.value,
+            model=primary_model,
+            models=(primary_model, model) if pooled else (),
             credential=ResolvedCredentialRequirement(
                 source=CREDENTIAL_SOURCE_SECRET_STORE,
                 required=True,
                 reference="openrouter:byok",
             ),
             routing_mode="latency",
-            provider_routing="google_gemini_latency",
         ),
-        concurrency_limit=3,
     )
     secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "gemini-byok-key")
+    secrets.set("openrouter_api_key", "synthetic-byok-key")
 
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, OpenRouterLLMProvider)
-    assert provider.inner.api_key == "gemini-byok-key"
-    assert provider.inner.model == OpenRouterLLMModel.GEMINI_FLASH.value
-    assert provider.inner.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY
-    assert_bounded_concurrency(provider, 3)
+    with pytest.raises(ValueError):
+        create_llm_provider_from_resolved_config(resolved, secrets=secrets)
 
 
 def test_create_llm_provider_canonical_qwen_byok_uses_selected_model() -> None:
@@ -1016,7 +996,7 @@ async def test_canonical_openrouter_connection_owns_credential_despite_stale_sou
     monkeypatch: pytest.MonkeyPatch, has_byok: bool
 ) -> None:
     settings = _vnext(
-        model="gemini_flash",
+        model="gpt_6_luna",
         connection="openrouter",
         openrouter_source="none",
     )
@@ -1067,19 +1047,15 @@ async def test_canonical_openrouter_connection_owns_credential_despite_stale_sou
         method, url, authorization, body = requests[0]
         assert (method, url) == ("POST", "https://openrouter.ai/api/v1/chat/completions")
         assert authorization == "Bearer synthetic-byok-key"
-        assert body["model"] == "google/gemini-3.8-flash"
-        assert body["messages"] == [
-            {"role": "system", "content": "Translate en to ja"},
-            {"role": "user", "content": "<input>\nsynthetic source\n</input>"},
-        ]
+        assert body["model"] == "openai/gpt-6-luna"
         assert "user" not in body
     finally:
         await provider.close()
 
 
 def test_create_llm_provider_requires_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    settings = _vnext(llm="gemini")
+    monkeypatch.delenv("ALIBABA_API_KEY_BEIJING", raising=False)
+    settings = _vnext(llm="qwen")
     secrets = InMemorySecretStore()
     with pytest.raises(ValueError):
         create_llm_provider(settings, secrets=secrets)
@@ -2096,7 +2072,7 @@ def test_rolling_backend_prepares_configured_members_once() -> None:
     from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
     secrets = _CountingSecretStore()
-    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    secrets.set("gemini_api_key", "gemini-key")
     secrets.set("deepgram_api_key", "deepgram-key")
     settings = _vnext(
         stt_provider="rolling_free",
@@ -2106,7 +2082,7 @@ def test_rolling_backend_prepares_configured_members_once() -> None:
     backend = create_stt_backend(settings, secrets=secrets)
     gets_after_prepare = list(secrets.gets)
 
-    assert gets_after_prepare.count("gemini_transcribe_api_key") == 1
+    assert gets_after_prepare.count("gemini_api_key") == 1
     assert gets_after_prepare.count("deepgram_api_key") == 1
     by_name = {definition.name.value: definition for definition in backend.providers}
     gemini = by_name["gemini_transcribe"]
@@ -2126,7 +2102,7 @@ def test_rolling_backend_prepares_configured_members_once() -> None:
 
 def test_rolling_backend_skips_prepare_for_members_without_keys() -> None:
     secrets = _CountingSecretStore()
-    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    secrets.set("gemini_api_key", "gemini-key")
     settings = _vnext(
         stt_provider="rolling_free",
         cloud_free_tier_providers=["gemini_transcribe", "elevenlabs_scribe"],
@@ -2151,7 +2127,7 @@ def test_rolling_backend_rebinds_only_the_changed_member() -> None:
     from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
     secrets = _CountingSecretStore()
-    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    secrets.set("gemini_api_key", "gemini-key")
     secrets.set("deepgram_api_key", "deepgram-key")
     settings = _vnext(
         stt_provider="rolling_free",
@@ -2167,7 +2143,7 @@ def test_rolling_backend_rebinds_only_the_changed_member() -> None:
 
     assert rebind_rolling_stt_provider(
         SimpleNamespace(backend=backend),
-        secret_key="gemini_transcribe_api_key",
+        secret_key="gemini_api_key",
         api_key="gemini-rotated",
     )
     rebound_gemini = by_name["gemini_transcribe"].build_backend()
@@ -2180,7 +2156,7 @@ def test_rolling_backend_rebinds_only_the_changed_member() -> None:
     assert backend.rebind_member(STTProviderName.ELEVENLABS_SCRIBE, "scribe-key") is False
     assert rebind_rolling_stt_provider(
         SimpleNamespace(backend=backend),
-        secret_key="gemini_transcribe_api_key",
+        secret_key="gemini_api_key",
         api_key="",
     )
     assert by_name["gemini_transcribe"].is_configured() is False

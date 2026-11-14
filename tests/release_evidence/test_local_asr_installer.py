@@ -58,7 +58,7 @@ def compiler():
     return executable
 
 
-def _compile(tmp_path, compiler, manifests=None, language="english", defines=()):
+def _compile(tmp_path, compiler, manifests=None, language="english", defines=(), photo=False):
     tmp_path.mkdir(parents=True, exist_ok=True)
     include = tmp_path / "models.iss"
     include.write_text(render_model_data(manifests), encoding="utf-8")
@@ -171,6 +171,22 @@ begin
   Result := '';
 end;
 """
+    if photo:
+        body = body.replace("CreateAppDir=no", "CreateAppDir=yes")
+        body = body.replace(
+            r"DefaultDirName={tmp}\unused-probe-app",
+            f"DefaultDirName={tmp_path / 'installed'}",
+        )
+        body = body.replace(
+            '#include "@TELEMETRY@"',
+            '#include "@TELEMETRY@"\n#include "@PHOTO@"',
+        )
+        body = body.replace(
+            "  TelemetryReadable := ProbeExistingTelemetryPreference",
+            "  if OperationError = '' then OperationError := RunSetupPhotoModelProvisioning();\n"
+            "  TelemetryReadable := ProbeExistingTelemetryPreference",
+        )
+        body = body.replace("  Result := '';\nend;", "  Result := OperationError;\nend;")
     replacements = {
         "PACKAGE": package,
         "MODELS": include,
@@ -180,6 +196,7 @@ end;
         "LANGUAGE": language,
         "ASR": ROOT / "installer/local-asr.iss",
         "TELEMETRY": ROOT / "installer/telemetry-preference.iss",
+        "PHOTO": ROOT / "installer/photo-model.iss",
         "IDENTITYJSON": identity_json,
         "REPORT": report,
     }
@@ -199,7 +216,7 @@ end;
     }
 
 
-def _run(probe, *arguments):
+def _run(probe, *arguments, expected_failure=False):
     probe["report"].unlink(missing_ok=True)
     environment = os.environ.copy()
     temporary = probe["profile"] / "temp"
@@ -219,7 +236,10 @@ def _run(probe, *arguments):
         text=True,
         timeout=60,
     )
-    assert executed.returncode == 0, executed.stdout + executed.stderr
+    if expected_failure:
+        assert executed.returncode != 0, executed.stdout + executed.stderr
+    else:
+        assert executed.returncode == 0, executed.stdout + executed.stderr
     return json.loads(probe["report"].read_text())
 
 
@@ -605,3 +625,53 @@ def test_full_setup_compiles_current_model_include_and_emits_canonical_product_m
         expected_product=identity["MyAppName"],
     )
     assert values["CompanyName"].strip() == identity["MyAppPublisher"]
+
+
+@WINDOWS
+@pytest.mark.parametrize("language", ["english", "chinesesimplified"])
+def test_photo_setup_blocks_failed_download_recovers_and_reuses_without_hashing(
+    tmp_path, compiler, language
+):
+    source = tmp_path / "sources"
+    payload = b"isolated-photo-model" * 16
+    for name in ("primary", "mirror"):
+        target = source / name / "model.onnx"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(payload)
+    with _sources(source) as (url, state):
+        probe = _compile(
+            tmp_path / "setup",
+            compiler,
+            language=language,
+            photo=True,
+            defines=(
+                f"/DPhotoModelPrimaryUrl={url}/primary/model.onnx",
+                f"/DPhotoModelMirrorUrl={url}/mirror/model.onnx",
+                f"/DPhotoModelSize={len(payload)}",
+            ),
+        )
+        installed = probe["script"].parent / "installed/assets/photo/mbnv4_text_seg.onnx"
+        state["primary"] = state["mirror"] = "wrongsize"
+        assert _run(probe, expected_failure=True)["success"] is False
+        assert not installed.exists()
+        state["requests"].clear()
+        state["primary"], state["mirror"] = "missing", "good"
+        assert _run(probe)["success"] is True
+        assert installed.read_bytes() == payload
+        expected_sources = {"mirror"} if language == "chinesesimplified" else {"primary", "mirror"}
+        assert {name for name, _ in state["requests"]} == expected_sources
+        before = len(state["requests"])
+        assert _run(probe)["success"] is True
+        assert len(state["requests"]) == before
+        installed.write_bytes(payload[:-1])
+        assert _run(probe)["success"] is True
+        assert installed.read_bytes() == payload
+        state["primary"] = state["mirror"] = "wrongsize"
+        assert _run(probe, "/TASKS=redownloadasr", expected_failure=True)["success"] is False
+        assert installed.read_bytes() == payload
+        state["primary"] = state["mirror"] = "corrupt"
+        assert _run(probe, "/TASKS=redownloadasr")["success"] is True
+        assert installed.read_bytes() == b"x" * len(payload)
+        before = len(state["requests"])
+        assert _run(probe)["success"] is True
+        assert len(state["requests"]) == before

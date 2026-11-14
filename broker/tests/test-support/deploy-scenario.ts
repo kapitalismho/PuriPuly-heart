@@ -53,12 +53,12 @@ export function createDeployScenario(options: {
     `);
     for (const name of BROKER_MIGRATION_FILENAMES) {
       if (name <= '0024_allow_unattributed_request_events.sql' || name.startsWith('0025_')
-        || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0026_'))) continue;
+        || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0031_'))) continue;
       db.exec(readFileSync(join(brokerRoot, 'migrations', name), 'utf8'));
     }
     db.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP)');
     for (const name of BROKER_MIGRATION_FILENAMES) {
-      if (name.startsWith('0025_') || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0026_'))) continue;
+      if (name.startsWith('0025_') || name.startsWith('0027_') || (options.pendingMigration && name.startsWith('0031_'))) continue;
       db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name);
     }
     db.prepare("UPDATE broker_config SET value = ? WHERE key = 'fingerprint_salt'").run(JSON.stringify({ current: { salt: 'synthetic-initialized-salt', version: 1 }, previous: null, rotated_at: null }));

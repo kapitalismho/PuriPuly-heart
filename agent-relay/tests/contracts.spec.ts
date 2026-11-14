@@ -34,8 +34,8 @@ describe('app protocol contracts', () => {
       'read_app', 'set_app', 'probe_app', 'retry_app', 'open_app', 'manage_proposal',
     ]);
     expect(current.tools.every((tool) => tool.strict === false)).toBe(true);
-    const previousInstructions = workInstructions(previous);
-    const currentInstructions = workInstructions(current);
+    const previousInstructions = workInstructions(previous, 23);
+    const currentInstructions = workInstructions(current, 23);
     expect(previousInstructions).toContain(previous.executionBoundary);
     expect(previousInstructions).toContain('Explicit execute_app actions ui.accounts and ui.provider_setup');
     expect(previousInstructions).not.toContain('normal tools available on your next response');

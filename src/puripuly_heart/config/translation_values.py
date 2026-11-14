@@ -8,7 +8,6 @@ class TranslationModel(str, Enum):
     GEMMA4_26B_31B = "gemma4_26b_31b"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
-    GEMINI_FLASH = "gemini_flash"
     GPT_6_LUNA = "gpt_6_luna"
     QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
@@ -49,10 +48,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.OPENROUTER,
         TranslationConnection.OFFICIAL_BYOK,
     ),
-    TranslationModel.GEMINI_FLASH: (
-        TranslationConnection.OFFICIAL_BYOK,
-        TranslationConnection.OPENROUTER,
-    ),
     TranslationModel.QWEN_38_FLASH: (TranslationConnection.OFFICIAL_BYOK,),
     TranslationModel.GPT_6_LUNA: (
         TranslationConnection.CHATGPT,
@@ -85,8 +80,6 @@ def supported_translation_connections(
 def default_translation_connection(model: TranslationModel) -> TranslationConnection:
     if model == TranslationModel.CUSTOM_HTTP:
         return TranslationConnection.CUSTOM_HTTP
-    if model == TranslationModel.GEMINI_FLASH:
-        return TranslationConnection.OFFICIAL_BYOK
     supported_connections = supported_translation_connections(model)
     for connection in TRANSLATION_CONNECTION_PRIORITY:
         if connection in supported_connections:
@@ -95,6 +88,8 @@ def default_translation_connection(model: TranslationModel) -> TranslationConnec
 
 
 def provider_llm_for_translation(model: str, connection: str) -> str:
+    if model != "openrouter_qwen35_flash":
+        TranslationModel(model)
     if model == "index_translate_35b":
         return "index_translate"
     if model in MANAGED_GEMMA_MODELS:
@@ -107,10 +102,6 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         return "openai"
     if model == "gpt_6_luna" and connection == "chatgpt":
         return "chatgpt"
-    if model == "gemini_flash":
-        if connection == "openrouter":
-            return "openrouter"
-        return "gemini"
     if model == "qwen38_flash":
         return "qwen"
     return "openrouter"

@@ -25,7 +25,6 @@ from puripuly_heart.core.error_messages import (
 from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
-from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.openai import OpenAILLMProvider
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
@@ -72,11 +71,8 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
         low_latency: bool = False,
     ) -> bool:
         normalized_provider = provider.strip().lower()
-        if normalized_provider == "google":
-            return await GeminiLLMProvider.verify_api_key(
-                api_key,
-                **({"model": model} if model is not None else {}),
-            )
+        if normalized_provider == "gemini":
+            return await GeminiTranscribeSTTBackend.verify_api_key(api_key)
         if normalized_provider == "openrouter":
             return await OpenRouterLLMProvider.verify_api_key(api_key)
         if normalized_provider == "openai":
@@ -108,8 +104,6 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
             )
         if normalized_provider == "deepgram":
             return await DeepgramRealtimeSTTBackend.verify_api_key(api_key)
-        if normalized_provider == "gemini_transcribe":
-            return await GeminiTranscribeSTTBackend.verify_api_key(api_key)
         if normalized_provider == "elevenlabs_scribe":
             return await ElevenLabsScribeSTTBackend.verify_api_key(api_key)
         if normalized_provider == "soniox":
@@ -176,7 +170,6 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
                 report = openrouter_auth_failure_report(exc, stage="key_verification")
             elif request.provider in {
                 "deepgram",
-                "gemini_transcribe",
                 "elevenlabs_scribe",
                 "soniox",
             }:

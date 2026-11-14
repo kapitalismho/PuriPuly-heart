@@ -156,7 +156,7 @@ SCENARIOS = (
         Persona(
             familiarity="regular",
             concern="음성 인식이 구려.",
-            obtainable_keys=("gemini_transcribe",),
+            obtainable_keys=("gemini",),
             existing_accounts=("google",),
         ),
         "Poor recognition leads to free-cloud advice, a displayed official Gemini action, guidance using an existing Google identity, secure verification and usable recognition without a paid switch. Project/key creation is not new identity signup. A gratuitous paid proposal is not required.",

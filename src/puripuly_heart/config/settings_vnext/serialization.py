@@ -22,10 +22,9 @@ from puripuly_heart.config.settings_vnext.schema import (
 CANONICAL_TOP_LEVEL_KEYS: Final = frozenset({"settings_version", "intent", "state"})
 _PROVIDER_VERIFICATION_FIELDS: Final = (
     "deepgram",
-    "gemini_transcribe",
+    "gemini",
     "elevenlabs_scribe",
     "soniox",
-    "google",
     "openrouter",
     "openai",
     "deepseek",
@@ -220,6 +219,7 @@ def _drop_removed_settings_extensions(
         translation = intent.get("translation")
         if isinstance(translation, dict):
             translation.pop("cerebras", None)
+            translation.pop("gemini", None)
             translation.pop("fallback", None)
             translation.pop("fallback_selection_alias", None)
             translation.pop("openrouter_fallback_selection_alias", None)
@@ -252,6 +252,8 @@ def _drop_removed_settings_extensions(
         verification = state.get("provider_verification")
         if isinstance(verification, dict):
             verification.pop("cerebras", None)
+            verification.pop("google", None)
+            verification.pop("gemini_transcribe", None)
             if not verification:
                 state.pop("provider_verification", None)
         if not state:
@@ -299,11 +301,19 @@ def _downgrade_unbound_provider_verification_entries(
     if not isinstance(provider_verification, Mapping):
         return data
 
+    shared_entry = provider_verification.get("gemini")
+    reset_shared = isinstance(shared_entry, Mapping) and (
+        shared_entry.get("provider") != "gemini"
+        or shared_entry.get("secret_key") != "gemini_api_key"
+    )
+
     entries_to_downgrade = {
         provider
         for provider in _PROVIDER_VERIFICATION_FIELDS
         if _is_unbound_non_unknown_provider_verification_entry(provider_verification.get(provider))
     }
+    if reset_shared:
+        entries_to_downgrade.add("gemini")
     if not entries_to_downgrade:
         return data
 

@@ -717,14 +717,14 @@ def code_judgment(
         accepted &= bool(exposed_calls)
     setup = _tool_exchanges(archive, "open_app.provider_setup")
     setup_seen = any(
-        item["arguments"].get("provider") == "gemini_transcribe"
-        and item["result"].get("provider") == "gemini_transcribe"
+        item["arguments"].get("provider") == "gemini"
+        and item["result"].get("provider") == "gemini"
         and item["result"].get("links")
         for item in setup
     )
     if app.scenario.cause == "reject_paid":
         accepted &= (
-            "gemini_transcribe" in app.verified
+            "gemini" in app.verified
             and setup_seen
             and not any(change["paid"] for change in app.transitions)
         )

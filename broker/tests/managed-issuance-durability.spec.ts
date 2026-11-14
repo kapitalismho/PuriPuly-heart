@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { checkEndpointRateLimit } from '../src/abuse-controls';
+import { checkEndpointRateLimit, matchSubjectHook, recordRequestEvent } from '../src/abuse-controls';
 import {
   validateManagedKeyDeliveryAck,
   createManagedKeyDelivery,
@@ -12,7 +12,16 @@ import {
   resolveNetworkIdentitySecrets,
   resolveRequestNetworkIdentity,
 } from '../src/network-identity';
-import { runNetworkIdentityBackfill } from '../src/network-identity-migration';
+import {
+  resolveNetworkIdentityMaxWindowMinutes,
+  runNetworkIdentityBackfill,
+} from '../src/network-identity-migration';
+import {
+  replaceAbuseControlsValue,
+  TEST_DEFAULT_ABUSE_CONTROLS,
+  updateAbuseControls,
+} from './test-support/abuse-controls';
+import { readBrokerMigrationSql } from './test-support/migrations';
 import {
   createTestBrokerEnv,
   testNetworkIdentitySecrets,
@@ -373,10 +382,24 @@ describe('network identity windows and hooks', () => {
       await expect(matchSubjectHook(wrapped, context)).resolves.toMatchObject({
         hookKind: 'denylist',
       });
+      const waitingForSecrets = await runNetworkIdentityBackfill(wrapped, null, NOW);
+      expect(waitingForSecrets).toMatchObject({
+        mode: 'dual',
+        hooksConverted: 0,
+        rawHooks: 1,
+        finalized: false,
+      });
+      expect(
+        db.prepare(`SELECT subject_value FROM broker_abuse_subject_hooks`).get(),
+      ).toMatchObject({ subject_value: '203.0.113.99' });
+      expect(
+        db.prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`).get(),
+      ).toEqual(phase);
 
       const converted = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
       expect(converted.hooksConverted).toBe(1);
       expect(converted.pendingHooks).toBe(0);
+      expect(converted.finalized).toBe(true);
       const stored = db
         .prepare(`SELECT subject_value FROM broker_abuse_subject_hooks WHERE subject_type = 'ip'`)
         .get() as { subject_value: string };
@@ -388,11 +411,33 @@ describe('network identity windows and hooks', () => {
 
       const later = new Date(NOW.getTime() + 25 * 60 * 60_000);
       const converged = await runNetworkIdentityBackfill(wrapped, secrets, later);
-      expect(converged.finalized).toBe(true);
-      db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
-      await expect(matchSubjectHook(wrapped, context)).resolves.toMatchObject({
+      expect(converged).toMatchObject({
+        mode: 'keyed',
+        hooksConverted: 0,
+        rawHooks: 0,
+        finalized: true,
+      });
+      expect(
+        db.prepare(`SELECT subject_value FROM broker_abuse_subject_hooks`).get(),
+      ).toEqual(stored);
+      await expect(matchSubjectHook(wrapped, { ...context, now: later })).resolves.toMatchObject({
         hookKind: 'denylist',
       });
+      db.exec(readBrokerMigrationSql('0021_network_identity_purge.sql'));
+      await expect(runNetworkIdentityBackfill(wrapped, null, later)).resolves.toMatchObject({
+        mode: 'keyed',
+        hooksConverted: 0,
+        finalized: true,
+      });
+      expect(
+        db.prepare(`SELECT subject_value FROM broker_abuse_subject_hooks`).get(),
+      ).toEqual(stored);
+      await expect(matchSubjectHook(wrapped, { ...context, now: later })).resolves.toMatchObject({
+        hookKind: 'denylist',
+      });
+      await expect(
+        matchSubjectHook(wrapped, { ...context, now: later, ip: '203.0.113.98' }),
+      ).resolves.toBeNull();
     } finally {
       db.close();
     }
@@ -440,22 +485,70 @@ describe('network identity windows and hooks', () => {
   });
 });
 
-describe('network identity window inventory and fail-closed finalize', () => {
-  it('keeps the purge gate and the backfill horizon on one window inventory', async () => {
-    const { NETWORK_IDENTITY_WINDOW_CONFIG_PATHS, resolveNetworkIdentityMaxWindowMinutes } =
-      await import('../src/network-identity-migration');
-    const { readBrokerMigrationSql } = await import('./test-support/migrations');
-    const sql = readBrokerMigrationSql('0021_network_identity_purge.sql');
-    const gatePaths = new Set(
-      [...sql.matchAll(/\$\.([\w.]+)\.windowMinutes/gu)].map((match) => match[1]),
-    );
-    const retiredPaths = ['qqAuthStatusIp', 'referralAttempts.validShaped', 'referralAttempts.unknown', 'referralAttempts.perReferralIdVelocity', 'referralAttempts.perReferrerRewardVelocity'];
-    expect(new Set([...gatePaths].filter((path) => !retiredPaths.includes(path!)))).toEqual(new Set(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS));
-    expect(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS).toContain('qqAuthAssertIp');
-    expect(NETWORK_IDENTITY_WINDOW_CONFIG_PATHS).toContain('trialStatus');
+describe('completed network identity migration', () => {
+  it.each([true, false])(
+    'leaves legacy residue untouched and keeps keyed hooks usable with secrets available: %s',
+    async (secretsAvailable) => {
+      const env = createTestBrokerEnv();
+      const secrets = resolveNetworkIdentitySecrets(env)!;
+      const [keyedHook] = await deriveStableNetworkIdentityDigest(
+        secrets,
+        normalizeNetworkIdentityIp('203.0.113.110')!,
+        'ip',
+      );
+      env.__db.prepare(
+        `INSERT INTO broker_abuse_subject_hooks (
+          hook_kind, subject_type, subject_value, outcome_code, outcome_class
+        ) VALUES ('denylist', 'ip', ?, 'trial_unavailable', 'terminal')`,
+      ).run(keyedHook!.digest);
+      env.__db.prepare(
+        `INSERT INTO broker_abuse_subject_hooks (
+          hook_kind, subject_type, subject_value, outcome_code, outcome_class
+        ) VALUES ('denylist', 'ip', ?, 'trial_unavailable', 'terminal')`,
+      ).run('not-an-ip-hook');
+      env.__db.prepare(
+        `INSERT INTO broker_velocity_cap_hooks (
+          subject_type, subject_value, max_requests, window_minutes,
+          outcome_code, outcome_class, active
+        ) VALUES ('ip', ?, 1, 60, 'rate_limited', 'retryable', 1)`,
+      ).run('203.0.113.111');
+      const subjectHooks = env.__db
+        .prepare(`SELECT * FROM broker_abuse_subject_hooks ORDER BY id`).all();
+      const velocityHooks = env.__db
+        .prepare(`SELECT * FROM broker_velocity_cap_hooks ORDER BY id`).all();
+      await expect(
+        runNetworkIdentityBackfill(env.BROKER_DB, secretsAvailable ? secrets : null, NOW),
+      ).resolves.toMatchObject({
+        mode: 'keyed',
+        finalized: true,
+      });
+      expect(
+        env.__db.prepare(`SELECT * FROM broker_abuse_subject_hooks ORDER BY id`).all(),
+      ).toEqual(subjectHooks);
+      expect(
+        env.__db.prepare(`SELECT * FROM broker_velocity_cap_hooks ORDER BY id`).all(),
+      ).toEqual(velocityHooks);
+      const context = {
+        endpoint: 'POST /v1/trial/challenge',
+        now: NOW,
+        ip: '203.0.113.110',
+        installationId: null,
+        hardwareHash: null,
+        networkIdentitySecrets: secrets,
+      };
+      await expect(matchSubjectHook(env.BROKER_DB, context)).resolves.toMatchObject({
+        hookKind: 'denylist',
+      });
+      await expect(
+        matchSubjectHook(env.BROKER_DB, { ...context, ip: '203.0.113.112' }),
+      ).resolves.toBeNull();
+    },
+  );
+});
 
+describe('network identity window inventory and fail-closed finalize', () => {
+  it('uses the longest configured identity window for retained history', async () => {
     const env = createTestBrokerEnv();
-    const { updateAbuseControls } = await import('./test-support/abuse-controls');
     updateAbuseControls(env, (controls) => {
       controls.trialStatus.windowMinutes = 10080;
     });
@@ -505,6 +598,83 @@ describe('network identity window inventory and fail-closed finalize', () => {
       expect(phase).toBeUndefined();
     } finally {
       db.close();
+    }
+  });
+
+  it.each([
+    { state: 'unreadable', mode: 'legacy', requestEventsBackfilled: 0 },
+    { state: 'missing', mode: 'legacy', requestEventsBackfilled: 0 },
+    { state: 'unknown', mode: 'dual', requestEventsBackfilled: 1 },
+  ])('does not assume completion when migration state is $state', async (scenario) => {
+    let failNextRead = false;
+    const env = createTestBrokerEnv({
+      throughMigration: '0019_managed_referral_settlement.sql',
+      beforeFirst: () => {
+        if (failNextRead) {
+          failNextRead = false;
+          throw new Error('migration state unavailable');
+        }
+      },
+    });
+    const secrets = resolveNetworkIdentitySecrets(env)!;
+    env.__db.prepare(
+      `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run('POST /v1/auth/qq/assert', '203.0.113.113', null, NOW_ISO);
+    const insertHook = env.__db.prepare(
+      `INSERT INTO broker_abuse_subject_hooks (
+        hook_kind, subject_type, subject_value, outcome_code, outcome_class
+      ) VALUES ('denylist', 'ip', ?, 'trial_unavailable', 'terminal')`,
+    );
+    insertHook.run('203.0.113.113');
+    insertHook.run('not-an-ip-hook');
+    env.__db.exec(readBrokerMigrationSql('0020_network_identity_hmac.sql'));
+    if (scenario.state === 'unreadable') {
+      failNextRead = true;
+    } else if (scenario.state === 'missing') {
+      env.__db.prepare(`DELETE FROM broker_config WHERE key = 'network_identity_migration'`).run();
+    } else {
+      env.__db.prepare(
+        `UPDATE broker_config SET value = ? WHERE key = 'network_identity_migration'`,
+      ).run(JSON.stringify({ phase: 'unrecognized_phase', purge_after: null }));
+    }
+
+    const result = await runNetworkIdentityBackfill(env.BROKER_DB, secrets, NOW);
+    expect(result).toMatchObject({
+      mode: scenario.mode,
+      requestEventsBackfilled: scenario.requestEventsBackfilled,
+      hooksConverted: 1,
+      rawHooks: 1,
+      unparseableHooks: 1,
+      finalized: false,
+    });
+    const identity = await resolveRequestNetworkIdentity('203.0.113.113', secrets, NOW);
+    expect(
+      env.__db.prepare(`SELECT ip, ip_digest FROM broker_request_events`).get(),
+    ).toEqual({
+      ip: '203.0.113.113',
+      ip_digest: scenario.requestEventsBackfilled === 1 ? identity!.digest : null,
+    });
+    const [hookIdentity] = await deriveStableNetworkIdentityDigest(
+      secrets,
+      normalizeNetworkIdentityIp('203.0.113.113')!,
+      'ip',
+    );
+    expect(
+      env.__db.prepare(`SELECT subject_value FROM broker_abuse_subject_hooks ORDER BY id`).all(),
+    ).toEqual([
+      expect.objectContaining({ subject_value: hookIdentity!.digest }),
+      expect.objectContaining({ subject_value: 'not-an-ip-hook' }),
+    ]);
+    const state = env.__db.prepare(
+      `SELECT value FROM broker_config WHERE key = 'network_identity_migration'`,
+    ).get() as { value: string } | undefined;
+    if (scenario.state === 'missing') {
+      expect(state).toBeUndefined();
+    } else {
+      expect(JSON.parse(state!.value).phase).toBe(
+        scenario.state === 'unreadable' ? 'dual_write' : 'unrecognized_phase',
+      );
     }
   });
 
@@ -733,10 +903,28 @@ describe('network identity staged migration', () => {
       const first = await runNetworkIdentityBackfill(wrapped, secrets, NOW);
       expect(first.requestEventsBackfilled).toBe(1);
       expect(first.finalized).toBe(true);
+      const identity = await resolveRequestNetworkIdentity('203.0.113.101', secrets, NOW);
+      const readRows = () => db.prepare(`SELECT * FROM broker_request_events ORDER BY id`).all();
+      const backfilledRows = readRows();
+      expect(backfilledRows).toEqual([
+        expect.objectContaining({
+          ip: null,
+          ip_digest: identity!.digest,
+          ip_key_version: identity!.keyVersion,
+          ip_epoch: identity!.epoch,
+          observed_at: NOW_ISO,
+        }),
+      ]);
 
       const later = new Date(NOW.getTime() + 25 * 60 * 60_000);
       const second = await runNetworkIdentityBackfill(wrapped, secrets, later);
-      expect(second.finalized).toBe(true);
+      expect(second).toMatchObject({
+        mode: 'keyed',
+        requestEventsBackfilled: 0,
+        pendingRequestEvents: 0,
+        finalized: true,
+      });
+      expect(readRows()).toEqual(backfilledRows);
 
       const legacy = db
         .prepare(`SELECT COUNT(*) AS count FROM broker_request_events WHERE ip IS NOT NULL`)
@@ -748,6 +936,37 @@ describe('network identity staged migration', () => {
         .prepare("SELECT name FROM pragma_table_info('broker_request_events') ORDER BY cid")
         .all() as Array<{ name: string }>;
       expect(columns.map((column) => column.name)).not.toContain('ip');
+      const purgedRows = readRows();
+      await expect(runNetworkIdentityBackfill(wrapped, null, later)).resolves.toMatchObject({
+        mode: 'keyed',
+        requestEventsBackfilled: 0,
+        finalized: true,
+      });
+      expect(readRows()).toEqual(purgedRows);
+
+      replaceAbuseControlsValue({ ...env, BROKER_DB: wrapped, __db: db }, {
+        ...TEST_DEFAULT_ABUSE_CONTROLS,
+        qqAuthAssertIp: {
+          ...TEST_DEFAULT_ABUSE_CONTROLS.qqAuthAssertIp,
+          maxRequests: 1,
+        },
+      });
+      const context = {
+        endpoint: 'POST /v1/auth/qq/assert',
+        now: NOW,
+        ip: '203.0.113.101',
+        installationId: null,
+        hardwareHash: null,
+        networkIdentitySecrets: secrets,
+      };
+      await recordRequestEvent(wrapped, context);
+      await expect(checkEndpointRateLimit(wrapped, context)).resolves.toMatchObject({
+        status: 429,
+        subcode: 'ip_rate_limited',
+      });
+      await expect(
+        checkEndpointRateLimit(wrapped, { ...context, ip: '203.0.113.105' }),
+      ).resolves.toBeNull();
     } finally {
       db.close();
     }

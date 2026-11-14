@@ -249,7 +249,7 @@ class ConversationRecorder:
         self.seen_messages = len(snapshot.messages)
         for item in snapshot.tool_results:
             if (
-                (item.tool == "get_provider_setup" or item.result.get("controls_staged") is True)
+                item.result.get("controls_staged") is True
                 and item.status == "available"
                 and item.result.get("provider") in KEY_FIELDS
             ):
@@ -1290,7 +1290,7 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                     "입력 임계값을 바꾸면 인식이 잠깐 끊길 수 있어. 변경 카드를 확인해 줘."
                 )
         elif cause == "reject_paid":
-            provider = "gemini_transcribe"
+            provider = "gemini"
             if provider not in app.provider_setups and not any(
                 item.get("status") == "available"
                 and item.get("provider") == provider

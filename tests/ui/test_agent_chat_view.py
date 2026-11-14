@@ -466,9 +466,9 @@ def test_without_a_connection_the_screen_stays_but_input_is_closed():
 
 
 def test_history_card_shows_manual_original_and_translation_as_one_bubble():
-    from puripuly_heart.ui.views.logs import LogsView
+    from puripuly_heart.core.conversation_history import ConversationHistory
 
-    logs = LogsView()
+    logs = ConversationHistory()
     for source, translation, target in (("안녕", None, None), (None, "你好", 0)):
         logs.append_conversation_record(
             source="You",
@@ -547,7 +547,7 @@ def test_history_back_label_follows_current_locale_and_drops_stale_hover():
 
 @pytest.mark.asyncio
 async def test_open_history_refreshes_periodically_and_keeps_existing_rows(monkeypatch):
-    from puripuly_heart.ui.views.logs import ConversationRecord
+    from puripuly_heart.core.conversation_history import ConversationRecord
 
     monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0.01)
     records = [ConversationRecord("21:02", "Mic", "self", "첫 말", "first", utterance_id="a")]
@@ -571,3 +571,53 @@ def test_chat_input_focus_border_is_coral_before_and_after_dictation():
     view._stop_dictation(send=False)
     assert view._input.focused_border_color == agent_chat.COLOR_PRIMARY
     assert view._input.border_color == agent_chat.COLOR_DIVIDER
+
+
+def test_app_dictation_observes_self_history_updates_and_unsubscribes(monkeypatch):
+    from uuid import uuid4
+
+    from puripuly_heart.core.conversation_history import ConversationHistory
+    from puripuly_heart.domain.events import SelfTurnPresentation
+    from puripuly_heart.ui import app as app_module
+
+    monkeypatch.setattr(app_module.time, "monotonic", lambda: 10.0)
+    history = ConversationHistory()
+    source = app_module._AgentDictationSource(SimpleNamespace(conversation_history=history))
+    received = []
+    unsubscribe = source.observe(lambda *args: received.append(args))
+    old = SelfTurnPresentation(
+        utterance_id=uuid4(),
+        turn_generation=1,
+        turn_order=1,
+        revision=1,
+        source_revision=1,
+        source_text="old speech",
+        source_language="en",
+        source_closed=False,
+        status="active",
+        targets=(),
+        created_at=9.0,
+    )
+    history.update_self_turn(old, source="Mic")
+    current = replace(old, utterance_id=uuid4(), source_text="draft", created_at=11.0)
+    history.update_self_turn(current, source="Mic")
+    history.update_self_turn(
+        replace(current, utterance_id=uuid4(), source_text="manual"), source="You"
+    )
+    final = replace(
+        current,
+        revision=2,
+        source_revision=2,
+        source_text="final",
+        source_closed=True,
+        status="complete",
+    )
+    history.update_self_turn(final, source="Mic")
+    unsubscribe()
+    history.update_self_turn(
+        replace(current, utterance_id=uuid4(), source_text="after unsubscribe"), source="Mic"
+    )
+    assert received == [
+        (str(current.utterance_id), "draft", False),
+        (str(current.utterance_id), "final", True),
+    ]

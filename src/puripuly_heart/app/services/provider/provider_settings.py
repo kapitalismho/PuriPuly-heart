@@ -737,8 +737,8 @@ def provider_verification_context(
     if settings is None:
         return {}
     translation = settings.intent.translation
-    if provider == "google":
-        return {"model": translation.gemini.llm_model}
+    if provider == "gemini":
+        return {"capability": "api_key", "verification_scope": "key_probe"}
     if provider == "openai":
         return {"model": "gpt-6-luna"}
     if provider in {"alibaba_beijing", "alibaba_singapore"}:

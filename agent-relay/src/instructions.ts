@@ -13,6 +13,8 @@ const guide = guideSource.replaceAll('\r\n', '\n').trim();
 if (!guide) throw new Error('Empty prompt: guide');
 const appContextMarker = '{{app_context}}';
 if (guide.split(appContextMarker).length !== 2) throw new Error('Missing prompt placeholder: app context');
+const photoAllowanceMarker = '{{photo_daily_allowance}}';
+if (guide.split(photoAllowanceMarker).length !== 2) throw new Error('Missing prompt placeholder: photo allowance');
 const costs = costsSource.replaceAll('\r\n', '\n').trim();
 if (!costs) throw new Error('Empty reference: costs');
 const benchmarks = benchmarksSource.replaceAll('\r\n', '\n').trim();
@@ -36,11 +38,12 @@ export function classifierInstructions(contract: Contract): string {
     () => contract.contextModules.map(({ name, description }) => `- ${name}: ${description}`).join('\n'));
 }
 
-export function workInstructions(contract: Contract): string {
+export function workInstructions(contract: Contract, photoAllowance: number): string {
   const appContext = contract.appContext.replaceAll('\r\n', '\n').trim();
   if (!appContext) throw new Error('Empty contract prompt: app context');
   const contractGuide = guide.replace(appContextMarker, () => appContext)
-    .replace('{{setup_controls}}', () => contract.setupControls);
+    .replace('{{setup_controls}}', () => contract.setupControls)
+    .replace(photoAllowanceMarker, () => String(photoAllowance));
   const work = section(system, '## Work and unclear requests')
     .replace('{{execution_boundary}}', () => contract.executionBoundary);
   return `${identityAndVoice}\n\n${work}\n\n${contractGuide}\n\n${costs}\n\n${benchmarks}`;

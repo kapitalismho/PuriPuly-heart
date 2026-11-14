@@ -191,7 +191,6 @@ async def test_event_bridge_records_only_nonempty_successful_translation(
     app = SimpleNamespace(
         controller=controller,
         view_dashboard=Dashboard(),
-        view_logs=None,
         add_history_entry=lambda *_args, **_kwargs: None,
     )
     bridge = UIEventBridge(

@@ -625,7 +625,7 @@ def test_support_log_snapshot_real_service_smoke_preserves_masked_conversation(t
     )
     service = RuntimeLoggingService(session_service=session)
     owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        presentation=SimpleNamespace(bind_conversation_history=lambda _service: None),
         service_factory=lambda: service,
         fallback_logger=root,
     )
@@ -2091,6 +2091,73 @@ def test_file_delivery_flushes_priority_records_before_ordinary_batch_expiry(
         release_writer.set()
         release_batch_expiry.set()
         session.close_terminal_owner()
+
+
+def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.photo.{uuid4()}")
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.runtime_logging.photo.session.{uuid4()}")
+    session_logger.propagate = False
+    live = io.StringIO()
+    log_file = tmp_path / "photo.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    service = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=RuntimeLoggingSinks(
+            stream_handler=logging.StreamHandler(live),
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+    identity = f"photo_id={uuid4()} attempt_id=1"
+    accepted = [
+        f"[Photo] decode {identity} duration_ms=10.250",
+        f"[Photo] source_ready {identity} block_id=0 duration_ms=1400.125",
+        f"[Photo] total {identity} duration_ms=2000.000 model=gemini-3.1-flash-lite",
+        f"[Photo] failed {identity} failure_code=photo_authentication_failed",
+        f"[Photo] cleanup_failed {identity} failure_code=photo_connection_close_failed",
+        "[Photo] process_failed generation=2 failure_code=photo_child_exited",
+        f"[Photo] interaction {identity} distance_m=0.131 facing_deg=12.500 forward_deg=30.000"
+        " interaction=grip_ignored reason=out_of_range",
+        f"[Photo] interaction {identity} hand=right interaction=photo_regrab",
+        f"[Photo] result {identity} request_elapsed_ms=5300.250 outcome=completed"
+        " output_blocks=12 corrected_blocks=0 excluded_blocks=1",
+        f"[Photo] preparation {identity} duration_ms=12.000 image_base64_bytes=180224",
+    ]
+    accepted.extend(
+        f"[Photo] image_{stage} {identity} block_id=0 duration_ms=1.250"
+        for stage in ("mask", "erase", "typeset", "roi_upload", "compose_gpu")
+    )
+    rejected = [
+        f"[Photo] failed {identity} failure_code=photo_private_secret",
+        f"[Photo] total {identity} duration_ms=nan",
+        f"[Photo] total {identity} duration_ms=-1",
+        f"[Photo] total {identity} model=private-model-name",
+        f"[Photo] source_ready {identity} source=private-source-text",
+        f"[Photo] preparation {identity} path=C:/private/photo.png",
+        f"[Photo] private-stage {identity}",
+        f"[Photo] image_unrecognized {identity} duration_ms=1",
+        f"[Photo] total {identity} duration_ms=1 duration_ms=2",
+        f"[Photo] interaction {identity} interaction=private_gesture",
+        f"[Photo] interaction {identity} interaction=grab distance_m=-0.100",
+        f"[Photo] interaction {identity} interaction=grab hand=both",
+        f"[Photo] result {identity} outcome=private-outcome",
+    ]
+    try:
+        for message in accepted + rejected:
+            service.emit_diagnostic(message)
+        file_handler.flush()
+        persisted = log_file.read_text(encoding="utf-8")
+        records = persisted.splitlines()
+        assert records[: len(accepted)] == accepted
+        assert all("untrusted_record_redacted" in record for record in records[len(accepted) :])
+        assert "private" not in persisted
+        assert live.getvalue() == ""
+    finally:
+        service.close()
+        file_handler.close()
 
 
 @pytest.mark.asyncio

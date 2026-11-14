@@ -12,9 +12,12 @@ const requiredColumns = {
   usage_daily: ['installation_hash', 'utc_date', 'uncached_input_tokens', 'cache_read_tokens', 'cache_write_tokens',
     'decisions_output_tokens', 'responses_output_tokens', 'decisions_calls', 'responses_calls', 'missing_usage_count', 'cost_usd'],
   support_daily: ['installation_hash', 'utc_date', 'reports'],
-  prompt_turns: ['installation_hash', 'turn_id', 'utc_date', 'expires_at', 'model_admissions', 'classifier_admitted'],
+  prompt_turns: ['installation_hash', 'turn_id', 'utc_date', 'expires_at', 'model_admissions', 'classifier_admitted', 'response_model'],
+  terra_daily: ['utc_date', 'tokens'],
   request_slots: ['installation_hash', 'slot', 'owner', 'turn_id', 'classification', 'expires_at'],
   protocol_daily: ['installation_hash', 'utc_date', 'agent_protocol', 'requests'],
+  photo_admissions: ['installation_hash', 'request_id', 'period_start', 'owner', 'expires_at', 'settled',
+    'uncached_input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'missing_usage', 'cost_usd'],
 };
 
 function required(env, name) {
@@ -41,6 +44,7 @@ export function guardDeployment(env, head) {
   for (const name of ['AGENT_SERVICE_ENABLED', 'SUPPORT_REPORTS_ENABLED']) {
     if (!['true', 'false'].includes(env[name])) throw new Error(`${name} must explicitly be true or false.`);
   }
+  if (!['', undefined, 'true', 'false'].includes(env.PHOTO_SERVICE_ENABLED)) throw new Error('PHOTO_SERVICE_ENABLED must be true or false when set.');
   if (![undefined, '', 'false', 'true'].includes(env.APPLY_MIGRATIONS)) throw new Error('APPLY_MIGRATIONS must be empty, false or true.');
   deploymentOrigin(env.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL);
 }
@@ -58,6 +62,7 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
   for (const name of ['AGENT_SERVICE_ENABLED', 'SUPPORT_REPORTS_ENABLED']) {
     if (!['true', 'false'].includes(env[name])) throw new Error(`${name} must explicitly be true or false.`);
   }
+  if (!['', undefined, 'true', 'false'].includes(env.PHOTO_SERVICE_ENABLED)) throw new Error('PHOTO_SERVICE_ENABLED must be true or false when set.');
   deploymentOrigin(env.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL);
   const token = required(env, 'PURI_TOKEN_SECRET_PRODUCTION');
   if (Buffer.byteLength(token, 'utf8') < 32) throw new Error('PURI_TOKEN_SECRET_PRODUCTION must contain at least 32 UTF-8 bytes and match broker.');
@@ -86,7 +91,11 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
   config.d1_databases[0].migrations_dir = resolve(root, 'migrations');
   config.vars.AGENT_SERVICE_ENABLED = env.AGENT_SERVICE_ENABLED;
   config.vars.SUPPORT_REPORTS_ENABLED = env.SUPPORT_REPORTS_ENABLED;
-  config.secrets.required = ['PURI_TOKEN_SECRET', ...(env.AGENT_SERVICE_ENABLED === 'true' ? ['OPENAI_API_KEY'] : [])];
+  config.vars.PHOTO_SERVICE_ENABLED = env.PHOTO_SERVICE_ENABLED || 'false';
+  if (env.PHOTO_POLICY) config.vars.PHOTO_POLICY = env.PHOTO_POLICY;
+  config.secrets.required = ['PURI_TOKEN_SECRET', ...(
+    env.AGENT_SERVICE_ENABLED === 'true' || env.PHOTO_SERVICE_ENABLED === 'true' ? ['OPENAI_API_KEY'] : []
+  )];
   await mkdir(destination, { recursive: true, mode: 0o700 });
   await writeFile(resolve(destination, 'wrangler.json'), `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 }

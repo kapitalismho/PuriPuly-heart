@@ -80,41 +80,41 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 Name: "redownloadasr"; Description: "{cm:RedownloadAsrTask}"; GroupDescription: "{cm:AsrModelsGroup}"; Flags: unchecked
 
 [CustomMessages]
-english.LocalSttDownloadSize=ASR models will be downloaded.%nInstallation requires %1 of disk space.
-english.LocalSttNoDownload=All ASR models are installed.
-english.LocalSttDiskSpaceFailed=Not enough free space for the ASR model download. %1 is required, but only %2 is available on %3.
+english.LocalSttDownloadSize=AI models will be downloaded.%nInstallation requires %1 of disk space.
+english.LocalSttNoDownload=All required AI models are installed.
+english.LocalSttDiskSpaceFailed=Not enough free space for the AI model download. %1 is required, but only %2 is available on %3.
 english.LocalSttDiskSpaceCheckFailed=Setup could not check free space on %1.
-korean.LocalSttDownloadSize=ASR 모델을 다운로드합니다.%n설치에 필요한 용량은 %1입니다.
-korean.LocalSttNoDownload=ASR 모델이 모두 설치되어있습니다.
-korean.LocalSttDiskSpaceFailed=ASR 모델 다운로드를 위한 여유 공간이 부족합니다. %3에 %1이 필요하지만 %2만 사용할 수 있습니다.
+korean.LocalSttDownloadSize=AI 모델을 다운로드합니다.%n설치에 필요한 용량은 %1입니다.
+korean.LocalSttNoDownload=필수 AI 모델이 모두 설치되어 있습니다.
+korean.LocalSttDiskSpaceFailed=AI 모델 다운로드를 위한 여유 공간이 부족합니다. %3에 %1이 필요하지만 %2만 사용할 수 있습니다.
 korean.LocalSttDiskSpaceCheckFailed=%1의 여유 공간을 확인할 수 없습니다.
-japanese.LocalSttDownloadSize=ASRモデルをダウンロードします。%nインストールには%1の空き容量が必要です。
-japanese.LocalSttNoDownload=ASRモデルはすべてインストール済みです。
-japanese.LocalSttDiskSpaceFailed=ASRモデルのダウンロードに必要な空き容量がありません。%3には%1が必要ですが、利用可能なのは%2です。
+japanese.LocalSttDownloadSize=AIモデルをダウンロードします。%nインストールには%1の空き容量が必要です。
+japanese.LocalSttNoDownload=必須AIモデルはすべてインストール済みです。
+japanese.LocalSttDiskSpaceFailed=AIモデルのダウンロードに必要な空き容量がありません。%3には%1が必要ですが、利用可能なのは%2です。
 japanese.LocalSttDiskSpaceCheckFailed=%1の空き容量を確認できません。
-chinesesimplified.LocalSttDownloadSize=将下载 ASR 模型。%n安装需要 %1 的空间。
-chinesesimplified.LocalSttNoDownload=ASR 模型均已安装。
-chinesesimplified.LocalSttDiskSpaceFailed=ASR 模型下载空间不足。%3 需要 %1，但只有 %2 可用。
+chinesesimplified.LocalSttDownloadSize=将下载 AI 模型。%n安装需要 %1 的空间。
+chinesesimplified.LocalSttNoDownload=必需的 AI 模型均已安装。
+chinesesimplified.LocalSttDiskSpaceFailed=AI 模型下载空间不足。%3 需要 %1，但只有 %2 可用。
 chinesesimplified.LocalSttDiskSpaceCheckFailed=无法检查 %1 的可用空间。
-chinesetraditional.LocalSttDownloadSize=將下載 ASR 模型。%n安裝需要 %1 的空間。
-chinesetraditional.LocalSttNoDownload=ASR 模型均已安裝。
-chinesetraditional.LocalSttDiskSpaceFailed=ASR 模型下載空間不足。%3 需要 %1，但只有 %2 可用。
+chinesetraditional.LocalSttDownloadSize=將下載 AI 模型。%n安裝需要 %1 的空間。
+chinesetraditional.LocalSttNoDownload=必要的 AI 模型均已安裝。
+chinesetraditional.LocalSttDiskSpaceFailed=AI 模型下載空間不足。%3 需要 %1，但只有 %2 可用。
 chinesetraditional.LocalSttDiskSpaceCheckFailed=無法檢查 %1 的可用空間。
-english.LocalSttDownloadTitle=Downloading ASR model
+english.LocalSttDownloadTitle=Downloading AI model
 english.LocalSttDownloadDescription=
-korean.LocalSttDownloadTitle=ASR 모델 다운로드 중
+korean.LocalSttDownloadTitle=AI 모델 다운로드 중
 korean.LocalSttDownloadDescription=
-japanese.LocalSttDownloadTitle=ASRモデルをダウンロード中
+japanese.LocalSttDownloadTitle=AIモデルをダウンロード中
 japanese.LocalSttDownloadDescription=
-chinesesimplified.LocalSttDownloadTitle=正在下载 ASR 模型
+chinesesimplified.LocalSttDownloadTitle=正在下载 AI 模型
 chinesesimplified.LocalSttDownloadDescription=
-chinesetraditional.LocalSttDownloadTitle=正在下載 ASR 模型
+chinesetraditional.LocalSttDownloadTitle=正在下載 AI 模型
 chinesetraditional.LocalSttDownloadDescription=
-english.LocalSttDownloadFailed=Required ASR model download or verification failed. Installation cannot complete.
-korean.LocalSttDownloadFailed=필수 ASR 모델 다운로드 또는 검증에 실패했습니다. 설치를 완료할 수 없습니다.
-japanese.LocalSttDownloadFailed=必須ASRモデルのダウンロードまたは検証に失敗しました。インストールを完了できません。
-chinesesimplified.LocalSttDownloadFailed=必需的 ASR 模型下载或验证失败。无法完成安装。
-chinesetraditional.LocalSttDownloadFailed=必要的 ASR 模型下載或驗證失敗。無法完成安裝。
+english.LocalSttDownloadFailed=Required AI model download or size check failed. Installation cannot complete.
+korean.LocalSttDownloadFailed=필수 AI 모델 다운로드 또는 크기 확인에 실패했습니다. 설치를 완료할 수 없습니다.
+japanese.LocalSttDownloadFailed=必須AIモデルのダウンロードまたはサイズ確認に失敗しました。インストールを完了できません。
+chinesesimplified.LocalSttDownloadFailed=必需的 AI 模型下载或大小检查失败。无法完成安装。
+chinesetraditional.LocalSttDownloadFailed=必要的 AI 模型下載或大小檢查失敗。無法完成安裝。
 english.AsrModelsGroup=AI Models
 english.RedownloadAsrTask=Re-download AI models
 english.LocalSttRedownloadSize=Re-downloading AI models.%nInstallation requires %1 of disk space.
@@ -169,7 +169,7 @@ Source: "{#MyStagedOverlayDir}\{#MyOverlayExeName}"; DestDir: "{app}"; Flags: ig
 Source: "{#MyPackagedAppDir}\{#MyASRWorkerExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; Installer build/install never resolves SteamVR paths for openvr_api.dll.
 ; Bundled CJK font is staged at {#MyPackagedAppDir}\{#NotoCjkFontRelativePath}; the recursive packaged-tree copy installs it to {app}\{#NotoCjkFontRelativePath}.
-Source: "{#MyPackagedAppDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#MyAppExeName},{#MyCliExeName},{#MyOverlayExeName},{#MyASRWorkerExeName}"
+Source: "{#MyPackagedAppDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#MyAppExeName},{#MyCliExeName},{#MyOverlayExeName},{#MyASRWorkerExeName},assets\photo\mbnv4_text_seg.onnx"
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -376,16 +376,19 @@ begin
 end;
 
 #include "installer\local-asr.iss"
+#include "installer\photo-model.iss"
 
 
 procedure CurPageChanged(CurPageID: Integer);
 var
   DownloadSizeText: String;
+  RequiredDownloadBytes: Int64;
 begin
   if CurPageID = wpReady then begin
     PrepareLocalSttDownloadPlan();
-    if LocalSttRequiredDownloadBytes > 0 then begin
-      DownloadSizeText := FormatByteSize(LocalSttRequiredDownloadBytes);
+    RequiredDownloadBytes := LocalSttRequiredDownloadBytes + PreparePhotoModelDownloadPlan();
+    if RequiredDownloadBytes > 0 then begin
+      DownloadSizeText := FormatByteSize(RequiredDownloadBytes);
       if WizardIsTaskSelected('redownloadasr') then begin
         WizardForm.ReadyMemo.Text := WizardForm.ReadyMemo.Text + #13#10 +
           FmtMessage(CustomMessage('LocalSttRedownloadSize'), [DownloadSizeText]);
@@ -564,4 +567,5 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   ResetSuspiciousInstallDir();
   Result := RunSetupLocalSttProvisioning();
+  if Result = '' then Result := RunSetupPhotoModelProvisioning();
 end;

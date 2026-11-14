@@ -39,7 +39,8 @@ type LegacyManagedChildKeyMetadata = {
   issueRef?: never;
 };
 
-type SourceAwareManagedChildKeyMetadata = ManagedIssueMetadata & {
+type SourceAwareManagedChildKeyMetadata = Omit<ManagedIssueMetadata, 'issueSource'> & {
+  issueSource: ManagedIssueMetadata['issueSource'] | 'photo';
   installationId?: never;
   releaseSessionRef?: never;
 };
@@ -51,6 +52,7 @@ export type CreateManagedChildKeyInput = {
   requireEffectiveLimitVerification?: boolean;
   fetchImpl?: FetchImpl;
   keyName?: string;
+  includeByokInLimit?: boolean;
 } & (LegacyManagedChildKeyMetadata | SourceAwareManagedChildKeyMetadata);
 
 export type ManagedChildKeyCleanupStepResult =
@@ -129,7 +131,7 @@ export async function createManagedChildKey(
       name: buildManagedChildKeyName(input),
       limit: requestedLimitUsd,
       limit_reset: MANAGED_TRIAL_BUDGET_POLICY.limitReset,
-      include_byok_in_limit: false,
+      include_byok_in_limit: input.includeByokInLimit ?? false,
       expires_at: input.expiresAt,
     },
   });
@@ -595,4 +597,69 @@ export async function verifyManagedChildKeyAbsent(input: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+export async function setManagedChildKeyDisabled(input: {
+  managementApiKey: string; keyHash: string; disabled: boolean; fetchImpl?: FetchImpl;
+}): Promise<void> {
+  const response = await requestOpenRouter({
+    ...input, operation: 'disable_key', method: 'PATCH',
+    path: `/keys/${encodeURIComponent(input.keyHash)}`, body: { disabled: input.disabled },
+  });
+  const payload = await readSuccessJson(response, 'disable_key');
+  if (!isRecord(payload) || !isRecord(payload.data) || payload.data.disabled !== input.disabled) {
+    throw malformedUpstreamError('disable_key', response.status, 'Photo key activation state was not confirmed');
+  }
+}
+
+export async function verifyManagedPhotoPolicy(input: {
+  managementApiKey: string; guardrailId: string; fetchImpl?: FetchImpl;
+}): Promise<void> {
+  const response = await requestOpenRouter({
+    ...input, operation: 'read_key', method: 'GET',
+    path: `/guardrails/${encodeURIComponent(input.guardrailId)}`,
+  });
+  const payload = await readSuccessJson(response, 'read_key');
+  const data = isRecord(payload) ? payload.data : null;
+  if (!isRecord(data) || !Array.isArray(data.allowed_models)
+    || data.allowed_models.length !== 1 || data.allowed_models[0] !== 'openai/gpt-6-luna'
+    || !Array.isArray(data.allowed_providers) || data.allowed_providers.length !== 1
+    || data.allowed_providers[0] !== 'openai'
+    || data.limit_usd !== null
+    || data.include_byok_in_budgets !== true
+    || !(data.ignored_models === null || Array.isArray(data.ignored_models) && data.ignored_models.length === 0)
+    || !(data.ignored_providers === null || Array.isArray(data.ignored_providers) && data.ignored_providers.length === 0)) {
+    throw malformedUpstreamError('read_key', response.status, 'Photo guardrail must restrict Luna/OpenAI without a shared spending pool');
+  }
+}
+
+export async function verifyManagedPhotoKey(input: {
+  managementApiKey: string; guardrailId: string; keyHash: string; limitUsd: number;
+  expiresAt: string; disabled?: boolean; fetchImpl?: FetchImpl;
+}): Promise<void> {
+  await verifyManagedPhotoPolicy(input);
+  const response = await requestOpenRouter({
+    ...input, operation: 'read_key', method: 'GET', path: `/keys/${encodeURIComponent(input.keyHash)}`,
+  });
+  const payload = await readSuccessJson(response, 'read_key');
+  const data = isRecord(payload) ? payload.data : null;
+  if (!isRecord(data) || data.hash !== input.keyHash || data.limit !== input.limitUsd
+    || data.limit_reset !== null || typeof data.disabled !== 'boolean'
+    || input.disabled !== undefined && data.disabled !== input.disabled || data.include_byok_in_limit !== true
+    || typeof data.expires_at !== 'string' || Date.parse(data.expires_at) !== Date.parse(input.expiresAt)) {
+    throw malformedUpstreamError('read_key', response.status, 'Photo key allowance, expiration or activation state was not confirmed');
+  }
+  for (let offset = 0; offset < 2000; offset += 100) {
+    const assigned = await requestOpenRouter({
+      ...input, operation: 'read_key', method: 'GET',
+      path: `/guardrails/${encodeURIComponent(input.guardrailId)}/assignments/keys?limit=100&offset=${offset}`,
+    });
+    const assignments = await readSuccessJson(assigned, 'read_key');
+    if (!isRecord(assignments) || !Array.isArray(assignments.data)
+      || !Number.isSafeInteger(assignments.total_count) || Number(assignments.total_count) < 0) break;
+    if (assignments.data.some((entry) => isRecord(entry)
+      && entry.key_hash === input.keyHash && entry.guardrail_id === input.guardrailId)) return;
+    if (!assignments.data.length || offset + assignments.data.length >= Number(assignments.total_count)) break;
+  }
+  throw malformedUpstreamError('read_key', response.status, 'Photo key guardrail assignment was not confirmed');
 }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { appTools } from '../src/app-tools';
 import { isRespondRequest } from '../src/requests';
+import { photoPolicy } from '../src/usage';
 import relay from '../src/index';
 import { authHeaders, installationHash, relayEvents, responseEvents, testEnv, turnId, usageDatabase } from './fixtures';
 
@@ -273,7 +274,7 @@ describe('authenticated agent relay', () => {
     expect(init?.headers).toEqual({ authorization: 'Bearer synthetic-test-key', 'content-type': 'application/json' });
     const sent = JSON.parse(init?.body as string);
     expect(sent).toMatchObject({
-      model: 'gpt-6-luna',
+      model: 'gpt-5.6-terra',
       prompt_cache_options: { mode: 'implicit', ttl: '30m' },
       safety_identifier: installationHash,
       reasoning: { effort: 'high' },
@@ -313,6 +314,18 @@ describe('authenticated agent relay', () => {
     expect(sentNext.parallel_tool_calls).toBe(true);
   });
 
+  it('states the configured photo allowance in the work instructions', async () => {
+    const fetch = mockUpstream();
+    for (const [policy, allowance] of [[undefined, photoPolicy().allowance], ['{"allowance":7}', 7]] as const) {
+      const response = await relay.fetch(request(), { ...testEnv(), ...(policy ? { PHOTO_POLICY: policy } : {}) });
+      expect(response.status).toBe(200);
+      await response.text();
+      const text = JSON.parse(fetch.mock.calls.at(-1)![1]?.body as string).input[0].content[0].text;
+      expect(text).toContain(`allows ${allowance} photos per installation per UTC day`);
+      expect(text).not.toContain('{{');
+    }
+  });
+
   it('disables further tools and preserves authoritative incomplete terminal output', async () => {
     const returned = {
       ...upstreamResponse(),
@@ -329,17 +342,14 @@ describe('authenticated agent relay', () => {
     expect(sent.tools[0].name).toBe('read_app');
   });
 
-  it('reports an unavailable Luna capability without fallback or unsafe error details', async () => {
+  it('reports an unavailable selected model without fallback or unsafe error details', async () => {
     const fetch = mockUpstream({ error: { code: 'model_not_found', message: 'private input synthetic-test-key' } }, 404);
     const log = vi.spyOn(console, 'log');
     const warn = vi.spyOn(console, 'warn');
     const consoleError = vi.spyOn(console, 'error');
     const response = await relay.fetch(request(), env);
     expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({ error: {
-      code: 'upstream_capability_unavailable',
-      message: 'The configured gpt-6-luna Responses capability is unavailable. No alternate model was used.',
-    } });
+    expect(await response.json()).toMatchObject({ error: { code: 'upstream_capability_unavailable' } });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(log).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();

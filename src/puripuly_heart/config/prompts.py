@@ -21,7 +21,6 @@ LUNA_TRANSLATION_PROMPT_NAME = "translation_prompt_luna"
 UNSPECIFIED_SOURCE_TEXT_REF = "<input>"
 _LLM_PROVIDER_PROMPT_KEYS = {
     "index_translate",
-    "gemini",
     "qwen",
     "deepseek",
     "openai",
@@ -415,7 +414,7 @@ def load_prompt_for_provider(provider: str) -> str:
     """Load the prompt for a specific LLM provider.
 
     Args:
-        provider: Provider name ('gemini' or 'qwen')
+        provider: Translation provider name
 
     Returns:
         Prompt content for the provider, or default if not found

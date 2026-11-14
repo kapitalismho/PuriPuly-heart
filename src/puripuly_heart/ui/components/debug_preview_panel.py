@@ -62,6 +62,7 @@ class DebugPreviewPanel(ft.Container):
         on_audio_fault_clear: Callable[[], None] | None = None,
         on_gpu_state_cycle: Callable[[], None] | None = None,
         on_stt_loading_button_cycle: Callable[[], None] | None = None,
+        on_photo_limited_toggle: Callable[[], None] | None = None,
     ) -> None:
         actions = [
             _PreviewAction(
@@ -144,6 +145,11 @@ class DebugPreviewPanel(ft.Container):
                 "stt_loading_button_cycle",
                 "debug_preview.stt_loading_button_cycle",
                 on_stt_loading_button_cycle,
+            ),
+            (
+                "photo_limited_toggle",
+                "debug_preview.photo_limited_toggle",
+                on_photo_limited_toggle,
             ),
         )
         self._actions = tuple(actions)

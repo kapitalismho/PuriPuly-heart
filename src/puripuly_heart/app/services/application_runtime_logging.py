@@ -43,7 +43,7 @@ class ApplicationRuntimeLoggingOwner:
     @property
     def service(self) -> Any:
         service = self._metadata_service()
-        self.presentation.attach_runtime_log_sink(service)
+        self.presentation.bind_conversation_history(service)
         return service
 
     @property

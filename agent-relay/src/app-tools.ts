@@ -49,8 +49,7 @@ export const appTools = [
             "deepgram",
             "deepseek",
             "elevenlabs_scribe",
-            "gemini_transcribe",
-            "google",
+            "gemini",
             "openai",
             "openrouter",
             "soniox"
@@ -164,8 +163,7 @@ export const appTools = [
             "deepgram",
             "deepseek",
             "elevenlabs_scribe",
-            "gemini_transcribe",
-            "google",
+            "gemini",
             "openai",
             "openrouter",
             "soniox"
@@ -177,6 +175,7 @@ export const appTools = [
             "api",
             "general",
             "overlay",
+            "photo",
             "prompts"
           ]
         }
@@ -344,6 +343,20 @@ export const appTools = [
               "type": "number",
               "minimum": 0.1,
               "maximum": 1
+            },
+            "photo.delete_translated": {
+              "type": "boolean"
+            },
+            "photo.enabled": {
+              "type": "boolean"
+            },
+            "photo.route": {
+              "type": "string",
+              "enum": [
+                "managed",
+                "chatgpt",
+                "gemini"
+              ]
             },
             "self_vad.speech_threshold": {
               "type": "number",
@@ -513,12 +526,11 @@ export const appTools = [
         "name": {
           "type": "string",
           "enum": [
-            "google_api_key",
             "openrouter_api_key",
             "openai_api_key",
             "deepseek_api_key",
             "deepgram_api_key",
-            "gemini_transcribe_api_key",
+            "gemini_api_key",
             "elevenlabs_scribe_api_key",
             "soniox_api_key",
             "local_llm_api_key",

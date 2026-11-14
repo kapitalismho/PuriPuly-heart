@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from puripuly_heart.app.services.osc.control_router import OscControlRouter
+from puripuly_heart.core.osc.control_codec import UnknownOscControlValueError
 
 
 class FakeApplication:
@@ -124,7 +125,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_PeerDstLang", 17),
         ("PuriPuly_SelfASR", 7),
         ("PuriPuly_PeerASR", 1),
-        ("PuriPuly_Translator", 5),
+        ("PuriPuly_Translator", 7),
     ]
 
     for name, value in packets:
@@ -156,7 +157,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("languages", ("ja", "en", "en", "ko")),
         ("self_asr", "soniox"),
         ("peer_asr", "local_cpu_auto"),
-        ("model", ("gemini_flash", None)),
+        ("model", ("qwen38_flash", None)),
     ]
     assert projected == [name for name, _value in packets]
     await router.close()
@@ -203,14 +204,15 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_router_accepts_legacy_gemini_translation_id_6() -> None:
+@pytest.mark.parametrize("identifier", [5, 6])
+async def test_router_rejects_retired_translation_ids(identifier: int) -> None:
     application = FakeApplication()
     router = OscControlRouter(application)
 
-    result = await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 6)
+    with pytest.raises(UnknownOscControlValueError):
+        await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", identifier)
 
-    assert result.applied is True
-    assert application.calls == [("model", ("gemini_flash", None))]
+    assert application.calls == []
     await router.close()
 
 
@@ -594,7 +596,7 @@ async def test_router_skips_a_cancelled_pending_coalesced_command() -> None:
     first = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_SelfASR", 1))
     await application.started.wait()
     cancelled = asyncio.create_task(
-        router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 5)
+        router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 7)
     )
     await asyncio.sleep(0)
 
@@ -604,7 +606,7 @@ async def test_router_skips_a_cancelled_pending_coalesced_command() -> None:
     application.gate.set()
     assert (await first).applied is True
 
-    assert ("model", ("gemini_flash", None)) not in application.calls
+    assert ("model", ("qwen38_flash", None)) not in application.calls
     assert projected == ["PuriPuly_SelfASR"]
     await router.close()
 

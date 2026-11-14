@@ -63,6 +63,7 @@ G15_GENERAL_INTENT_FIELDS = (
     "apply_loopback_capture_option",
     "loopback_capture_summary",
     "osc_effective_ports",
+    "photo_status",
 )
 G15_PROMPT_INTENT_FIELDS = ("prompt_apply_settings", "pending_prompt_changed")
 G15_OVERLAY_INTENT_FIELDS = (
@@ -70,7 +71,7 @@ G15_OVERLAY_INTENT_FIELDS = (
     "desktop_overlay_size_change",
     "desktop_overlay_recovery_action",
     "desktop_overlay_position_reset",
-    "view_logs",
+    "open_agent",
     "calibration_begin",
     "calibration_change",
     "calibration_apply",
@@ -91,7 +92,7 @@ G15_OWNED_VIEW_CALLBACKS = (
     "on_desktop_overlay_size_change",
     "on_desktop_overlay_recovery_action",
     "on_desktop_overlay_position_reset",
-    "on_view_logs",
+    "on_open_agent",
     "on_overlay_calibration_begin",
     "on_overlay_calibration_change",
     "on_overlay_calibration_apply",
@@ -242,14 +243,14 @@ def test_g15_surfaces_consume_the_shared_renderer_without_private_g14_access() -
     source = (SOURCE_ROOT / "ui" / "views" / "settings.py").read_text(encoding="utf-8")
     for call in (
         "compose_settings_general_surface(",
-        "compose_settings_prompt_surface(",
+        "compose_settings_photo_surface(",
         "compose_settings_overlay_surface(",
     ):
         assert call in source
 
     expected = {
         settings_renderer.compose_settings_general_surface: "SettingsGeneralSurfaceSlots",
-        settings_renderer.compose_settings_prompt_surface: "SettingsPromptSurfaceSlots",
+        settings_renderer.compose_settings_photo_surface: "SettingsPhotoSurfaceSlots",
         settings_renderer.compose_settings_overlay_surface: "SettingsOverlaySurfaceSlots",
     }
     for function, slot_type in expected.items():
@@ -265,7 +266,7 @@ def test_g15_surfaces_consume_the_shared_renderer_without_private_g14_access() -
             and node.func.id
             in {
                 "compose_settings_general_surface",
-                "compose_settings_prompt_surface",
+                "compose_settings_photo_surface",
                 "compose_settings_overlay_surface",
             }
         ):

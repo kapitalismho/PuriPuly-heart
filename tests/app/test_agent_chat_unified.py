@@ -216,10 +216,19 @@ async def test_read_action_read_observes_order_and_proposal_stops_effects(catalo
 
 
 @pytest.mark.asyncio
-async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
+@pytest.mark.parametrize(
+    ("provider", "canonical_provider", "secret_key"),
+    [
+        ("openrouter", "openrouter", "openrouter_api_key"),
+        ("gemini", "gemini", "gemini_api_key"),
+    ],
+)
+async def test_pure_provider_read_does_not_replace_staged_secure_entry(
+    catalog, provider, canonical_provider, secret_key
+):
     control = ExecutionControl(catalog)
     transport = Responses(
-        batch(call("stage", "open_app", "provider_setup", provider="openrouter")),
+        batch(call("stage", "open_app", "provider_setup", provider=provider)),
         answer(),
         batch(call("read", "read_app", "provider_setup", provider="deepseek")),
         answer(),
@@ -227,9 +236,18 @@ async def test_pure_provider_read_does_not_replace_staged_secure_entry(catalog):
     owner = AgentChatOwner(control, transport, localize=str)
     await owner.start()
     try:
-        await owner.send("Show the OpenRouter secure controls.")
+        metadata_call = call("metadata", "read_app", "provider_setup", provider=provider)
+        metadata = await owner._execute_call(
+            metadata_call, owner._arguments(metadata_call), owner._generation
+        )
+        assert metadata["status"] == "available"
+        assert metadata["provider"] == provider
+        assert metadata["secure_field"]["provider"] == canonical_provider
+        assert metadata["secure_field"]["secret_key"] == secret_key
+        assert owner.snapshot.secure_entry_requests == ()
+        await owner.send(f"Show the {provider} secure controls.")
         staged = owner.snapshot.secure_entry_requests
-        assert [item.provider for item in staged] == ["openrouter"]
+        assert [item.provider for item in staged] == [canonical_provider]
         assert staged[0].status == "ready" and not staged[0].displayed
         read = call("pure-read", "read_app", "provider_setup", provider="deepseek")
         result = await owner._execute_call(read, owner._arguments(read), owner._generation)
@@ -245,12 +263,24 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
     for family, request in (
         ("manage_proposal", {"action": "settings", "changes": {"overlay.background_alpha": None}}),
         ("manage_proposal", {"action": "settings", "changes": {"private": "value"}}),
+        ("manage_proposal", {"action": "secrets.delete", "name": "google_api_key"}),
+        ("manage_proposal", {"action": "secrets.delete", "name": "gemini_transcribe_api_key"}),
         ("set_app", {"target": "capture.self"}),
         ("probe_app", {"target": "recognition.both"}),
         ("open_app", {"view": "auth.login", "provider": "chatgpt"}),
         ("read_app", {"topic": "settings.current"}),
         ("read_app", {"topic": "provider_setup"}),
         ("read_app", {"request": {"topic": "overview"}}),
+        (
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {
+                    "translation.model": "gemini_flash",
+                    "translation.connection": "official_byok",
+                },
+            },
+        ),
     ):
         with pytest.raises(ValueError):
             validate_app_request(family, request, catalog)

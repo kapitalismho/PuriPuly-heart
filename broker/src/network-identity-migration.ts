@@ -118,13 +118,26 @@ export async function runNetworkIdentityBackfill(
   secrets: NetworkIdentitySecrets | null,
   now: Date,
 ): Promise<NetworkIdentityBackfillResult> {
+  const mode = await resolveNetworkIdentityWriteMode(db);
+  if (mode === 'keyed') {
+    return {
+      mode,
+      requestEventsBackfilled: 0,
+      pendingRequestEvents: 0,
+      hooksConverted: 0,
+      pendingHooks: 0,
+      unparseableHooks: 0,
+      rawHooks: 0,
+      rawHookSampleIds: [],
+      finalized: true,
+    };
+  }
   const hooks = secrets
     ? await runNetworkIdentityHookBackfill(db, secrets)
-    : { converted: 0, pending: 0, unparseable: 0, rawHooks: 0, rawHookSampleIds: [] as Array<{ table: string; id: number }> };
+    : { converted: 0, pending: 0, unparseable: 0 };
   const rawHooks = await countActiveRawHooks(db);
-  const mode = await resolveNetworkIdentityWriteMode(db);
   if (mode !== 'dual' || !secrets) {
-    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized: mode === 'keyed' && rawHooks.count === 0 };
+    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized: false };
   }
   const maxWindowMinutes = await resolveNetworkIdentityMaxWindowMinutes(db);
   const windowStartIso = new Date(now.getTime() - maxWindowMinutes * 60_000).toISOString();

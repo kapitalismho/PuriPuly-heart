@@ -767,7 +767,7 @@ class AgentChatView(ft.Row):
             )
         if row.failed:
             texts.append(
-                ft.Text(t("logs.conversation.target.failed"), size=17, color=COLOR_TRANS_ON)
+                ft.Text(t("agent.history.translation_failed"), size=17, color=COLOR_TRANS_ON)
             )
         if not texts:
             return None

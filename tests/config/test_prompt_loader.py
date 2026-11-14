@@ -22,7 +22,6 @@ from puripuly_heart.config.prompts import (
 def test_load_prompt_for_llm_providers_uses_shared_translation_prompt() -> None:
     raw = (get_prompts_dir() / "translation_prompt.md").read_text(encoding="utf-8").strip()
     assert load_prompt_for_provider("index_translate") == raw
-    assert load_prompt_for_provider("gemini") == raw
     assert load_prompt_for_provider("qwen") == raw
     assert load_prompt_for_provider("deepseek") == raw
     assert load_prompt_for_provider("openrouter") == raw
@@ -244,7 +243,7 @@ def test_load_prompt_for_provider_requires_translation_prompt_for_llm_provider(
     monkeypatch.setenv("PURIPULY_HEART_PROMPTS_DIR", str(prompts_dir))
 
     with pytest.raises(FileNotFoundError):
-        load_prompt_for_provider("gemini")
+        load_prompt_for_provider("openrouter")
 
 
 def test_list_prompts_returns_empty_when_missing(monkeypatch, tmp_path) -> None:

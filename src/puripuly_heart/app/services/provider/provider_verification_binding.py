@@ -11,14 +11,13 @@ from puripuly_heart.app.ports.canonical_settings_persistence import (
 ProviderVerificationContextProvider = Callable[[str], Mapping[str, object]]
 
 _SECRET_KEY_BY_PROVIDER = {
-    "google": "google_api_key",
     "openrouter": "openrouter_api_key",
     "openai": "openai_api_key",
     "deepseek": "deepseek_api_key",
     "alibaba_beijing": "alibaba_api_key_beijing",
     "alibaba_singapore": "alibaba_api_key_singapore",
     "deepgram": "deepgram_api_key",
-    "gemini_transcribe": "gemini_transcribe_api_key",
+    "gemini": "gemini_api_key",
     "elevenlabs_scribe": "elevenlabs_scribe_api_key",
     "soniox": "soniox_api_key",
 }

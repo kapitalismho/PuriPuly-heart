@@ -13,7 +13,6 @@ from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
 )
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
-    GeminiLLMModel,
     LLMProviderName,
     QwenLLMModel,
     STTProviderName,
@@ -43,15 +42,11 @@ def _settings(
     settings = AppSettingsVNext()
     translation = settings.intent.translation
     if model is not None or connection is not None or history is not None:
-        gemini = translation.gemini
-        if model == "gemini_flash":
-            gemini = replace(gemini, llm_model="gemini-3.8-flash")
         translation = replace(
             translation,
             model=model or translation.model,
             connection=connection or translation.connection,
             connection_history=history or dict(translation.connection_history),
-            gemini=gemini,
         )
     languages = settings.intent.languages
     if source_language is not None:
@@ -153,17 +148,6 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch, settings_event
         == LLMProviderName.LOCAL_LLM.value
     )
 
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
-    pending = view.build_provider_apply_settings()
-
-    assert view._prompt_editor.value == load_prompt_for_provider("gemini")
-    assert _llm(settings) == LLMProviderName.OPENROUTER.value
-    assert pending is not None
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.GEMINI.value
-    )
-
     view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
     pending = view.build_provider_apply_settings()
 
@@ -216,46 +200,46 @@ def test_settings_view_uses_single_prompt_across_provider_switches(
     monkeypatch, settings_events
 ) -> None:
     settings = _settings(
-        model="gemini_flash",
+        model="deepseek_v4_flash_41",
         connection="official_byok",
-        prompt="GEMINI CUSTOM",
+        prompt="CUSTOM PROMPT",
     )
 
     view = _make_settings_view(monkeypatch)
     settings_events.load(view, settings, config_path=Path("settings.json"))
 
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
+    assert view._prompt_editor.value == "CUSTOM PROMPT"
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     pending = view.build_provider_apply_settings()
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
-    assert _prompt(settings) == "GEMINI CUSTOM"
+    assert view._prompt_editor.value == "CUSTOM PROMPT"
+    assert _prompt(settings) == "CUSTOM PROMPT"
     assert pending is not None
-    assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "GEMINI CUSTOM"
+    assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "CUSTOM PROMPT"
 
     view._on_prompt_change("QWEN EDITED")
     pending = view.build_provider_apply_settings()
     assert pending is not None
     assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "QWEN EDITED"
 
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     pending = view.build_provider_apply_settings()
     assert view._prompt_editor.value == "QWEN EDITED"
-    assert _prompt(settings) == "GEMINI CUSTOM"
+    assert _prompt(settings) == "CUSTOM PROMPT"
     assert pending is not None
     assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "QWEN EDITED"
 
     view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
     pending = view.build_provider_apply_settings()
     assert view._prompt_editor.value == "QWEN EDITED"
-    assert _prompt(settings) == "GEMINI CUSTOM"
+    assert _prompt(settings) == "CUSTOM PROMPT"
     assert pending is not None
     assert _prompt(apply_provider_intent(settings_events.settings, pending)) == "QWEN EDITED"
 
 
 def test_single_prompt_whitespace_survives_provider_switch(monkeypatch, settings_events) -> None:
     settings = _settings(
-        model="gemini_flash",
+        model="deepseek_v4_flash_41",
         connection="official_byok",
         prompt="  CUSTOM PROMPT\n",
     )
@@ -513,32 +497,6 @@ def test_deepseek_connection_modal_exposes_version_specific_choices(
         connection.value for connection in expected_connections
     ]
     assert captured["current"] == connection.value
-
-
-def test_settings_view_keeps_gemini_model_without_provider_switch(
-    monkeypatch, settings_events
-) -> None:
-    settings = _settings(
-        model="gemini_flash",
-        connection="official_byok",
-        prompt="GEMINI CUSTOM",
-    )
-
-    view = _make_settings_view(monkeypatch)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    view._on_llm_selected(TranslationModel.GEMINI_FLASH.value)
-    pending = view.build_provider_apply_settings()
-
-    assert _llm(settings) == LLMProviderName.GEMINI.value
-    assert _translation(settings).gemini.llm_model == GeminiLLMModel.GEMINI_FLASH.value
-    assert pending is not None
-    assert (
-        _translation(apply_provider_intent(settings_events.settings, pending)).gemini.llm_model
-        == GeminiLLMModel.GEMINI_FLASH.value
-    )
-    assert _prompt(settings) == "GEMINI CUSTOM"
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
 
 
 def test_settings_view_toggles_qwen_region_visibility_with_stt_provider(

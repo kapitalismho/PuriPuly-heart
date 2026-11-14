@@ -347,7 +347,7 @@ def app_actions() -> tuple[AppAction, ...]:
         "settings",
         "navigation",
         fields={
-            "section": scalar("string", ("api", "general", "overlay", "prompts")),
+            "section": scalar("string", ("api", "general", "overlay", "photo", "prompts")),
             "provider": provider,
         },
         optional=("provider",),

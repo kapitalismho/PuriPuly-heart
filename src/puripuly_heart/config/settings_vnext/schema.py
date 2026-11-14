@@ -23,11 +23,12 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 54
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 55
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
 OSC_CONNECTION_MODES: Final = ("automatic", "manual", "off")
+PHOTO_ROUTES: Final = ("managed", "chatgpt", "gemini")
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
@@ -304,11 +305,6 @@ class QwenTranslationIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class GeminiTranslationIntent:
-    llm_model: str = "gemini-3.8-flash"
-
-
-@dataclass(frozen=True, slots=True)
 class DeepSeekTranslationIntent:
     llm_model: str = "deepseek-flash"
 
@@ -329,7 +325,6 @@ class TranslationIntent:
     openrouter_selected_source: str = "managed"
     openrouter_selection_alias: str | None = "gemma4_26b_31b_managed"
     openrouter_provider_routing: str = "gemma4_26b_31b_latency"
-    gemini: GeminiTranslationIntent = field(default_factory=GeminiTranslationIntent)
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)
     gpu_device_id: str = "auto"
@@ -781,6 +776,21 @@ class PromptIntent:
 
 
 @dataclass(frozen=True, slots=True)
+class PhotoIntent:
+    enabled: bool = True
+    route: str = "managed"
+    delete_translated: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise ValueError("photo enabled must be a boolean")
+        if self.route not in PHOTO_ROUTES:
+            raise ValueError("photo route must be managed, chatgpt or gemini")
+        if not isinstance(self.delete_translated, bool):
+            raise ValueError("photo delete_translated must be a boolean")
+
+
+@dataclass(frozen=True, slots=True)
 class UserIntentSettings:
     translation: TranslationIntent = field(default_factory=TranslationIntent)
     local_llm: LocalLLMIntent = field(default_factory=LocalLLMIntent)
@@ -797,6 +807,7 @@ class UserIntentSettings:
     integrated_context: IntegratedContextIntent = field(default_factory=IntegratedContextIntent)
     telemetry: TelemetryIntent = field(default_factory=TelemetryIntent)
     prompts: PromptIntent = field(default_factory=PromptIntent)
+    photo: PhotoIntent = field(default_factory=PhotoIntent)
 
 
 @dataclass(frozen=True, slots=True)
@@ -876,10 +887,9 @@ class ProviderVerificationEntry:
 @dataclass(frozen=True, slots=True)
 class ProviderVerificationState:
     deepgram: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    gemini_transcribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
+    gemini: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     elevenlabs_scribe: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     soniox: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    google: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openrouter: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openai: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     deepseek: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
@@ -1116,7 +1126,6 @@ __all__ = [
     "DesktopFletOverlayPositionIntent",
     "DesktopFletOverlayVisualIntent",
     "GithubStarPromptState",
-    "GeminiTranslationIntent",
     "IntegratedContextIntent",
     "IntegratedContextState",
     "is_safe_compatibility_extension_key",
@@ -1135,6 +1144,7 @@ __all__ = [
     "PeerTranslationState",
     "PersistedOperationalState",
     "ProcessCaptureTargetIntent",
+    "PhotoIntent",
     "PromptIntent",
     "ProviderVerificationEntry",
     "ProviderVerificationState",
@@ -1150,6 +1160,7 @@ __all__ = [
     "UserIntentSettings",
     "VNEXT_SETTINGS_SCHEMA_VERSION",
     "OSC_CONNECTION_MODES",
+    "PHOTO_ROUTES",
     "OSC_DEFAULT_HOST",
     "OSC_DEFAULT_RECEIVE_PORT",
     "OSC_DEFAULT_SEND_PORT",

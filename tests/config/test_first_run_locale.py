@@ -115,7 +115,7 @@ def test_load_settings_preserves_existing_saved_locale(
 
 def test_first_run_settings_preserve_prompt_defaults() -> None:
     settings = _new_first_run_settings("ko_KR")
-    default_prompt = load_prompt_for_provider("gemini")
+    default_prompt = load_prompt_for_provider("openrouter")
 
     assert settings.intent.prompts.system_prompt_override is None
     assert resolve_system_prompt(settings.intent.prompts.system_prompt_override) == default_prompt
@@ -224,7 +224,7 @@ def test_main_first_run_populates_default_system_prompt(
 
     loaded = _load_settings_or_default(path)
 
-    expected = load_prompt_for_provider(LLMProviderName.GEMINI.value)
+    expected = load_prompt_for_provider(LLMProviderName.OPENROUTER.value)
     assert loaded.intent.prompts.system_prompt_override is None
     assert resolve_system_prompt(loaded.intent.prompts.system_prompt_override) == expected
     assert not path.exists()

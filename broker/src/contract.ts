@@ -96,6 +96,9 @@ export interface BrokerBindings {
   NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
   PURI_TOKEN_SECRET?: string;
   PURI_IDENTITY_HMAC_SECRET?: string;
+  PHOTO_OPENROUTER_ENABLED?: string;
+  PHOTO_OPENROUTER_LIMIT_USD?: string;
+  OPENROUTER_PHOTO_GUARDRAIL_ID?: string;
 }
 
 export type BrokerEnv = {

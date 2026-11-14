@@ -87,12 +87,19 @@ MODULE_FIELDS = {
         "chatbox.activation_notice.enabled",
         "vrc_mic_intercept.enabled",
     ),
-    "general": ("locale", "clipboard.enabled", "telemetry.enabled"),
+    "general": (
+        "locale",
+        "clipboard.enabled",
+        "telemetry.enabled",
+        "photo.enabled",
+        "photo.route",
+        "photo.delete_translated",
+    ),
 }
 MODULE_KEYS = {
     "recognition": (
         "deepgram_api_key",
-        "gemini_transcribe_api_key",
+        "gemini_api_key",
         "elevenlabs_scribe_api_key",
         "soniox_api_key",
         "custom_stt_api_key",
@@ -100,7 +107,6 @@ MODULE_KEYS = {
         "alibaba_api_key_singapore",
     ),
     "translation": (
-        "google_api_key",
         "openrouter_api_key",
         "openai_api_key",
         "deepseek_api_key",

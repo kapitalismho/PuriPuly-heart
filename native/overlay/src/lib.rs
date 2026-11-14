@@ -3,6 +3,7 @@ mod frame_cycle;
 pub mod logging;
 pub mod manifest;
 pub mod openvr;
+pub mod photo;
 pub mod presentation;
 pub mod renderer;
 mod retry_episode;

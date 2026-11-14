@@ -75,10 +75,6 @@ class SettingsSecretsOwner:
         try:
             snapshot = replace(
                 snapshot,
-                google_api_key=store.get("google_api_key") or "",
-            )
-            snapshot = replace(
-                snapshot,
                 openrouter_api_key=store.get("openrouter_api_key") or "",
             )
             snapshot = replace(
@@ -95,7 +91,7 @@ class SettingsSecretsOwner:
             )
             snapshot = replace(
                 snapshot,
-                gemini_transcribe_api_key=store.get("gemini_transcribe_api_key") or "",
+                gemini_api_key=store.get("gemini_api_key") or "",
             )
             snapshot = replace(
                 snapshot,

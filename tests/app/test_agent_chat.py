@@ -19,7 +19,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from puripuly_heart.app.adapters.agent_relay_auth import AgentRelayTokenOwner
 from puripuly_heart.app.adapters.agent_relay_transport import AgentRelayTransport
-from puripuly_heart.app.ports.agent_chat import AgentServiceError, AgentTransportError
+from puripuly_heart.app.ports.agent_chat import (
+    AGENT_CHAT_PROTOCOL,
+    AgentServiceError,
+    AgentTransportError,
+)
 from puripuly_heart.app.services.agent_chat.context import (
     TOPICS,
     AgentActivity,
@@ -1106,7 +1110,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
         ]
         assert events == [{"type": "completed", "response": response}]
         assert json.loads(seen[0].content) == {
-            "agent_protocol": 7,
+            "agent_protocol": AGENT_CHAT_PROTOCOL,
             "input": inputs,
             "turn_id": "0123456789abcdef0123456789abcdef",
             "effort": effort,
@@ -1174,7 +1178,7 @@ async def test_composed_owner_read_only_turn_and_agent_chat_view(tmp_path, monke
                 },
             )
         assert request.headers["authorization"] == "Bearer synthetic-installation-token"
-        assert body.pop("agent_protocol") == 7
+        assert body.pop("agent_protocol") == AGENT_CHAT_PROTOCOL
         if request.url.path == "/v1/classify":
             return httpx.Response(200, json=await transport.classify(**body))
         frames = [json.dumps(event) async for event in transport.respond(**body)]

@@ -44,6 +44,7 @@ EXTENDED_ACTION_KEYS = [
     "audio_fault_clear",
     "gpu_state_cycle",
     "stt_loading_button_cycle",
+    "photo_limited_toggle",
 ]
 DEBUG_PREVIEW_I18N_KEYS = {
     "debug_preview.button",

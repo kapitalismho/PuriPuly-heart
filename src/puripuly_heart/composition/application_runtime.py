@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import copy
 import logging
+import os
 import sys
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
@@ -15,6 +16,7 @@ from puripuly_heart.app.adapters.application_runtime_shutdown import (
 )
 from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicationSettings
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
+from puripuly_heart.app.adapters.photo_provider import PhotoProviderAdapter, photo_route_kind
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
     UiAudioTestRuntimeAdapter,
@@ -40,6 +42,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
+from puripuly_heart.app.ports.settings_view import PhotoStatusSnapshot
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
@@ -120,6 +123,7 @@ from puripuly_heart.app.services.overlay.overlay_application import (
 from puripuly_heart.app.services.overlay.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
+from puripuly_heart.app.services.photo_application import PhotoApplicationOwner
 from puripuly_heart.app.services.provider.provider_credential_verification import (
     ProviderCredentialVerificationInteractionOwner,
 )
@@ -161,7 +165,11 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
-from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
+from puripuly_heart.app.wiring.wiring_agent_chat import (
+    AGENT_RELAY_URL,
+    compose_agent_transport,
+    compose_relay_token_owner,
+)
 from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
@@ -265,7 +273,9 @@ from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.peer_capture import PeerCaptureSessionSnapshot
+from puripuly_heart.core.photo.recycle import recycle_captured_photo
 from puripuly_heart.core.runtime.gpu_asr import GpuASRChannel
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -285,6 +295,7 @@ from puripuly_heart.core.telemetry import (
     HttpAppActiveDayTelemetryClient,
 )
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
+from puripuly_heart.runtime_layout import current_runtime_layout
 
 STT_RESET_DEADLINE_S = 300.0
 MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S = 3.0
@@ -1830,6 +1841,98 @@ def compose_application_runtime(
         ),
     )
 
+    relay_token_owner = compose_relay_token_owner(settings=settings, config_path=config_path)
+    photo_source = current_runtime_layout().host_kind == "source"
+    photo_provider = PhotoProviderAdapter(
+        session=chatgpt_session,
+        secret_store=create_settings_secret_store,
+        token_owner=relay_token_owner,
+        installation_id=relay_token_owner.installation_id,
+        broker_base_url=lambda: (
+            os.environ.get("PURIPULY_AGENT_BROKER_URL")
+            or settings.require_canonical().intent.translation.openrouter_broker_base_url
+        ),
+        relay_endpoint=os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL).removesuffix(
+            "/respond"
+        )
+        + "/photo",
+        allow_loopback_http=photo_source,
+        benchmark_route=os.environ.get("PURIPULY_PHOTO_BENCHMARK_ROUTE") if photo_source else None,
+        selected_route=lambda: (
+            settings.canonical.intent.photo.route if settings.canonical is not None else "managed"
+        ),
+    )
+
+    def photo_diagnostic(stage: str, fields: dict) -> None:
+        if "model" in fields and fields["model"] not in {
+            "gpt-6-luna",
+            "openai/gpt-6-luna",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+        }:
+            fields = {**fields, "model": "unknown"}
+        values = " ".join(
+            f"{key}={value:.3f}" if isinstance(value, float) else f"{key}={value}"
+            for key, value in fields.items()
+            if key
+            in {
+                "photo_id",
+                "attempt_id",
+                "block_id",
+                "duration_ms",
+                "request_elapsed_ms",
+                "image_base64_bytes",
+                "output_blocks",
+                "corrected_blocks",
+                "excluded_blocks",
+                "outcome",
+                "model",
+                "failure_code",
+                "generation",
+                "pid",
+                "interaction",
+                "reason",
+                "hand",
+                "facing_deg",
+                "forward_deg",
+                "distance_m",
+                "progress",
+            }
+            and isinstance(value, (str, int, float))
+        )
+        runtime_logging.emit_diagnostic(f"[Photo] {stage} {values}")
+
+    async def resolve_photo_route():
+        current = settings.canonical
+        if current is not None and not current.intent.photo.enabled:
+            return None
+        return await photo_provider.resolve_route()
+
+    async def discard_translated_photo(capture) -> None:
+        current = settings.canonical
+        if current is None or not current.intent.photo.delete_translated:
+            return
+        await run_owned_thread_call(lambda: recycle_captured_photo(capture))
+
+    async def photo_status() -> PhotoStatusSnapshot:
+        kind = photo_route_kind(await photo_provider.resolve_route())
+        allowance = await photo_provider.allowance()
+        if allowance is None:
+            return PhotoStatusSnapshot(kind)
+        return PhotoStatusSnapshot(kind, remaining=allowance[0], allowance=allowance[1])
+
+    photo_owner = PhotoApplicationOwner(
+        resolve_route=resolve_photo_route,
+        discard_translated=discard_translated_photo,
+        target_language=lambda: (
+            settings.canonical.intent.languages.source_language
+            if settings.canonical is not None
+            else "ko"
+        ),
+        diagnostic=photo_diagnostic,
+        wrist_calibration_path=Path(config_path).parent / "photo-wrist-calibration.json",
+    )
+
     def translation_runtime_enabled() -> bool:
         owner = pipeline.translation_runtime_configuration
         return owner.snapshot().value.translation_enabled if owner is not None else False
@@ -1849,7 +1952,6 @@ def compose_application_runtime(
             verification_provider = None
             if translation.connection == "official_byok":
                 verification_provider = {
-                    "gemini": "google",
                     "openai": "openai",
                     "deepseek": "deepseek",
                 }.get(provider)
@@ -2130,7 +2232,6 @@ def compose_application_runtime(
         ):
             return False
         return provider in {
-            LLMProviderName.GEMINI,
             LLMProviderName.OPENROUTER,
             LLMProviderName.QWEN,
             LLMProviderName.DEEPSEEK,
@@ -2196,6 +2297,7 @@ def compose_application_runtime(
         start_event_bridge=start_event_bridge,
         wait_for_event_bridge=wait_for_event_bridge,
         sync_clipboard=sync_clipboard,
+        start_photo=photo_owner.start,
     )
     startup = compose_application_startup(startup_adapter)
 
@@ -2357,6 +2459,7 @@ def compose_application_runtime(
             cycle_capture_fault=audio_owner.cycle_capture_fault_profile,
             cycle_stt_fault=audio_owner.cycle_stt_fault_profile,
             clear_audio_faults=audio_owner.clear_fault_profiles,
+            toggle_photo_limited=photo_owner.toggle_debug_limited,
         ),
         state=UiApplicationStateOwner(
             ApplicationUiStateAdapter(
@@ -2379,6 +2482,7 @@ def compose_application_runtime(
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
         runtime_control_activity=runtime_control_activity,
+        photo_status_provider=photo_status,
         output_status_provider=lambda: {
             "overlay": {
                 **overlay_owner.output_snapshot(),
@@ -2426,7 +2530,9 @@ def compose_application_runtime(
     application.attach_control(control)
     agent_chat = AgentChatOwner(
         control,
-        compose_agent_transport(settings=settings, config_path=config_path),
+        compose_agent_transport(
+            settings=settings, config_path=config_path, token_owner=relay_token_owner
+        ),
         localize=presentation.localize,
         support_log_snapshot=runtime_logging.support_log_snapshot,
     )
@@ -2434,6 +2540,18 @@ def compose_application_runtime(
     settings.observe_commits(control._publish_committed)
     application.register_application_shutdown_callbacks(
         (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="PhotoApplicationOwner",
+                callback_name="stop_ingress",
+                callback=photo_owner.stop_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PhotoApplicationOwner",
+                callback_name="close",
+                callback=photo_owner.close,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="AgentChatOwner",
@@ -2445,6 +2563,18 @@ def compose_application_runtime(
                 owner_name="AgentChatOwner",
                 callback_name="close",
                 callback=agent_chat.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="PhotoProviderAdapter",
+                callback_name="close",
+                callback=photo_provider.close,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="AgentRelayTokenOwner",
+                callback_name="close",
+                callback=relay_token_owner.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,

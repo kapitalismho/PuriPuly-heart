@@ -45,7 +45,6 @@ from puripuly_heart.config.runtime_resolution import (
     OPENAI_MODEL_GPT_6_LUNA,
     PROVIDER_CHATGPT,
     PROVIDER_DEEPSEEK,
-    PROVIDER_GEMINI,
     PROVIDER_INDEX_TRANSLATE,
     PROVIDER_LOCAL_LLM,
     PROVIDER_MANAGED_GEMMA,
@@ -92,7 +91,6 @@ from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
-from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.index_translate import IndexTranslateProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
@@ -206,7 +204,6 @@ def runtime_resolution_input_from_vnext(settings: AppSettingsVNext) -> RuntimeRe
         ),
         openrouter=openrouter_intent,
         direct=DirectProviderRuntimeIntent(
-            gemini_flash_model=translation.gemini.llm_model,
             deepseek_v4_flash_model=translation.deepseek.llm_model,
             qwen_38_flash_model=translation.qwen.llm_model,
             qwen_region=translation.qwen.region,
@@ -634,6 +631,10 @@ def _openrouter_provider_from_resolved_fields(
     force_managed_wrapper: bool = False,
     include_selection_alias: bool = True,
 ) -> LLMProvider:
+    parse_openrouter_llm_model(model)
+    for candidate in models:
+        if candidate != model:
+            parse_openrouter_llm_model(candidate)
     selected_source = _openrouter_source_for_resolved_credential(credential)
     if selected_source == OpenRouterCredentialSource.NONE:
         raise ValueError("OpenRouter selected source must not be `none` for execution")
@@ -779,14 +780,6 @@ def _provider_from_resolved_target(
             ),
             vulkan_device=vulkan_device,
             release_runtime=managed_gemma_release,
-            runtime_logging=runtime_logging,
-        )
-
-    if target.provider == PROVIDER_GEMINI:
-        api_key = require_secret(secrets, key="google_api_key", env_var="GOOGLE_API_KEY")
-        return GeminiLLMProvider(
-            api_key=api_key,
-            model=target.model,
             runtime_logging=runtime_logging,
         )
 

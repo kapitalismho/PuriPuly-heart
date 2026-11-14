@@ -4,10 +4,13 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import os
 import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics

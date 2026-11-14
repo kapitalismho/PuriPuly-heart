@@ -37,8 +37,6 @@ from puripuly_heart.core.orchestrator.configuration import (
         ("gemma4_26b_31b", "managed", None),
         ("deepseek_v4_flash", "openrouter", None),
         ("deepseek_v4_flash_41", "official_byok", None),
-        ("gemini_flash", "official_byok", None),
-        ("gemini_flash", "openrouter", None),
         ("qwen38_flash", "official_byok", None),
         ("managed_gemma", "cpu", None),
         ("managed_gemma", "gpu", None),

@@ -9,7 +9,6 @@ import pytest
 
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.runtime_logging import (
-    RealtimeLogHandler,
     SessionRuntimeLoggingService,
     configure_main_logging,
 )
@@ -226,18 +225,8 @@ async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks
     runtime_logging = SessionRuntimeLoggingService(
         root_logger=root_logger,
         sinks=sinks,
-        ui_handler_factory=RealtimeLogHandler,
     )
 
-    class RealtimeSink:
-        def __init__(self) -> None:
-            self.lines: list[str] = []
-
-        def append_log(self, line: str) -> None:
-            self.lines.append(line)
-
-    realtime = RealtimeSink()
-    runtime_logging.attach_realtime_sink(realtime)
     transport = httpx.MockTransport(
         lambda request: httpx.Response(
             502,
@@ -269,11 +258,9 @@ async def test_httpx_deepseek_failure_excludes_arbitrary_body_from_session_sinks
         sinks.close()
 
         console = capsys.readouterr().err
-        ui = "\n".join(realtime.lines)
         persisted = sinks.log_file.read_text(encoding="utf-8")
         for target, rendered in (
             ("console", console),
-            ("ui", ui),
             ("file", persisted),
         ):
             assert sentinel not in rendered, target

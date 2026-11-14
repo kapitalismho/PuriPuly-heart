@@ -300,7 +300,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(displayed)
     selection = replace(
         provider.translation,
-        model=TranslationModel.GEMINI_FLASH,
+        model=TranslationModel.GPT_6_LUNA,
         connection=TranslationConnection.OPENROUTER,
     )
     current = _vnext(
@@ -330,7 +330,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
             (
                 TranslationSelectionEdit(
                     selection,
-                    ((TranslationModel.GEMINI_FLASH, TranslationConnection.OPENROUTER),),
+                    ((TranslationModel.GPT_6_LUNA, TranslationConnection.OPENROUTER),),
                 ),
                 SelfSttProviderEdit(STTProviderName.DEEPGRAM),
                 SttGpuDeviceEdit("staged-stt-gpu"),
@@ -345,7 +345,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
 
     translation = updated.intent.translation
     assert provider_llm_for_translation(translation.model, translation.connection) == "openrouter"
-    assert translation.model == TranslationModel.GEMINI_FLASH.value
+    assert translation.model == TranslationModel.GPT_6_LUNA.value
     assert translation.connection == TranslationConnection.OPENROUTER.value
     assert translation.connection_history[TranslationModel.GEMMA4_26B_31B.value] == (
         TranslationConnection.OPENROUTER.value
@@ -353,7 +353,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
         TranslationConnection.OFFICIAL_BYOK.value
     )
-    assert translation.connection_history[TranslationModel.GEMINI_FLASH.value] == (
+    assert translation.connection_history[TranslationModel.GPT_6_LUNA.value] == (
         TranslationConnection.OPENROUTER.value
     )
     assert updated.intent.stt.provider == STTProviderName.DEEPGRAM.value
@@ -392,7 +392,7 @@ def test_model_selection_preserves_prompt_override_and_generic_editor_default(
     )
     for model, selected_connection in (
         (TranslationModel.GPT_6_LUNA, connection),
-        (TranslationModel.GEMINI_FLASH, TranslationConnection.OFFICIAL_BYOK),
+        (TranslationModel.QWEN_38_FLASH, TranslationConnection.OFFICIAL_BYOK),
     ):
         provider, _general, _prompt, _overlay = settings_view_surface_snapshots(current)
         selection = replace(

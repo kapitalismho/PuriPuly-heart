@@ -32,7 +32,7 @@ from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_CUSTOM_STT,
     CREDENTIAL_REF_DEEPGRAM_STT,
     CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT,
-    CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT,
+    CREDENTIAL_REF_GEMINI_API_KEY,
     CREDENTIAL_REF_SONIOX_STT,
     GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS,
     QWEN_AUDIO_STT_MODEL,
@@ -877,14 +877,14 @@ def _soniox_api_key_for_resolved_credential(
     return require_secret(secrets, key="soniox_api_key", env_var="SONIOX_API_KEY")
 
 
-def _gemini_transcribe_api_key_for_resolved_credential(
+def _gemini_api_key_for_resolved_credential(
     credential: ResolvedCredentialRequirement,
     *,
     secrets: SecretStore,
 ) -> str:
-    if credential.reference not in (CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT, None):
+    if credential.reference not in (CREDENTIAL_REF_GEMINI_API_KEY, None):
         raise ValueError("Unsupported Gemini Transcribe resolved credential reference")
-    return require_secret(secrets, key="gemini_transcribe_api_key", env_var="GEMINI_API_KEY")
+    return require_secret(secrets, key="gemini_api_key", env_var="GEMINI_API_KEY")
 
 
 def _elevenlabs_scribe_api_key_for_resolved_credential(
@@ -905,7 +905,7 @@ def _qwen_audio_endpoint_for_resolved_config(config: ResolvedSTTConfig) -> str:
 
 _ROLLING_MEMBER_SECRET_KEYS = {
     STTProviderName.ELEVENLABS_SCRIBE.value: ("elevenlabs_scribe_api_key", "ELEVENLABS_API_KEY"),
-    STTProviderName.GEMINI_TRANSCRIBE.value: ("gemini_transcribe_api_key", "GEMINI_API_KEY"),
+    STTProviderName.GEMINI_TRANSCRIBE.value: ("gemini_api_key", "GEMINI_API_KEY"),
     STTProviderName.DEEPGRAM.value: ("deepgram_api_key", "DEEPGRAM_API_KEY"),
 }
 
@@ -1173,9 +1173,7 @@ def create_stt_backend_from_resolved_config(
     if config.provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
-        api_key = _gemini_transcribe_api_key_for_resolved_credential(
-            config.credential, secrets=secrets
-        )
+        api_key = _gemini_api_key_for_resolved_credential(config.credential, secrets=secrets)
         language_codes_value = config.provider_options.get("language_codes")
         language_codes = (
             tuple(language_codes_value)

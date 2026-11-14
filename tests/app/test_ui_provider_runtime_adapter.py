@@ -88,11 +88,11 @@ async def test_rolling_member_secret_change_rebinds_without_provider_apply() -> 
     )
 
     assert await adapter.persist_provider_secret_change(
-        "gemini_transcribe_api_key",
+        "gemini_api_key",
         "rotated-key",
     )
 
-    assert rebound == [("gemini_transcribe_api_key", "rotated-key")]
+    assert rebound == [("gemini_api_key", "rotated-key")]
     apply.assert_not_awaited()
 
 
@@ -109,7 +109,7 @@ async def test_failed_secret_change_does_not_rebind_rolling() -> None:
 
     assert (
         await adapter.persist_provider_secret_change(
-            "gemini_transcribe_api_key",
+            "gemini_api_key",
             "rotated-key",
         )
         is False

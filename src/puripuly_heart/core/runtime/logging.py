@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from puripuly_heart.core.messages import DiagnosticFieldValue, ErrorDiagnostics
-from puripuly_heart.core.observability import ConversationRecordChannel, RealtimeLogSink
+from puripuly_heart.core.observability import ConversationRecord, ConversationRecordChannel
 
 LIVE_AUDIENCE_RECORD_ATTRIBUTE = "_puripuly_heart_live_audience"
 LIVE_AUDIENCE_BASIC = "basic"
@@ -92,9 +92,9 @@ class RuntimeLoggingAdapterPort(Protocol):
         exception: BaseException | None = None,
     ) -> dict: ...
 
-    def attach_realtime_sink(self, sink: RealtimeLogSink) -> None: ...
-
-    def detach_realtime_sink(self) -> None: ...
+    def set_conversation_history_observer(
+        self, observer: Callable[[ConversationRecord], None] | None
+    ) -> None: ...
 
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None: ...
 
@@ -156,7 +156,7 @@ class RuntimeLoggingService:
     """Lifecycle owner that keeps runtime logging open until terminal shutdown."""
 
     resource_fields = (
-        "live log sink",
+        "conversation history observer",
         "queue listener",
         "file handlers",
         "retained diagnostic metadata",
@@ -204,15 +204,12 @@ class RuntimeLoggingService:
             "late_callback_rule": self.late_callback_rule,
         }
 
-    def attach_realtime_sink(self, sink: RealtimeLogSink) -> None:
+    def set_conversation_history_observer(
+        self, observer: Callable[[ConversationRecord], None] | None
+    ) -> None:
         if self._closed:
             return
-        self._session.attach_realtime_sink(sink)
-
-    def detach_realtime_sink(self) -> None:
-        if self._closed:
-            return
-        self._session.detach_realtime_sink()
+        self._session.set_conversation_history_observer(observer)
 
     def configure_diagnostics(self, *, instance_id: str | None = None, event_sink=None) -> None:
         self._session.configure_diagnostics(instance_id=instance_id, event_sink=event_sink)

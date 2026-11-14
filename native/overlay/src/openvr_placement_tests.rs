@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::mem::ManuallyDrop;
+use std::rc::Rc;
 
 use super::{
-    OpenVrError, OpenVrOutputAdapter, OverlayPlacementPolicy, SpatialReanchorOutcome,
-    WindowsOpenVrOverlay, DEFAULT_OVERLAY_WIDTH_METERS,
+    OpenVrError, OpenVrOutputAdapter, OpenVrRuntimeLease, OverlayPlacementPolicy,
+    PhotoHandReferences, SpatialReanchorOutcome, WindowsOpenVrOverlay, WindowsOpenVrSession,
+    DEFAULT_OVERLAY_WIDTH_METERS,
 };
 use crate::presentation::AdapterIdentity;
 use crate::state::OverlayCalibration;
@@ -169,12 +171,26 @@ impl ControlledOwner {
             overlay_handle: handle,
             placement_policy: OverlayPlacementPolicy::default(),
             applied_placement_policy: None,
+            tracked_presentation: None,
+            card_presentation: None,
             visible: false,
             output_adapter: OpenVrOutputAdapter {
                 identity: AdapterIdentity::Unavailable,
                 requested_identity: AdapterIdentity::Unavailable,
                 adapter: None,
             },
+            _session: Rc::new(WindowsOpenVrSession {
+                overlay_api: &mut *overlay,
+                system_api: &mut *system,
+                compositor_api: Some(&mut *compositor),
+                output_adapter: OpenVrOutputAdapter {
+                    identity: AdapterIdentity::Unavailable,
+                    requested_identity: AdapterIdentity::Unavailable,
+                    adapter: None,
+                },
+                hand_references: RefCell::new(PhotoHandReferences::default()),
+                _runtime: OpenVrRuntimeLease { shutdown: || {} },
+            }),
         });
         Self {
             owner,

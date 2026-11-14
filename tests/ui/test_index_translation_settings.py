@@ -72,7 +72,6 @@ def test_index_picker_is_enabled_and_public_connection_needs_no_auth(view, monke
     assert not view._managed_trial_usage_bar.visible
     assert not view._openrouter_key.visible
     assert not view._openrouter_pkce_button_row.visible
-    assert not view._google_key.visible
     assert not view._openai_key.visible
     assert not view._deepseek_key.visible
     assert not view._chatgpt_account_card.visible
@@ -149,10 +148,10 @@ async def test_index_immediate_apply_commits_only_selection_and_keeps_drafts(
     assert view._prompt_editor.value == "unapplied prompt"
     assert view._provider_draft.custom_stt_endpoint == "https://unapplied.invalid/stt"
     assert view.has_provider_changes
-    view._on_llm_selected("gemini_flash")
+    view._on_llm_selected("qwen38_flash")
     assert len(queued) == 1
     await queued.pop()()
-    assert canonical.intent.translation.model == "gemini_flash"
+    assert canonical.intent.translation.model == "qwen38_flash"
     assert len(observed) == 2
     canonical = _settings(TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED)
     _load(view, canonical)

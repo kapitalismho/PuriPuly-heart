@@ -46,6 +46,9 @@ from puripuly_heart.app.ports.settings_view import (
     PeerVadHangoverIntent,
     PeerVadPreRollIntent,
     PeerVadSpeechThresholdIntent,
+    PhotoDeleteTranslatedSettingsIntent,
+    PhotoEnabledSettingsIntent,
+    PhotoRouteSettingsIntent,
     PromptApplyIntent,
     PromptSettingsSnapshot,
     ProviderApplyIntent,
@@ -177,7 +180,6 @@ def _active_prompt_key(settings: AppSettingsVNext) -> str:
     if provider == "chatgpt":
         return "openai"
     if provider in {
-        "gemini",
         "openrouter",
         "openai",
         "deepseek",
@@ -284,10 +286,9 @@ def settings_view_surface_snapshots(
         ),
         verified=ProviderVerificationSnapshot(
             deepgram=_verified(verification.deepgram),
-            gemini_transcribe=_verified(verification.gemini_transcribe),
+            gemini=_verified(verification.gemini),
             elevenlabs_scribe=_verified(verification.elevenlabs_scribe),
             soniox=_verified(verification.soniox),
-            google=_verified(verification.google),
             openrouter=_verified(verification.openrouter),
             openai=(
                 _verified(verification.openai)
@@ -322,6 +323,10 @@ def settings_view_surface_snapshots(
         clipboard_auto_translate_enabled=intent.clipboard.auto_translate_enabled,
         telemetry_enabled=intent.telemetry.enabled,
         peer_expected_languages=tuple(intent.languages.peer_expected_languages),
+        photo_enabled=intent.photo.enabled,
+        photo_route=intent.photo.route,
+        photo_delete_translated=intent.photo.delete_translated,
+        peer_source_mode=intent.languages.peer_source_mode,
     )
     source_language = intent.languages.source_language
     prompt = PromptSettingsSnapshot(
@@ -553,6 +558,15 @@ def materialize_immediate_settings_intent(
         updated = _with_intent(
             updated,
             clipboard=replace(updated.intent.clipboard, auto_translate_enabled=intent.enabled),
+        )
+    elif isinstance(intent, PhotoEnabledSettingsIntent):
+        updated = _with_intent(updated, photo=replace(updated.intent.photo, enabled=intent.enabled))
+    elif isinstance(intent, PhotoRouteSettingsIntent):
+        updated = _with_intent(updated, photo=replace(updated.intent.photo, route=intent.route))
+    elif isinstance(intent, PhotoDeleteTranslatedSettingsIntent):
+        updated = _with_intent(
+            updated,
+            photo=replace(updated.intent.photo, delete_translated=intent.enabled),
         )
     elif isinstance(intent, PeerExpectedLanguagesIntent):
         languages = replace(

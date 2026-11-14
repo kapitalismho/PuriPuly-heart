@@ -8,7 +8,6 @@ from puripuly_heart.app.services.application_runtime_logging import (
 )
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import (
-    RealtimeLogHandler,
     RuntimeLoggingSinks,
     SessionRuntimeLoggingService,
 )
@@ -25,7 +24,6 @@ def compose_application_runtime_logging(
         service_factory=lambda: RuntimeLoggingService(
             session_factory=lambda: SessionRuntimeLoggingService(
                 sinks=sinks,
-                ui_handler_factory=RealtimeLogHandler,
             ),
             fallback_logger=fallback_logger,
         ),

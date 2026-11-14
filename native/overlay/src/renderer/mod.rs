@@ -1,7 +1,7 @@
 mod backend;
 mod cache;
 mod font_resolver;
-mod glyph_run;
+pub(crate) mod glyph_run;
 mod layout;
 mod types;
 

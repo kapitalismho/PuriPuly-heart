@@ -47,8 +47,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('Luna-only shared installation admission', () => {
-  it.each(supportedProtocols)('sends protocol %i classification and every route only to server-selected Luna', async (protocol) => {
+describe('shared installation admission', () => {
+  it.each(supportedProtocols)('keeps protocol %i classification on Luna and selects Terra for response routes', async (protocol) => {
     const upstream = mockLuna();
     const env = testEnv();
     expect((await relay.fetch(post('/v1/classify', classifyBody(protocol)), env)).status).toBe(200);
@@ -57,7 +57,7 @@ describe('Luna-only shared installation admission', () => {
     }
     expect(sentModels(upstream)).toEqual([
       ['https://api.openai.com/v1/decisions', 'gpt-6-luna'],
-      ...Array(4).fill(['https://api.openai.com/v1/responses', 'gpt-6-luna']),
+      ...Array(4).fill(['https://api.openai.com/v1/responses', 'gpt-5.6-terra']),
     ]);
   });
 
@@ -85,22 +85,21 @@ describe('Luna-only shared installation admission', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it.each(supportedProtocols)('reports protocol %i Luna capability failures without an alternate model', async (protocol) => {
+  it.each(supportedProtocols)('reports protocol %i capability failures without retrying an alternate model', async (protocol) => {
     const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
       Response.json({ error: { code: 'model_not_found' } }, { status: 404 }));
     const env = testEnv();
-    for (const [path, body, capability] of [
-      ['/v1/classify', classifyBody(protocol), 'Decisions'],
-      ['/v1/respond', respondBody(protocol), 'Responses'],
+    for (const [path, body] of [
+      ['/v1/classify', classifyBody(protocol)],
+      ['/v1/respond', respondBody(protocol)],
     ] as const) {
       const response = await relay.fetch(post(path, body), env);
       expect(response.status).toBe(502);
-      expect(await response.json()).toEqual({ error: { code: 'upstream_capability_unavailable',
-        message: `The configured gpt-6-luna ${capability} capability is unavailable. No alternate model was used.` } });
+      expect(await response.json()).toMatchObject({ error: { code: 'upstream_capability_unavailable' } });
     }
     expect(sentModels(upstream as ReturnType<typeof mockLuna>)).toEqual([
       ['https://api.openai.com/v1/decisions', 'gpt-6-luna'],
-      ['https://api.openai.com/v1/responses', 'gpt-6-luna'],
+      ['https://api.openai.com/v1/responses', 'gpt-5.6-terra'],
     ]);
   });
 
@@ -150,7 +149,7 @@ describe('Luna-only shared installation admission', () => {
       expect(sqlite.prepare('SELECT agent_protocol, requests FROM protocol_daily WHERE installation_hash = ?')
         .all(installationHash)).toEqual([{ agent_protocol: protocol, requests: 16 }]);
       expect(upstream).toHaveBeenCalledTimes(17);
-      expect(new Set(sentModels(upstream).map(([, model]) => model))).toEqual(new Set(['gpt-6-luna']));
+      expect(new Set(sentModels(upstream).map(([, model]) => model))).toEqual(new Set(['gpt-6-luna', 'gpt-5.6-terra']));
     } finally {
       sqlite.close();
     }

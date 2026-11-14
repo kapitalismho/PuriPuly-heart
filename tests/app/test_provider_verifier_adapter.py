@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 
+import httpx
 import pytest
 
 from puripuly_heart.app.ports.provider_verifier import (
@@ -9,76 +10,48 @@ from puripuly_heart.app.ports.provider_verifier import (
     PROVIDER_VERIFICATION_STATUS_VERIFIED,
     ProviderVerificationRequest,
 )
-from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.core import network_clients
 
 
 @pytest.mark.asyncio
-async def test_provider_verifier_adapter_maps_controller_provider_checks(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    ("status_code", "expected_status"),
+    [(200, PROVIDER_VERIFICATION_STATUS_VERIFIED), (403, PROVIDER_VERIFICATION_STATUS_FAILED)],
+)
+async def test_shared_gemini_key_verification_is_an_authentication_probe(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, expected_status: str
 ) -> None:
-    adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
-    adapter = adapter_module.ProviderVerifierAdapter()
-    calls: list[tuple[str, str, str | None]] = []
+    from puripuly_heart.app.adapters.provider_verifier import ProviderVerifierAdapter
 
-    async def fake_gemini(api_key: str, *, model: str) -> bool:
-        calls.append(("google", api_key, model))
-        return True
+    requests: list[httpx.Request] = []
 
-    async def fake_openrouter(api_key: str) -> bool:
-        calls.append(("openrouter", api_key, None))
-        return True
-
-    async def fake_deepseek(api_key: str) -> bool:
-        calls.append(("deepseek", api_key, None))
-        return True
-
-    async def fake_deepgram(api_key: str) -> bool:
-        calls.append(("deepgram", api_key, None))
-        return True
-
-    async def fake_soniox(api_key: str) -> bool:
-        calls.append(("soniox", api_key, None))
-        return True
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(status_code, json={"models": []})
 
     monkeypatch.setattr(
-        adapter_module.GeminiLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_gemini),
+        network_clients,
+        "external_client",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(respond), **kwargs),
     )
-    monkeypatch.setattr(
-        adapter_module.OpenRouterLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_openrouter),
-    )
-    monkeypatch.setattr(
-        adapter_module.DeepSeekLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_deepseek),
-    )
-    monkeypatch.setattr(
-        DeepgramRealtimeSTTBackend,
-        "verify_api_key",
-        staticmethod(fake_deepgram),
-    )
-    monkeypatch.setattr(
-        adapter_module.SonioxRealtimeSTTBackend,
-        "verify_api_key",
-        staticmethod(fake_soniox),
+    result = await ProviderVerifierAdapter().verify_provider_secret(
+        ProviderVerificationRequest(
+            provider="gemini",
+            secret_key="gemini_api_key",
+            secret_value="synthetic-shared-key",
+            secret_revision="revision-1",
+            context={"flow": "settings.verify_api_key"},
+        )
     )
 
-    assert await adapter.verify_api_key("google", "secret", model="gemini-custom")
-    assert await adapter.verify_api_key("openrouter", "secret")
-    assert await adapter.verify_api_key("deepseek", "secret")
-    assert await adapter.verify_api_key("deepgram", "secret")
-    assert await adapter.verify_api_key("soniox", "secret")
-
-    assert calls == [
-        ("google", "secret", "gemini-custom"),
-        ("openrouter", "secret", None),
-        ("deepseek", "secret", None),
-        ("deepgram", "secret", None),
-        ("soniox", "secret", None),
+    assert result.status == expected_status
+    assert result.evidence["verification_scope"] == "key_probe"
+    assert result.evidence["recognition_readiness"] == "unobserved"
+    assert [(request.method, request.url.path) for request in requests] == [
+        ("GET", "/v1beta/models")
     ]
+    assert requests[0].headers["x-goog-api-key"] == "synthetic-shared-key"
+    assert "synthetic-shared-key" not in repr(result)
 
 
 @pytest.mark.asyncio
@@ -104,11 +77,12 @@ async def test_direct_openai_verification_requires_the_luna_model(
 
 
 @pytest.mark.asyncio
-async def test_retired_provider_cannot_be_verified() -> None:
+@pytest.mark.parametrize("provider", ["cerebras", "google", "gemini_transcribe"])
+async def test_retired_provider_cannot_be_verified(provider: str) -> None:
     adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
 
     with pytest.raises(ValueError, match="Unknown provider"):
-        await adapter_module.ProviderVerifierAdapter().verify_api_key("cerebras", "retired-key")
+        await adapter_module.ProviderVerifierAdapter().verify_api_key(provider, "retired-key")
 
 
 @pytest.mark.asyncio
