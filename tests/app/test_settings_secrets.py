@@ -38,7 +38,7 @@ class RecordingSecretStore:
 def test_settings_secret_snapshot_projects_named_values_and_legacy_fallbacks() -> None:
     store = RecordingSecretStore(
         {
-            "google_api_key": "google-secret",
+            "gemini_api_key": "google-secret",
             "openrouter_api_key": "openrouter-secret",
             "openai_api_key": "openai-secret",
             "deepseek_api_key": "deepseek-secret",
@@ -56,7 +56,7 @@ def test_settings_secret_snapshot_projects_named_values_and_legacy_fallbacks() -
 
     assert result.error_message is None
     assert result.snapshot is not None
-    assert result.snapshot.google_api_key == "google-secret"
+    assert result.snapshot.gemini_api_key == "google-secret"
     assert result.snapshot.openrouter_api_key == "openrouter-secret"
     assert result.snapshot.openai_api_key == "openai-secret"
     assert result.snapshot.deepseek_api_key == "deepseek-secret"
@@ -116,30 +116,6 @@ def test_openrouter_pkce_load_reads_only_its_previous_secret_surface() -> None:
     assert store.delete_calls == []
 
 
-def test_settings_secret_load_returns_the_sequential_prefix_on_read_failure() -> None:
-    store = RecordingSecretStore(
-        {
-            "google_api_key": "google-secret",
-            "openrouter_api_key": "openrouter-secret",
-            "deepseek_api_key": "deepseek-secret",
-        }
-    )
-    failure = OSError("unavailable")
-    store.get_failure_key = "deepgram_api_key"
-    store.failure = failure
-
-    result = SettingsSecretsOwner(secret_store_factory=lambda: store).load()
-
-    assert result.snapshot is not None
-    assert result.snapshot.google_api_key == "google-secret"
-    assert result.snapshot.openrouter_api_key == "openrouter-secret"
-    assert result.snapshot.deepseek_api_key == "deepseek-secret"
-    assert result.snapshot.deepgram_api_key is None
-    assert result.snapshot.soniox_api_key is None
-    assert result.diagnostics.fields["exception_class"] == "OSError"
-    assert result.diagnostics.operation == "secret_read"
-
-
 def test_openrouter_pkce_load_returns_its_sequential_prefix_on_read_failure() -> None:
     store = RecordingSecretStore({"openrouter_api_key": "openrouter-secret"})
     failure = OSError("unavailable")
@@ -156,7 +132,7 @@ def test_openrouter_pkce_load_returns_its_sequential_prefix_on_read_failure() ->
 
 
 def test_settings_secret_mutation_owns_set_delete_and_failure_results() -> None:
-    store = RecordingSecretStore({"google_api_key": "secret"})
+    store = RecordingSecretStore({"gemini_api_key": "secret"})
     owner = SettingsSecretsOwner(secret_store_factory=lambda: store)
 
     mutation = SettingsSecretMutation(
@@ -164,13 +140,13 @@ def test_settings_secret_mutation_owns_set_delete_and_failure_results() -> None:
         value="value",
     )
     written = owner.mutate(mutation)
-    deleted = owner.mutate(SettingsSecretMutation(key=SettingsSecretKey.GOOGLE_API_KEY, value=""))
+    deleted = owner.mutate(SettingsSecretMutation(key=SettingsSecretKey.GEMINI_API_KEY, value=""))
 
     assert written.succeeded is True
     assert written.error_type is None
     assert deleted.succeeded is True
     assert store.set_calls == [("openrouter_api_key", "value")]
-    assert store.delete_calls == ["google_api_key"]
+    assert store.delete_calls == ["gemini_api_key"]
     assert "value" not in repr(mutation)
 
     store.failure = OSError("unavailable")

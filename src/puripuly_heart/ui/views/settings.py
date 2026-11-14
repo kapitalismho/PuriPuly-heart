@@ -10,7 +10,7 @@ import json
 import logging
 import math
 import re
-from dataclasses import fields, replace
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 
@@ -59,6 +59,10 @@ from puripuly_heart.app.ports.settings_view import (
     PeerExpectedLanguagesIntent,
     PeerSttProviderEdit,
     PeerVadSpeechThresholdIntent,
+    PhotoDeleteTranslatedSettingsIntent,
+    PhotoEnabledSettingsIntent,
+    PhotoRouteSettingsIntent,
+    PhotoStatusSnapshot,
     PromptApplyIntent,
     PromptSettingsSnapshot,
     ProviderApplyIntent,
@@ -121,6 +125,7 @@ from puripuly_heart.config.resolved import (
     VAD_ONSET_MAX,
     VAD_ONSET_MIN,
 )
+from puripuly_heart.config.settings_vnext.schema import PHOTO_ROUTES
 from puripuly_heart.config.translation_values import (
     MANAGED_GEMMA_MODELS,
     TranslationConnection,
@@ -175,8 +180,8 @@ from puripuly_heart.ui.settings.contract import (
     SettingsGeneralSurfaceSlots,
     SettingsOverlayIntents,
     SettingsOverlaySurfaceSlots,
+    SettingsPhotoSurfaceSlots,
     SettingsPromptIntents,
-    SettingsPromptSurfaceSlots,
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
@@ -185,7 +190,7 @@ from puripuly_heart.ui.settings.renderer import (
     compose_settings_api_surface,
     compose_settings_general_surface,
     compose_settings_overlay_surface,
-    compose_settings_prompt_surface,
+    compose_settings_photo_surface,
 )
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
@@ -224,7 +229,7 @@ _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
 
 
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
-_SETTINGS_SUBTAB_ORDER = ("api", "general", "prompt", "overlay")
+_SETTINGS_SUBTAB_ORDER = ("api", "general", "photo", "overlay")
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
 _OVERLAY_DISTANCE_DIVISIONS = 30
@@ -275,6 +280,24 @@ _ROLLING_MEMBER_STT_PROVIDERS = frozenset(
         STTProviderName.ELEVENLABS_SCRIBE,
     }
 )
+_CUSTOM_VOCABULARY_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.ROLLING_FREE,
+        STTProviderName.DEEPGRAM,
+        STTProviderName.SONIOX,
+        STTProviderName.GEMINI_TRANSCRIBE,
+        STTProviderName.QWEN_AUDIO,
+        STTProviderName.ELEVENLABS_SCRIBE,
+    }
+)
+_PEER_LANGUAGE_HINT_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.ROLLING_FREE,
+        STTProviderName.SONIOX,
+        STTProviderName.GEMINI_TRANSCRIBE,
+        STTProviderName.QWEN_AUDIO,
+    }
+)
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.ROLLING_FREE: "settings.stt.section.recommended_cloud",
     STTProviderName.QWEN_AUDIO: "settings.stt.section.recommended_cloud",
@@ -301,7 +324,6 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
     TranslationModel.GPT_6_LUNA: "provider.gpt_6_luna",
-    TranslationModel.GEMINI_FLASH: "provider.gemini_flash",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
@@ -342,7 +364,6 @@ _TRANSLATION_MODELS = (
     TranslationModel.GPT_6_LUNA,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
-    TranslationModel.GEMINI_FLASH,
     TranslationModel.QWEN_38_FLASH,
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
@@ -361,7 +382,6 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GPT_6_LUNA: "settings.translation_model.section.recommended_cloud",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
-    TranslationModel.GEMINI_FLASH: "settings.translation_model.section.others",
     TranslationModel.QWEN_38_FLASH: "settings.translation_model.section.others",
 }
 
@@ -423,6 +443,17 @@ def _derive_openrouter_selection_alias(
     return OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
 
 
+@dataclass(frozen=True, slots=True)
+class _ChatGptAccountView:
+    card: ft.Control
+    title: ft.Text
+    status: ft.Text
+    email: ft.Text
+    connect: ft.Control
+    usage: ft.Control
+    sign_out: ft.Control
+
+
 class SettingsView(ft.Column):
     """Settings view with Bento grid layout."""
 
@@ -457,7 +488,7 @@ class SettingsView(ft.Column):
         self.on_desktop_overlay_size_change: Callable[[str], None] | None = None
         self.on_desktop_overlay_recovery_action: Callable[[str], None] | None = None
         self.on_desktop_overlay_position_reset: Callable[[], None] | None = None
-        self.on_view_logs: Callable[[], None] | None = None
+        self.on_open_agent: Callable[[], None] | None = None
         self.on_start_audio_test: Callable[[], None] | None = None
         self.on_gpu_discovery_requested: Callable[[], object] | None = None
         self.on_open_model_assets: Callable[[], None] | None = None
@@ -599,7 +630,8 @@ class SettingsView(ft.Column):
             "api": "api",
             "general": "general",
             "overlay": "overlay",
-            "prompts": "prompt",
+            "photo": "photo",
+            "prompts": "general",
         }.get(section)
         key_fields = {
             field._provider: field
@@ -685,13 +717,14 @@ class SettingsView(ft.Column):
         self.on_apply_loopback_capture_option = general.apply_loopback_capture_option
         self.on_loopback_capture_summary = general.loopback_capture_summary
         self.on_osc_effective_ports = general.osc_effective_ports
+        self.photo_status = general.photo_status
         self.on_prompt_apply_settings = prompt.prompt_apply_settings
         self.on_pending_prompt_changed = prompt.pending_prompt_changed
         self.on_desktop_overlay_lock_change = overlay.desktop_overlay_lock_change
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
         self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
-        self.on_view_logs = overlay.view_logs
+        self.on_open_agent = overlay.open_agent
         if overlay.calibration_begin is not None:
             self.on_overlay_calibration_begin = overlay.calibration_begin
         if overlay.calibration_change is not None:
@@ -812,7 +845,7 @@ class SettingsView(ft.Column):
             self._overlay_vr_reset_button,
             self._overlay_desktop_reset_button,
             self._desktop_overlay_primary_action,
-            self._desktop_overlay_view_logs_action,
+            self._desktop_overlay_open_agent_action,
             self._translation_connection_text,
             self._cloud_free_tier_text,
             self._soniox_speaker_diarization_text,
@@ -1027,7 +1060,12 @@ class SettingsView(ft.Column):
             font_family=font_for_language(get_locale()),
             initial_key=_SETTINGS_SUBTAB_ORDER[0],
             subtab_bar_position="bottom",
+            on_tab_change=self._on_settings_subtab_change,
         )
+
+    def _on_settings_subtab_change(self, key: str) -> None:
+        if key == "photo":
+            self.refresh_photo_status()
 
     def _emit_runtime_basic(self, message: str, *, level: int = logging.INFO) -> None:
         runtime_log_basic = getattr(self, "runtime_log_basic", None)
@@ -1102,7 +1140,7 @@ class SettingsView(ft.Column):
         )
 
         self._llm_text = self._build_clickable_text(
-            t("provider.gemini_flash"),
+            t("provider.gemma4_26b_31b"),
             self._on_llm_click,
         )
         self._trans_title = ft.Text(
@@ -1144,16 +1182,8 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
-        self._gemini_transcribe_key = ApiKeyField(
-            "settings.gemini_transcribe_api_key",
-            "gemini_transcribe_api_key",
-            "gemini_transcribe",
-            on_verify=self._verify_key,
-            on_save=self._on_secret_change,
-            show_snackbar=lambda msg, bg: (
-                self.show_snackbar(msg, bg) if self.show_snackbar else None
-            ),
-        )
+        self._gemini_key = self._build_gemini_key_field()
+        self._photo_gemini_key = self._build_gemini_key_field()
         self._elevenlabs_scribe_key = ApiKeyField(
             "settings.elevenlabs_scribe_api_key",
             "elevenlabs_scribe_api_key",
@@ -1194,16 +1224,6 @@ class SettingsView(ft.Column):
             ),
             height=None,
             expand=False,
-        )
-        self._google_key = ApiKeyField(
-            "settings.google_api_key",
-            "google_api_key",
-            "google",
-            on_verify=self._verify_key,
-            on_save=self._on_secret_change,
-            show_snackbar=lambda msg, bg: (
-                self.show_snackbar(msg, bg) if self.show_snackbar else None
-            ),
         )
         self._openrouter_key = ApiKeyField(
             "settings.openrouter_api_key",
@@ -1269,65 +1289,15 @@ class SettingsView(ft.Column):
         )
         self._managed_key_card.visible = False
         self._chatgpt_intents: SettingsChatGptIntents | None = None
-        self._chatgpt_account_title = ft.Text(
-            t("settings.chatgpt_account.title"),
-            size=24,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_SECONDARY,
-        )
-        self._chatgpt_account_status = ft.Text(
-            "",
-            size=18,
-            color=COLOR_ON_BACKGROUND,
-            visible=False,
-        )
-        self._chatgpt_account_email = ft.Text(
-            "",
-            size=20,
-            color=COLOR_ON_BACKGROUND,
-            no_wrap=True,
-            overflow=ft.TextOverflow.ELLIPSIS,
-            visible=False,
-        )
-        self._chatgpt_connect_button = self._build_action_button(
-            t("settings.chatgpt_account.connect"),
-            self._on_chatgpt_connect_click,
-            size=20,
-            default_color=COLOR_NEUTRAL_DARK,
-            disabled_color=COLOR_NEUTRAL_DARK,
-        )
-        self._chatgpt_usage_button = self._build_action_button(
-            t("settings.chatgpt_account.manage_usage"),
-            self._on_chatgpt_usage_click,
-            size=20,
-        )
-        self._chatgpt_sign_out_button = self._build_action_button(
-            t("settings.chatgpt_account.sign_out"),
-            self._on_chatgpt_sign_out_click,
-            size=20,
-        )
-        self._chatgpt_account_card = self._wrap_card(
-            ft.Column(
-                [
-                    self._chatgpt_account_title,
-                    ft.Container(height=4),
-                    self._chatgpt_account_status,
-                    self._chatgpt_account_email,
-                    ft.Row(
-                        [
-                            self._chatgpt_usage_button,
-                            self._chatgpt_sign_out_button,
-                            self._chatgpt_connect_button,
-                        ],
-                        alignment=ft.MainAxisAlignment.END,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                ],
-                spacing=8,
-            ),
-            height=None,
-            expand=False,
-        )
+        chatgpt_view = self._build_chatgpt_account_view()
+        self._chatgpt_account_views = [chatgpt_view]
+        self._chatgpt_account_title = chatgpt_view.title
+        self._chatgpt_account_status = chatgpt_view.status
+        self._chatgpt_account_email = chatgpt_view.email
+        self._chatgpt_connect_button = chatgpt_view.connect
+        self._chatgpt_usage_button = chatgpt_view.usage
+        self._chatgpt_sign_out_button = chatgpt_view.sign_out
+        self._chatgpt_account_card = chatgpt_view.card
         self._chatgpt_account_card.visible = False
         self._alibaba_key_beijing = ApiKeyField(
             "settings.alibaba_api_key_beijing",
@@ -1375,9 +1345,8 @@ class SettingsView(ft.Column):
                 # self._qwen_region_row removed
                 self._deepgram_key,
                 self._elevenlabs_scribe_key,
-                self._gemini_transcribe_key,
+                self._gemini_key,
                 self._soniox_key,
-                self._google_key,
                 self._deepseek_key,
                 self._openai_key,
                 self._qwen_api_host_row,
@@ -1650,6 +1619,48 @@ class SettingsView(ft.Column):
                 expand=True,
             ),
         )
+        # === Row 8: Persona (2x2) - Licenses style ===
+        self._prompt_editor = PromptEditor(
+            on_change=self._on_prompt_change,
+            on_commit=self._on_prompt_commit,
+        )
+        self._persona_title = ft.Text(
+            t("settings.section.persona"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
+        )
+
+        # Reset button (matches Persona title color, hover -> primary)
+        self._reset_prompt_btn = _make_text_button(
+            t("settings.reset_prompt"),
+            icon=ft.Icons.REFRESH_ROUNDED,
+            style=_settings_secondary_text_button_style(),
+            on_click=self._on_reset_prompt,
+        )
+
+        # Header row with title and reset button
+        persona_header = ft.Row(
+            controls=[self._persona_title, ft.Container(expand=True), self._reset_prompt_btn],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        # Simple container like Licenses (no border, no internal scroll)
+        prompt_container = ft.Container(
+            content=self._prompt_editor,
+            width=float("inf"),
+        )
+
+        self._persona_card = SharedCardWrapper(
+            ft.Column(
+                [
+                    persona_header,
+                    ft.Container(height=16),
+                    prompt_container,
+                ],
+                spacing=0,
+            ),
+            height=None,
+            expand=False,
+        )
         self._general_surface = compose_settings_general_surface(
             SettingsGeneralSurfaceSlots(
                 ui=self._general_ui_card,
@@ -1666,6 +1677,7 @@ class SettingsView(ft.Column):
                 activation_notice=self._activation_notice_card,
                 activation_notice_middle=self._wrap_empty_unit_card(),
                 activation_notice_trailing=self._wrap_empty_unit_card(),
+                persona=self._persona_card,
             ),
             placeholder_factory=lambda: self._vrchat_osc_card,
         )
@@ -2061,19 +2073,19 @@ class SettingsView(ft.Column):
             overflow=ft.TextOverflow.ELLIPSIS,
         )
         self._desktop_overlay_primary_action.visible = False
-        self._desktop_overlay_view_logs_action = self._build_clickable_text(
+        self._desktop_overlay_open_agent_action = self._build_clickable_text(
             t("settings.overlay.desktop.recovery.action.view_details"),
-            self._on_desktop_overlay_view_logs,
+            self._on_desktop_overlay_open_agent,
             size=16,
             max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,
         )
-        self._desktop_overlay_view_logs_action.visible = False
+        self._desktop_overlay_open_agent_action.visible = False
         self._desktop_overlay_status_body = ft.Column(
             [
                 self._desktop_overlay_reason_text,
                 self._desktop_overlay_primary_action,
-                self._desktop_overlay_view_logs_action,
+                self._desktop_overlay_open_agent_action,
                 self._desktop_overlay_helper_text,
             ],
             spacing=6,
@@ -2424,48 +2436,6 @@ class SettingsView(ft.Column):
             visible=False,
         )
 
-        # === Row 8: Persona (2x2) - Licenses style ===
-        self._prompt_editor = PromptEditor(
-            on_change=self._on_prompt_change,
-            on_commit=self._on_prompt_commit,
-        )
-        self._persona_title = ft.Text(
-            t("settings.section.persona"), size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY
-        )
-
-        # Reset button (matches Persona title color, hover -> primary)
-        self._reset_prompt_btn = _make_text_button(
-            t("settings.reset_prompt"),
-            icon=ft.Icons.REFRESH_ROUNDED,
-            style=_settings_secondary_text_button_style(),
-            on_click=self._on_reset_prompt,
-        )
-
-        # Header row with title and reset button
-        persona_header = ft.Row(
-            controls=[self._persona_title, ft.Container(expand=True), self._reset_prompt_btn],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-        # Simple container like Licenses (no border, no internal scroll)
-        prompt_container = ft.Container(
-            content=self._prompt_editor,
-            width=float("inf"),
-        )
-
-        persona_card = SharedCardWrapper(
-            ft.Column(
-                [
-                    persona_header,
-                    ft.Container(height=16),
-                    prompt_container,
-                ],
-                spacing=0,
-            ),
-            height=None,
-            expand=False,
-        )
         # === Row 9: Custom Vocabulary (2x1) ===
         self._custom_vocab_title = ft.Text(
             t("settings.section.custom_vocabulary"),
@@ -2493,7 +2463,7 @@ class SettingsView(ft.Column):
             on_add_terms=self._on_custom_vocabulary_add_terms,
             on_remove_term=self._on_custom_vocabulary_remove_term,
         )
-        row7 = SharedCardWrapper(
+        self._custom_vocab_card = SharedCardWrapper(
             ft.Column(
                 [
                     self._custom_vocab_header,
@@ -2507,29 +2477,233 @@ class SettingsView(ft.Column):
         )
 
         self._api_surface = compose_settings_api_surface(
-            SettingsApiSurfaceSlots.from_slot_provider(self),
+            replace(
+                SettingsApiSurfaceSlots.from_slot_provider(self),
+                custom_vocabulary=self._custom_vocab_card,
+                peer_expected_language=self._peer_auto_languages_card,
+            ),
         )
         self._translation_connection_row = self._api_surface.translation_connection_row
         self._openrouter_routing_row = self._translation_connection_row
         self._gpu_device_row = self._api_surface.gpu_device_row
 
-        self._prompt_surface = compose_settings_prompt_surface(
-            SettingsPromptSurfaceSlots(
-                custom_vocabulary=row7,
-                peer_expected_language=self._peer_auto_languages_card,
-                persona=persona_card,
-            )
+        self._photo_surface = compose_settings_photo_surface(
+            self._build_photo_surface_slots(),
+            placeholder_factory=self._wrap_empty_unit_card,
         )
 
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
                 "api": list(self._api_surface.rows),
                 "general": list(self._general_surface.rows),
-                "prompt": list(self._prompt_surface.rows),
+                "photo": list(self._photo_surface.rows),
                 "overlay": list(self._overlay_surface.rows),
             }
         )
         self.controls = [self._settings_subtab_shell]
+
+    def _build_gemini_key_field(self) -> ApiKeyField:
+        return ApiKeyField(
+            "settings.gemini_api_key",
+            "gemini_api_key",
+            "gemini",
+            on_verify=self._verify_key,
+            on_save=self._on_gemini_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
+
+    def _on_gemini_secret_change(self, key: str, value: str) -> object:
+        for field in (self._gemini_key, self._photo_gemini_key):
+            if field.value != value:
+                field.value = value
+                _update_control_if_mounted(field)
+        return self._on_secret_change(key, value)
+
+    def _build_photo_surface_slots(self) -> SettingsPhotoSurfaceSlots:
+        self._photo_status: PhotoStatusSnapshot | None = None
+        self._photo_status_pending = False
+        self._photo_enabled_title = self._unit_card_title(t("settings.photo.enabled.title"))
+        self._photo_enabled_text = self._build_clickable_text(
+            t("settings.photo.state.on"),
+            self._on_photo_enabled_click,
+        )
+        self._photo_route_title = self._unit_card_title(t("settings.photo.route.title"))
+        self._photo_route_text = self._build_clickable_text(
+            t("settings.photo.route.managed"),
+            self._on_photo_route_click,
+        )
+        self._photo_remaining_title = self._unit_card_title(t("settings.photo.remaining.title"))
+        self._photo_remaining_text = ft.Text(
+            "",
+            size=28,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._photo_delete_title = self._unit_card_title(
+            t("settings.photo.delete_translated.title")
+        )
+        self._photo_delete_text = self._build_clickable_text(
+            t("settings.photo.state.off"),
+            self._on_photo_delete_translated_click,
+        )
+        self._photo_chatgpt_view = self._build_chatgpt_account_view()
+        self._chatgpt_account_views.append(self._photo_chatgpt_view)
+        self._photo_gemini_card = self._wrap_card(
+            self._photo_gemini_key,
+            height=None,
+            expand=False,
+        )
+        self._sync_photo_setting_cards()
+        return SettingsPhotoSurfaceSlots(
+            chatgpt_account=self._photo_chatgpt_view.card,
+            gemini_key=self._photo_gemini_card,
+            enabled=self._wrap_unit_card(
+                title=self._photo_enabled_title,
+                value=self._photo_enabled_text,
+            ),
+            route=self._wrap_unit_card(title=self._photo_route_title, value=self._photo_route_text),
+            remaining=self._wrap_unit_card(
+                title=self._photo_remaining_title,
+                value=self._photo_remaining_text,
+            ),
+            delete_translated=self._wrap_unit_card(
+                title=self._photo_delete_title,
+                value=self._photo_delete_text,
+            ),
+        )
+
+    @staticmethod
+    def _unit_card_title(text: str) -> ft.Text:
+        return ft.Text(text, size=24, weight=ft.FontWeight.BOLD, color=COLOR_SECONDARY)
+
+    def _sync_photo_setting_cards(self) -> None:
+        general = self._general_snapshot
+        enabled = general is None or general.photo_enabled
+        delete_translated = general is not None and general.photo_delete_translated
+        self._photo_enabled_text.content.value = t(
+            "settings.photo.state.on" if enabled else "settings.photo.state.off"
+        )
+        self._photo_route_text.content.value = t(f"settings.photo.route.{self._photo_route()}")
+        self._photo_delete_text.content.value = t(
+            "settings.photo.state.on" if delete_translated else "settings.photo.state.off"
+        )
+        for control in (self._photo_enabled_text, self._photo_route_text, self._photo_delete_text):
+            control.disabled = general is None
+        route = self._photo_route()
+        self._photo_chatgpt_view.card.visible = general is not None and route == "chatgpt"
+        self._photo_gemini_card.visible = general is not None and route == "gemini"
+        if route == "chatgpt":
+            self._sync_chatgpt_account_card()
+        _update_control_if_mounted(self._photo_chatgpt_view.card)
+        _update_control_if_mounted(self._photo_gemini_card)
+        if is_control_mounted(self):
+            for control in (
+                self._photo_enabled_text,
+                self._photo_route_text,
+                self._photo_delete_text,
+            ):
+                with contextlib.suppress(Exception):
+                    control.update()
+        self._sync_photo_status_cards()
+
+    def _photo_route(self) -> str:
+        general = self._general_snapshot
+        return "managed" if general is None else general.photo_route
+
+    def _sync_photo_status_cards(self) -> None:
+        status = self._photo_status
+        managed = self._photo_route() == "managed"
+        self._photo_remaining_title.visible = managed
+        self._photo_remaining_text.visible = managed
+        if status is None:
+            remaining = t("settings.managed_trial_usage.remaining_placeholder")
+        elif status.remaining is not None and status.allowance is not None:
+            remaining = t(
+                "settings.photo.remaining.value",
+                remaining=status.remaining,
+                allowance=status.allowance,
+            )
+        else:
+            remaining = "—"
+        self._photo_remaining_text.value = remaining
+        if is_control_mounted(self):
+            for control in (self._photo_remaining_title, self._photo_remaining_text):
+                with contextlib.suppress(Exception):
+                    control.update()
+
+    def set_photo_status(self, status: PhotoStatusSnapshot | None) -> None:
+        self._photo_status = status
+        self._sync_photo_status_cards()
+
+    def refresh_photo_status(self) -> None:
+        if (
+            getattr(self, "photo_status", None) is None
+            or self._photo_status_pending
+            or self._photo_route() != "managed"
+        ):
+            return
+        self._photo_status_pending = True
+        self._schedule_page_task(self._refresh_photo_status)
+        if getattr(self, "page", None) is None:
+            self._photo_status_pending = False
+
+    async def _refresh_photo_status(self) -> None:
+        try:
+            status = await self.photo_status()
+        except Exception:
+            status = PhotoStatusSnapshot(None)
+        finally:
+            self._photo_status_pending = False
+        self.set_photo_status(status)
+
+    def _on_photo_enabled_click(self, e) -> None:
+        if self._general_snapshot is None:
+            return
+        enabled = not self._general_snapshot.photo_enabled
+        self._emit_runtime_basic(f"[Settings] Photo translation toggled: {enabled}")
+        self._general_snapshot = replace(self._general_snapshot, photo_enabled=enabled)
+        self._sync_photo_setting_cards()
+        self._emit_settings_changed(PhotoEnabledSettingsIntent(enabled))
+
+    def _on_photo_route_click(self, e) -> None:
+        _ = e
+        if not is_control_mounted(self) or self._general_snapshot is None:
+            return
+        modal = SettingsModal(
+            self.page,
+            t("settings.photo.route.title"),
+            [
+                OptionItem(value=route, label=t(f"settings.photo.route.{route}"))
+                for route in PHOTO_ROUTES
+            ],
+            self._on_photo_route_selected,
+        )
+        modal.open(self._photo_route())
+
+    def _on_photo_route_selected(self, value: str) -> None:
+        if (
+            self._general_snapshot is None
+            or value not in PHOTO_ROUTES
+            or value == self._general_snapshot.photo_route
+        ):
+            return
+        self._emit_runtime_basic(f"[Settings] Photo route selected: {value}")
+        self._general_snapshot = replace(self._general_snapshot, photo_route=value)
+        self._photo_status = None
+        self._sync_photo_setting_cards()
+        self._emit_settings_changed(PhotoRouteSettingsIntent(value))
+        self.refresh_photo_status()
+
+    def _on_photo_delete_translated_click(self, e) -> None:
+        if self._general_snapshot is None:
+            return
+        enabled = not self._general_snapshot.photo_delete_translated
+        self._emit_runtime_basic(f"[Settings] Delete translated photos toggled: {enabled}")
+        self._general_snapshot = replace(self._general_snapshot, photo_delete_translated=enabled)
+        self._sync_photo_setting_cards()
+        self._emit_settings_changed(PhotoDeleteTranslatedSettingsIntent(enabled))
 
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
@@ -3036,11 +3210,9 @@ class SettingsView(ft.Column):
         settings: ProviderSettingsSnapshot | None,
     ) -> str:
         if settings is None:
-            return "gemini"
+            return "openrouter"
         if settings.llm_provider == LLMProviderName.INDEX_TRANSLATE:
             return "index_translate"
-        if settings.llm_provider == LLMProviderName.GEMINI:
-            return "gemini"
         if settings.llm_provider == LLMProviderName.OPENROUTER:
             return "openrouter"
         if settings.llm_provider in (LLMProviderName.OPENAI, LLMProviderName.CHATGPT):
@@ -3759,6 +3931,7 @@ class SettingsView(ft.Column):
         )
         self._sync_telemetry_enabled_card(general)
         self._sync_activation_notice_card()
+        self._sync_photo_setting_cards()
         # Prompt
         provider_name = self._active_prompt_key()
         self._prompt_editor.set_provider(provider_name)
@@ -4030,8 +4203,6 @@ class SettingsView(ft.Column):
             return result
         snapshot = result.snapshot
 
-        if snapshot.google_api_key is not None:
-            self._google_key.value = snapshot.google_api_key
         if snapshot.openrouter_api_key is not None:
             self._openrouter_key.value = snapshot.openrouter_api_key
         if snapshot.openai_api_key is not None:
@@ -4040,10 +4211,13 @@ class SettingsView(ft.Column):
             self._deepseek_key.value = snapshot.deepseek_api_key
         if snapshot.deepgram_api_key is not None:
             self._deepgram_key.value = snapshot.deepgram_api_key
-        if snapshot.gemini_transcribe_api_key is not None:
-            gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
-            if gemini_transcribe_key is not None:
-                gemini_transcribe_key.value = snapshot.gemini_transcribe_api_key
+        if snapshot.gemini_api_key is not None:
+            for gemini_key in (
+                getattr(self, "_gemini_key", None),
+                getattr(self, "_photo_gemini_key", None),
+            ):
+                if gemini_key is not None:
+                    gemini_key.value = snapshot.gemini_api_key
         if snapshot.elevenlabs_scribe_api_key is not None:
             elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
             if elevenlabs_scribe_key is not None:
@@ -4120,14 +4294,20 @@ class SettingsView(ft.Column):
         verified = settings.verified
 
         # Map field -> (has_key, is_verified)
-        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
+        gemini_key = getattr(self, "_gemini_key", None)
+        photo_gemini_key = getattr(self, "_photo_gemini_key", None)
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
             (
-                gemini_transcribe_key,
-                gemini_transcribe_key.value if gemini_transcribe_key else None,
-                verified.gemini_transcribe,
+                gemini_key,
+                gemini_key.value if gemini_key else None,
+                verified.gemini,
+            ),
+            (
+                photo_gemini_key,
+                photo_gemini_key.value if photo_gemini_key else None,
+                verified.gemini,
             ),
             (
                 elevenlabs_scribe_key,
@@ -4135,7 +4315,6 @@ class SettingsView(ft.Column):
                 verified.elevenlabs_scribe,
             ),
             (self._soniox_key, self._soniox_key.value, verified.soniox),
-            (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._openai_key, self._openai_key.value, verified.openai),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
@@ -4220,6 +4399,21 @@ class SettingsView(ft.Column):
             else None
         )
 
+    def _sync_speech_hint_cards(
+        self,
+        stt: STTProviderName,
+        peer_stt: STTProviderName,
+    ) -> None:
+        general = self._general_snapshot
+        self._custom_vocab_card.visible = stt in _CUSTOM_VOCABULARY_STT_PROVIDERS
+        self._peer_auto_languages_card.visible = (
+            general is not None
+            and general.peer_source_mode == "auto"
+            and peer_stt in _PEER_LANGUAGE_HINT_STT_PROVIDERS
+        )
+        _update_control_if_mounted(self._custom_vocab_card)
+        _update_control_if_mounted(self._peer_auto_languages_card)
+
     def _update_api_visibility(self) -> None:
         """Update API key field visibility based on selected providers."""
         settings = self._build_settings_with_provider_draft()
@@ -4240,18 +4434,15 @@ class SettingsView(ft.Column):
             if provider in _ROLLING_MEMBER_STT_PROVIDERS:
                 visible_cloud_free_tier.add(provider)
         self._deepgram_key.visible = STTProviderName.DEEPGRAM in visible_cloud_free_tier
-        gemini_transcribe_key = getattr(self, "_gemini_transcribe_key", None)
-        if gemini_transcribe_key is not None:
-            gemini_transcribe_key.visible = (
-                STTProviderName.GEMINI_TRANSCRIBE in visible_cloud_free_tier
-            )
+        gemini_key = getattr(self, "_gemini_key", None)
+        if gemini_key is not None:
+            gemini_key.visible = STTProviderName.GEMINI_TRANSCRIBE in visible_cloud_free_tier
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         if elevenlabs_scribe_key is not None:
             elevenlabs_scribe_key.visible = (
                 STTProviderName.ELEVENLABS_SCRIBE in visible_cloud_free_tier
             )
         self._soniox_key.visible = STTProviderName.SONIOX in active_stt_providers
-        self._google_key.visible = not is_custom_http and llm == LLMProviderName.GEMINI
         self._sync_managed_key_card(settings)
         if is_custom_http:
             self._managed_key_card.visible = False
@@ -4287,6 +4478,7 @@ class SettingsView(ft.Column):
             if custom_stt_card.visible:
                 self._sync_custom_stt_card(settings)
         self._sync_http_extension_card(settings)
+        self._sync_speech_hint_cards(stt, peer_stt)
 
         qwen_regions: set[QwenRegion] = set()
         if (
@@ -4315,9 +4507,8 @@ class SettingsView(ft.Column):
                 for control in (
                     self._deepgram_key,
                     getattr(self, "_elevenlabs_scribe_key", None),
-                    getattr(self, "_gemini_transcribe_key", None),
+                    getattr(self, "_gemini_key", None),
                     self._soniox_key,
-                    self._google_key,
                     self._openrouter_key,
                     self._deepseek_key,
                     self._openai_key,
@@ -4330,6 +4521,7 @@ class SettingsView(ft.Column):
                 )
                 if control is not None
             )
+            _update_control_if_mounted(api_keys_card)
         self._sync_cloud_free_tier_card(settings)
         self._sync_soniox_speaker_diarization_card(settings)
 
@@ -4819,16 +5011,6 @@ class SettingsView(ft.Column):
                     if openrouter_source == OpenRouterCredentialSource.MANAGED
                     else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
                 )
-        elif model == TranslationModel.GEMINI_FLASH:
-            llm_provider = (
-                LLMProviderName.GEMINI
-                if connection == TranslationConnection.OFFICIAL_BYOK
-                else LLMProviderName.OPENROUTER
-            )
-            if llm_provider == LLMProviderName.OPENROUTER:
-                openrouter_source = OpenRouterCredentialSource.BYOK
-                openrouter_model = OpenRouterLLMModel.GEMINI_FLASH
-                openrouter_alias = OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
         elif model in MANAGED_GEMMA_MODELS:
@@ -5049,9 +5231,72 @@ class SettingsView(ft.Column):
             self._ui_text.update()
         self._emit_settings_changed(LocaleSettingsIntent(value))
 
+    def _build_chatgpt_account_view(self) -> _ChatGptAccountView:
+        title = ft.Text(
+            t("settings.chatgpt_account.title"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        status = ft.Text(
+            "",
+            size=18,
+            color=COLOR_ON_BACKGROUND,
+            visible=False,
+        )
+        email = ft.Text(
+            "",
+            size=20,
+            color=COLOR_ON_BACKGROUND,
+            no_wrap=True,
+            overflow=ft.TextOverflow.ELLIPSIS,
+            visible=False,
+        )
+        connect = self._build_action_button(
+            t("settings.chatgpt_account.connect"),
+            self._on_chatgpt_connect_click,
+            size=20,
+            default_color=COLOR_NEUTRAL_DARK,
+            disabled_color=COLOR_NEUTRAL_DARK,
+        )
+        usage = self._build_action_button(
+            t("settings.chatgpt_account.manage_usage"),
+            self._on_chatgpt_usage_click,
+            size=20,
+        )
+        sign_out = self._build_action_button(
+            t("settings.chatgpt_account.sign_out"),
+            self._on_chatgpt_sign_out_click,
+            size=20,
+        )
+        card = self._wrap_card(
+            ft.Column(
+                [
+                    title,
+                    ft.Container(height=4),
+                    status,
+                    email,
+                    ft.Row(
+                        [
+                            usage,
+                            sign_out,
+                            connect,
+                        ],
+                        alignment=ft.MainAxisAlignment.END,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                ],
+                spacing=8,
+            ),
+            height=None,
+            expand=False,
+        )
+        return _ChatGptAccountView(card, title, status, email, connect, usage, sign_out)
+
     def refresh_chatgpt_account(self) -> None:
         self._sync_chatgpt_account_card()
-        _update_control_if_mounted(self._chatgpt_account_card)
+        for view in self._chatgpt_account_views:
+            _update_control_if_mounted(view.card)
 
     def _sync_chatgpt_account_card(self) -> None:
         intents = getattr(self, "_chatgpt_intents", None)
@@ -5059,34 +5304,29 @@ class SettingsView(ft.Column):
         signed_in = bool(snapshot is not None and snapshot.signed_in)
         in_progress = bool(snapshot is not None and snapshot.in_progress)
         email = snapshot.email if snapshot is not None else None
-        self._chatgpt_account_title.value = t("settings.chatgpt_account.title")
-        self._chatgpt_account_status.value = (
-            t("settings.chatgpt_account.in_progress") if in_progress else ""
-        )
-        self._chatgpt_account_status.visible = in_progress
-        self._chatgpt_account_email.value = (
-            t("settings.chatgpt_account.account_email", email=email)
-            if email
-            else t("settings.chatgpt_account.connected")
-        )
-        self._chatgpt_account_email.visible = signed_in
-        _set_text_button_label(
-            self._chatgpt_usage_button, t("settings.chatgpt_account.manage_usage")
-        )
-        _set_text_button_label(
-            self._chatgpt_sign_out_button, t("settings.chatgpt_account.sign_out")
-        )
-        _set_text_button_label(
-            self._chatgpt_connect_button,
-            t(
-                "settings.chatgpt_account.reopen"
-                if in_progress
-                else "settings.chatgpt_account.connect"
-            ),
-        )
-        self._chatgpt_connect_button.visible = not signed_in
-        self._chatgpt_usage_button.visible = signed_in
-        self._chatgpt_sign_out_button.visible = signed_in
+        for view in self._chatgpt_account_views:
+            view.title.value = t("settings.chatgpt_account.title")
+            view.status.value = t("settings.chatgpt_account.in_progress") if in_progress else ""
+            view.status.visible = in_progress
+            view.email.value = (
+                t("settings.chatgpt_account.account_email", email=email)
+                if email
+                else t("settings.chatgpt_account.connected")
+            )
+            view.email.visible = signed_in
+            _set_text_button_label(view.usage, t("settings.chatgpt_account.manage_usage"))
+            _set_text_button_label(view.sign_out, t("settings.chatgpt_account.sign_out"))
+            _set_text_button_label(
+                view.connect,
+                t(
+                    "settings.chatgpt_account.reopen"
+                    if in_progress
+                    else "settings.chatgpt_account.connect"
+                ),
+            )
+            view.connect.visible = not signed_in
+            view.usage.visible = signed_in
+            view.sign_out.visible = signed_in
 
     def _on_chatgpt_connect_click(self, _e) -> None:
         intents = getattr(self, "_chatgpt_intents", None)
@@ -5814,8 +6054,8 @@ class SettingsView(ft.Column):
         self._desktop_overlay_reason_text.value = ""
         self._desktop_overlay_helper_text.visible = False
         self._desktop_overlay_helper_text.value = ""
-        self._desktop_overlay_view_logs_action.visible = False
-        self._desktop_overlay_view_logs_action.disabled = False
+        self._desktop_overlay_open_agent_action.visible = False
+        self._desktop_overlay_open_agent_action.disabled = False
 
         if state == "failed":
             self._desktop_overlay_status_title.value = t("settings.overlay.desktop.status.failed")
@@ -5835,7 +6075,7 @@ class SettingsView(ft.Column):
                 action_kind=action_kind,
                 visible=True,
             )
-            self._desktop_overlay_view_logs_action.visible = True
+            self._desktop_overlay_open_agent_action.visible = True
         else:
             self._set_desktop_overlay_primary_action(
                 label_key=None,
@@ -6013,10 +6253,10 @@ class SettingsView(ft.Column):
         elif action_kind in {"retry", "reopen"} and self.on_desktop_overlay_recovery_action:
             self.on_desktop_overlay_recovery_action(action_kind)
 
-    def _on_desktop_overlay_view_logs(self, e) -> None:
+    def _on_desktop_overlay_open_agent(self, e) -> None:
         _ = e
-        if self.on_view_logs:
-            self.on_view_logs()
+        if self.on_open_agent:
+            self.on_open_agent()
 
     def set_overlay_calibration(
         self,
@@ -6756,6 +6996,10 @@ class SettingsView(ft.Column):
         self._osc_connection_title.value = t("settings.osc.connection.title")
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
+        self._photo_enabled_title.value = t("settings.photo.enabled.title")
+        self._photo_route_title.value = t("settings.photo.route.title")
+        self._photo_remaining_title.value = t("settings.photo.remaining.title")
+        self._photo_delete_title.value = t("settings.photo.delete_translated.title")
         self._telemetry_enabled_title.value = t("settings.telemetry.title")
         self._activation_notice_title.value = t("settings.activation_notice.title")
         self._sync_activation_notice_card()
@@ -6870,6 +7114,8 @@ class SettingsView(ft.Column):
             )
             if self._general_snapshot is not None:
                 self._sync_telemetry_enabled_card(self._general_snapshot)
+            self._sync_photo_setting_cards()
+            self._sync_photo_status_cards()
             self._set_unit_card_value_text(
                 self._audio_test_text,
                 t("settings.audio_test.action"),
@@ -6885,10 +7131,10 @@ class SettingsView(ft.Column):
 
         # Components
         self._deepgram_key.apply_locale()
-        self._gemini_transcribe_key.apply_locale()
+        self._gemini_key.apply_locale()
+        self._photo_gemini_key.apply_locale()
         self._elevenlabs_scribe_key.apply_locale()
         self._soniox_key.apply_locale()
-        self._google_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._openai_key.apply_locale()

@@ -16,6 +16,9 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from puripuly_heart.core.diagnostics import exception_diagnostics
 
+_GEMINI_API_KEY = "gemini_api_key"
+_GEMINI_LEGACY_KEYS = ("gemini_transcribe_api_key", "google_api_key")
+
 
 class SecretStore(Protocol):
     def get(self, key: str) -> str | None: ...
@@ -70,6 +73,18 @@ class KeyringSecretStore:
                 raise
             raise
 
+    def _migrate_gemini_api_key(self) -> None:
+        values = {key: self.get(key) for key in (_GEMINI_API_KEY, *_GEMINI_LEGACY_KEYS)}
+        selected = values[_GEMINI_API_KEY] or values["gemini_transcribe_api_key"]
+        if selected:
+            if not values[_GEMINI_API_KEY]:
+                self.set(_GEMINI_API_KEY, selected)
+            if self.get(_GEMINI_API_KEY) != selected:
+                raise ValueError("secret migration canonical write not retained")
+        for key in _GEMINI_LEGACY_KEYS:
+            if values[key] is not None and self.get(key) == values[key]:
+                self.delete(key)
+
 
 def mask_secret(value: str, *, unmasked_prefix: int = 3) -> str:
     if not value:
@@ -105,11 +120,7 @@ class EncryptedFileSecretStore:
             token = self._read()["items"].get(key)
             if token is None:
                 return None
-            try:
-                plaintext = self._fernet.decrypt(token.encode("ascii"))
-            except InvalidToken as exc:
-                raise ValueError("invalid passphrase or corrupted secrets file") from exc
-            return plaintext.decode("utf-8")
+            return self._decrypt(token)
 
     def set(self, key: str, value: str) -> None:
         token = self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
@@ -124,6 +135,32 @@ class EncryptedFileSecretStore:
             if key in raw["items"]:
                 del raw["items"][key]
                 _atomic_write_json(self.path, raw)
+
+    def _migrate_gemini_api_key(self) -> None:
+        with _secret_file_lock(self.path):
+            raw = self._read()
+            values = {}
+            for key in (_GEMINI_API_KEY, *_GEMINI_LEGACY_KEYS):
+                token = raw["items"].get(key)
+                values[key] = self._decrypt(token) if token is not None else None
+            selected = values[_GEMINI_API_KEY] or values["gemini_transcribe_api_key"]
+            if selected and not values[_GEMINI_API_KEY]:
+                raw["items"][_GEMINI_API_KEY] = self._fernet.encrypt(
+                    selected.encode("utf-8")
+                ).decode("ascii")
+                _atomic_write_json(self.path, raw)
+            obsolete = [key for key in _GEMINI_LEGACY_KEYS if key in raw["items"]]
+            if obsolete:
+                for key in obsolete:
+                    del raw["items"][key]
+                _atomic_write_json(self.path, raw)
+
+    def _decrypt(self, token: str) -> str:
+        try:
+            plaintext = self._fernet.decrypt(token.encode("ascii"))
+        except InvalidToken as exc:
+            raise ValueError("invalid passphrase or corrupted secrets file") from exc
+        return plaintext.decode("utf-8")
 
     def _read(self) -> dict[str, Any]:
         raw = json.loads(self.path.read_text(encoding="utf-8"))

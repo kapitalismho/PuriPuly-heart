@@ -426,6 +426,11 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
+        "providers/photo.py",
+        {"_PhotoConnection.stream": 1, "_PhotoConnection.close": 1},
+        "Photo connections retain one stream producer and one transport-close task; explicit iterator close and connection close cancel or shield-drain both through repeated caller cancellation before releasing image transport resources",
+    ),
+    *_reviews(
         "providers/llm/chatgpt_plan.py",
         {
             "ChatGptPlanLLMProvider._maintain": 1,

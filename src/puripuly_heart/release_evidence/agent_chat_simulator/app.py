@@ -42,12 +42,11 @@ from .scenarios import Scenario
 KEY_FIELDS = {
     "deepgram": "deepgram_api_key",
     "soniox": "soniox_api_key",
-    "gemini_transcribe": "gemini_transcribe_api_key",
+    "gemini": "gemini_api_key",
     "elevenlabs_scribe": "elevenlabs_scribe_api_key",
     "deepseek": "deepseek_api_key",
     "openrouter": "openrouter_api_key",
     "openai": "openai_api_key",
-    "google": "google_api_key",
     "alibaba_beijing": "alibaba_api_key_beijing",
     "alibaba_singapore": "alibaba_api_key_singapore",
 }
@@ -246,8 +245,8 @@ class ScenarioApp:
                 account_exists=True, credit=True, authorization_return="failed"
             )
         if scenario.cause == "signup_deepgram":
-            self.accounts["gemini_transcribe"] = self.new_account("gemini_transcribe")
-            self.accounts["gemini_transcribe"].update(account_exists=True, signed_in=True)
+            self.accounts["gemini"] = self.new_account("gemini")
+            self.accounts["gemini"].update(account_exists=True, signed_in=True)
         if scenario.cause == "internal_error":
             self.add_diagnostic("translation.internal_error", "internal")
         if scenario.cause == "managed_damaged":
@@ -402,8 +401,8 @@ class ScenarioApp:
             provider
             for provider in ROLLING_MEMBERS
             if provider in enabled
-            and self.presence[KEY_FIELDS[provider]]
-            and provider in self.verified
+            and self.presence[KEY_FIELDS[self.credential_provider(provider)]]
+            and self.credential_provider(provider) in self.verified
         ]
 
     def recognition_ready(self, channel: str = "self") -> bool:
@@ -424,7 +423,7 @@ class ScenarioApp:
     def credential_provider(self, provider: str) -> str:
         if provider in {"qwen", "qwen_audio"}:
             return "alibaba_" + self.intent["translation"]["qwen"]["region"]
-        return "google" if provider == "gemini" else provider
+        return "gemini" if provider == "gemini_transcribe" else provider
 
     def translation_ready(self) -> bool:
         selection = self.intent["translation"]
@@ -788,7 +787,7 @@ class ScenarioApp:
         return {
             "account_exists": (
                 provider in self.scenario.persona.existing_accounts
-                or provider in {"google", "gemini_transcribe"}
+                or provider == "gemini"
                 and "google" in self.scenario.persona.existing_accounts
             ),
             "signed_in": False,
@@ -797,8 +796,7 @@ class ScenarioApp:
             "credit": False,
             "access_enabled": provider != "deepgram",
             "region_eligible": not (
-                provider in {"google", "gemini_transcribe"}
-                and self.scenario.cause == "signup_deepgram"
+                provider == "gemini" and self.scenario.cause == "signup_deepgram"
             ),
             "billing": "free",
             "authorization_return": "not_started",
@@ -920,10 +918,7 @@ class ScenarioApp:
                     "label": "Sign in" if account["account_exists"] else "Sign up",
                 }
             ]
-        elif (
-            provider in {"google", "gemini_transcribe", "deepgram"}
-            and not account["project_exists"]
-        ):
+        elif provider in {"gemini", "deepgram"} and not account["project_exists"]:
             stage, title = "account", "Create a project"
             controls = [{"id": "create_project", "label": "Create free project; no payment method"}]
         elif not account["key_issued"]:
@@ -1368,11 +1363,7 @@ class ScenarioApp:
             )
             if before["translation"] != self.intent["translation"]:
                 selection = self.intent["translation"]
-                paid |= (
-                    selection["connection"] in {"openrouter", "official_byok"}
-                    and provider_llm_for_translation(selection["model"], selection["connection"])
-                    != "gemini"
-                )
+                paid |= selection["connection"] in {"openrouter", "official_byok"}
             approval = operation["approval"]
             approved_exact = (
                 approval is not None
@@ -1914,7 +1905,7 @@ class ScenarioApp:
                     and provider in self.eligible_rolling_members()
                 )
                 and self.recognition_ready()
-                and self.signup_completed(provider)
+                and self.signup_completed(self.credential_provider(provider))
                 and current["usable_recognition"] is not None
                 and (not self.translation_enabled or current["translation"] is not None)
             )

@@ -24,7 +24,6 @@ _MANAGED_OPENROUTER_CONNECTIONS = frozenset({"managed", "managed_china"})
 
 def llm_provider_requires_secret(translation_model: str, provider: str) -> bool:
     return translation_model != "custom_http" and provider in {
-        "gemini",
         "openai",
         "chatgpt",
         "openrouter",
@@ -65,7 +64,6 @@ def build_llm_provider_signature(
         extension_signature,
         provider_llm,
         translation.concurrency_limit,
-        translation.gemini.llm_model if provider_llm == "gemini" else None,
         OPENAI_MODEL_GPT_6_LUNA if provider_llm in {PROVIDER_OPENAI, PROVIDER_CHATGPT} else None,
         translation.openrouter_model if primary_uses_openrouter else None,
         translation.openrouter_routing_mode if uses_openrouter else None,

@@ -59,9 +59,9 @@ interface DailyReportDeliveryClaim {
   leaseToken: string;
 }
 
-interface DailyReportDeliveryRow {
-  report_date_utc: string;
-  status: 'pending' | 'delivered';
+interface DailyReportProgressRow {
+  pending_date_utc: string | null;
+  last_delivered_date_utc: string | null;
 }
 
 export async function handleScheduled(
@@ -102,7 +102,9 @@ export async function handleScheduled(
     await runScheduledPhase(failures, () => runDailyReport(env, now));
   }
 
-  await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  if (now.getUTCMinutes() === 0) {
+    await runScheduledPhase(failures, () => applyScheduledRetention(env.BROKER_DB, now));
+  }
   throwFirstScheduledFailure(failures);
 }
 
@@ -194,6 +196,7 @@ export async function reconcileStaleManagedKeyDeliveries(
       continue;
     }
     if (delivery.operation_id && delivery.attempt_index) continue;
+    if (delivery.issue_source === 'photo') continue;
     const claimed = await claimStaleManagedKeyDeliveryCleanup(env.BROKER_DB, {
       delivery,
       claimedAt: nowIso,
@@ -583,22 +586,23 @@ function isDailyReportScheduleDue(
 export async function runDailyReport(
   env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
   now: Date,
-): Promise<{ ok: true; payload: DailyReportPayload; sent: boolean }> {
+): Promise<
+  | { ok: true; payload: DailyReportPayload; sent: true }
+  | { ok: true; payload: null; sent: false }
+> {
   const reportDateUtc = await resolveNextDailyReportDate(env.BROKER_DB, now);
-  const payload = await buildDailySummaryPacketForDate(
-    env.BROKER_DB,
-    reportDateUtc,
-  );
   const claim = await claimDailyReportDelivery(
     env.BROKER_DB,
-    payload.report_date_utc,
+    reportDateUtc,
     now,
   );
   if (!claim) {
-    return { ok: true, payload, sent: false };
+    return { ok: true, payload: null, sent: false };
   }
 
+  let payload: DailyReportPayload;
   try {
+    payload = await buildDailySummaryPacketForDate(env.BROKER_DB, reportDateUtc);
     await sendDailyReport(env.DISCORD_DAILY_REPORT_WEBHOOK_URL, payload);
   } catch (error) {
     await releaseDailyReportDelivery(env.BROKER_DB, claim, now);
@@ -666,21 +670,26 @@ async function resolveNextDailyReportDate(
   now: Date,
 ): Promise<string> {
   const latestCompletedDateUtc = resolveDailyReportWindow(now).reportDateUtc;
-  const rows = await db
+  const progress = await db
     .prepare(
-      `SELECT report_date_utc, status
-         FROM broker_daily_summary_deliveries
-        WHERE report_date_utc <= ?
-        ORDER BY report_date_utc`,
+      `SELECT (
+         SELECT report_date_utc
+           FROM broker_daily_summary_deliveries
+          WHERE status = 'pending' AND report_date_utc <= ?
+          ORDER BY report_date_utc
+          LIMIT 1
+       ) AS pending_date_utc, (
+         SELECT report_date_utc
+           FROM broker_daily_summary_deliveries
+          WHERE status = 'delivered' AND report_date_utc <= ?
+          ORDER BY report_date_utc DESC
+          LIMIT 1
+       ) AS last_delivered_date_utc`,
     )
-    .bind(latestCompletedDateUtc)
-    .all<DailyReportDeliveryRow>();
-  const pendingDateUtc = rows.results.find(
-    (row) => row.status === 'pending',
-  )?.report_date_utc;
-  const lastDeliveredDateUtc = rows.results
-    .filter((row) => row.status === 'delivered')
-    .at(-1)?.report_date_utc;
+    .bind(latestCompletedDateUtc, latestCompletedDateUtc)
+    .first<DailyReportProgressRow>();
+  const pendingDateUtc = progress?.pending_date_utc;
+  const lastDeliveredDateUtc = progress?.last_delivered_date_utc;
   const nextAfterDeliveredUtc = lastDeliveredDateUtc
     ? addUtcDays(lastDeliveredDateUtc, 1)
     : null;

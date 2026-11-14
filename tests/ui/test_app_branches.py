@@ -82,8 +82,8 @@ def _vnext(
 ) -> AppSettingsVNext:
     current = AppSettingsVNext()
     translation = current.intent.translation
-    if llm == "gemini":
-        model = model or "gemini_flash"
+    if llm == "openai":
+        model = model or "gpt_6_luna"
         connection = connection or "official_byok"
     elif llm == "local_llm":
         model = model or "local_llm"
@@ -739,6 +739,10 @@ class ConstructionDummyController:
     def clear_debug_audio_fault_profiles(self) -> None:
         self.audio_faults_cleared = True
 
+    def toggle_debug_photo_limited(self) -> bool:
+        self.photo_limited = not getattr(self, "photo_limited", False)
+        return self.photo_limited
+
     def _save_settings(self) -> None:
         return None
 
@@ -829,7 +833,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_desktop_overlay_size_change = overlay.desktop_overlay_size_change
         self.on_desktop_overlay_recovery_action = overlay.desktop_overlay_recovery_action
         self.on_desktop_overlay_position_reset = overlay.desktop_overlay_position_reset
-        self.on_view_logs = overlay.view_logs
+        self.on_open_agent = overlay.open_agent
         self.on_overlay_calibration_begin = overlay.calibration_begin
         self.on_overlay_calibration_change = overlay.calibration_change
         self.on_overlay_calibration_apply = overlay.calibration_apply
@@ -852,25 +856,6 @@ class ConstructionDummySettingsView(ft.Container):
 
     def refresh_prompt_if_empty(self) -> None:
         return None
-
-
-class ConstructionDummyLogsView(ft.Container):
-    conversation_records = ()
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def apply_locale(self) -> None:
-        return None
-
-    async def scroll_to_bottom(self) -> None:
-        return None
-
-    def log_basic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-        _ = (message, level)
-
-    def log_diagnostic(self, message: str, *, level: int = app_module.logging.INFO) -> None:
-        _ = (message, level)
 
 
 _construction_backends: list[ConstructionDummyController] = []
@@ -899,7 +884,6 @@ def _construction_application_factory(
 def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "DashboardView", ConstructionDummyDashboardView)
     monkeypatch.setattr(app_module, "SettingsView", ConstructionDummySettingsView)
-    monkeypatch.setattr(app_module, "LogsView", ConstructionDummyLogsView)
     monkeypatch.setattr(app_module, "AboutView", lambda: ft.Container())
     monkeypatch.setattr(
         app_module,
@@ -960,7 +944,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_settings.on_desktop_overlay_position_reset == (
         app._on_desktop_overlay_position_reset
     )
-    assert app.view_settings.on_view_logs == app._open_agent_tab
+    assert app.view_settings.on_open_agent == app._open_agent_tab
     assert app.view_settings.runtime_log_basic == app.application.log_basic
     assert isinstance(app.application, UiApplicationBoundary)
     assert app.application is app._ui_application
@@ -1407,6 +1391,7 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_audio_fault_clear",
         "on_gpu_state_cycle",
         "on_stt_loading_button_cycle",
+        "on_photo_limited_toggle",
     }
     preview_calls: list[bool] = []
     monkeypatch.setattr(
@@ -1548,6 +1533,12 @@ def test_debug_preview_panel_wires_audio_fault_actions(monkeypatch) -> None:
         "debug_preview.stt_fault_snackbar", profile="stt_input_low_snr_vad_pass"
     )
     assert snackbars[2][0] == app_module.t("debug_preview.audio_fault_clear")
+    captured_kwargs["on_photo_limited_toggle"]()
+    assert backend.photo_limited is True
+    assert snackbars[3][0] == app_module.t("debug_preview.photo_limited_on")
+    captured_kwargs["on_photo_limited_toggle"]()
+    assert backend.photo_limited is False
+    assert snackbars[4][0] == app_module.t("debug_preview.photo_limited_off")
 
 
 def test_debug_audio_fault_actions_do_not_call_persistence_or_providers(monkeypatch) -> None:
@@ -2955,7 +2946,6 @@ def test_gpu_provider_selection_alone_does_not_start_install() -> None:
     app.page = DummyPage()
     app._current_tab = 2
     app.view_dashboard = object()
-    app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
     app.view_settings = SimpleNamespace(
         has_provider_changes=True,
@@ -3363,7 +3353,6 @@ def test_on_nav_change_closes_open_dialog_before_switching_tabs() -> None:
         has_provider_changes=False,
         refresh_prompt_if_empty=lambda: None,
     )
-    app.view_logs = SimpleNamespace(scroll_to_bottom=lambda: asyncio.sleep(0))
     app.view_about = object()
     app.content_area = RecordingContent(app.view_dashboard)
     controller = SimpleNamespace(apply_providers=lambda _settings=None: asyncio.sleep(0))
@@ -3386,7 +3375,6 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     view_calls: list[str] = []
     app.view_dashboard = SimpleNamespace(apply_locale=lambda: view_calls.append("dash"))
     app.view_settings = SimpleNamespace(apply_locale=lambda: view_calls.append("settings"))
-    app.view_logs = SimpleNamespace(apply_locale=lambda: view_calls.append("logs"))
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
     monkeypatch.setattr(app_module, "font_for_language", lambda _code: "font")
     monkeypatch.setattr(app_module, "get_locale", lambda: "en")
@@ -3394,7 +3382,7 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     app.apply_locale()
 
     assert app.page.title == app_module.t("app.title")
-    assert view_calls == ["dash", "settings", "logs"]
+    assert view_calls == ["dash", "settings"]
     assert app.page.updated == 1
 
 
@@ -3495,7 +3483,7 @@ async def test_local_llm_secret_changed_ignores_non_local_llm_provider() -> None
     ) -> None:
         calls.append(force_rebuild_llm)
 
-    settings = _vnext(llm="gemini")
+    settings = _vnext(llm="openai")
     controller = SimpleNamespace(settings=settings, apply_providers=fake_apply_providers)
     app._ui_application = compose_test_ui_application_boundary(controller)
 
@@ -3665,7 +3653,7 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         api_key_verified=SimpleNamespace(
             deepgram=False,
             soniox=False,
-            google=False,
+            gemini=False,
             openrouter=False,
             deepseek=False,
             alibaba_beijing=False,
@@ -3687,15 +3675,15 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
     app._ui_application = compose_test_ui_application_boundary(controller)
 
     deepgram_result = await app._on_verify_api_key("deepgram", "k")
-    google_result = await app._on_verify_api_key("google", "k")
+    gemini_result = await app._on_verify_api_key("gemini", "k")
     openrouter_result = await app._on_verify_api_key("openrouter", "k")
     deepseek_result = await app._on_verify_api_key("deepseek", "k")
 
     assert deepgram_result == ProviderCredentialVerificationOutcome(
         status="verified", provider="deepgram", error_text="ok"
     )
-    assert google_result == ProviderCredentialVerificationOutcome(
-        status="failed", provider="google", error_text="ok"
+    assert gemini_result == ProviderCredentialVerificationOutcome(
+        status="failed", provider="gemini", error_text="ok"
     )
     assert openrouter_result == ProviderCredentialVerificationOutcome(
         status="failed", provider="openrouter", error_text="ok"
@@ -3704,10 +3692,10 @@ async def test_on_verify_api_key_persists_and_updates_dashboard_flags(
         status="verified", provider="deepseek", error_text="ok"
     )
     assert settings.api_key_verified.deepgram is True
-    assert settings.api_key_verified.google is False
+    assert settings.api_key_verified.gemini is False
     assert settings.api_key_verified.openrouter is False
     assert settings.api_key_verified.deepseek is True
-    assert app.view_dashboard.stt_calls[-1] == (False, False)
+    assert app.view_dashboard.stt_calls[-1] == (True, False)
     assert app.view_dashboard.trans_calls[-1] == (False, False)
     assert len(saves) == 4
 
@@ -3717,7 +3705,7 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app = TranslatorApp.__new__(TranslatorApp)
-    app.view_settings = SimpleNamespace(_google_key=SimpleNamespace(value="new-key"))
+    app.view_settings = SimpleNamespace(_gemini_key=SimpleNamespace(value="new-key"))
     app.view_dashboard = SimpleNamespace(
         stt_calls=[],
         trans_calls=[],
@@ -3730,14 +3718,14 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     )
 
     async def fake_verify(provider: str, key: str):
-        assert (provider, key) == ("google", "old-key")
+        assert (provider, key) == ("gemini", "old-key")
         return ProviderCredentialVerificationOutcome(
             status="verified", provider=provider, error_text="ok"
         )
 
     settings = SimpleNamespace(
         api_key_verified=SimpleNamespace(
-            google=False,
+            gemini=False,
         )
     )
     saves: list[tuple[str, str, bool]] = []
@@ -3751,12 +3739,12 @@ async def test_on_verify_api_key_skips_persistence_for_stale_field_value(
     )
     app._ui_application = compose_test_ui_application_boundary(controller)
 
-    result = await app._on_verify_api_key("google", "old-key")
+    result = await app._on_verify_api_key("gemini", "old-key")
 
     assert result == ProviderCredentialVerificationOutcome(
-        status="verified", provider="google", error_text="ok"
+        status="verified", provider="gemini", error_text="ok"
     )
-    assert settings.api_key_verified.google is False
+    assert settings.api_key_verified.gemini is False
     assert saves == []
     assert app.view_dashboard.stt_calls == []
     assert app.view_dashboard.trans_calls == []

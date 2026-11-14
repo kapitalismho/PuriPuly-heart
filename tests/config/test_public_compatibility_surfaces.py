@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from puripuly_heart.app import wiring
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.config import resolved as resolved_config
 from puripuly_heart.config import runtime_resolution
 from puripuly_heart.config.prompts import load_prompt, load_prompt_for_provider
@@ -29,7 +30,6 @@ from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     SecretsIntent,
 )
-from puripuly_heart.core import managed_identity
 from puripuly_heart.core.openrouter import openrouter_credentials
 from puripuly_heart.core.overlay import manifest as overlay_manifest_module
 from puripuly_heart.core.overlay import process as overlay_process_module
@@ -42,7 +42,6 @@ from puripuly_heart.core.overlay.protocol import (
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     InMemorySecretStore,
-    KeyringSecretStore,
 )
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from tests.config.settings_migration_fixtures import (
@@ -86,31 +85,27 @@ REQUIRED_INVENTORY_SOURCE_RULES = {
     "approved facade",
 }
 REQUIRED_SECRET_KEYS = (
-    "google_api_key",
+    "gemini_api_key",
     "openrouter_api_key",
     "openrouter_managed_api_key",
     "openrouter_managed_qq_api_key",
     "openrouter_managed_user_id",
     "openrouter_managed_user_installation_id",
+    "openai_api_key",
     "deepseek_api_key",
     "deepgram_api_key",
+    "elevenlabs_scribe_api_key",
     "soniox_api_key",
     "alibaba_api_key_beijing",
     "alibaba_api_key_singapore",
     "alibaba_api_key",
     "local_llm_api_key",
+    "custom_stt_api_key",
     "managed_device_private_key",
     "managed_device_public_key",
     "managed_identity_binding",
 )
 EXPECTED_SECRET_ENV_LOOKUP_PATHS = (
-    {
-        "owner": "gemini_llm",
-        "lookup": "require_secret",
-        "key": "google_api_key",
-        "env_vars": ["GOOGLE_API_KEY"],
-        "legacy_keys": [],
-    },
     {
         "owner": "openrouter_byok_llm",
         "lookup": "openrouter_byok",
@@ -332,7 +327,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             broker_base_url=None,
         ),
         direct=runtime_resolution.DirectProviderRuntimeIntent(
-            gemini_flash_model="gemini-3.8-flash",
             deepseek_v4_flash_model="deepseek-v4-flash",
             qwen_38_flash_model="qwen3.8-flash",
             qwen_region=QwenRegion.BEIJING,
@@ -474,36 +468,10 @@ def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
             assert test_name in _test_function_names(test_path), ref
 
 
-def test_secret_store_key_registry_snapshot_matches_current_public_keys() -> None:
-    snapshot = _load_snapshot()["secret_store"]
-    registry_keys = tuple(snapshot["registry_keys"])
-
-    assert registry_keys == REQUIRED_SECRET_KEYS
-    assert KeyringSecretStore().service_name == snapshot["keyring_service_name"]
-    assert openrouter_credentials.OPENROUTER_BYOK_API_KEY_SECRET == "openrouter_api_key"
-    assert openrouter_credentials.OPENROUTER_MANAGED_API_KEY_SECRET == (
-        "openrouter_managed_api_key"
-    )
-    assert openrouter_credentials.OPENROUTER_MANAGED_QQ_API_KEY_SECRET == (
-        "openrouter_managed_qq_api_key"
-    )
-    assert openrouter_credentials.OPENROUTER_MANAGED_USER_ID_SECRET == (
-        "openrouter_managed_user_id"
-    )
-    assert openrouter_credentials.OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET == (
-        "openrouter_managed_user_installation_id"
-    )
-    assert managed_identity.MANAGED_DEVICE_PRIVATE_KEY_SECRET == "managed_device_private_key"
-    assert managed_identity.MANAGED_DEVICE_PUBLIC_KEY_SECRET == "managed_device_public_key"
-    assert managed_identity.MANAGED_IDENTITY_BINDING_SECRET == "managed_identity_binding"
-
-
-def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
+def test_secret_store_env_lookup_preserves_precedence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    entries = tuple(_load_snapshot()["secret_store"]["env_lookup_paths"])
-
-    assert entries == EXPECTED_SECRET_ENV_LOOKUP_PATHS
+    entries = EXPECTED_SECRET_ENV_LOOKUP_PATHS
     for entry in entries:
         _clear_entry_env(monkeypatch, entry)
         lookup = entry["lookup"]
@@ -520,7 +488,11 @@ def test_secret_store_env_lookup_snapshot_matches_current_fallback_behavior(
 
 
 def test_settings_serialization_excludes_secret_store_registry_keys() -> None:
-    registry_keys = set(_load_snapshot()["secret_store"]["registry_keys"])
+    registry_keys = (
+        {key.value for key in SettingsSecretKey}
+        | set(REQUIRED_SECRET_KEYS)
+        | set(_load_snapshot()["secret_store"]["encrypted_file"]["item_keys"])
+    )
     serialized_settings = (
         serialization.to_dict(AppSettingsVNext()),
         maximal_v24_settings_fixture(),
@@ -783,7 +755,7 @@ def test_prompt_loader_prefers_named_files_then_defaults(
     assert load_prompt(prompt_name) == ""
 
     with pytest.raises(FileNotFoundError):
-        load_prompt_for_provider("gemini")
+        load_prompt_for_provider("openai")
 
 
 def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() -> None:

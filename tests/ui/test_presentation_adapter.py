@@ -10,6 +10,7 @@ from puripuly_heart.app.services.settings.settings_application import (
     settings_view_surface_snapshots,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.ui.event_bridge import UIEventBridge
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.osc_presentation import osc_control_presentation_state
@@ -53,11 +54,11 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
         set_managed_key_state=lambda **kwargs: events.append(("managed-key", kwargs)),
         set_overlay_peer_contract=lambda value: events.append(("settings-overlay-contract", value)),
     )
-    logs = SimpleNamespace(append_conversation_record=lambda **kwargs: None)
+    logs = ConversationHistory()
     host = SimpleNamespace(
         view_dashboard=dashboard,
         view_settings=settings,
-        view_logs=logs,
+        conversation_history=logs,
         debug_ui_preview=True,
         refresh_overlay_peer_contract=lambda: events.append(("refresh",)),
         apply_locale=lambda: events.append(("locale",)),
@@ -79,7 +80,7 @@ def test_presentation_adapter_exposes_only_named_destinations_and_events() -> No
 
     assert not hasattr(adapter, "view_dashboard")
     assert not hasattr(adapter, "view_settings")
-    assert not hasattr(adapter, "view_logs")
+    assert not hasattr(adapter, "conversation_history")
     assert adapter.debug_ui_preview is True
     assert adapter.get_event_language_codes() == ("ko", "en")
     assert adapter.is_event_translation_enabled() is True
@@ -161,11 +162,11 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
         set_local_cpu_auto_available=lambda value: events.append(("cpu-auto", value)),
         set_managed_key_state=lambda **kwargs: events.append(("managed-key", kwargs)),
     )
-    logs = SimpleNamespace(append_conversation_record=lambda **kwargs: None)
+    logs = ConversationHistory()
     host = SimpleNamespace(
         view_dashboard=dashboard,
         view_settings=settings,
-        view_logs=logs,
+        conversation_history=logs,
         get_event_language_codes=lambda: ("ko", "en"),
         is_event_translation_enabled=lambda: True,
         get_event_stt_state=lambda: "listening",
@@ -176,7 +177,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     )
     adapter = FletUiPresentationAdapter(host)
     runtime_logging = SimpleNamespace(
-        attach_realtime_sink=lambda sink: events.append(("log-sink", sink))
+        set_conversation_history_observer=lambda observer: events.append(("history", observer))
     )
     provider, general, prompt, overlay = settings_view_surface_snapshots(AppSettingsVNext())
     calibration = object()
@@ -184,7 +185,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     gemma_notice = object()
     devices = (object(),)
 
-    adapter.attach_runtime_log_sink(runtime_logging)
+    adapter.bind_conversation_history(runtime_logging)
     adapter.set_dashboard_translation_enabled(True)
     adapter.set_dashboard_stt_enabled(True)
     adapter.set_dashboard_translation_needs_key(False)
@@ -239,7 +240,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
     )
 
     assert adapter.dashboard_translation_enabled() is False
-    assert ("log-sink", logs) in events
+    assert ("history", logs.observe_conversation) in events
     assert ("translation-enabled", True) in events
     assert ("peer-key", True) in events
     assert ("gpu-devices", {"devices": devices}) in events
@@ -275,7 +276,7 @@ def test_presentation_adapter_projects_semantic_dashboard_and_settings_outputs(
 def test_presentation_adapter_owns_ui_event_bridge_composition() -> None:
     host = SimpleNamespace(
         view_dashboard=SimpleNamespace(),
-        view_logs=SimpleNamespace(),
+        conversation_history=SimpleNamespace(),
         get_event_language_codes=lambda: ("ko", "en"),
         is_event_translation_enabled=lambda: True,
         get_event_stt_state=lambda: None,

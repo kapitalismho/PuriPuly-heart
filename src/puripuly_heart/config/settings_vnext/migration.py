@@ -114,7 +114,7 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
             _migrate_retired_cerebras_translation(translation)
         if migrate_managed_gemma_12b_retirement:
             _migrate_retired_managed_gemma_12b_translation(translation)
-        _migrate_gemini_3_flash_translation(translation)
+        _migrate_retired_gemini_translation(translation)
         _migrate_qwen_35_plus_translation(translation)
         _migrate_legacy_openrouter_model_translation(translation)
         if migrate_translation_fallback_retirement:
@@ -360,7 +360,7 @@ def _shared_default_prompt() -> str:
     from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.config.provider_values import LLMProviderName
 
-    return load_prompt_for_provider(LLMProviderName.GEMINI.value)
+    return load_prompt_for_provider(LLMProviderName.OPENROUTER.value)
 
 
 def _stored_system_prompt(data: Mapping[str, Any]) -> str:
@@ -499,43 +499,49 @@ def _migrate_retired_managed_gemma_12b_translation(translation: dict[str, Any]) 
             history["managed_gemma"] = "gpu"
 
 
-def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
-    legacy_models = {
+def _migrate_retired_gemini_translation(translation: dict[str, Any]) -> None:
+    retired_models = {
+        "gemini",
+        "gemini_flash",
         "gemini3_flash",
         "gemini31_flash_lite",
-        "gemini-3.1-flash-lite",
         "gemini37_flash",
-    }
-    if translation.get("model") in legacy_models:
-        translation["model"] = "gemini_flash"
-    if translation.get("previous_llm_model") in legacy_models:
-        translation["previous_llm_model"] = "gemini_flash"
-    gemini = translation.get("gemini")
-    if isinstance(gemini, dict) and gemini.get("llm_model") in {
         "gemini-3-flash",
         "gemini-3-flash-preview",
         "gemini-3.1-flash-lite",
         "gemini-3.7-flash",
-    }:
-        gemini["llm_model"] = "gemini-3.8-flash"
-    if translation.get("openrouter_model") in {
-        "google/gemini-3-flash-preview",
-        "google/gemini-3.1-flash-lite",
-        "google/gemini-3.7-flash",
-    }:
-        translation["openrouter_model"] = "google/gemini-3.8-flash"
-    if translation.get("openrouter_selection_alias") in {
-        "gemini3_flash_byok",
-        "gemini31_flash_lite_byok",
-        "gemini37_flash_byok",
-    }:
-        translation["openrouter_selection_alias"] = "gemini_flash_byok"
+        "gemini-3.8-flash",
+    }
+    retired_primary = translation.get("model") in retired_models
+    retired_openrouter = (
+        isinstance(translation.get("openrouter_model"), str)
+        and translation["openrouter_model"].strip().startswith("google/gemini-")
+    ) or (
+        isinstance(translation.get("openrouter_selection_alias"), str)
+        and "gemini" in translation["openrouter_selection_alias"]
+    )
+    if retired_primary:
+        translation["model"] = "gemma4_26b_31b"
+        translation["connection"] = "managed"
+    if translation.get("previous_llm_model") in retired_models:
+        translation["previous_llm_model"] = "gemma4_26b_31b"
     history = translation.get("connection_history")
     if isinstance(history, dict):
-        for legacy_model in legacy_models:
-            if legacy_model in history:
-                history.setdefault("gemini_flash", history[legacy_model])
-                history.pop(legacy_model, None)
+        had_retired_history = any(model in history for model in retired_models)
+        for model in retired_models:
+            history.pop(model, None)
+        if retired_primary:
+            history["gemma4_26b_31b"] = "managed"
+        elif had_retired_history:
+            history.setdefault("gemma4_26b_31b", "managed")
+    if retired_primary or retired_openrouter:
+        translation["openrouter_model"] = "google/gemma-4-26b-a4b-it"
+        translation["openrouter_selected_source"] = "managed"
+        translation["openrouter_selection_alias"] = "gemma4_26b_31b_managed"
+        translation["openrouter_provider_routing"] = "gemma4_26b_31b_latency"
+    elif translation.get("openrouter_provider_routing") == "google_gemini_latency":
+        translation["openrouter_provider_routing"] = "default"
+    translation.pop("gemini", None)
 
 
 def _migrate_qwen_35_plus_translation(translation: dict[str, Any]) -> None:

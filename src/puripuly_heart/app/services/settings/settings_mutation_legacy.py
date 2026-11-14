@@ -31,7 +31,6 @@ ORDER21_TRANSLATION_PROVIDER_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.translation.http_extension_id",
     "intent.translation.previous_llm_model",
     "intent.translation.gpu_device_id",
-    "intent.translation.gemini.llm_model",
     "intent.translation.openrouter_model",
     "intent.translation.openrouter_routing_mode",
     "intent.translation.openrouter_provider_routing",

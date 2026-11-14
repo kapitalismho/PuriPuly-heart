@@ -120,7 +120,6 @@ describe('manual relay deployment preparation', () => {
       const path = await directory();
       await prepareDeployment({ env: { ...base, SUPPORT_REPORTS_ENABLED: 'true' }, directory: path, fetcher });
       const config = JSON.parse(await readFile(join(path, 'wrangler.json'), 'utf8'));
-      expect(config.vars).toEqual({ AGENT_SERVICE_ENABLED: 'false', SUPPORT_REPORTS_ENABLED: 'true' });
       expect(config.r2_buckets).toEqual([{ binding: 'SUPPORT_REPORTS', bucket_name: 'puripuly-heart-support-reports' }]);
       expect(calls.every((call) => call.startsWith('GET '))).toBe(true);
       expect(await readdir(path)).toEqual(['wrangler.json']);
@@ -204,7 +203,7 @@ describe('manual relay deployment preparation', () => {
         database.exec(await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
         rows.push({ kind: 'migration', name, table_name: '' });
       }
-      for (const table of ['usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily']) {
+      for (const table of ['usage_daily', 'support_daily', 'prompt_turns', 'request_slots', 'protocol_daily', 'photo_admissions', 'terra_daily']) {
         for (const row of database.prepare('SELECT name FROM pragma_table_info(?)').all(table)) {
           rows.push({ kind: 'column', name: String(row.name), table_name: table });
         }

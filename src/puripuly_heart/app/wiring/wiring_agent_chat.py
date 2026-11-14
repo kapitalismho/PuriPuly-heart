@@ -22,13 +22,10 @@ from puripuly_heart.runtime_layout import current_runtime_layout
 AGENT_RELAY_URL: Final = "https://puripuly-heart-agent-relay.kapitalismho.workers.dev/v1/respond"
 
 
-def compose_agent_transport(
+def compose_relay_token_owner(
     *, settings: SettingsOwner, config_path: Path
-) -> AgentRelayTransport | None:
+) -> AgentRelayTokenOwner:
     source = current_runtime_layout().host_kind == "source"
-    endpoint = os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL)
-    if not endpoint:
-        return None
     broker_override = os.environ.get("PURIPULY_AGENT_BROKER_URL") or None
 
     def broker_url() -> str:
@@ -46,7 +43,23 @@ def compose_agent_transport(
     async def identity() -> ManagedIdentityBundle:
         return await run_owned_thread_call(identity_bundle)
 
-    token_owner = AgentRelayTokenOwner(
+    return AgentRelayTokenOwner(
         broker_url, identity, app_version=__version__, allow_loopback_http=source
     )
-    return AgentRelayTransport(endpoint, token_owner, allow_loopback_http=source)
+
+
+def compose_agent_transport(
+    *,
+    settings: SettingsOwner,
+    config_path: Path,
+    token_owner: AgentRelayTokenOwner | None = None,
+) -> AgentRelayTransport | None:
+    endpoint = os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL)
+    if not endpoint:
+        return None
+    token_owner = token_owner or compose_relay_token_owner(
+        settings=settings, config_path=config_path
+    )
+    return AgentRelayTransport(
+        endpoint, token_owner, allow_loopback_http=current_runtime_layout().host_kind == "source"
+    )

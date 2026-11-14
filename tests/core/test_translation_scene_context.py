@@ -486,7 +486,6 @@ async def test_managed_openrouter_provider_forwards_scene_count() -> None:
 @pytest.mark.asyncio
 async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
     from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
-    from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
     from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
     from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
     from puripuly_heart.providers.llm.qwen_async import AsyncQwenLLMProvider
@@ -516,7 +515,6 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
         AsyncQwenLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         OpenRouterLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         DeepSeekLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
-        GeminiLLMProvider(api_key="k", client=(inners.append(CapturingInner()) or inners[-1])),
         LocalOpenAICompatibleLLMProvider(client=(inners.append(CapturingInner()) or inners[-1])),
     ]
     for provider in providers:

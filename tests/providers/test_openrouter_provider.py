@@ -435,35 +435,6 @@ def test_openrouter_cache_schema_requires_luna_only_routing_and_preserves_custom
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collection(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-
-    client = HttpxOpenRouterClient(
-        api_key="test-key",
-        model="google/gemini-3.8-flash",
-        base_url="https://example",
-        provider_routing=OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY,
-    )
-    await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko-KR",
-        target_language="en",
-    )
-
-    body = fake_client.last_request["json"]
-    assert body["provider"] == {
-        "sort": "latency",
-        "only": ["google-vertex", "google-ai-studio"],
-        "allow_fallbacks": True,
-        "data_collection": "deny",
-    }
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_routing",
     [

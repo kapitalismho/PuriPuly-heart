@@ -2,14 +2,15 @@ import { authenticate, hasTokenSecret } from './auth';
 import { contracts, contractFor, supportedProtocols } from './contracts';
 import { classifierInstructions, outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
 import { beforeAbort, requestLifetime } from './lifetime';
+import { PhotoEnv, receivePhoto, receivePhotoAllowance } from './photo';
 import { ClassifyRequest, isClassifyRequest, isRespondRequest, maxClassifyBytes, maxRespondBytes, readRequestJson, RespondRequest } from './requests';
 import { classifierQuestions } from './scope';
 import { receiveSupport, SupportEnv } from './support';
 import { responseStream } from './stream';
 import { isRecord } from './type-guards';
-import { Admission, checkAllowance, usageRecorder, UsageEnv } from './usage';
+import { Admission, checkAllowance, photoPolicy, usageRecorder, UsageEnv } from './usage';
 
-type Env = UsageEnv & SupportEnv & {
+type Env = UsageEnv & SupportEnv & PhotoEnv & {
   OPENAI_API_KEY?: string;
   PURI_TOKEN_SECRET?: string;
   AGENT_SERVICE_ENABLED?: string;
@@ -19,16 +20,34 @@ const developerMessage = (text: string, breakpoint: Record<string, string> = { m
   role: 'developer',
   content: [{ type: 'input_text', text, prompt_cache_breakpoint: breakpoint }],
 });
-const prepared = new Map([...contracts].map(([protocol, contract]) => [protocol, {
-  classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
-  questions: classifierQuestions(contract),
-  workDeveloperMessage: developerMessage(workInstructions(contract), { mode: 'explicit', ttl: '12h' }),
-  workOptions: {
-    tools: contract.tools,
-    reasoning: { effort: 'high' },
-    prompt_cache_options: { mode: 'implicit', ttl: '30m' },
-  },
-}]));
+const prepared = new Map([...contracts].map(([protocol, contract]) => {
+  const work = new Map<number, ReturnType<typeof developerMessage>>();
+  return [protocol, {
+    classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
+    questions: classifierQuestions(contract),
+    workDeveloperMessage(photoAllowance: number) {
+      let message = work.get(photoAllowance);
+      if (!message) {
+        message = developerMessage(workInstructions(contract, photoAllowance), { mode: 'explicit', ttl: '12h' });
+        work.set(photoAllowance, message);
+      }
+      return message;
+    },
+    workOptions: {
+      tools: contract.tools,
+      reasoning: { effort: 'high' },
+      prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+    },
+  }];
+}));
+
+function photoAllowance(env: Env): number {
+  try {
+    return photoPolicy(env.PHOTO_POLICY).allowance;
+  } catch {
+    return photoPolicy().allowance;
+  }
+}
 const supported = supportedProtocols.join(', ');
 const socialOptions = { instructions: socialInstructions, tools: [], reasoning: { effort: 'low' } };
 const outOfScopeOptions = { instructions: outOfScopeInstructions, tools: [], reasoning: { effort: 'low' } };
@@ -53,7 +72,9 @@ export default {
     const url = new URL(request.url);
     const classification = url.pathname === '/v1/classify';
     const support = url.pathname === '/v1/support';
-    if (!classification && !support && url.pathname !== '/v1/respond') {
+    const photo = url.pathname === '/v1/photo';
+    const photoAllowanceRequest = url.pathname === '/v1/photo/allowance';
+    if (!classification && !support && !photo && !photoAllowanceRequest && url.pathname !== '/v1/respond') {
       return error(404, 'not_found', 'Unknown relay endpoint.');
     }
     if (request.method !== 'POST') {
@@ -67,6 +88,8 @@ export default {
       return error(401, 'service_authentication_failed', 'The assistant service could not authenticate. Reconnect through PuriPuly.');
     }
     if (support) return receiveSupport(request, env, installation);
+    if (photo) return receivePhoto(request, env, installation, context);
+    if (photoAllowanceRequest) return receivePhotoAllowance(env, installation);
     if (env.AGENT_SERVICE_ENABLED !== 'true') {
       return error(503, 'service_shutdown', 'The assistant service is stopped. Settings, Cancel and the static guide remain available.');
     }
@@ -117,10 +140,10 @@ export default {
       questions: contract.questions,
       prompt_cache_options: { mode: 'explicit', ttl: '30m' },
     } : {
-      model: 'gpt-6-luna',
+      model: accounting.model,
       safety_identifier: installation,
       ...(outOfScope ? outOfScopeOptions : social ? socialOptions : contract.workOptions),
-      input: noTools ? input : [contract.workDeveloperMessage, ...input],
+      input: noTools ? input : [contract.workDeveloperMessage(photoAllowance(env)), ...input],
       store: false,
       stream: true,
       parallel_tool_calls: !noTools,
@@ -193,7 +216,7 @@ export default {
         return error(503, 'service_allowance_exhausted', 'The assistant service allowance is exhausted. Try again after it resets.');
       }
       if (capabilityError(result, upstream.status)) {
-        return error(502, 'upstream_capability_unavailable', `The configured gpt-6-luna ${classification ? 'Decisions' : 'Responses'} capability is unavailable. No alternate model was used.`);
+        return error(502, 'upstream_capability_unavailable', `The configured ${accounting.model} ${classification ? 'Decisions' : 'Responses'} capability is unavailable. No alternate model was used.`);
       }
       return error(502, 'upstream_unavailable', 'The model service could not complete this request.');
     }

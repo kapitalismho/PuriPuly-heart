@@ -711,7 +711,6 @@ class UiProviderRuntimeAdapter:
             active_secret = None
             if translation.connection == "official_byok":
                 active_secret = {
-                    "gemini": "google_api_key",
                     "openai": "openai_api_key",
                     "deepseek": "deepseek_api_key",
                 }.get(provider_llm_for_translation(translation.model, translation.connection))
@@ -871,6 +870,7 @@ class UiDiagnosticsRuntimeAdapter:
     cycle_capture_fault: Callable[[], str]
     cycle_stt_fault: Callable[[], str]
     clear_audio_faults: Callable[[], None]
+    toggle_photo_limited: Callable[[], bool]
 
     def cycle_debug_capture_fault_profile(self) -> str:
         return self.cycle_capture_fault()
@@ -880,3 +880,6 @@ class UiDiagnosticsRuntimeAdapter:
 
     def clear_debug_audio_fault_profiles(self) -> None:
         self.clear_audio_faults()
+
+    def toggle_debug_photo_limited(self) -> bool:
+        return self.toggle_photo_limited()

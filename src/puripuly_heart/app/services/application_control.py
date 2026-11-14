@@ -46,6 +46,9 @@ from puripuly_heart.app.ports.settings_view import (
     PeerVadHangoverIntent,
     PeerVadPreRollIntent,
     PeerVadSpeechThresholdIntent,
+    PhotoDeleteTranslatedSettingsIntent,
+    PhotoEnabledSettingsIntent,
+    PhotoRouteSettingsIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenBeijingApiHostEdit,
@@ -80,7 +83,7 @@ from puripuly_heart.config.provider_values import (
     STTProviderName,
     normalize_stt_provider,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import PHOTO_ROUTES, AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -263,6 +266,9 @@ COMMAND_ARGUMENTS = {
 IMMEDIATE = {
     "locale": lambda v: LocaleSettingsIntent(v),
     "clipboard.enabled": lambda v: ClipboardSettingsIntent(v),
+    "photo.enabled": lambda v: PhotoEnabledSettingsIntent(v),
+    "photo.route": lambda v: PhotoRouteSettingsIntent(v),
+    "photo.delete_translated": lambda v: PhotoDeleteTranslatedSettingsIntent(v),
     "chatbox.source.enabled": lambda v: ChatboxSourceSettingsIntent(v),
     "chatbox.activation_notice.enabled": lambda v: ActivationNoticeSettingsIntent(v),
     "vrc_mic_intercept.enabled": lambda v: VrcMicInterceptSettingsIntent(v),
@@ -320,6 +326,8 @@ SETTINGS_FIELDS = (
 BOOLEAN_FIELDS = frozenset(
     {
         "clipboard.enabled",
+        "photo.enabled",
+        "photo.delete_translated",
         "chatbox.source.enabled",
         "chatbox.activation_notice.enabled",
         "vrc_mic_intercept.enabled",
@@ -370,12 +378,11 @@ def _extension_ids(application: UiApplicationBoundary) -> tuple[str, ...]:
 
 
 _VERIFIABLE_SECRET_PROVIDERS = {
-    "google_api_key": "google",
     "openrouter_api_key": "openrouter",
     "openai_api_key": "openai",
     "deepseek_api_key": "deepseek",
     "deepgram_api_key": "deepgram",
-    "gemini_transcribe_api_key": "gemini_transcribe",
+    "gemini_api_key": "gemini",
     "elevenlabs_scribe_api_key": "elevenlabs_scribe",
     "soniox_api_key": "soniox",
     "alibaba_api_key_beijing": "alibaba_beijing",
@@ -404,12 +411,11 @@ def _effective_secret_presence(
     from puripuly_heart.config.alibaba_connection import alibaba_credential_sources
 
     env_vars = {
-        "google_api_key": "GOOGLE_API_KEY",
         "openrouter_api_key": "OPENROUTER_API_KEY",
         "openai_api_key": "OPENAI_API_KEY",
         "deepseek_api_key": "DEEPSEEK_API_KEY",
         "deepgram_api_key": "DEEPGRAM_API_KEY",
-        "gemini_transcribe_api_key": "GEMINI_API_KEY",
+        "gemini_api_key": "GEMINI_API_KEY",
         "elevenlabs_scribe_api_key": "ELEVENLABS_API_KEY",
         "soniox_api_key": "SONIOX_API_KEY",
     }
@@ -1048,7 +1054,6 @@ class ApplicationControlOwner:
             CLOUD_FREE_TIER_STT_PROVIDERS,
             MAX_CUSTOM_VOCAB_TERMS,
             DeepSeekLLMModel,
-            GeminiLLMModel,
             LLMProviderName,
             LocalLLMBackend,
             OpenRouterCredentialSource,
@@ -1209,6 +1214,7 @@ class ApplicationControlOwner:
             "audio.input_device": input_devices,
             "audio.output_device": output_devices,
             "overlay.target": list(OVERLAY_TARGETS),
+            "photo.route": list(PHOTO_ROUTES),
             "overlay.desktop_size": list(DESKTOP_FLET_SIZE_PRESET_ORDER),
             "osc.connection.mode": list(OSC_CONNECTION_MODES),
         }
@@ -1406,7 +1412,6 @@ class ApplicationControlOwner:
                 "openrouter_credential_sources": [
                     item.value for item in OpenRouterCredentialSource
                 ],
-                "gemini_llm_models": [item.value for item in GeminiLLMModel],
                 "deepseek_llm_models": [item.value for item in DeepSeekLLMModel],
                 "local_llm_backends": [item.value for item in LocalLLMBackend],
             },
@@ -3993,6 +3998,8 @@ def _validate_settings_field(
         valid = value == "" or (parsed is not None and parsed[0] == name.split(".")[2])
     elif name == "overlay.target":
         valid = value in OVERLAY_TARGETS
+    elif name == "photo.route":
+        valid = value in PHOTO_ROUTES
     elif name == "overlay.desktop_size":
         valid = value in DESKTOP_FLET_SIZE_PRESET_ORDER
     elif name == "overlay.background_alpha":

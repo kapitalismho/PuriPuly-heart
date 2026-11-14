@@ -54,37 +54,6 @@ class RecordingVerifier:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("provider", "selected_model"),
-    (
-        ("google", "gemini-model"),
-        ("openai", "gpt-6-luna"),
-        ("openrouter", None),
-        ("deepseek", None),
-        ("deepgram", None),
-        ("soniox", None),
-    ),
-)
-async def test_owner_routes_direct_provider_verification(
-    provider: str,
-    selected_model: str | None,
-) -> None:
-    verifier = RecordingVerifier(outcomes={(provider, selected_model): True})
-    owner = ProviderCredentialVerificationOwner(verifier=verifier)
-
-    outcome = await owner.verify(
-        ProviderCredentialVerificationRequest(
-            provider=provider,
-            api_key="secret",
-            selected_model=selected_model,
-        )
-    )
-
-    assert outcome.status == PROVIDER_CREDENTIAL_VERIFIED
-    assert verifier.calls == [(provider, "secret", selected_model, None, False)]
-
-
-@pytest.mark.asyncio
 async def test_owner_does_not_probe_fallback_qwen_models() -> None:
     verifier = RecordingVerifier(outcomes={("qwen", "fallback"): True})
     owner = ProviderCredentialVerificationOwner(verifier=verifier)
@@ -132,7 +101,7 @@ async def test_owner_rejects_empty_and_unknown_credentials_without_verifier_call
 
     empty = await owner.verify(
         ProviderCredentialVerificationRequest(
-            provider="google",
+            provider="gemini",
             api_key="",
         )
     )
@@ -158,7 +127,7 @@ async def test_owner_contains_verifier_failure_and_emits_safe_diagnostics() -> N
 
     outcome = await owner.verify(
         ProviderCredentialVerificationRequest(
-            provider="google",
+            provider="gemini",
             api_key="secret",
             selected_model="gemini-model",
         )
@@ -185,7 +154,7 @@ async def test_interaction_owner_maps_empty_unknown_failed_and_error_results() -
         error_sink=lambda provider, error: error_calls.append((provider, error)),
     )
 
-    empty = await owner.verify("google", "")
+    empty = await owner.verify("gemini", "")
     assert empty.status == PROVIDER_CREDENTIAL_EMPTY
     assert empty.error_text == "API Key is empty"
     unknown = await owner.verify("unknown", "secret")
@@ -212,13 +181,21 @@ def test_interaction_owner_factory_composes_verifier_and_callbacks() -> None:
 
     assert isinstance(owner, ProviderCredentialVerificationInteractionOwner)
     assert owner.verification_owner.verifier is verifier
-    assert owner.selected_model_provider("google") == "google-model"
+    assert owner.selected_model_provider("gemini") == "gemini-model"
     assert owner.low_latency is True
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("verified", [True, False])
-async def test_control_verification_preserves_public_receipt_with_typed_outcome(verified) -> None:
+@pytest.mark.parametrize(
+    ("provider", "secret_name"),
+    (("openrouter", "openrouter_api_key"), ("gemini", "gemini_api_key")),
+)
+async def test_control_verification_preserves_public_receipt_with_typed_outcome(
+    verified: bool,
+    provider: str,
+    secret_name: str,
+) -> None:
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
 
@@ -229,7 +206,7 @@ async def test_control_verification_preserves_public_receipt_with_typed_outcome(
     application = SimpleNamespace(
         verify_api_key=AsyncMock(
             return_value=ProviderCredentialVerificationOutcome(
-                status="verified" if verified else "failed", provider="openrouter"
+                status="verified" if verified else "failed", provider=provider
             )
         ),
         http_extension_registry=lambda: None,
@@ -240,7 +217,7 @@ async def test_control_verification_preserves_public_receipt_with_typed_outcome(
 
     result = await control._dispatch(
         "secrets.verify",
-        {"name": "openrouter_api_key", "value": secret},
+        {"name": secret_name, "value": secret},
         operation_id="synthetic",
     )
 
@@ -249,5 +226,5 @@ async def test_control_verification_preserves_public_receipt_with_typed_outcome(
         "verification": "verified" if verified else "failed",
         "reason": "Verification successful" if verified else "verification_failed",
     }
-    application.verify_api_key.assert_awaited_once_with("openrouter", secret)
+    application.verify_api_key.assert_awaited_once_with(provider, secret)
     assert secret not in repr(result)

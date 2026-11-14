@@ -59,7 +59,7 @@ export type ManagedOperationClientAction =
 
 export interface ManagedOperationRecord {
   operation_id: string;
-  issue_source: 'discord' | 'qq';
+  issue_source: 'discord' | 'qq' | 'photo';
   subject_ref: string;
   installation_id: string | null;
   device_public_key: string | null;
@@ -77,6 +77,10 @@ export interface ManagedOperationRecord {
   updated_at: string;
   last_reconciled_at: string | null;
   cleanup_attempts: number;
+  photo_period_start?: number | null;
+  photo_limit_usd?: number | null;
+  photo_activated_at?: string | null;
+  photo_revoked_at?: string | null;
 }
 
 export interface ManagedOperationIssuanceContext {
@@ -139,7 +143,7 @@ export function isManagedOperationId(value: unknown): value is string {
   return isBase64Url(value.slice(MANAGED_OPERATION_ID_PREFIX.length), 24);
 }
 
-export function providerKeyNameForOperationAttempt(operationId: string, issueSource: 'discord' | 'qq', attemptIndex: number): string {
+export function providerKeyNameForOperationAttempt(operationId: string, issueSource: ManagedOperationRecord['issue_source'], attemptIndex: number): string {
   const short = operationId.slice(MANAGED_OPERATION_ID_PREFIX.length).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16);
   return `puripuly-heart:mop:${issueSource}:${short}:a${attemptIndex}`;
 }
@@ -163,11 +167,13 @@ export async function createManagedOperation(
   input: {
     operationId: string;
     resumeTokenHash: string;
-    issueSource: 'discord' | 'qq';
+    issueSource: ManagedOperationRecord['issue_source'];
     subjectRef: string;
     installationId: string | null;
     devicePublicKey: string | null;
     now: Date;
+    photoPeriodStart?: number;
+    photoLimitUsd?: number;
   },
 ): Promise<{ created: boolean; operation: ManagedOperationRecord }> {
   const nowIso = input.now.toISOString();
@@ -182,12 +188,12 @@ export async function createManagedOperation(
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
           failure_reason, client_action,
-          created_at, updated_at, last_reconciled_at, cleanup_attempts
-        ) VALUES (?, ?, ?, ?, ?, 'AUTHENTICATED', 0, 0, ?, ?, NULL, 'wait', ?, ?, NULL, 0)`,
+          created_at, updated_at, last_reconciled_at, cleanup_attempts, photo_period_start, photo_limit_usd
+        ) VALUES (?, ?, ?, ?, ?, 'AUTHENTICATED', 0, 0, ?, ?, NULL, 'wait', ?, ?, NULL, 0, ?, ?)`,
     )
     .bind(
       input.operationId, input.issueSource, input.subjectRef, input.installationId, input.devicePublicKey,
-      input.resumeTokenHash, authExpiresAt, nowIso, nowIso,
+      input.resumeTokenHash, authExpiresAt, nowIso, nowIso, input.photoPeriodStart ?? null, input.photoLimitUsd ?? null,
     )
     .run();
   const operation = await getManagedOperation(db, input.operationId);
@@ -209,7 +215,7 @@ export async function authenticateManagedOperationRequest(
   input: { operationId: string; resumeToken: string; installationId: string | null },
 ): Promise<{ ok: true; operation: ManagedOperationRecord } | { ok: false; reason: 'invalid' }> {
   const operation = await getManagedOperation(db, input.operationId);
-  if (!operation) {
+  if (!operation || operation.issue_source === 'photo') {
     return { ok: false, reason: 'invalid' };
   }
   const candidateHash = await hashManagedOperationResumeToken(input.resumeToken);
@@ -902,7 +908,9 @@ export async function sweepStaleManagedOperations(
     if (operation.cleanup_state === 'pending') {
       const attempt = await db.prepare(`SELECT * FROM managed_operation_attempts WHERE id = ?`)
         .bind(operation.cleanup_attempt_id).first<ManagedOperationAttemptRecord>();
-      if (attempt) await cleanLegacyManagedAttempt(env, now, { ...attempt, issue_source: operation.issue_source }, budget, fetchImpl);
+      if (attempt && operation.issue_source !== 'photo') {
+        await cleanLegacyManagedAttempt(env, now, { ...attempt, issue_source: operation.issue_source }, budget, fetchImpl);
+      }
       continue;
     }
     const after = await reconcileUnknownAttempt(db, env.OPENROUTER_MANAGEMENT_API_KEY, operation, now, fetchImpl, budget);

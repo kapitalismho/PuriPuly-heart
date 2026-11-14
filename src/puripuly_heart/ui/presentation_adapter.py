@@ -85,11 +85,10 @@ class FletUiPresentationAdapter:
             return
         self.show_snackbar(text, COLOR_WARNING)
 
-    def attach_runtime_log_sink(self, runtime_logging: object) -> None:
-        sink = getattr(self._app, "view_logs", None)
-        attach = getattr(runtime_logging, "attach_realtime_sink", None)
-        if sink is not None and callable(attach):
-            attach(sink)
+    def bind_conversation_history(self, runtime_logging: object) -> None:
+        history = getattr(self._app, "conversation_history", None)
+        if history is not None:
+            runtime_logging.set_conversation_history_observer(history.observe_conversation)
 
     def schedule_task(self, coroutine_factory: object, *args: object) -> bool:
         schedule = getattr(self._app, "_run_page_task", None)
@@ -117,7 +116,7 @@ class FletUiPresentationAdapter:
             ),
             history_destination=AppHistoryEventDestination(
                 getattr(self._app, "add_history_entry", None),
-                getattr(self._app, "view_logs", None),
+                getattr(self._app, "conversation_history", None),
             ),
             get_language_codes=getattr(self._app, "get_event_language_codes", None),
             is_translation_enabled=getattr(self._app, "is_event_translation_enabled", None),

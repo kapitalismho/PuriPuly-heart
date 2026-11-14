@@ -12,6 +12,11 @@ import pytest
 from puripuly_heart.composition.headless_application import HeadlessApplicationPresentation
 from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.conversation_history import (
+    ConversationHistory,
+    ConversationHistoryModel,
+    ConversationRecord,
+)
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionRuntimeLoggingService
 from puripuly_heart.core.translation_backend import TranslationBackend
@@ -21,7 +26,6 @@ from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import EventProjectionContext, EventProjectionService
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
-from puripuly_heart.ui.views.logs import ConversationRecord, ConversationViewModel, LogsView
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -48,18 +52,17 @@ def history_destination(tmp_path):
         observability_runner=pending.append,
     )
     runtime = RuntimeLoggingService(session_service=session)
-    logs = LogsView()
+    logs = ConversationHistory()
     legacy_entries = []
     host = SimpleNamespace(
-        view_logs=logs,
+        conversation_history=logs,
         view_dashboard=DashboardView(),
         add_history_entry=lambda *args, **kwargs: legacy_entries.append((args, kwargs)),
         get_event_language_codes=lambda: ("en", "ko"),
     )
     adapter = FletUiPresentationAdapter(host)
-    adapter.attach_runtime_log_sink(runtime)
+    adapter.bind_conversation_history(runtime)
     bridge = adapter.create_ui_event_bridge(event_queue=asyncio.Queue(), runtime_logging=runtime)
-    logs._on_conversation_button_click(None)
     yield SimpleNamespace(
         runtime=runtime,
         session=session,
@@ -73,7 +76,6 @@ def history_destination(tmp_path):
     )
     bridge.close()
     runtime.close()
-    logs.will_unmount()
 
 
 def caption_event(unit_id, revision, text, *, translated=False, final=True):
@@ -177,8 +179,6 @@ async def test_dual_history_delivery_replaces_chained_repairs_once(
     assert "stale" not in persisted
     assert "duplicate" not in persisted
     assert destination.legacy_entries == []
-    assert destination.logs._log_text.value.count("A, second, third.") == 2
-    assert "translated:A,\n" not in destination.logs._log_text.value
 
 
 @pytest.mark.asyncio
@@ -200,7 +200,6 @@ async def test_source_only_revision_clears_old_translation_and_allows_recovery(h
     record = destination.logs.conversation_records[0]
     assert record.source_text == "authoritative merged source"
     assert record.translated_text is None
-    assert "old translation" not in destination.logs._log_text.value
     for translated in (True, False):
         value = "recovered translation" if translated else "recovered source"
         await destination.bridge._handle_event(
@@ -248,7 +247,7 @@ def test_projection_preserves_identity_rejects_stale_and_bounds_revision_state()
 
 @pytest.mark.parametrize("translation_first", [True, False])
 def test_history_model_merges_each_revision_pair_and_retains_genuine_repetition(translation_first):
-    model = ConversationViewModel(max_entries=2, cleanup_batch=1)
+    model = ConversationHistoryModel(max_entries=2, cleanup_batch=1)
     unit_id = str(uuid4())
     source = ConversationRecord(
         "10:00:00",
@@ -396,7 +395,6 @@ async def test_composed_cloud_caption_history_smoke(history_destination):
             None,
             5,
         )
-        assert "translated:A, b, c." not in destination.logs._log_text.value
         assert destination.audit[-1].transcript_text == "A, b, c. and d."
         assert destination.audit[-1].translation_text is None
         clock.advance(2)

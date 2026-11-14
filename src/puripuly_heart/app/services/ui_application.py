@@ -37,6 +37,7 @@ from puripuly_heart.app.ports.settings_view import (
     LoopbackCaptureSettingsIntent,
     OpenRouterPkceTarget,
     OverlaySettingsSnapshot,
+    PhotoStatusSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
     SettingsApplyOutcome,
@@ -118,6 +119,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "connect_openrouter_via_pkce",
         "cycle_debug_capture_fault_profile",
         "cycle_debug_stt_fault_profile",
+        "toggle_debug_photo_limited",
         "ensure_gpu_device_discovery",
         "handle_gpu_notice_action",
         "handle_managed_gemma_notice_action",
@@ -341,6 +343,7 @@ class UiApplicationBoundary:
         settings_secrets: SettingsSecretsPort,
         osc_state_publisher: Callable[[], object] | None = None,
         output_status_provider: Callable[[], dict[str, dict[str, object]]] | None = None,
+        photo_status_provider: Callable[[], Awaitable[PhotoStatusSnapshot]] | None = None,
         http_extension_registry: object | None = None,
         scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
         index_selection: IndexSelectionOwner | None = None,
@@ -368,6 +371,7 @@ class UiApplicationBoundary:
         self._state_owner = state
         self._osc_state_publisher = osc_state_publisher
         self._output_status_provider = output_status_provider
+        self._photo_status_provider = photo_status_provider
         self._scene_observation_provider = scene_observation_provider
         self._runtime_control_authority = runtime_control_authority
         self._runtime_control_activity = runtime_control_activity
@@ -479,6 +483,11 @@ class UiApplicationBoundary:
 
     def effective_osc_ports(self) -> tuple[int | None, int | None]:
         return self._runtime_shutdown.effective_osc_ports()
+
+    async def photo_status(self) -> PhotoStatusSnapshot:
+        if self._photo_status_provider is None:
+            return PhotoStatusSnapshot(None)
+        return await self._photo_status_provider()
 
     def output_status(self) -> dict[str, dict[str, object]]:
         if self._output_status_provider is None:
@@ -1363,6 +1372,9 @@ class UiApplicationBoundary:
 
     def clear_debug_audio_fault_profiles(self) -> None:
         self._diagnostics.clear_debug_audio_fault_profiles()
+
+    def toggle_debug_photo_limited(self) -> bool:
+        return bool(self._diagnostics.toggle_debug_photo_limited())
 
     def handle_gpu_notice_action(self, action: GpuNoticeAction) -> object:
         return self._provider.handle_gpu_notice_action(action)

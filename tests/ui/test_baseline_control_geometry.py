@@ -8,7 +8,6 @@ import flet as ft
 
 from puripuly_heart.ui.components.settings.prompt_editor import PromptEditor
 from puripuly_heart.ui.theme import get_app_theme
-from puripuly_heart.ui.views.logs import LogsView
 
 
 def _padding_values(padding: object) -> tuple[float, float, float, float]:
@@ -32,12 +31,6 @@ def test_app_theme_pins_text_button_padding() -> None:
         assert button_theme is not None
         assert button_theme.style is not None
         assert _padding_values(button_theme.style.padding) == (8.0, 8.0, 8.0, 8.0)
-
-
-def test_logs_header_buttons_set_no_padding_override_so_the_theme_applies() -> None:
-    view = LogsView.__new__(LogsView)
-    style = LogsView._get_button_style(view, "Arial")
-    assert style.padding is None
 
 
 def test_prompt_editor_applies_the_pinned_content_padding() -> None:

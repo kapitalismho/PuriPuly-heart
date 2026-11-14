@@ -97,7 +97,7 @@ def _approval_groups(changes: dict) -> list[dict]:
     return groups
 
 
-NAVIGATION_SECTIONS = ("api", "general", "overlay", "prompts")
+NAVIGATION_SECTIONS = ("api", "general", "overlay", "photo", "prompts")
 _OSC_ENUMS = {
     "configured_mode": frozenset({"automatic", "manual", "off", None}),
     "effective_mode": frozenset({"automatic", "manual", "off"}),
@@ -118,12 +118,11 @@ _DYNAMIC_CHOICE_FIELDS = _AUDIO_ROUTE_FIELDS | {
 }
 _STT_SECRET_KEYS = {
     STTProviderName.DEEPGRAM.value: SettingsSecretKey.DEEPGRAM_API_KEY.value,
-    STTProviderName.GEMINI_TRANSCRIBE.value: SettingsSecretKey.GEMINI_TRANSCRIBE_API_KEY.value,
+    STTProviderName.GEMINI_TRANSCRIBE.value: SettingsSecretKey.GEMINI_API_KEY.value,
     STTProviderName.ELEVENLABS_SCRIBE.value: SettingsSecretKey.ELEVENLABS_SCRIBE_API_KEY.value,
     STTProviderName.SONIOX.value: SettingsSecretKey.SONIOX_API_KEY.value,
 }
 _TRANSLATION_SECRET_KEYS = {
-    "gemini": SettingsSecretKey.GOOGLE_API_KEY.value,
     "openai": SettingsSecretKey.OPENAI_API_KEY.value,
     "openrouter": SettingsSecretKey.OPENROUTER_API_KEY.value,
     "deepseek": SettingsSecretKey.DEEPSEEK_API_KEY.value,
@@ -1038,7 +1037,7 @@ class AgentTools:
                     else _TRANSLATION_SECRET_KEYS.get(provider)
                 )
                 fact.update(
-                    cost="free_tier_eligible" if provider == "gemini" else "provider_billed",
+                    cost="provider_billed",
                     credential_requirement="api_key",
                     credential_readiness=_credential_readiness(
                         presence, (secret,) if secret is not None else ()

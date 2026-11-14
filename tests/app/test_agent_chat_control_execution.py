@@ -466,8 +466,12 @@ async def test_production_tools_apply_notice_and_speaker_with_terminal_effective
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "stored_key",
+    ["deepgram_api_key", "gemini_api_key"],
+)
 async def test_production_key_deletion_card_removes_the_stored_key_across_restart(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, stored_key
 ):
     from puripuly_heart.app.services import application_audio_devices
     from puripuly_heart.composition import application_runtime
@@ -510,9 +514,7 @@ async def test_production_key_deletion_card_removes_the_stored_key_across_restar
         await app.start()
         try:
             app.control().bind_instance("synthetic-restarted-instance")
-            return (await app.control().query("secrets.presence", {}))["presence"][
-                "deepgram_api_key"
-            ]
+            return (await app.control().query("secrets.presence", {}))["presence"][stored_key]
         finally:
             await app.stop()
 
@@ -523,23 +525,31 @@ async def test_production_key_deletion_card_removes_the_stored_key_across_restar
         control.bind_instance("synthetic-key-deletion")
         stored = await control.submit(
             "secrets.set",
-            {"name": "deepgram_api_key", "value": "synthetic-deepgram-value"},
+            {"name": stored_key, "value": "synthetic-isolated-key-value"},
             request_id="synthetic-store",
         )
         if not stored.get("terminal"):
             stored = await control.wait(stored["operation_id"])
         assert stored["status"] == "applied"
         owner = app.agent_chat()
-        offered = await execute(owner._tools, "secrets.delete", name="deepgram_api_key")
+        arguments = {"action": "secrets.delete", "name": stored_key}
+        offered = await owner._execute_call(
+            {
+                "type": "function_call",
+                "name": "manage_proposal",
+                "call_id": "synthetic-delete",
+                "arguments": json.dumps(arguments),
+            },
+            arguments,
+            owner._generation,
+        )
         assert offered["status"] == "needs_confirmation"
-        assert owner.snapshot.confirmation_previous == {"secrets.deepgram_api_key": True}
-        assert (await control.query("secrets.presence", {}))["presence"]["deepgram_api_key"] is True
+        assert owner.snapshot.confirmation_previous == {f"secrets.{stored_key}": True}
+        assert (await control.query("secrets.presence", {}))["presence"][stored_key] is True
         completed = await owner.confirm(offered["confirmation"]["id"], True)
         assert completed["status"] == "applied" and completed["receipt"]["terminal"] is True
-        assert (await control.query("secrets.presence", {}))["presence"][
-            "deepgram_api_key"
-        ] is False
-        assert "synthetic-deepgram-value" not in json.dumps([completed, owner.report_archive])
+        assert (await control.query("secrets.presence", {}))["presence"][stored_key] is False
+        assert "synthetic-isolated-key-value" not in json.dumps([completed, owner.report_archive])
     finally:
         await app.stop()
     assert await presence() is False

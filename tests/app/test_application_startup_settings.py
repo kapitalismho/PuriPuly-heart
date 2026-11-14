@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from puripuly_heart.app.ports.application_startup import ApplicationStartupState
+from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
+    compose_application_runtime_logging,
+)
 from puripuly_heart.composition.application_startup import ApplicationStartupAdapter
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.conversation_history import ConversationHistory
+from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
+from puripuly_heart.ui.i18n import get_locale, set_locale
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 
 
 class _FailingPersistOwner:
@@ -75,6 +84,7 @@ def _startup_adapter(
         start_event_bridge=lambda _bridge: None,
         wait_for_event_bridge=AsyncMock(),
         sync_clipboard=AsyncMock(),
+        start_photo=AsyncMock(),
     )
 
 
@@ -132,3 +142,44 @@ async def test_unsaved_first_launch_mark_is_retried_on_the_next_launch() -> None
     assert state.main_input_first_launch is True
     assert state.settings is loaded
     assert owner.canonical.state.main_input_hint.first_launch_completed is False
+
+
+def test_gui_startup_uses_logging_owner_history_binding_without_rebinding_its_facade(
+    tmp_path, monkeypatch
+) -> None:
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", list(root.handlers))
+    monkeypatch.setattr(root, "level", root.level)
+    log_file = tmp_path / "startup-history.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    history = ConversationHistory()
+    presentation = FletUiPresentationAdapter(SimpleNamespace(conversation_history=history))
+    runtime_logging = compose_application_runtime_logging(
+        presentation=presentation,
+        sinks=RuntimeLoggingSinks(logging.NullHandler(), file_handler, log_file),
+    )
+    settings = AppSettingsVNext()
+    adapter = _startup_adapter(
+        _RecordingPersistOwner(settings), settings, presentation=presentation
+    )
+    adapter.runtime_logging = runtime_logging
+    previous_locale = get_locale()
+    try:
+        adapter.apply_startup_presentation(
+            ApplicationStartupState(settings=settings, main_input_first_launch=False)
+        )
+        runtime_logging.record_conversation_observation(
+            utterance_id="synthetic-startup-turn",
+            speaker_channel="self",
+            transcript_text="synthetic startup speech",
+            translation_text=None,
+            source_language="en",
+            target_language=None,
+        )
+        assert len(history.conversation_records) == 1
+        assert history.conversation_records[0].source_text == "synthetic startup speech"
+        assert "synthetic startup speech" in log_file.read_text(encoding="utf-8")
+    finally:
+        runtime_logging.service.close()
+        file_handler.close()
+        set_locale(previous_locale)

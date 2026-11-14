@@ -301,7 +301,7 @@ function Invoke-InstallerLifecycle {
             "/DMyAppGroupName=PuriPuly-native-smoke-$runId",
             "/DMyAppDirName=$defaultDirectoryName",
             "/DInstallerSmokeAppDataRoot=$($data.Replace('\', '/'))",
-            "/DSkipLocalSttProvisioning=1", "/DMyPackagedAppDir=$OutputDir",
+            "/DSkipLocalSttProvisioning=1", "/DSkipPhotoModelProvisioning=1", "/DMyPackagedAppDir=$OutputDir",
             "/DNativeCleanupInclude=$cleanupInclude", "/DLocalASRModelsInclude=$asrModelsInclude", "/O$state", (Join-Path $repoRoot "installer.iss")
         )
         $negativeCases = @(

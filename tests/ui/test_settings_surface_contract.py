@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import flet as ft
 import pytest
 
@@ -10,18 +12,20 @@ from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
     SettingsGeneralIntents,
+    SettingsGeneralSurfaceSlots,
     SettingsOverlayIntents,
     SettingsOverlaySurfaceSlots,
+    SettingsPhotoSurfaceSlots,
     SettingsPromptIntents,
-    SettingsPromptSurfaceSlots,
     SettingsProviderIntents,
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
     SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
+    compose_settings_general_surface,
     compose_settings_overlay_surface,
-    compose_settings_prompt_surface,
+    compose_settings_photo_surface,
 )
 from puripuly_heart.ui.views import settings as settings_view_module
 
@@ -122,6 +126,25 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
     )
 
 
+def test_settings_api_surface_places_speech_hints_after_api_keys() -> None:
+    provider = _SlotProvider()
+    vocabulary = ft.Text("vocabulary")
+    peer_expected_language = ft.Text("peer_expected_language")
+    surface = compose_settings_api_surface(
+        replace(
+            SettingsApiSurfaceSlots.from_slot_provider(provider),
+            custom_vocabulary=vocabulary,
+            peer_expected_language=peer_expected_language,
+        )
+    )
+
+    assert surface.rows[-3:] == (
+        provider.controls["api_keys"],
+        vocabulary,
+        peer_expected_language,
+    )
+
+
 def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> None:
     surface, provider = _compose()
 
@@ -197,7 +220,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         desktop_overlay_size_change=make("desktop_overlay_size_change"),
         desktop_overlay_recovery_action=make("desktop_overlay_recovery_action"),
         desktop_overlay_position_reset=make("desktop_overlay_position_reset"),
-        view_logs=make("view_logs"),
+        open_agent=make("open_agent"),
         calibration_begin=make("calibration_begin"),
         calibration_change=make("calibration_change"),
         calibration_apply=make("calibration_apply"),
@@ -238,7 +261,7 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_desktop_overlay_size_change is overlay.desktop_overlay_size_change
     assert view.on_desktop_overlay_recovery_action is overlay.desktop_overlay_recovery_action
     assert view.on_desktop_overlay_position_reset is overlay.desktop_overlay_position_reset
-    assert view.on_view_logs is overlay.view_logs
+    assert view.on_open_agent is overlay.open_agent
     assert view.on_overlay_calibration_begin is overlay.calibration_begin
     assert view.on_overlay_calibration_change is overlay.calibration_change
     assert view.on_overlay_calibration_apply is overlay.calibration_apply
@@ -284,7 +307,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
             desktop_overlay_size_change=lambda *_a, **_k: None,
             desktop_overlay_recovery_action=lambda *_a, **_k: None,
             desktop_overlay_position_reset=lambda *_a, **_k: None,
-            view_logs=lambda *_a, **_k: None,
+            open_agent=lambda *_a, **_k: None,
         ),
     )
 
@@ -298,18 +321,33 @@ def _overlay_slots() -> SettingsOverlaySurfaceSlots:
     )
 
 
-def test_prompt_surface_preserves_the_accepted_card_order() -> None:
-    vocabulary = ft.Text("vocabulary")
-    peer_expected_language = ft.Text("peer_expected_language")
+def test_general_surface_places_the_system_prompt_last() -> None:
     persona = ft.Text("persona")
-    surface = compose_settings_prompt_surface(
-        SettingsPromptSurfaceSlots(
-            custom_vocabulary=vocabulary,
-            peer_expected_language=peer_expected_language,
-            persona=persona,
-        )
+    names = [name for name in SettingsGeneralSurfaceSlots.__dataclass_fields__ if name != "persona"]
+    surface = compose_settings_general_surface(
+        SettingsGeneralSurfaceSlots(**{name: ft.Text(name) for name in names}, persona=persona),
+        placeholder_factory=lambda: ft.Text("placeholder"),
     )
-    assert surface.rows == (vocabulary, peer_expected_language, persona)
+
+    assert len(surface.rows) == 6
+    assert surface.rows[-1] is persona
+
+
+def test_photo_surface_uses_two_three_card_rows_then_route_credentials() -> None:
+    placeholders: list[ft.Control] = []
+    slots = SettingsPhotoSurfaceSlots(
+        **{name: ft.Text(name) for name in SettingsPhotoSurfaceSlots.__dataclass_fields__}
+    )
+    surface = compose_settings_photo_surface(
+        slots,
+        placeholder_factory=lambda: _track(placeholders),
+    )
+
+    assert len(surface.rows) == 4
+    assert surface.rows[0].content.controls == [slots.enabled, slots.route, slots.remaining]
+    assert surface.rows[1].content.controls == [slots.delete_translated, *placeholders]
+    assert len(placeholders) == 2
+    assert surface.rows[2:] == (slots.chatgpt_account, slots.gemini_key)
 
 
 def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> None:

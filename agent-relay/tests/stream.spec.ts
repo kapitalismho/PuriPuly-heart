@@ -46,7 +46,9 @@ describe('upstream response streaming', () => {
     expect(database.writes).toHaveLength(0);
     expect(upstream.cancel).not.toHaveBeenCalled();
     const result = terminal();
-    upstream.emit({ type: 'response.completed', response: result });
+    upstream.emit({ type: 'response.completed', response: {
+      ...result, instructions: 'Server-owned prompt echo', tools: [{ type: 'function', name: 'read_app' }],
+    } });
     const completed = await reader.read();
     expect(JSON.parse(new TextDecoder().decode(completed.value).slice(6))).toEqual({ type: 'completed', response: result });
     expect((await reader.read()).done).toBe(true);

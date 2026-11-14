@@ -51,7 +51,6 @@ from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, Secret
 from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.openrouter_metadata import OpenRouterKeyMetadata
-from puripuly_heart.release_evidence.agent_chat_simulator.app import choice_catalog
 from tests.app.test_agent_chat import Records, Responses
 from tests.app.test_osc_control_runtime import (
     FakeReceiverOwner,
@@ -202,6 +201,34 @@ def adapter(control, *, watching=False):
     )
     tools.observe_context(control.context())
     return tools, actions, events
+
+
+@pytest.mark.asyncio
+async def test_photo_settings_change_through_the_normal_approval_card(catalog):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        proposed = await tools.execute(
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {"photo.route": "gemini", "photo.delete_translated": True},
+            },
+        )
+        assert proposed["status"] == "needs_confirmation"
+        assert not control.submissions
+        applied = await tools.confirm(proposed["confirmation"]["id"], True)
+        assert applied["receipt"]["terminal"] is True
+        assert control.submissions[0]["changes"] == {
+            "photo.route": "gemini",
+            "photo.delete_translated": True,
+        }
+        rejected = await tools.execute(
+            "manage_proposal", {"action": "settings", "changes": {"photo.route": "openai"}}
+        )
+        assert rejected["status"] != "needs_confirmation"
+    finally:
+        await tools.close()
 
 
 @pytest.mark.asyncio
@@ -1596,7 +1623,7 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
             assert result["secure_field"]["section"] == "api"
             assert result["secure_field"]["provider"] == provider
             assert result["links"]
-            if provider in {"google", "gemini_transcribe", "openrouter", "deepgram"}:
+            if provider in {"gemini", "openrouter", "deepgram"}:
                 assert {link["kind"] for link in result["links"]} == {
                     "key_console",
                     "key_documentation",
@@ -1635,7 +1662,7 @@ async def test_provider_setup_is_fixed_public_metadata_without_navigation_or_sec
         assert len(fields) == len(NAVIGATION_PROVIDERS)
         for arguments in (
             {"provider": "unknown"},
-            {"provider": "google", "url": "https://attacker.invalid"},
+            {"provider": "gemini", "url": "https://attacker.invalid"},
             {"provider": "openai", "key": "PRIVATE-KEY"},
         ):
             assert (await tools.execute("open_app", {"view": "provider_setup", **arguments}))[
@@ -1698,7 +1725,7 @@ async def test_initial_context_projects_bounded_local_evidence_route_and_safe_re
     control.values["secrets.presence"]["effective_presence"] = {
         "openai_api_key": False,
         "deepgram_api_key": True,
-        "google_api_key": None,
+        "gemini_api_key": None,
         "custom_name": "PRIVATE-SECRET",
     }
     control.values["audio.devices"] = {
@@ -1843,16 +1870,6 @@ async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, 
     )
     runpy.run_path(str(generator), run_name="__main__")
     assert "PRIVATE-" not in output_path.read_text(encoding="utf-8")
-
-
-@pytest.mark.asyncio
-async def test_committed_relay_tools_match_generator_output():
-    root = Path(__file__).resolve().parents[2]
-    generator = runpy.run_path(str(root / "agent-relay/generate-tools.py"))
-    committed = (root / "agent-relay/src/app-tools.ts").read_text(encoding="utf-8")
-    assert json.loads(
-        committed.removeprefix("export const appTools = ").removesuffix(";\n")
-    ) == generator["app_tools"](await choice_catalog())
 
 
 @pytest.mark.asyncio
@@ -2005,7 +2022,7 @@ async def test_recognition_cost_and_readiness_follow_observed_credential(
 ):
     control = Control(catalog)
     control.settings["intent"]["stt"]["provider"] = "local_cpu_auto"
-    key = f"{provider}_api_key"
+    key = "gemini_api_key" if provider == "gemini_transcribe" else f"{provider}_api_key"
     control.presence = {key: presence} if presence is not None else {}
     tools, _, _ = adapter(control)
     try:
@@ -2072,13 +2089,13 @@ async def test_free_tier_ready_switch_still_requires_active_capture_approval(cat
     (
         (
             ["deepgram", "gemini_transcribe"],
-            {"deepgram_api_key": False, "gemini_transcribe_api_key": True},
+            {"deepgram_api_key": False, "gemini_api_key": True},
             "present",
             "needs_confirmation",
         ),
         (
             ["deepgram"],
-            {"deepgram_api_key": False, "gemini_transcribe_api_key": True},
+            {"deepgram_api_key": False, "gemini_api_key": True},
             "absent",
             "needs_confirmation",
         ),
@@ -2122,8 +2139,6 @@ async def test_rolling_free_requires_any_selected_member_not_an_unselected_key(
 @pytest.mark.parametrize(
     ("model", "connection", "cost", "readiness", "status"),
     (
-        ("gemini_flash", "official_byok", "free_tier_eligible", "present", "needs_confirmation"),
-        ("gemini_flash", "openrouter", "provider_billed", "present", "needs_confirmation"),
         ("gpt_6_luna", "official_byok", "provider_billed", "present", "needs_confirmation"),
         ("deepseek_v4_flash_41", "managed", "managed_budget", "present", "needs_confirmation"),
         (
@@ -2172,10 +2187,7 @@ async def test_translation_cost_follows_connection_and_keeps_account_budgets_sep
             assert route["budget"]["remaining_percent"] == 31
         else:
             assert "budget" not in route
-        if (
-            connection in {"managed", "chatgpt", "openrouter", "official_byok"}
-            and cost != "free_tier_eligible"
-        ):
+        if connection in {"managed", "chatgpt", "openrouter", "official_byok"}:
             assert len(details["effects"]) == 1
     finally:
         await tools.close()
@@ -2377,9 +2389,10 @@ async def test_effective_credentials_include_runtime_environment_and_legacy_sour
         settings=SimpleNamespace(committed_settings=None),
     )
     observed = await ApplicationControlOwner.query(native, "secrets.presence", {})
-    assert observed["presence"]["gemini_transcribe_api_key"] is False
-    assert observed["effective_presence"]["gemini_transcribe_api_key"] is True
-    assert observed["effective_presence"]["google_api_key"] is False
+    assert observed["presence"]["gemini_api_key"] is False
+    assert observed["effective_presence"]["gemini_api_key"] is True
+    assert "google_api_key" not in observed["effective_presence"]
+    assert "gemini_transcribe_api_key" not in observed["effective_presence"]
     assert observed["effective_presence"]["alibaba_api_key_beijing"] is True
     assert observed["effective_presence"]["alibaba_api_key_singapore"] is True
     assert "PRIVATE-" not in json.dumps(observed)

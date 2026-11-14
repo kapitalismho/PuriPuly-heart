@@ -149,7 +149,6 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
     assert view._local_llm_connection_card.visible is False
-    assert view._google_key.visible is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is False
 

@@ -18,7 +18,7 @@ const DELIVERY_RANDOM_BYTES = 32;
 const ACK_TOKEN_RANDOM_BYTES = 32;
 export const STALE_DELIVERY_CLEANUP_CLAIM_REASON = 'stale_delivery_cleanup_claimed';
 
-type ManagedKeyDeliveryIssueSource = BrokerIssueSuccessSource;
+type ManagedKeyDeliveryIssueSource = BrokerIssueSuccessSource | 'photo';
 
 interface ManagedKeyDeliveryAckRequestBody {
   delivery_id?: unknown;
@@ -343,6 +343,9 @@ export async function handleManagedKeyDeliveryAck(
   });
 
   if (validation.ok) {
+    if (validation.delivery.issue_source === 'photo') {
+      return ackErrorResponse(c, 404, 'invalid', 'Photo delivery requires Puri authorization');
+    }
     let status: 'acknowledged' | 'already_acknowledged';
     try {
       if (validation.delivery.issue_source === 'discord') {

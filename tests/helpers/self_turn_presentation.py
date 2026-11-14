@@ -146,9 +146,9 @@ class OwnerPresentation:
             ui_queue_maxsize=4,
         )
         adapter = FletUiPresentationAdapter(
-            SimpleNamespace(view_dashboard=dashboard, view_logs=logs)
+            SimpleNamespace(view_dashboard=dashboard, conversation_history=logs)
         )
-        adapter.attach_runtime_log_sink(runtime_logging)
+        adapter.bind_conversation_history(runtime_logging)
         self.bridge = adapter.create_ui_event_bridge(
             event_queue=self.harness.ui_events,
             runtime_logging=runtime_logging,

@@ -2776,6 +2776,9 @@ async fn run_with_manifest_and_profile(
 }
 
 pub async fn run_cli(args: &[String]) -> i32 {
+    if args.get(1).is_some_and(|argument| argument == "--role") {
+        return crate::photo::run_cli(args).await;
+    }
     if args.len() == 2 && args[1] == "--version" {
         println!("{}", env!("CARGO_PKG_VERSION"));
         return 0;

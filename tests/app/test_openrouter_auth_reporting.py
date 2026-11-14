@@ -454,7 +454,7 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
     service = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
     service.configure_diagnostics(instance_id=uuid4().hex)
     owner = ApplicationRuntimeLoggingOwner(
-        presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
+        presentation=SimpleNamespace(bind_conversation_history=lambda _service: None),
         service_factory=lambda: service,
         fallback_logger=root,
     )
