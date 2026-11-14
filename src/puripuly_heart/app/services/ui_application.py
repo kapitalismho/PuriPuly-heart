@@ -953,6 +953,9 @@ class UiApplicationBoundary:
             snapshot["in_progress"] = True
         return snapshot
 
+    async def refresh_managed_account_usage(self) -> dict:
+        return await self._managed.refresh_managed_account_usage()
+
     def managed_auth_last_failure_kind(self) -> str:
         accessor = getattr(self._managed, "managed_auth_last_failure_kind", None)
         if not callable(accessor):

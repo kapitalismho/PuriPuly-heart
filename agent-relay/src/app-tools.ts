@@ -93,7 +93,7 @@ export const appTools = [
   {
     "type": "function",
     "name": "probe_app",
-    "description": "Run an isolated scoped check, not live pipeline repair or output delivery. Arguments: recognition.self; recognition.peer; translation.self; translation.peer; microphone. Local capture/VAD only; no settings change. Supply only the selected action's fields.",
+    "description": "Run an isolated scoped check, not live pipeline repair or output delivery. Arguments: recognition.self; recognition.peer; translation.self; translation.peer; microphone. Local capture/VAD only; no settings change; managed_access. Whether the selected managed credential is still usable; no translation request. Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
@@ -105,7 +105,8 @@ export const appTools = [
             "recognition.peer",
             "translation.self",
             "translation.peer",
-            "microphone"
+            "microphone",
+            "managed_access"
           ]
         }
       },

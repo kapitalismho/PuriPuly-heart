@@ -599,3 +599,44 @@ async def test_single_recovery_failure_preserves_both_errors_and_never_readmits(
     assert admission.limits == [2, 1]
     assert first.close_calls == recovery.close_calls == 1
     assert not extra.branches[0].started.is_set()
+
+
+def _http_status_error(status: int) -> Exception:
+    import httpx
+
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(status, request=request)
+    return httpx.HTTPStatusError("synthetic", request=request, response=response)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sources", "expected"),
+    [(("managed", "managed"), "managed"), (("managed", "secret_store"), None)],
+)
+async def test_translation_failure_reports_shared_credential_source(sources, expected) -> None:
+    from puripuly_heart.core.error_messages import provider_failure_report
+
+    provider = FallbackRacingLLMProvider(
+        attempts=tuple(
+            LLMProviderAttempt(
+                FakeProvider(f"attempt-{index}", error=_http_status_error(401)),
+                start_after_ms=0,
+                start_on_primary_error=index > 0,
+                provider_name="openrouter",
+                credential_source=source,
+            )
+            for index, source in enumerate(sources)
+        ),
+    )
+
+    with pytest.raises(LLMProviderRaceError) as failure:
+        await provider.translate(**_kwargs())
+    diagnostics = provider_failure_report(
+        failure.value, provider="llm", operation="translate"
+    ).diagnostics
+
+    assert diagnostics.status_code == 401
+    assert diagnostics.fields["provider"] == "openrouter"
+    assert diagnostics.fields.get("credential_source") == expected
+    await provider.close()

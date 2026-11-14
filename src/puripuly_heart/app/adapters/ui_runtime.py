@@ -84,6 +84,7 @@ from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
 from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
+from puripuly_heart.core.openrouter.openrouter_handoff import is_effectively_exhausted
 from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryResult,
@@ -301,6 +302,25 @@ class UiManagedRuntimeAdapter:
             "secondary_omitted_count": (
                 observation.secondary_omitted_count if observation is not None else 0
             ),
+        }
+
+    async def refresh_managed_account_usage(self) -> dict:
+        usage = self.managed.usage
+        result = await usage.refresh(auto_show_founder_letter=False)
+        if result is None or not result.key_available:
+            return {"status": "action_required", "reason": "credential_unavailable"}
+        if result.metadata is not None:
+            exhausted = is_effectively_exhausted(result.metadata)
+            return {
+                "status": "failed" if exhausted else "applied",
+                "managed_access": "unusable" if exhausted else "usable",
+                "managed_remaining_percent": usage.remaining_percent_for(result.metadata),
+            }
+        status_code = result.diagnostics.status_code if result.diagnostics is not None else None
+        return {
+            "status": "failed",
+            "managed_access": "unusable" if status_code in (401, 403) else "unknown",
+            "diagnostics": result.diagnostics,
         }
 
     async def start_qq_managed_auth_from_dialog(self, **kwargs: object) -> object:

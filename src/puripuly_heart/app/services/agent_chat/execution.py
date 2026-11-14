@@ -56,7 +56,9 @@ DEDICATED_COMMANDS = frozenset(
         "provider.apply",
     }
 )
-DIRECT_COMMANDS = frozenset({"overlay.set", "audio.retry", "models.retry"})
+DIRECT_COMMANDS = frozenset(
+    {"overlay.set", "audio.retry", "models.retry", "accounts.managed.refresh"}
+)
 CARD_COMMANDS = frozenset({"secrets.delete", "auth.logout", "overlay.position.reset"})
 CLI_ONLY_COMMANDS = frozenset(
     {
@@ -324,6 +326,13 @@ def app_actions() -> tuple[AppAction, ...]:
         "command",
         {"command": "audio.diagnose"},
         guidance="Local capture/VAD only; no settings change.",
+    )
+    add(
+        "probe_app",
+        "managed_access",
+        "command",
+        {"command": "accounts.managed.refresh"},
+        guidance="Whether the selected managed credential is still usable; no translation request",
     )
     for target, command, binding in (
         ("audio", "audio.retry", {}),

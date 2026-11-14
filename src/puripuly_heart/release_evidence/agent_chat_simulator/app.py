@@ -253,6 +253,15 @@ class ScenarioApp:
             intent["translation"].update(model="gemma4_26b_31b", connection="managed")
             self.managed_credentials.add("discord")
             self.add_diagnostic("managed.credential_damaged", "auth")
+        if scenario.cause == "managed_rejected":
+            intent["translation"].update(model="gemma4_26b_31b", connection="managed")
+            self.managed_credentials.add("discord")
+            self.presence["openrouter_api_key"] = True
+            self.add_diagnostic("provider.auth", "auth")
+            self.diagnostics[-1].update(
+                status_code=401,
+                fields={"provider": "openrouter", "credential_source": "managed"},
+            )
         if scenario.cause == "osc_discovery":
             self.add_diagnostic("oscquery_unavailable", "network")
         self.initial_osc_settings = deepcopy(intent["osc"])
@@ -419,7 +428,7 @@ class ScenarioApp:
     def translation_ready(self) -> bool:
         selection = self.intent["translation"]
         if self.scenario.cause == "internal_error" or (
-            self.scenario.cause == "managed_damaged"
+            self.scenario.cause in {"managed_damaged", "managed_rejected"}
             and selection["connection"] in {"managed", "managed_china"}
         ):
             return False
@@ -1478,6 +1487,21 @@ class ScenarioApp:
                 receipt.update(
                     output=self.osc_output(),
                 )
+        elif command == "accounts.managed.refresh":
+            connection = self.intent["translation"]["connection"]
+            account = "qq" if connection == "managed_china" else "discord"
+            if (
+                connection not in {"managed", "managed_china"}
+                or account not in self.managed_credentials
+                or self.scenario.cause == "managed_damaged"
+            ):
+                receipt.update(status="action_required", reason="credential_unavailable")
+            elif self.scenario.cause == "managed_rejected":
+                receipt.update(status="failed", managed_access="unusable")
+            else:
+                receipt.update(
+                    status="applied", managed_access="usable", managed_remaining_percent=80
+                )
         elif command in {"recognition.probe", "translation.probe"}:
             recognition = command == "recognition.probe"
             ready = (
@@ -1926,6 +1950,16 @@ class ScenarioApp:
             )
         if cause == "recognition_auth":
             return current["recognition"] is not None
+        if cause == "managed_rejected":
+            return (
+                current["translation"] is not None
+                and current["translation"]["configuration"]["connection"]
+                not in {"managed", "managed_china"}
+                and any(
+                    item["approved_exact"] and "translation.connection" in item["changes"]
+                    for item in self.transitions
+                )
+            )
         return current["translation"] is not None and current["usable_recognition"] is not None
 
     def signup_completed(self, provider: str) -> bool:

@@ -114,6 +114,7 @@ def test_inventory_classifies_every_cli_capability_and_exposes_only_the_chat_sub
         "overlay.set",
         "audio.retry",
         "models.retry",
+        "accounts.managed.refresh",
         "recognition.probe",
         "translation.probe",
         "audio.diagnose",
@@ -129,6 +130,7 @@ def test_inventory_classifies_every_cli_capability_and_exposes_only_the_chat_sub
         "translation.self",
         "translation.peer",
         "microphone",
+        "managed_access",
     }
     assert private_fields().isdisjoint(SETTINGS_FIELDS)
 
@@ -191,6 +193,30 @@ async def test_direct_actions_run_without_a_card_and_report_the_terminal_result(
         assert result["status"] == "applied" and result["receipt"]["terminal"] is True
         assert control.submissions == [
             {"command": action, "arguments": arguments, "revision": None}
+        ]
+        assert tools.confirmation is None and not events
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_access_probe_reports_usability_without_a_card(catalog):
+    control = ExecutionControl(catalog)
+    control.terminal_status = "failed"
+    original_wait = control.wait
+
+    async def wait(identity, timeout=None):
+        control.operations[identity].update(managed_access="unusable")
+        return await original_wait(identity, timeout)
+
+    control.wait = wait
+    tools, _, events = tools_for(control)
+    try:
+        result = await tools.execute("probe_app", {"target": "managed_access"})
+        assert result["status"] == "failed"
+        assert result["receipt"]["managed_access"] == "unusable"
+        assert control.submissions == [
+            {"command": "accounts.managed.refresh", "arguments": {}, "revision": None}
         ]
         assert tools.confirmation is None and not events
     finally:
