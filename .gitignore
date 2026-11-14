@@ -242,12 +242,6 @@ refactoring/
 /scripts/release/*
 !/scripts/release/unattended-runtime-evidence.py
 !/scripts/release/huggingface-xet-frozen-smoke.py
-!/scripts/probes/
-/scripts/probes/*
-!/scripts/probes/README.md
-!/scripts/probes/x1_controller_probe.py
-!/scripts/probes/x1_actions.json
-!/scripts/probes/x3_photo_preview.py
 .codex/
 .agent/
 .agents/
