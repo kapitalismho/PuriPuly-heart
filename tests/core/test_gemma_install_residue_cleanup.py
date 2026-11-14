@@ -382,38 +382,76 @@ async def test_close_drains_inspection_cleanup_and_prevents_new_cleanup(
     models_root: Path,
     blocked_cleanup: tuple[Path, threading.Event, threading.Event],
     cancel_inspection: bool,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     staging, entered, release = blocked_cleanup
     owner = _owner()
-    inspection = asyncio.create_task(asyncio.to_thread(owner.install_state, GEMMA_26B))
+    unrelated = _install(models_root, "unrelated-install")
+    loop = asyncio.get_running_loop()
+    shutdown_progress: asyncio.Queue[str] = asyncio.Queue()
+    runtime_closed = asyncio.Event()
+    cleanup_lock = owner._residue_cleanup_lock
+    close_runtime = owner.runtime.close
+
+    class ObservedCleanupLock:
+        def __enter__(self):
+            loop.call_soon_threadsafe(shutdown_progress.put_nowait, "cleanup lock wait")
+            return cleanup_lock.__enter__()
+
+        def __exit__(self, *args):
+            return cleanup_lock.__exit__(*args)
+
+    async def observed_runtime_close() -> None:
+        await close_runtime()
+        runtime_closed.set()
+        shutdown_progress.put_nowait("runtime closed")
+
+    monkeypatch.setattr(owner.runtime, "close", observed_runtime_close)
+    worker = asyncio.create_task(asyncio.to_thread(owner.install_state, GEMMA_26B))
+
+    async def inspect() -> object:
+        return await asyncio.shield(worker)
+
+    inspection = asyncio.create_task(inspect())
     closing = None
     try:
         assert await asyncio.to_thread(entered.wait, 5)
+        monkeypatch.setattr(owner, "_residue_cleanup_lock", ObservedCleanupLock())
         if cancel_inspection:
             inspection.cancel()
-            for _ in range(5):
-                await asyncio.sleep(0)
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(inspection, timeout=5)
         closing = asyncio.create_task(owner.close())
-        for _ in range(5):
-            await asyncio.sleep(0)
+        progress = await asyncio.wait_for(shutdown_progress.get(), timeout=5)
 
+        assert (
+            progress == "cleanup lock wait"
+        ), "Runtime teardown finished before held inspection cleanup settled"
+        assert not worker.done()
+        assert not runtime_closed.is_set()
         assert not closing.done()
         assert owner.snapshot.state != "closed"
         assert staging.exists()
         assert not _lease_available(models_root)
     finally:
         release.set()
-        result = (await asyncio.gather(inspection, return_exceptions=True))[0]
-        if closing is not None:
-            await closing
-        await owner.close()
+        if closing is None:
+            closing = asyncio.create_task(owner.close())
+        _, pending = await asyncio.wait((worker, inspection, closing), timeout=5)
+        for task in pending:
+            task.cancel()
+        assert not pending, "Inspection cleanup or close did not settle after worker release"
+        assert closing.result() is None
+        assert worker.result().status == "missing"
+        assert not staging.exists()
+        assert _lease_available(models_root)
+        assert (unrelated / "nested" / "weights.bin").read_bytes() == b"live"
 
     if cancel_inspection:
-        assert isinstance(result, asyncio.CancelledError)
+        assert inspection.cancelled()
     else:
-        assert result.status == "missing"
-    assert not staging.exists()
-    assert _lease_available(models_root)
+        assert inspection.result().status == "missing"
+    assert runtime_closed.is_set()
     assert owner.snapshot.state == "closed"
 
     later_residue = _residue(models_root, GEMMA_E4B, "staging")
