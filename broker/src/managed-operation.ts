@@ -182,19 +182,24 @@ export async function createManagedOperation(
   if (existing) {
     return { created: false, operation: existing };
   }
+  const photo = input.issueSource === 'photo';
+  const photoColumns = photo ? ', photo_period_start, photo_limit_usd' : '';
+  const photoValues = photo ? ', ?, ?' : '';
+  const parameters: (string | number | null)[] = [
+    input.operationId, input.issueSource, input.subjectRef, input.installationId, input.devicePublicKey,
+    input.resumeTokenHash, authExpiresAt, nowIso, nowIso,
+  ];
+  if (photo) parameters.push(input.photoPeriodStart ?? null, input.photoLimitUsd ?? null);
   await db
     .prepare(
       `INSERT OR IGNORE INTO managed_operations (
           operation_id, issue_source, subject_ref, installation_id, device_public_key,
           state, attempt_count, current_attempt_index, resume_token_hash, auth_expires_at,
           failure_reason, client_action,
-          created_at, updated_at, last_reconciled_at, cleanup_attempts, photo_period_start, photo_limit_usd
-        ) VALUES (?, ?, ?, ?, ?, 'AUTHENTICATED', 0, 0, ?, ?, NULL, 'wait', ?, ?, NULL, 0, ?, ?)`,
+          created_at, updated_at, last_reconciled_at, cleanup_attempts${photoColumns}
+        ) VALUES (?, ?, ?, ?, ?, 'AUTHENTICATED', 0, 0, ?, ?, NULL, 'wait', ?, ?, NULL, 0${photoValues})`,
     )
-    .bind(
-      input.operationId, input.issueSource, input.subjectRef, input.installationId, input.devicePublicKey,
-      input.resumeTokenHash, authExpiresAt, nowIso, nowIso, input.photoPeriodStart ?? null, input.photoLimitUsd ?? null,
-    )
+    .bind(...parameters)
     .run();
   const operation = await getManagedOperation(db, input.operationId);
   if (!operation) {

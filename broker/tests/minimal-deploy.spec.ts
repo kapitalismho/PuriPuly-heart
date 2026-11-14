@@ -73,8 +73,8 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(result.status, result.stderr).toBe(0);
     const db = new DatabaseSync(value.databasePath, { readOnly: true });
     try {
-      expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0026_managed_attempt_cleanup_ownership.sql'").get()).toEqual({
-        name: '0026_managed_attempt_cleanup_ownership.sql',
+      expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0031_photo_managed_access.sql'").get()).toEqual({
+        name: '0031_photo_managed_access.sql',
       });
       expect(db.prepare("SELECT name FROM pragma_table_info('managed_operation_attempts') WHERE name IN ('cleanup_token', 'create_in_flight', 'legacy_cleanup_state') ORDER BY name").all()).toEqual([
         { name: 'cleanup_token' }, { name: 'create_in_flight' }, { name: 'legacy_cleanup_state' },
@@ -95,7 +95,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 1 });
     expect(readEvents(value)).toEqual([
       { event: 'validate' }, { event: 'read' }, { event: 'read' },
-      { event: 'migrate', pending: ['0026_managed_attempt_cleanup_ownership.sql'] }, { event: 'read' }, { event: 'deploy' },
+      { event: 'migrate', pending: ['0031_photo_managed_access.sql'] }, { event: 'read' }, { event: 'deploy' },
     ]);
     expect(result.requests).toEqual(['GET /healthz', 'GET /v1/foundation']);
   });
@@ -189,8 +189,8 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
   });
 
   it.each(['false', 'true'])('rejects missing actual cleanup schema despite completed journal with apply_migrations=%s', async (applyMigrations) => {
-    const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS: applyMigrations } });
-    changeDatabase(value, "INSERT INTO d1_migrations (name) VALUES ('0026_managed_attempt_cleanup_ownership.sql')");
+    const value = scenario({ env: { APPLY_MIGRATIONS: applyMigrations } });
+    changeDatabase(value, 'ALTER TABLE managed_operation_attempts DROP COLUMN scan_offset');
     const before = readFileSync(value.databasePath);
     const result = await runDeployWorkflow(value);
     expect(result.status).not.toBe(0);
@@ -210,8 +210,8 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'read', 'read', 'migrate', 'read']);
     const db = new DatabaseSync(value.databasePath, { readOnly: true });
     try {
-      expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0026_managed_attempt_cleanup_ownership.sql'").get()).toBeDefined();
-      expect(db.prepare("SELECT name FROM pragma_table_info('managed_operation_attempts') WHERE name = 'cleanup_token'").get()).toBeDefined();
+      expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0031_photo_managed_access.sql'").get()).toBeDefined();
+      expect(db.prepare("SELECT name FROM pragma_table_info('managed_operations') WHERE name = 'photo_period_start'").get()).toBeDefined();
     } finally {
       db.close();
     }
@@ -232,7 +232,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
       expect(events).toEqual(['validate', 'read', 'read', 'migrate', 'read', 'deploy']);
       const db = new DatabaseSync(value.databasePath, { readOnly: true });
       try {
-        expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0026_managed_attempt_cleanup_ownership.sql'").get()).toBeDefined();
+        expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0031_photo_managed_access.sql'").get()).toBeDefined();
       } finally {
         db.close();
       }
