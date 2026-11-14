@@ -229,7 +229,7 @@ _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
 
 
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
-_SETTINGS_SUBTAB_ORDER = ("api", "general", "photo", "overlay")
+_SETTINGS_SUBTAB_ORDER = ("api", "photo", "general", "overlay")
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
 _OVERLAY_DISTANCE_DIVISIONS = 30
@@ -631,7 +631,7 @@ class SettingsView(ft.Column):
             "general": "general",
             "overlay": "overlay",
             "photo": "photo",
-            "prompts": "general",
+            "prompts": "api",
         }.get(section)
         key_fields = {
             field._provider: field
@@ -1677,7 +1677,6 @@ class SettingsView(ft.Column):
                 activation_notice=self._activation_notice_card,
                 activation_notice_middle=self._wrap_empty_unit_card(),
                 activation_notice_trailing=self._wrap_empty_unit_card(),
-                persona=self._persona_card,
             ),
             placeholder_factory=lambda: self._vrchat_osc_card,
         )
@@ -2443,22 +2442,6 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._custom_vocab_description_text = ft.Text(
-            t("settings.custom_vocabulary.description"),
-            size=20,
-            color=COLOR_SECONDARY,
-            text_align=ft.TextAlign.RIGHT,
-        )
-        self._custom_vocab_header = ft.Row(
-            controls=[
-                self._custom_vocab_title,
-                ft.Container(expand=True),
-                self._custom_vocab_description_text,
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=8,
-        )
         self._custom_vocab_tag_editor = CustomVocabularyTagEditor(
             on_add_terms=self._on_custom_vocabulary_add_terms,
             on_remove_term=self._on_custom_vocabulary_remove_term,
@@ -2466,7 +2449,7 @@ class SettingsView(ft.Column):
         self._custom_vocab_card = SharedCardWrapper(
             ft.Column(
                 [
-                    self._custom_vocab_header,
+                    self._custom_vocab_title,
                     ft.Container(height=12),
                     self._custom_vocab_tag_editor,
                 ],
@@ -2481,22 +2464,20 @@ class SettingsView(ft.Column):
                 SettingsApiSurfaceSlots.from_slot_provider(self),
                 custom_vocabulary=self._custom_vocab_card,
                 peer_expected_language=self._peer_auto_languages_card,
+                system_prompt=self._persona_card,
             ),
         )
         self._translation_connection_row = self._api_surface.translation_connection_row
         self._openrouter_routing_row = self._translation_connection_row
         self._gpu_device_row = self._api_surface.gpu_device_row
 
-        self._photo_surface = compose_settings_photo_surface(
-            self._build_photo_surface_slots(),
-            placeholder_factory=self._wrap_empty_unit_card,
-        )
+        self._photo_surface = compose_settings_photo_surface(self._build_photo_surface_slots())
 
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
                 "api": list(self._api_surface.rows),
-                "general": list(self._general_surface.rows),
                 "photo": list(self._photo_surface.rows),
+                "general": list(self._general_surface.rows),
                 "overlay": list(self._overlay_surface.rows),
             }
         )
@@ -2535,12 +2516,7 @@ class SettingsView(ft.Column):
             self._on_photo_route_click,
         )
         self._photo_remaining_title = self._unit_card_title(t("settings.photo.remaining.title"))
-        self._photo_remaining_text = ft.Text(
-            "",
-            size=28,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_SECONDARY,
-        )
+        self._photo_remaining_bar = ManagedTrialUsageBar()
         self._photo_delete_title = self._unit_card_title(
             t("settings.photo.delete_translated.title")
         )
@@ -2555,6 +2531,18 @@ class SettingsView(ft.Column):
             height=None,
             expand=False,
         )
+        self._photo_remaining_card = self._wrap_card(
+            ft.Column(
+                [
+                    self._photo_remaining_title,
+                    ft.Container(height=4),
+                    self._photo_remaining_bar,
+                ],
+                spacing=0,
+            ),
+            height=None,
+            expand=False,
+        )
         self._sync_photo_setting_cards()
         return SettingsPhotoSurfaceSlots(
             chatgpt_account=self._photo_chatgpt_view.card,
@@ -2564,10 +2552,7 @@ class SettingsView(ft.Column):
                 value=self._photo_enabled_text,
             ),
             route=self._wrap_unit_card(title=self._photo_route_title, value=self._photo_route_text),
-            remaining=self._wrap_unit_card(
-                title=self._photo_remaining_title,
-                value=self._photo_remaining_text,
-            ),
+            remaining=self._photo_remaining_card,
             delete_translated=self._wrap_unit_card(
                 title=self._photo_delete_title,
                 value=self._photo_delete_text,
@@ -2615,23 +2600,14 @@ class SettingsView(ft.Column):
     def _sync_photo_status_cards(self) -> None:
         status = self._photo_status
         managed = self._photo_route() == "managed"
-        self._photo_remaining_title.visible = managed
-        self._photo_remaining_text.visible = managed
+        self._photo_remaining_card.visible = managed
         if status is None:
-            remaining = t("settings.managed_trial_usage.remaining_placeholder")
-        elif status.remaining is not None and status.allowance is not None:
-            remaining = t(
-                "settings.photo.remaining.value",
-                remaining=status.remaining,
-                allowance=status.allowance,
-            )
+            self._photo_remaining_bar.set_percent(None)
         else:
-            remaining = "—"
-        self._photo_remaining_text.value = remaining
+            self._photo_remaining_bar.set_count(status.remaining, status.allowance)
         if is_control_mounted(self):
-            for control in (self._photo_remaining_title, self._photo_remaining_text):
-                with contextlib.suppress(Exception):
-                    control.update()
+            with contextlib.suppress(Exception):
+                self._photo_remaining_card.update()
 
     def set_photo_status(self, status: PhotoStatusSnapshot | None) -> None:
         self._photo_status = status
@@ -3245,7 +3221,6 @@ class SettingsView(ft.Column):
         return self._prompt_snapshot.source_language
 
     def _sync_prompt_tab_copy(self) -> None:
-        self._custom_vocab_description_text.value = t("settings.custom_vocabulary.description")
         peer_auto_languages_title = getattr(self, "_peer_auto_languages_title", None)
         if peer_auto_languages_title is not None:
             peer_auto_languages_title.value = t("settings.peer_auto_languages.title")
@@ -3255,13 +3230,9 @@ class SettingsView(ft.Column):
         ):
             peer_auto_languages_editor.apply_locale()
         if is_control_mounted(self):
-            for control in (
-                self._custom_vocab_description_text,
-                peer_auto_languages_title,
-            ):
-                if control is not None:
-                    with contextlib.suppress(Exception):
-                        control.update()
+            if peer_auto_languages_title is not None:
+                with contextlib.suppress(Exception):
+                    peer_auto_languages_title.update()
 
     def _sync_custom_vocabulary_editor_from_settings(self, *, preserve_input: bool = False) -> None:
         if self._prompt_snapshot is None:
@@ -4404,13 +4375,8 @@ class SettingsView(ft.Column):
         stt: STTProviderName,
         peer_stt: STTProviderName,
     ) -> None:
-        general = self._general_snapshot
         self._custom_vocab_card.visible = stt in _CUSTOM_VOCABULARY_STT_PROVIDERS
-        self._peer_auto_languages_card.visible = (
-            general is not None
-            and general.peer_source_mode == "auto"
-            and peer_stt in _PEER_LANGUAGE_HINT_STT_PROVIDERS
-        )
+        self._peer_auto_languages_card.visible = peer_stt in _PEER_LANGUAGE_HINT_STT_PROVIDERS
         _update_control_if_mounted(self._custom_vocab_card)
         _update_control_if_mounted(self._peer_auto_languages_card)
 

@@ -19,6 +19,7 @@ from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
     OverlayTranslationSettingsIntent,
     PeerSttProviderEdit,
+    PhotoStatusSnapshot,
     SelfSttProviderEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -3838,7 +3839,7 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
         ("gemini", False, True, False),
     ],
 )
-def test_photo_route_shows_only_its_credential_card(
+def test_photo_route_shows_only_its_own_card(
     monkeypatch: pytest.MonkeyPatch,
     settings_events,
     route: str,
@@ -3857,11 +3858,33 @@ def test_photo_route_shows_only_its_credential_card(
     photo_controls = _subtab_controls(view, "photo")
     assert view._photo_chatgpt_view.card in photo_controls
     assert view._photo_gemini_card in photo_controls
+    assert view._photo_remaining_card in photo_controls
     assert view._photo_chatgpt_view.card is not view._chatgpt_account_card
     assert view._photo_chatgpt_view.card.visible is chatgpt
     assert view._photo_gemini_card.visible is gemini
-    assert view._photo_remaining_text.visible is remaining
+    assert view._photo_remaining_card.visible is remaining
     assert view._photo_route_text.content.value == t(f"settings.photo.route.{route}")
+
+
+def test_photo_remaining_card_uses_the_managed_usage_bar_with_the_daily_count(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    from puripuly_heart.ui.components.managed_trial_usage_bar import ManagedTrialUsageBar
+
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, AppSettingsVNext(), config_path=Path("settings.json"))
+
+    bar = view._photo_remaining_bar
+    assert isinstance(bar, ManagedTrialUsageBar)
+    assert _tree_contains_control(view._photo_remaining_card, bar)
+    assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
+
+    view.set_photo_status(PhotoStatusSnapshot(route="managed", remaining=20, allowance=25))
+
+    assert bar.percent == 80
+    assert bar._remaining_text.value == t(
+        "settings.photo.remaining.value", remaining=20, allowance=25
+    )
 
 
 def test_agent_navigation_opens_the_tab_that_holds_each_section(
@@ -3870,7 +3893,7 @@ def test_agent_navigation_opens_the_tab_that_holds_each_section(
     view, _ = _make_settings_view(monkeypatch, settings_events)
     opened = []
 
-    for section, tab in (("photo", "photo"), ("prompts", "general"), ("api", "api")):
+    for section, tab in (("photo", "photo"), ("prompts", "api"), ("api", "api")):
         result = view.open_agent_section(section, None, show_settings=lambda: opened.append(1))
         assert result["opened"] is True
         assert view._settings_subtab_shell.active_key == tab
@@ -3891,18 +3914,22 @@ def test_photo_gemini_field_shares_the_gemini_secret(
     assert saved == [("gemini_api_key", "synthetic-gemini")]
 
 
-def test_speech_hint_cards_follow_api_keys_and_system_prompt_ends_general_tab(
+def test_speech_hint_cards_precede_api_keys_and_system_prompt_ends_translation_tab(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
     api_controls = _subtab_controls(view, "api")
-    assert api_controls[-2] is _full_width_card(view, t("settings.section.custom_vocabulary"))
-    assert api_controls[-1] is view._peer_auto_languages_card
+    assert api_controls[-4] is _full_width_card(view, t("settings.section.custom_vocabulary"))
+    assert api_controls[-3] is view._peer_auto_languages_card
+    assert _row_card_titles(api_controls[-2]) == [t("settings.section.api_keys")]
+    assert api_controls[-1] is _full_width_card(view, t("settings.section.persona"))
     general_controls = _subtab_controls(view, "general")
-    assert general_controls[-1] is _full_width_card(view, t("settings.section.persona"))
-    assert settings_view._SETTINGS_SUBTAB_ORDER == ("api", "general", "photo", "overlay")
+    assert all(
+        not _tree_contains_control(control, view._persona_card) for control in general_controls
+    )
+    assert settings_view._SETTINGS_SUBTAB_ORDER == ("api", "photo", "general", "overlay")
 
 
 @pytest.mark.parametrize(
@@ -3910,7 +3937,8 @@ def test_speech_hint_cards_follow_api_keys_and_system_prompt_ends_general_tab(
     [
         (STTProviderName.SONIOX, STTProviderName.SONIOX, "auto", True, True),
         (STTProviderName.DEEPGRAM, STTProviderName.GEMINI_TRANSCRIBE, "auto", True, True),
-        (STTProviderName.SONIOX, STTProviderName.SONIOX, "manual", True, False),
+        (STTProviderName.SONIOX, STTProviderName.SONIOX, "manual", True, True),
+        (STTProviderName.DEEPGRAM, STTProviderName.QWEN_AUDIO, "manual", True, True),
         (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.LOCAL_CPU_AUTO, "auto", False, False),
         (STTProviderName.LOCAL_CPU_AUTO, STTProviderName.ELEVENLABS_SCRIBE, "auto", False, False),
     ],
@@ -4938,7 +4966,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     view, _ = _make_settings_view(monkeypatch, settings_events)
     api_controls = _subtab_controls(view, "api")
 
-    assert len(api_controls) == 11
+    assert len(api_controls) == 12
     assert _row_card_titles(api_controls[0]) == [
         t("settings.section.stt"),
         t("settings.section.peer_stt"),
@@ -4971,10 +4999,11 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[6]) == [t("settings.chatgpt_account.title")]
     assert api_controls[7] is view._managed_key_card
     assert _row_card_titles(api_controls[7]) == [t("settings.managed_key.title")]
-    assert api_controls[8] is not view._api_keys_column
-    assert _row_card_titles(api_controls[8]) == [t("settings.section.api_keys")]
-    assert api_controls[9] is view._custom_vocab_card
-    assert api_controls[10] is view._peer_auto_languages_card
+    assert api_controls[8] is view._custom_vocab_card
+    assert api_controls[9] is view._peer_auto_languages_card
+    assert api_controls[10] is not view._api_keys_column
+    assert _row_card_titles(api_controls[10]) == [t("settings.section.api_keys")]
+    assert api_controls[11] is view._persona_card
 
 
 def test_api_tab_primary_value_typography_is_consistent_across_rows(
@@ -5633,7 +5662,7 @@ def test_custom_vocabulary_loads_empty_tags_for_fresh_settings(
     assert view._custom_vocab_tag_editor._chips_wrap.visible is False  # noqa: SLF001
 
 
-def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
+def test_custom_vocabulary_card_header_is_only_the_title(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
@@ -5641,14 +5670,8 @@ def test_custom_vocabulary_card_shows_one_line_provider_support_helper(
     custom_vocab_card = _full_width_card(view, t("settings.section.custom_vocabulary"))
     custom_vocab_column = _wrapped_card_column(custom_vocab_card)
 
-    assert custom_vocab_column.controls[0] is view._custom_vocab_header
-    assert view._custom_vocab_header.controls[0] is view._custom_vocab_title
-    assert view._custom_vocab_header.controls[-1] is view._custom_vocab_description_text
-    assert view._custom_vocab_description_text not in custom_vocab_column.controls
-    assert view._custom_vocab_description_text.value == t("settings.custom_vocabulary.description")
-    assert "Deepgram, Soniox, Gemini Transcribe, Qwen Audio, Scribe" in (
-        view._custom_vocab_description_text.value
-    )
+    assert custom_vocab_column.controls[0] is view._custom_vocab_title
+    assert _control_labels(custom_vocab_card) == [t("settings.section.custom_vocabulary")]
     assert not hasattr(view, "_custom_vocab_info_icon")
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
@@ -5663,7 +5686,7 @@ def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
     prompt_cards = [
         view._custom_vocab_card,
         view._peer_auto_languages_card,
-        _subtab_controls(view, "general")[-1],
+        view._persona_card,
     ]
 
     assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
@@ -6128,7 +6151,7 @@ def test_settings_subtab_bar_matches_bottom_nav_family_structure(
     assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_SECONDARY
 
     buttons[1].on_click(SimpleNamespace())
-    assert shell.active_key == "general"
+    assert shell.active_key == "photo"
     assert _subtab_text_color(buttons[0]) == subtab_shell_module.COLOR_SECONDARY
     assert _subtab_text_color(buttons[1]) == subtab_shell_module.COLOR_PRIMARY
 

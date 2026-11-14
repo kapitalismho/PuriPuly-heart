@@ -326,7 +326,6 @@ def settings_view_surface_snapshots(
         photo_enabled=intent.photo.enabled,
         photo_route=intent.photo.route,
         photo_delete_translated=intent.photo.delete_translated,
-        peer_source_mode=intent.languages.peer_source_mode,
     )
     source_language = intent.languages.source_language
     prompt = PromptSettingsSnapshot(

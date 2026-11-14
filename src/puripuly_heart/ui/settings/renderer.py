@@ -58,17 +58,18 @@ def compose_settings_api_surface(
         slots.local_llm_connection,
         slots.custom_stt_connection,
         slots.managed_key,
+        *(
+            control
+            for control in (slots.custom_vocabulary, slots.peer_expected_language)
+            if control is not None
+        ),
         slots.api_keys,
+        *((slots.system_prompt,) if slots.system_prompt is not None else ()),
     ]
     if slots.chatgpt_account is not None:
         rows.insert(rows.index(slots.managed_key), slots.chatgpt_account)
     if slots.http_extension is not None:
         rows.insert(2, slots.http_extension)
-    rows.extend(
-        control
-        for control in (slots.custom_vocabulary, slots.peer_expected_language)
-        if control is not None
-    )
 
     return SettingsApiSurfaceRegions(
         rows=tuple(rows),
@@ -130,9 +131,8 @@ def compose_settings_general_surface(
         slots.activation_notice_middle,
         slots.activation_notice_trailing,
     )
-    rows = (primary_row, audio_row, vad_row, clipboard_row, activation_notice_row)
     return SettingsGeneralSurfaceRegions(
-        rows=rows if slots.persona is None else (*rows, slots.persona),
+        rows=(primary_row, audio_row, vad_row, clipboard_row, activation_notice_row),
         primary_row=primary_row,
         audio_row=audio_row,
         vad_row=vad_row,
@@ -144,17 +144,11 @@ def compose_settings_general_surface(
 
 def compose_settings_photo_surface(
     slots: SettingsPhotoSurfaceSlots,
-    *,
-    placeholder_factory: Callable[[], ft.Control],
 ) -> SettingsPhotoSurfaceRegions:
     return SettingsPhotoSurfaceRegions(
         rows=(
-            compose_settings_triple_row(slots.enabled, slots.route, slots.remaining),
-            compose_settings_triple_row(
-                slots.delete_translated,
-                placeholder_factory(),
-                placeholder_factory(),
-            ),
+            compose_settings_triple_row(slots.enabled, slots.route, slots.delete_translated),
+            slots.remaining,
             *(
                 control
                 for control in (slots.chatgpt_account, slots.gemini_key)

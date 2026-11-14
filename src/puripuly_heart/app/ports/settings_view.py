@@ -148,7 +148,6 @@ class GeneralSettingsSnapshot:
     photo_enabled: bool = True
     photo_route: str = "managed"
     photo_delete_translated: bool = False
-    peer_source_mode: str = "manual"
 
 
 @dataclass(frozen=True, slots=True)

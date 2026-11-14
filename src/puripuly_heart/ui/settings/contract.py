@@ -200,6 +200,7 @@ class SettingsApiSurfaceSlots:
     chatgpt_account: ft.Control | None = None
     custom_vocabulary: ft.Control | None = None
     peer_expected_language: ft.Control | None = None
+    system_prompt: ft.Control | None = None
 
     @classmethod
     def from_slot_provider(cls, provider: SettingsApiSlotProvider) -> SettingsApiSurfaceSlots:
@@ -251,7 +252,6 @@ class SettingsGeneralSurfaceSlots:
     activation_notice: ft.Control
     activation_notice_middle: ft.Control
     activation_notice_trailing: ft.Control
-    persona: ft.Control | None = None
 
 
 @dataclass(frozen=True, slots=True)

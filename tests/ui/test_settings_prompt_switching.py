@@ -179,9 +179,6 @@ def test_prompt_tab_labels_and_tag_editor_copy_render_from_i18n(
 
         assert view._persona_title.value == t("settings.section.persona")
         assert view._custom_vocab_title.value == t("settings.section.custom_vocabulary")
-        assert view._custom_vocab_description_text.value == t(
-            "settings.custom_vocabulary.description"
-        )
         assert view._custom_vocab_tag_editor._input_field.hint_text == ""  # noqa: SLF001
     finally:
         i18n_module.set_locale(previous_locale)

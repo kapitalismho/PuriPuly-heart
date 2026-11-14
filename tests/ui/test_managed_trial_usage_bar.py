@@ -73,3 +73,38 @@ def test_managed_trial_usage_bar_apply_locale_refreshes_overlay_text() -> None:
         assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
     finally:
         set_locale(previous_locale)
+
+
+@pytest.mark.parametrize(
+    ("remaining", "allowance", "expected_percent", "expected_text"),
+    [
+        (20, 25, 80, "20 / 25"),
+        (0, 25, 0, "0 / 25"),
+        (30, 25, 100, "25 / 25"),
+    ],
+)
+def test_managed_trial_usage_bar_shows_a_count_and_fills_by_its_share(
+    remaining: int,
+    allowance: int,
+    expected_percent: int,
+    expected_text: str,
+) -> None:
+    set_locale("en")
+    bar = ManagedTrialUsageBar()
+
+    bar.set_count(remaining, allowance)
+
+    assert bar.percent == expected_percent
+    assert bar._remaining_text.value == expected_text
+
+
+def test_managed_trial_usage_bar_marks_an_unknown_count_and_returns_to_percent() -> None:
+    set_locale("en")
+    bar = ManagedTrialUsageBar()
+
+    bar.set_count(None, 25)
+    assert bar.percent is None
+    assert bar._remaining_text.value == "—"
+
+    bar.set_percent(None)
+    assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")

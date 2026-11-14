@@ -126,22 +126,26 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
     )
 
 
-def test_settings_api_surface_places_speech_hints_after_api_keys() -> None:
+def test_settings_api_surface_places_speech_hints_above_api_keys_and_system_prompt_last() -> None:
     provider = _SlotProvider()
     vocabulary = ft.Text("vocabulary")
     peer_expected_language = ft.Text("peer_expected_language")
+    system_prompt = ft.Text("system_prompt")
     surface = compose_settings_api_surface(
         replace(
             SettingsApiSurfaceSlots.from_slot_provider(provider),
             custom_vocabulary=vocabulary,
             peer_expected_language=peer_expected_language,
+            system_prompt=system_prompt,
         )
     )
 
-    assert surface.rows[-3:] == (
-        provider.controls["api_keys"],
+    assert surface.rows[-5:] == (
+        provider.controls["managed_key"],
         vocabulary,
         peer_expected_language,
+        provider.controls["api_keys"],
+        system_prompt,
     )
 
 
@@ -321,33 +325,30 @@ def _overlay_slots() -> SettingsOverlaySurfaceSlots:
     )
 
 
-def test_general_surface_places_the_system_prompt_last() -> None:
-    persona = ft.Text("persona")
-    names = [name for name in SettingsGeneralSurfaceSlots.__dataclass_fields__ if name != "persona"]
+def test_general_surface_has_only_its_five_card_rows() -> None:
     surface = compose_settings_general_surface(
-        SettingsGeneralSurfaceSlots(**{name: ft.Text(name) for name in names}, persona=persona),
+        SettingsGeneralSurfaceSlots(
+            **{name: ft.Text(name) for name in SettingsGeneralSurfaceSlots.__dataclass_fields__}
+        ),
         placeholder_factory=lambda: ft.Text("placeholder"),
     )
 
-    assert len(surface.rows) == 6
-    assert surface.rows[-1] is persona
+    assert len(surface.rows) == 5
 
 
-def test_photo_surface_uses_two_three_card_rows_then_route_credentials() -> None:
-    placeholders: list[ft.Control] = []
+def test_photo_surface_uses_one_three_card_row_then_route_cards() -> None:
     slots = SettingsPhotoSurfaceSlots(
         **{name: ft.Text(name) for name in SettingsPhotoSurfaceSlots.__dataclass_fields__}
     )
-    surface = compose_settings_photo_surface(
-        slots,
-        placeholder_factory=lambda: _track(placeholders),
-    )
+    surface = compose_settings_photo_surface(slots)
 
     assert len(surface.rows) == 4
-    assert surface.rows[0].content.controls == [slots.enabled, slots.route, slots.remaining]
-    assert surface.rows[1].content.controls == [slots.delete_translated, *placeholders]
-    assert len(placeholders) == 2
-    assert surface.rows[2:] == (slots.chatgpt_account, slots.gemini_key)
+    assert surface.rows[0].content.controls == [
+        slots.enabled,
+        slots.route,
+        slots.delete_translated,
+    ]
+    assert surface.rows[1:] == (slots.remaining, slots.chatgpt_account, slots.gemini_key)
 
 
 def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> None:
