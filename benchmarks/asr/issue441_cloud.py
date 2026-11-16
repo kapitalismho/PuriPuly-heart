@@ -449,7 +449,7 @@ class Scribe:
         run.data["metadata"]["config"] = cfg
         run.data["metadata"]["language_policy"] = "Automatic language detection with multilang_mode=true; language_code and secondary_languages omitted in all Scribe conditions."
         run.data["metadata"]["turn_prediction_threshold"] = 0.9
-        run.data["metadata"]["cap_policy"] = "Identical T1/T2 conservative client policy: source frontier=max(last manual command frontier, received committed timed-word end), checked each 100 ms source chunk. Timed word end is not server commit boundary; trailing silence can cause earlier-than-10 s cuts after native commits. Untimed commits do not reset. Silence can produce empty cap commands every 10 s. Old delayed receipts never move the frontier backward. No exact server-consumed-frontier claim; no 4/5 s cuts."
+        run.data["metadata"]["cap_policy"] = "Identical T1/T2 conservative client policy: source frontier=max(last manual command frontier, received committed timed-word end), checked each 32 ms source chunk. Timed word end is not server commit boundary; trailing silence can cause earlier-than-10 s cuts after native commits. Untimed commits do not reset. Silence can produce empty cap commands every 10 s. Old delayed receipts never move the frontier backward. No exact server-consumed-frontier claim; no 4/5 s cuts."
         endpoint = "wss://api.elevenlabs.io/v1/speech-to-text/realtime?" + urlencode(cfg)
         run.event("connection_start", {"endpoint": endpoint})
         self.ws = await connect(endpoint, additional_headers={"xi-api-key": key}, open_timeout=15, max_size=None, ping_interval=20)
@@ -627,7 +627,7 @@ async def run_scribe(run):
         if run.args.arm == "E0":
             await run_e0(run, scribe)
         else:
-            source = Source(run, continuous=scribe.audio, chunk_samples=1600)
+            source = Source(run, continuous=scribe.audio, chunk_samples=512)
             async for _ in source.frames():
                 pass
         await scribe.drain()
@@ -921,6 +921,80 @@ async def suite(args):
     return int(any(row["returncode"] for row in results))
 
 
+async def offline_scribe_cadence(args, parent_path):
+    original_scribe = Scribe
+    captures = {}
+    fixture = parent_path.with_suffix(".cadence.wav")
+    samples = np.zeros(5 * 512 + 127, dtype="<i2")
+    samples[123] = 1024
+    pcm = samples.tobytes()
+    with wave.open(str(fixture), "wb") as wav:
+        wav.setparams((1, 2, RATE, 0, "NONE", "not compressed"))
+        wav.writeframes(pcm)
+
+    class OfflineScribe(original_scribe):
+        async def open(self):
+            self.messages = []
+
+            async def send(payload):
+                self.messages.append(json.loads(payload))
+
+            self.ws = SimpleNamespace(send=send)
+            self.receiver = asyncio.create_task(asyncio.Event().wait())
+
+        async def drain(self):
+            await self.commit("eof")
+
+        async def close(self):
+            self.receiver.cancel()
+            await asyncio.gather(self.receiver, return_exceptions=True)
+            captures[self.run.args.arm] = self.messages
+
+    globals()["Scribe"] = OfflineScribe
+    receipts = {}
+    try:
+        for arm in ("E0", "T1", "T2"):
+            output = Path(f".tmp/issue441/runs/{arm}/{parent_path.stem}.cadence.json")
+            run_args = SimpleNamespace(**{**vars(args), "arm": arm, "output": str(output),
+                                          "freeze_sha256": "offline"})
+            recording = dict(id="offline-matched-cadence", language="en", diagnostic=True,
+                             sha256=digest(fixture), audio_path=str(fixture.resolve()),
+                             duration_s=len(samples) / RATE)
+            run = Run(run_args, recording)
+            try:
+                await run_scribe(run)
+                chunks = [base64.b64decode(message["audio_base_64"]) for message in captures[arm]
+                          if message["audio_base_64"]]
+                assert b"".join(chunks) == pcm
+                assert [len(chunk) // 2 for chunk in chunks] == [512] * 5 + [127]
+                audio_sends = [row for row in run.data["sends"] if row["kind"] == "audio"]
+                assert len(audio_sends) == 6
+                assert all(abs(row["source_end_s"] - row["source_start_s"] - 0.032) < 1e-8
+                           for row in audio_sends[:-1])
+                assert all(row["start_mono_s"] >= run.origin + row["source_end_s"] - 0.001
+                           for row in audio_sends)
+                assert not any(row["kind"] in ("cap_commit", "controller_commit") for row in run.data["sends"])
+                receipts[arm] = dict(pcm_sha256=hashlib.sha256(b"".join(chunks)).hexdigest(),
+                                     chunk_samples=[len(chunk) // 2 for chunk in chunks],
+                                     pacing_quantum_s=512 / RATE,
+                                     observed_send_offsets_s=[row["start_mono_s"] - run.origin for row in audio_sends],
+                                     source_eof=run.data["eof"]["source_reached"],
+                                     boundary_replaced="WebSocket transport only; E0 uses real Silero/capture/controller/SmartTurn.")
+                run.data["offline_cadence_receipt"] = receipts[arm]
+            except BaseException as exc:
+                run.error(exc, "offline_scribe_cadence")
+                raise
+            finally:
+                run.finish()
+        assert len({row["pcm_sha256"] for row in receipts.values()}) == 1
+        assert len({tuple(row["chunk_samples"]) for row in receipts.values()}) == 1
+        assert len({row["pacing_quantum_s"] for row in receipts.values()}) == 1
+        return receipts
+    finally:
+        globals()["Scribe"] = original_scribe
+        fixture.unlink()
+
+
 async def offline(args):
     from tests.core.test_smart_turn_delivery import Harness
 
@@ -1018,6 +1092,8 @@ async def offline(args):
         await application_replay(run)
         assert not run.data["application"]["captions"]
         outcomes.append("zero_output_structural_replay_explicit_origin")
+        run.data["matched_scribe_cadence"] = await offline_scribe_cadence(args, path)
+        outcomes.append("matched_E0_T1_T2_actual_source_PCM_chunk_lengths_32ms_pacing")
         run.data["offline_checks"] = outcomes
     except BaseException as exc:
         run.error(exc, "offline")
