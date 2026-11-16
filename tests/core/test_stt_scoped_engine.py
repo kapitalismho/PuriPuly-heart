@@ -5365,3 +5365,63 @@ async def test_cloud_final_timeouts_do_not_consume_channel_recovery_budget(
     else:
         assert terminals()[-1].channel_availability is STTChannelAvailability.UNAVAILABLE
         assert notified
+
+
+@pytest.mark.asyncio
+async def test_final_timeout_keeps_visible_provisional_text_and_admits_waiting_turn() -> None:
+    class SilentFinalSession(ControlledScopedSession):
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            await super().begin_turn(request)
+            self.buffer.put(
+                STTProviderTurnUpdate(
+                    identity=request.identity,
+                    sequence=1,
+                    stability="provisional",
+                    assembly="replace",
+                    text=f"visible {len(self.requests)}",
+                )
+            )
+
+    sessions: list[SilentFinalSession] = []
+    emitted: list[object] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        sessions.append(SilentFinalSession())
+        return sessions[-1]
+
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=factory,
+        event_sink=emitted.append,
+        sleep=no_sleep,
+        watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=0.05),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+    a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
+    b_start, _b_chunk, b_end = segment_events(ledger, start_sample=200, now=2.0)
+
+    def terminals() -> list[STTProviderTurnTerminal]:
+        return [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+
+    try:
+        await engine.handle_owned_vad_event(a_start)
+        await engine.handle_owned_vad_event(a_end)
+        await engine.handle_owned_vad_event(b_start)
+        await engine.handle_owned_vad_event(b_end)
+        await wait_until(lambda: len(terminals()) == 2)
+    finally:
+        await engine.close()
+
+    assert [
+        (event.identity.segment, event.outcome, event.text, event.failure_reason)
+        for event in terminals()
+    ] == [
+        (a_start.segment.identity, "degraded", "visible 1", "provider_final_timeout"),
+        (b_start.segment.identity, "degraded", "visible 1", "provider_final_timeout"),
+    ]
+    assert all(
+        event.channel_availability is STTChannelAvailability.RECOVERING for event in terminals()
+    )

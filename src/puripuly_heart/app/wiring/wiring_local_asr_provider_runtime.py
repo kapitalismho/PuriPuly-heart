@@ -301,10 +301,10 @@ def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
     local_provider_ids = _LOCAL_PROVIDER_IDS
     if provider_id in local_provider_ids:
         readiness_timeout_s = 60.0
-        final_timeout_s = 30.0
+        final_timeout_s = 12.0
     elif provider_id == STTProviderName.CUSTOM_OFFLINE.value:
         readiness_timeout_s = 30.0
-        final_timeout_s = 50.0
+        final_timeout_s = 12.0
     elif provider_id == STTProviderName.GEMINI_TRANSCRIBE.value:
         readiness_timeout_s = 30.0
         final_timeout_s = 2.0
@@ -316,10 +316,10 @@ def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
         final_timeout_s = drain_timeout_s * 2.0 + 5.0
     elif provider_id == STTProviderName.SONIOX.value:
         readiness_timeout_s = 5.0
-        final_timeout_s = 5.0 if getattr(config, "channel") == "peer" else 20.0
+        final_timeout_s = 5.0 if getattr(config, "channel") == "peer" else 12.0
     else:
         readiness_timeout_s = 30.0
-        final_timeout_s = 20.0
+        final_timeout_s = 12.0
     max_session_age_s = _MAX_SESSION_AGE_BY_PROVIDER.get(
         provider_id,
         _DEFAULT_REALTIME_MAX_SESSION_AGE_S if _session_lifetime_enabled(config) else None,

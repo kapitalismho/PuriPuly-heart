@@ -139,7 +139,7 @@ STTWatchdogResolver = Callable[[AudioSegmentSettingsSnapshot], "STTRecognitionWa
 class STTRecognitionWatchdogs:
     readiness_timeout_s: float = 30.0
     write_timeout_s: float = 5.0
-    final_timeout_s: float = 20.0
+    final_timeout_s: float = 12.0
     drain_timeout_s: float = 1.5
     idle_timeout_s: float = 60.0
     max_session_age_s: float | None = None
@@ -2095,6 +2095,7 @@ class ScopedRecognitionEngine:
         self._set_turn_failure(
             turn,
             "provider_final_timeout",
+            allow_provisional=True,
             failure_retryable=True,
         )
 

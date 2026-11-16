@@ -102,7 +102,7 @@ class _CaptureGeneration:
 @dataclass(slots=True)
 class _UnsentRecognitionSegment:
     start: OwnedVadEvent
-    admitted_at_monotonic_s: float
+    sealed_at_monotonic_s: float | None = None
     expiry_task: asyncio.Task[None] | None = None
 
 
@@ -306,6 +306,8 @@ class _GenerationGuardedVadSink:
                 )
                 return
         self._queue.append(owned)
+        if isinstance(event, SpeechEnd):
+            self._arm_unsent_expiry(owned)
         await self._observe_pending_source_work(True)
         worker = self._worker
         if worker is None:
@@ -348,28 +350,31 @@ class _GenerationGuardedVadSink:
                 reason="recognition_admission_overload",
             )
         segment_id = owned.segment.identity.segment_id
-        pending = _UnsentRecognitionSegment(
-            start=owned,
-            admitted_at_monotonic_s=owned.segment.opened_at_monotonic_s,
-        )
-        self._unsent_segments[segment_id] = pending
+        self._unsent_segments[segment_id] = _UnsentRecognitionSegment(start=owned)
+
+    def _arm_unsent_expiry(self, owned: OwnedVadEvent) -> None:
+        segment_id = owned.segment.identity.segment_id
+        pending = self._unsent_segments.get(segment_id)
+        if pending is None or pending.expiry_task is not None:
+            return
+        sealed_at = owned.segment.sealed_at_monotonic_s
+        if sealed_at is None:
+            sealed_at = asyncio.get_running_loop().time()
+        pending.sealed_at_monotonic_s = sealed_at
         pending.expiry_task = asyncio.create_task(
-            self._expire_unsent_segment(
-                segment_id,
-                pending.admitted_at_monotonic_s,
-            ),
+            self._expire_unsent_segment(segment_id, sealed_at),
             name=f"self-recognition-expiry:{segment_id}",
         )
 
     async def _expire_unsent_segment(
         self,
         segment_id: UUID,
-        admitted_at_monotonic_s: float,
+        sealed_at_monotonic_s: float,
     ) -> None:
-        deadline = admitted_at_monotonic_s + self.wholly_unsent_ttl_s
+        deadline = sealed_at_monotonic_s + self.wholly_unsent_ttl_s
         await asyncio.sleep(max(0.0, deadline - asyncio.get_running_loop().time()))
         pending = self._unsent_segments.get(segment_id)
-        if pending is None or pending.admitted_at_monotonic_s != admitted_at_monotonic_s:
+        if pending is None or pending.sealed_at_monotonic_s != sealed_at_monotonic_s:
             return
         await self._reject_unsent_segment(
             segment_id,
