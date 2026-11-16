@@ -531,7 +531,7 @@ class OverlayProcessManager:
             )
             await self._wait_for_startup(deadline)
         except TimeoutError:
-            if not spawn_task.done():
+            if not spawn_task.done() or self._process is None:
                 self._late_spawn_reaper = asyncio.create_task(
                     self._reap_late_spawn(spawn_task),
                     name="OverlayProcessManager:late-spawn-reaper",
@@ -540,7 +540,7 @@ class OverlayProcessManager:
             else:
                 await self._fail("startup_timeout")
         except asyncio.CancelledError:
-            if not spawn_task.done():
+            if not spawn_task.done() or self._process is None:
                 self._late_spawn_reaper = asyncio.create_task(
                     self._reap_late_spawn(spawn_task),
                     name="OverlayProcessManager:cancelled-spawn-reaper",

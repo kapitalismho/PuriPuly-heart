@@ -522,11 +522,6 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
-        "release_evidence/cli_control_speech.py",
-        {"_recognize": 1},
-        "Speech evidence coroutine owns channel subscriber tasks and cancels plus gathers the set in finally; subscribers terminate their subprocesses",
-    ),
-    *_reviews(
         "release_evidence/local_asr_production_composition.py",
         {"_execute": 1},
         "Production composition evidence locally awaits provider handoff and cancels plus gathers it on failure before leaving the evidence boundary",
@@ -576,11 +571,6 @@ TASK_CREATION_REVIEWS = (
         "desktop overlay adapter has exactly one injected UI callback task-runner call site tracked by the renderer scheduler",
         classification="legacy_exception",
         family=BARE_RUN_TASK,
-    ),
-    *_reviews(
-        "ui/desktop_overlay_repro.py",
-        {"StaticCheckerboardBackdrop.start": 1, "DesktopOverlayReproOwner.run": 2},
-        "DesktopOverlayReproOwner owns and gathers its renderer, diagnostic consumer, and static-backdrop tasks",
     ),
     *_reviews(
         "ui/flet_desktop_runtime.py",

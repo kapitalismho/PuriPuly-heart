@@ -4,7 +4,6 @@ import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Final, Literal, TypeAlias
 
@@ -210,7 +209,6 @@ BROKER_RAW_MESSAGE_REDACTION_MARKER: Final = "[broker-raw-message-redacted]"
 PROVIDER_RESPONSE_BODY_REDACTION_MARKER: Final = "[provider-response-body-redacted]"
 LOCAL_LLM_EXTRA_BODY_REDACTION_MARKER: Final = "[local-llm-extra-body-redacted]"
 DESKTOP_RENDERER_EVENT_SCHEMA_VERSION: Final = 1
-DESKTOP_OVERLAY_REPRO_SCHEMA_VERSION: Final = 1
 _DESKTOP_RENDERER_EVENT_FIELDS: Final = frozenset(
     {
         "schema_version",
@@ -236,57 +234,6 @@ _DESKTOP_RENDERER_EVENT_DISPOSITIONS: Final = MappingProxyType(
         "render_start": frozenset({"committed"}),
         "render_commit": frozenset({"committed"}),
         "render_commit_acknowledgement": frozenset({"committed"}),
-    }
-)
-_DESKTOP_OVERLAY_REPRO_DISPOSITIONS: Final = frozenset(
-    {"committed", "superseded", "stale", "failed"}
-)
-_DESKTOP_OVERLAY_REPRO_RECORD_FIELDS: Final = frozenset(
-    {
-        "schema_version",
-        "record_type",
-        "cycle",
-        "wall_clock_utc",
-        "monotonic_ms",
-        "synthetic_revision",
-        "expected_disposition",
-        "actual_disposition",
-        "render_commit_acknowledged",
-        "slot_count",
-        "line_count",
-        "surface_visible",
-        "interaction_mode",
-        "window_width",
-        "window_height",
-    }
-)
-_DESKTOP_OVERLAY_REPRO_RESULT_FIELDS: Final = frozenset(
-    {
-        "schema_version",
-        "record_type",
-        "outcome",
-        "reason",
-        "cycles_requested",
-        "cycles_completed",
-        "committed_count",
-        "superseded_count",
-        "stale_count",
-        "failed_count",
-        "renderer_shutdown_completed",
-        "bridge_shutdown_completed",
-        "backdrop_shutdown_completed",
-    }
-)
-_DESKTOP_OVERLAY_REPRO_FAILURE_REASONS: Final = frozenset(
-    {
-        "invalid_argument",
-        "startup_failed",
-        "bridge_failed",
-        "render_failed",
-        "render_timeout",
-        "validation_failed",
-        "cleanup_failed",
-        "artifact_invalid",
     }
 )
 _STT_STARTUP_FAILURE_STAGES: Final = frozenset(
@@ -642,145 +589,8 @@ def validate_desktop_renderer_event(
     return MappingProxyType(candidate)
 
 
-def validate_desktop_overlay_repro_record(
-    record: Mapping[str, object],
-) -> Mapping[str, object] | None:
-    candidate = dict(record)
-    if set(candidate) != _DESKTOP_OVERLAY_REPRO_RECORD_FIELDS:
-        return None
-    if not _is_exact_int(candidate.get("schema_version"), DESKTOP_OVERLAY_REPRO_SCHEMA_VERSION):
-        return None
-    if candidate.get("record_type") != "revision_outcome" or not isinstance(
-        candidate.get("record_type"), str
-    ):
-        return None
-    if not _is_bounded_int(candidate.get("cycle"), minimum=1):
-        return None
-    wall_clock = candidate.get("wall_clock_utc")
-    if not _is_rfc3339_utc(wall_clock):
-        return None
-    if not _is_nonnegative_int(candidate.get("monotonic_ms")) or not _is_nonnegative_int(
-        candidate.get("synthetic_revision")
-    ):
-        return None
-    expected = candidate.get("expected_disposition")
-    actual = candidate.get("actual_disposition")
-    if (
-        not isinstance(expected, str)
-        or not isinstance(actual, str)
-        or expected not in _DESKTOP_OVERLAY_REPRO_DISPOSITIONS
-        or actual not in _DESKTOP_OVERLAY_REPRO_DISPOSITIONS
-    ):
-        return None
-    acknowledged = candidate.get("render_commit_acknowledged")
-    if not isinstance(acknowledged, bool) or acknowledged != (actual == "committed"):
-        return None
-    if not _valid_desktop_overlay_repro_visual_state(candidate):
-        return None
-    return _validate_desktop_overlay_repro_candidate(candidate, "revision_outcome")
-
-
-def validate_desktop_overlay_repro_result(
-    result: Mapping[str, object],
-) -> Mapping[str, object] | None:
-    candidate = dict(result)
-    if set(candidate) != _DESKTOP_OVERLAY_REPRO_RESULT_FIELDS:
-        return None
-    if not _is_exact_int(candidate.get("schema_version"), DESKTOP_OVERLAY_REPRO_SCHEMA_VERSION):
-        return None
-    if candidate.get("record_type") != "run_result" or not isinstance(
-        candidate.get("record_type"), str
-    ):
-        return None
-    outcome = candidate.get("outcome")
-    reason = candidate.get("reason")
-    if not isinstance(outcome, str) or outcome not in {"completed", "failed"}:
-        return None
-    if outcome == "completed" and reason is not None:
-        return None
-    if outcome == "failed" and (
-        not isinstance(reason, str) or reason not in _DESKTOP_OVERLAY_REPRO_FAILURE_REASONS
-    ):
-        return None
-    for key in (
-        "cycles_requested",
-        "cycles_completed",
-        "committed_count",
-        "superseded_count",
-        "stale_count",
-        "failed_count",
-    ):
-        if not _is_nonnegative_int(candidate.get(key)):
-            return None
-    if candidate["cycles_completed"] > candidate["cycles_requested"]:
-        return None
-    if not all(
-        isinstance(candidate.get(key), bool)
-        for key in (
-            "renderer_shutdown_completed",
-            "bridge_shutdown_completed",
-            "backdrop_shutdown_completed",
-        )
-    ):
-        return None
-    return _validate_desktop_overlay_repro_candidate(candidate, "run_result")
-
-
-def _valid_desktop_overlay_repro_visual_state(candidate: Mapping[str, object]) -> bool:
-    return (
-        _is_bounded_int(candidate.get("slot_count"), minimum=0, maximum=2)
-        and _is_bounded_int(candidate.get("line_count"), minimum=0, maximum=6)
-        and isinstance(candidate.get("surface_visible"), bool)
-        and candidate.get("interaction_mode") in {"edit", "locked"}
-        and _is_bounded_int(candidate.get("window_width"), minimum=1)
-        and _is_bounded_int(candidate.get("window_height"), minimum=1)
-    )
-
-
-def _validate_desktop_overlay_repro_candidate(
-    candidate: dict[str, object], operation: str
-) -> Mapping[str, object] | None:
-    validation = validate_diagnostics_for_sink(
-        ErrorDiagnostics(
-            component="desktop_overlay_repro",
-            operation=operation,
-            code="v1",
-            category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
-            fields=candidate,
-        ),
-        DIAGNOSTIC_SINK_PERSISTED_LOGS,
-    )
-    if validation.status != DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED:
-        return None
-    return MappingProxyType(candidate)
-
-
 def _is_nonnegative_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
-
-
-def _is_exact_int(value: object, expected: int) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and value == expected
-
-
-def _is_rfc3339_utc(value: object) -> bool:
-    if not isinstance(value, str) or not re.fullmatch(
-        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z", value
-    ):
-        return False
-    # CPython 3.14 accepts ISO 8601's end-of-day spelling ``24:00:00``.
-    # RFC 3339 permits only hours 00 through 23.
-    if int(value[11:13]) > 23:
-        return False
-    try:
-        parsed = datetime.fromisoformat(f"{value[:-1]}+00:00")
-    except ValueError:
-        return False
-    return parsed.tzinfo is not None and parsed.utcoffset() == timedelta(0)
 
 
 def _is_bounded_int(value: object, *, minimum: int, maximum: int | None = None) -> bool:
@@ -1384,7 +1194,6 @@ __all__ = [
     "BROKER_RAW_MESSAGE_REDACTION_MARKER",
     "DEFAULT_DIAGNOSTIC_REDACTION_POLICY",
     "DESKTOP_RENDERER_EVENT_SCHEMA_VERSION",
-    "DESKTOP_OVERLAY_REPRO_SCHEMA_VERSION",
     "DIAGNOSTIC_FIELD_MAX_DEPTH",
     "DIAGNOSTIC_REDACTION_MARKER",
     "DIAGNOSTIC_SINK_BASIC_LOGS",
@@ -1427,6 +1236,4 @@ __all__ = [
     "stt_startup_failure_type",
     "validate_diagnostics_for_sink",
     "validate_desktop_renderer_event",
-    "validate_desktop_overlay_repro_record",
-    "validate_desktop_overlay_repro_result",
 ]

@@ -105,13 +105,16 @@ describe('Terra daily response preference', () => {
   });
 
   it('preserves pre-migration response turns on Luna while allowing classifier-only turns to select Terra', async () => {
-    const { sqlite, db } = accountingDatabase(relayMigrations.slice(0, -1));
+    const terraMigrationIndex = relayMigrations.indexOf('0007_terra_routing.sql');
+    const { sqlite, db } = accountingDatabase(relayMigrations.slice(0, terraMigrationIndex));
     try {
       const seed = sqlite.prepare(`INSERT INTO prompt_turns
         (installation_hash, turn_id, utc_date, expires_at, model_admissions, classifier_admitted) VALUES (?, ?, ?, ?, ?, 1)`);
       seed.run(installationHash, turnId, '2026-11-11', start.getTime() + turnLifetimeMs, 2);
       seed.run(otherInstallation, turnId, '2026-11-11', start.getTime() + turnLifetimeMs, 1);
-      sqlite.exec(readFileSync(new URL('../migrations/0007_terra_routing.sql', import.meta.url), 'utf8'));
+      for (const migration of relayMigrations.slice(terraMigrationIndex)) {
+        sqlite.exec(readFileSync(new URL(`../migrations/${migration}`, import.meta.url), 'utf8'));
+      }
       const existing = await admit(db, installationHash, turnId);
       const firstResponse = await admit(db, otherInstallation, turnId);
       expect([existing.model, firstResponse.model]).toEqual(['gpt-6-luna', 'gpt-5.6-terra']);
