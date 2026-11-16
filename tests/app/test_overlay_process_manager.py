@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import threading
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
@@ -1757,6 +1758,172 @@ async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_esc
     assert shutdown_requests == ["requested"]
     assert runner.last_process is not None
     assert runner.last_process.terminated is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interruption", ["timeout", "cancelled"])
+@pytest.mark.parametrize("acknowledge", [True, False])
+async def test_completed_spawn_interruption_keeps_child_owned_through_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    interruption: str,
+    acknowledge: bool,
+) -> None:
+    async def run_inline(
+        function: Callable[..., object],
+        /,
+        *args: object,
+        **kwargs: object,
+    ) -> object:
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(process_module.asyncio, "to_thread", run_inline)
+    monkeypatch.setattr(process_module.tempfile, "tempdir", str(tmp_path))
+    runner = FakeProcessRunner()
+    shutdown_requested = asyncio.Event()
+
+    async def request_shutdown() -> None:
+        shutdown_requested.set()
+
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        startup_timeout_ms=0 if interruption == "timeout" else 3_000,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+    )
+    start_task = asyncio.create_task(manager.start())
+    if interruption == "cancelled":
+        asyncio.get_running_loop().call_soon(start_task.cancel)
+
+    try:
+        if interruption == "cancelled":
+            with pytest.raises(asyncio.CancelledError):
+                await start_task
+        else:
+            await start_task
+            assert manager.state == "failed"
+            assert manager.failure_reason == "startup_timeout"
+
+        process = runner.last_process
+        assert process is not None
+        assert process.returncode is None
+        await asyncio.wait_for(shutdown_requested.wait(), timeout=1.0)
+        assert process.terminated is False
+        assert process.returncode is None
+        if acknowledge:
+            await process._events.put(
+                {
+                    "type": "shutdown_complete",
+                    "overlay_instance_id": manager.overlay_instance_id,
+                }
+            )
+            process._exit_future.set_result(0)
+
+        await asyncio.wait_for(process.wait_for_exit(), timeout=1.0)
+        if manager._late_spawn_reaper is not None:
+            await asyncio.wait_for(manager._late_spawn_reaper, timeout=1.0)
+        assert process.terminated is not acknowledge
+        assert process.returncode == 0
+        receipt = manager.shutdown_receipt()
+        assert receipt["acknowledged"] is acknowledge
+        assert receipt["reader_cleanup"] == "complete"
+        assert manager._process is None
+        assert manager._manifest_path is None
+    finally:
+        if not start_task.done():
+            start_task.cancel()
+        await asyncio.gather(start_task, return_exceptions=True)
+        if runner.last_process is not None and runner.last_process.returncode is None:
+            await runner.last_process.terminate()
+        if manager._late_spawn_reaper is not None:
+            await asyncio.wait_for(manager._late_spawn_reaper, timeout=1.0)
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("acknowledge", [True, False])
+async def test_completed_spawn_timeout_reaps_real_child(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    acknowledge: bool,
+) -> None:
+    script_path = tmp_path / "overlay_completed_spawn.py"
+    request_path = tmp_path / "shutdown.request"
+    script_path.write_text(
+        "\n".join(
+            [
+                "import json",
+                "import sys",
+                "import time",
+                "from pathlib import Path",
+                "manifest = json.load(open(sys.argv[2], encoding='utf-8'))",
+                f"request_path = Path({str(request_path)!r})",
+                "while not request_path.exists():",
+                "    time.sleep(0.005)",
+                f"if {acknowledge!r}:",
+                "    print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id']}), flush=True)",
+                "else:",
+                "    time.sleep(30)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(process_module.tempfile, "tempdir", str(tmp_path))
+    original_wait_for = asyncio.wait_for
+    interrupt_spawn = True
+    process: _AsyncioOverlayProcess | None = None
+
+    async def complete_spawn_before_timeout(
+        awaitable: Awaitable[object],
+        timeout: float | None,
+    ) -> object:
+        nonlocal interrupt_spawn, process
+        if not interrupt_spawn:
+            return await original_wait_for(awaitable, timeout=timeout)
+        interrupt_spawn = False
+        result = await original_wait_for(awaitable, timeout=timeout)
+        assert isinstance(result, tuple)
+        process = result[2]
+        assert isinstance(process, _AsyncioOverlayProcess)
+        raise TimeoutError
+
+    monkeypatch.setattr(process_module.asyncio, "wait_for", complete_spawn_before_timeout)
+    shutdown_requested = asyncio.Event()
+
+    async def request_shutdown() -> None:
+        request_path.touch()
+        shutdown_requested.set()
+
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
+        startup_timeout_ms=5_000,
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=1.0,
+    )
+    try:
+        await manager.start()
+        assert manager.state == "failed"
+        assert manager.failure_reason == "startup_timeout"
+        await asyncio.wait_for(shutdown_requested.wait(), timeout=2.0)
+        assert manager._late_spawn_reaper is not None
+        await asyncio.wait_for(manager._late_spawn_reaper, timeout=3.0)
+        assert process is not None
+        assert process.returncode is not None
+        assert (process.returncode == 0) is acknowledge
+        assert process._reader_tasks == []
+        receipt = manager.shutdown_receipt()
+        assert receipt["acknowledged"] is acknowledge
+        assert receipt["reader_cleanup"] == "complete"
+        assert manager._process is None
+        assert manager._manifest_path is None
+    finally:
+        if process is not None and process.returncode is None:
+            await process.terminate()
+        if manager._late_spawn_reaper is not None:
+            await asyncio.wait_for(manager._late_spawn_reaper, timeout=3.0)
+        await manager.stop()
+        request_path.unlink(missing_ok=True)
+        script_path.unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio

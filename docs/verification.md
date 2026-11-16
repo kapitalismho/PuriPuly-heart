@@ -16,6 +16,8 @@ Choose the smallest path through the actual application that establishes the cha
 
 **Example — save and restart:** Start an isolated source or installed host with a known setting and record its instance identity and revision. Choose a supported harmless change, apply/save it through the application, and inspect the terminal result, committed value, and relevant effective state. Stop the host to completion, start a fresh process on the same isolated state, and read the value and effective state again. The changed value in a different instance establishes persistence and reload; an `applied` receipt alone does not. A saved-but-degraded provider selection is not usable-provider evidence.
 
+For startup-timeout or cancellation changes, observe cleanup of any already spawned child before replacement. A failed or cancelled start does not itself prove that the child exited; graceful acknowledgement and forced escalation retain their separate meanings.
+
 **Environment:** A runnable candidate and isolated writable roots; no account or model is needed for a setting unrelated to those resources. GUI editing claims require using the actual settings UI. For a visible caption-setting effect, also use [captions and output](#captions-and-output).
 
 ## Speech recognition and translation
