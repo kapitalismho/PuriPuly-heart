@@ -6,17 +6,6 @@ fn photo(width: u32, height: u32) -> WorkingPhoto {
     WorkingPhoto::new(Arc::new(RgbImage::new(width, height)), [width, height]).unwrap()
 }
 
-fn rectangular_quad(bbox: Rect) -> Quad {
-    Quad {
-        corners: [
-            [f64::from(bbox.left), f64::from(bbox.top)],
-            [f64::from(bbox.right), f64::from(bbox.top)],
-            [f64::from(bbox.right), f64::from(bbox.bottom)],
-            [f64::from(bbox.left), f64::from(bbox.bottom)],
-        ],
-    }
-}
-
 #[test]
 fn decoded_source_is_shared_and_custom_aspects_use_actual_content_height() {
     let original = Arc::new(RgbImage::new(1920, 1080));
@@ -28,7 +17,7 @@ fn decoded_source_is_shared_and_custom_aspects_use_actual_content_height() {
     assert_eq!(wide.pixels.dimensions(), (1920, 540));
     assert_eq!(wide.reference_scale, 0.375);
     assert_eq!(
-        wide.map_quad([[100.5,20.5],[200.5,20.5],[200.5,50.5],[100.5,50.5]]).bounds(),
+        wide.map_bbox([100.5, 20.5, 200.5, 50.5]),
         Rect {
             left: 50.25,
             top: 10.25,
@@ -67,7 +56,7 @@ fn supported_resolutions_scale_absolute_constants_once_not_derived_geometry() {
         WorkingPhoto::new(Arc::new(RgbImage::new(3840, 2160)), DEFAULT_MAX_DIMENSIONS).unwrap();
     assert_eq!(work.reference_scale, 0.75);
     assert_eq!(
-        geometry(&work, work.map_quad([[200.0,200.0],[1000.0,200.0],[1000.0,440.0],[200.0,440.0]]).bounds(), 3)
+        geometry(&work, work.map_bbox([200.0, 200.0, 1000.0, 440.0]), 3)
             .unwrap()
             .2,
         40.0
@@ -372,7 +361,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
             .unwrap()
             .into_rgb8(),
     );
-    let quad: [[f64; 2]; 4] = serde_json::from_value(fixture["quad"].clone()).unwrap();
+    let bbox: [f64; 4] = std::array::from_fn(|i| fixture["bbox"][i].as_f64().unwrap());
     let mut processor = MaskProcessor::new(&model, Some(&runtime)).unwrap();
     let mut workspace = telea::Workspace::default();
     for (height, extra) in [(719, 1), (1068, 1), (1080, 1), (1440, 1), (2160, 2)] {
@@ -383,7 +372,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
         let mut region = processor
             .prepare(
                 &work,
-                work.map_quad(quad),
+                work.map_bbox(bbox),
                 fixture["lines"].as_u64().unwrap() as u32,
                 &work.pixels,
                 &mut workspace,
@@ -956,63 +945,9 @@ fn recovery_follows_owned_lines_past_a_short_box_but_leaves_neighbor_lines() {
         let neighbor = (40..56).contains(&y) && (20..170).contains(&x) && glyph(x);
         Luma([if own_line || detached || neighbor { 255 } else { 0 }])
     });
-    let owned = owned_lines(&foreground, roi, rectangular_quad(bbox), 20.0, false);
+    let owned = owned_lines(&foreground, roi, bbox, 20.0, false);
     assert_ne!(owned.get_pixel(150, 20)[0], 0, "glyph past the box on the same line");
     assert_ne!(owned.get_pixel(185, 20)[0], 0, "detached glyph continuing the line");
     assert_eq!(owned.get_pixel(30, 48)[0], 0, "line below belongs to another block");
     assert_ne!(owned.get_pixel(30, 20)[0], 0);
-}
-
-#[test]
-fn quad_ownership_changes_line_recovery_not_only_core_seeds() {
-    let roi = PixelRect { x: 0, y: 0, width: 100, height: 100 };
-    let quad = Quad::new(
-        [[10.0,10.0],[90.0,70.0],[90.0,90.0],[10.0,30.0]], [100,100],
-    ).unwrap();
-    let foreground = GrayImage::from_fn(100,100,|x,y| {
-        let target = (10..95).contains(&x) && i64::from(y) >= 10 + i64::from(x)*3/4
-            && i64::from(y) < 20 + i64::from(x)*3/4;
-        let neighbor = (65..85).contains(&x) && (10..20).contains(&y);
-        Luma([if target || neighbor { 255 } else { 0 }])
-    });
-    let baseline = owned_lines(&foreground,roi,rectangular_quad(quad.bounds()),10.0,false);
-    assert_eq!(baseline.get_pixel(75,15)[0],255);
-    let candidate = owned_lines(&foreground,roi,quad,10.0,false);
-    assert_eq!(candidate.get_pixel(75,15)[0],0);
-    assert!(!inside(roi,quad,75,15));
-    assert_eq!(candidate.get_pixel(92,86)[0],255);
-    assert!(!inside(roi,quad,92,86));
-    assert_eq!(candidate.get_pixel(40,43)[0],255);
-    let empty = GrayImage::new(100,100);
-    assert_eq!(owned_lines(&empty,roi,quad,10.0,false),empty);
-}
-
-#[test]
-fn axis_aligned_quad_matches_half_open_aabb_pixel_membership() {
-    let roi = PixelRect { x: 10, y: 20, width: 30, height: 30 };
-    let bbox = Rect { left: 15.5, top: 25.5, right: 35.5, bottom: 45.5 };
-    let quad = Quad::new(
-        [[15.5,25.5],[35.5,25.5],[35.5,45.5],[15.5,45.5]], [100,100],
-    ).unwrap();
-    for y in 0..30 {
-        for x in 0..30 {
-            let px = x as f32 + roi.x as f32 + 0.5;
-            let py = y as f32 + roi.y as f32 + 0.5;
-            assert_eq!(
-                px >= bbox.left && px < bbox.right && py >= bbox.top && py < bbox.bottom,
-                inside(roi,quad,x,y),
-            );
-        }
-    }
-}
-
-#[test]
-fn quad_mapping_uses_separate_actual_axis_scales_without_send_offsets() {
-    let work = WorkingPhoto::new(Arc::new(RgbImage::new(333, 201)), [192, 108]).unwrap();
-    assert_ne!(work.scale_x, work.scale_y);
-    let corners = [[33.0,20.0],[300.0,30.0],[290.0,180.0],[40.0,170.0]];
-    let mapped = work.map_quad(corners);
-    for (actual, [x, y]) in mapped.corners.into_iter().zip(corners) {
-        assert_eq!(actual, [x * f64::from(work.scale_x), y * f64::from(work.scale_y)]);
-    }
 }

@@ -253,7 +253,7 @@ def _is_photo_metadata_text(message: str) -> bool:
         "jpeg",
         "request_sent",
         "ttft",
-        "quad_ready",
+        "bbox_ready",
         "source_ready",
         "block_complete",
         "image_mask",
@@ -332,9 +332,6 @@ def _is_photo_metadata_text(message: str) -> bool:
                 "photo_child_exited",
                 "photo_child_unavailable",
                 "photo_capture_unavailable",
-                "photo_quad_invalid",
-                "photo_quad_outside_image",
-                "photo_quad_clipping_excessive",
             }
         else:
             return False

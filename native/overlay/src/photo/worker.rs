@@ -7,11 +7,9 @@ use super::image::{PhotoImageOutput, PhotoImageResult, PhotoImageWorker, Prepara
 use super::manifest::{PhotoError, PhotoImageConfig};
 use super::prepare::recover_original;
 use super::processing::{
-    erase_input_rect, keep_original, refresh_erase, MaskProcessor, PixelRect, PreparedRegion,
+    erase_input_rect, keep_original, refresh_erase, MaskProcessor, PixelRect, PreparedRegion, Rect,
     WorkingPhoto,
 };
-#[cfg(test)]
-use super::processing::Rect;
 use super::state::{PhotoPhase, PhotoSnapshot};
 
 pub struct RunningImageWorker {
@@ -242,7 +240,7 @@ impl ImagePipeline {
                     None => {
                         let region = self.prepare_region(
                             &working,
-                            block.quad,
+                            block.bbox,
                             block.source.split('\n').count() as u32,
                         )?;
                         if !emit_preparation_costs(block.block_id, &region, &mut emit) {
@@ -364,7 +362,7 @@ impl ImagePipeline {
                 let start = Instant::now();
                 let rect = super::processing::candidate_region(
                     &working,
-                    working.map_quad(preparation.quad).bounds(),
+                    mapped_rect(preparation.bbox, &working),
                 )
                 .map_err(|_| "candidate_geometry_failed")?;
                 if !emit(PhotoImageOutput::Candidate {
@@ -377,7 +375,7 @@ impl ImagePipeline {
             }
             if let (Some(_), Some(lines)) = (&preparation.source, preparation.source_line_count) {
                 if !self.prepared.contains_key(&preparation.block_id) {
-                    let region = self.prepare_region(&working, preparation.quad, lines)?;
+                    let region = self.prepare_region(&working, preparation.bbox, lines)?;
                     if !emit_preparation_costs(preparation.block_id, &region, &mut emit) {
                         return Ok(());
                     }
@@ -444,7 +442,7 @@ impl ImagePipeline {
     fn prepare_region(
         &mut self,
         working: &WorkingPhoto,
-        quad: [[f64; 2]; 4],
+        bbox: [f64; 4],
         lines: u32,
     ) -> Result<PreparedRegion, &'static str> {
         if self.processor.is_none() {
@@ -466,7 +464,7 @@ impl ImagePipeline {
             .unwrap()
             .prepare(
                 working,
-                working.map_quad(quad),
+                mapped_rect(bbox, working),
                 lines,
                 self.erase_source
                     .as_ref()
@@ -548,6 +546,15 @@ fn emit_preparation_costs(
 
 fn intersects(a: PixelRect, b: PixelRect) -> bool {
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+fn mapped_rect(bbox: [f64; 4], working: &WorkingPhoto) -> Rect {
+    Rect {
+        left: bbox[0] as f32 * working.scale_x,
+        top: bbox[1] as f32 * working.scale_y,
+        right: bbox[2] as f32 * working.scale_x,
+        bottom: bbox[3] as f32 * working.scale_y,
+    }
 }
 
 #[cfg(test)]

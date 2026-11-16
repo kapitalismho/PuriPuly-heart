@@ -120,7 +120,7 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
         for block in job.blocks {
             photo.preparations.push(PhotoPreparation {
                 block_id: block.block_id,
-                quad: block.quad,
+                bbox: block.bbox,
                 source: None,
                 source_line_count: None,
             });
@@ -197,24 +197,4 @@ pub async fn run(path: &Path) -> Result<(), PhotoError> {
         json!({"type": "photo_offline_complete", "block_count": compositor.block_count(), "original_uploads": compositor.original_uploads})
     );
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn offline_job_preserves_quad_block_order_and_physical_lines() {
-        let job: OfflineJob = serde_json::from_value(json!({
-            "source_path":"original.png","output_dir":"output","model_path":"mask.onnx",
-            "blocks":[
-                {"block_id":7,"quad":[[10,20],[30,20],[30,40],[10,40]],"source":"first\nsecond","translation":"번역"},
-                {"block_id":2,"quad":[[50,20],[80,20],[80,40],[50,40]],"source":"last","translation":"마지막"}
-            ]
-        })).unwrap();
-        assert_eq!(job.max_size, [1920, 1080]);
-        assert_eq!(job.blocks.iter().map(|block| block.block_id).collect::<Vec<_>>(), [7, 2]);
-        assert_eq!(job.blocks[0].quad, [[10.0,20.0],[30.0,20.0],[30.0,40.0],[10.0,40.0]]);
-        assert_eq!(job.blocks[0].source.split('\n').count(), 2);
-    }
 }

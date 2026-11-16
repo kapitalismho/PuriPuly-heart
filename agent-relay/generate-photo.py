@@ -12,6 +12,6 @@ if __name__ == "__main__":
         "schema": render_photo_prompt("en").schema,
         "languages": {code: info.name for code, info in SUPPORTED_LANGUAGES.items()},
     }
-    Path(__file__).with_name("src").joinpath("photo-quad-contract.json").write_text(
+    Path(__file__).with_name("src").joinpath("photo-contract.json").write_text(
         json.dumps(contract, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import legacyContract from '../src/photo-contract.json';
-import quadContract from '../src/photo-quad-contract.json';
 import relay from '../src/index';
 import { checkPhotoAllowance, photoAllowanceUsed, photoPolicy } from '../src/usage';
 import { accountingDatabase, installationHash, relayEvents, responseEvents, signToken, tokenSecret } from './fixtures';
@@ -110,12 +109,9 @@ The image is ${text} pixels.`);
     expect(upstream.mock.calls.length).toBe(calls);
     sqlite.close();
   });
-  it.each([1, 2, 3])('preserves protocol %s geometry, JPEG upload and one settled request', async (version) => {
+  it.each([1, 2])('preserves protocol %s geometry, JPEG upload and one settled request', async (version) => {
     const { db, sqlite } = accountingDatabase();
-    const geometry = version === 3
-      ? { quad: [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]] }
-      : { bbox: [0, 0, 100, 100] };
-    const block = { ...geometry, source: 'one\nunknown ?', translation: '하나\n?' };
+    const block = { bbox: [0, 0, 100, 100], source: 'one\nunknown ?', translation: '하나\n?' };
     const text = JSON.stringify({ blocks: [block] });
     const upstream = vi.fn().mockResolvedValue(responseEvents(result, [
       { type: 'response.output_text.delta', delta: text },
@@ -130,19 +126,13 @@ The image is ${text} pixels.`);
       expect(JSON.parse(events[0].text as string).blocks).toEqual([block]);
       expect(upstream).toHaveBeenCalledTimes(1);
       const sent = JSON.parse(upstream.mock.calls[0][1].body);
-      const contract = version === 3 ? quadContract : legacyContract;
-      expect(sent.text.format.schema).toEqual(contract.schema);
-      expect(sent.text.format.schema.properties.blocks.items.required).toEqual([
-        version === 3 ? 'quad' : 'bbox', 'source', 'translation',
-      ]);
-      expect(sent.text.format.schema.properties.blocks.items.properties).toEqual(version === 3 ? {
-        quad: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, minItems: 4, maxItems: 4 },
-        source: { type: 'string' }, translation: { type: 'string' },
-      } : {
+      expect(sent.text.format.schema).toEqual(legacyContract.schema);
+      expect(sent.text.format.schema.properties.blocks.items.required).toEqual(['bbox', 'source', 'translation']);
+      expect(sent.text.format.schema.properties.blocks.items.properties).toEqual({
         bbox: { type: 'array', items: { type: 'integer' }, minItems: 4, maxItems: 4 },
         source: { type: 'string' }, translation: { type: 'string' },
       });
-      expect(sent.instructions).toBe(contract.instructions.replaceAll('${targetName}', 'Korean'));
+      expect(sent.instructions).toBe(legacyContract.instructions.replaceAll('${targetName}', 'Korean'));
       expect(sent.input[0].content[0]).toEqual({ type: 'input_image', image_url: `data:image/jpeg;base64,${body.image_base64}` });
       expect(sent.input[0].content[1].text).toContain(version === 1 ? '1280x720' : '720x1280');
       expect(sqlite.prepare('SELECT settled, output_tokens FROM photo_admissions').get()).toMatchObject({ settled: 1, output_tokens: 2556 });
@@ -151,15 +141,15 @@ The image is ${text} pixels.`);
     }
   });
 
-  it('rejects invalid v3 canvases, retired versions and non-JPEG input before admission', async () => {
+  it('rejects invalid v2 canvases, unsupported versions and non-JPEG input before admission', async () => {
     const { db, sqlite } = accountingDatabase();
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     try {
-      const current = { ...body, photo_protocol: 3, image_size: [1280, 720] };
+      const current = { ...body, photo_protocol: 2, image_size: [1280, 720] };
       for (const invalid of [
         { ...current, image_size: [1920, 1080] }, { ...current, image_size: undefined },
-        { ...current, photo_protocol: true }, { ...current, photo_protocol: 4 },
+        { ...current, photo_protocol: true }, { ...current, photo_protocol: 3 }, { ...current, photo_protocol: 4 },
         { ...current, image_base64: 'iVBORw0KGgo=' }, { ...current, image_base64: '/9j/AAA!' },
       ]) {
         expect((await relay.fetch(request(invalid), environment(db))).status).toBe(400);
@@ -402,7 +392,6 @@ describe('photo structured-answer message selection', () => {
   it.each([
     [1, '{"blocks": invalid'], [1, '{"blocks":[]}'],
     [2, '{"blocks": invalid'], [2, '{"blocks":[]}'],
-    [3, '{"blocks": invalid'], [3, '{"blocks":[]}'],
   ] as const)('streams only final blocks before terminal completion for protocol %s (%s)', async (version, commentary) => {
     const { db, sqlite } = accountingDatabase();
     let controller: ReadableStreamDefaultController<Uint8Array>;
@@ -411,7 +400,7 @@ describe('photo structured-answer message selection', () => {
     const fetch = vi.fn().mockResolvedValue(new Response(upstream, { headers: { 'content-type': 'text/event-stream' } }));
     vi.stubGlobal('fetch', fetch);
     const block = {
-      ...(version === 3 ? { quad: [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]] } : { bbox: [0, 0, 100, 100] }),
+      bbox: [0, 0, 100, 100],
       source: 'FINAL\n?', translation: '최종\n?',
     };
     const first = '{"blocks":[' + JSON.stringify(block);
@@ -450,7 +439,7 @@ describe('photo structured-answer message selection', () => {
     ]));
     vi.stubGlobal('fetch', fetch);
     try {
-      const events = await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 3, image_size: [1280, 720] }), environment(db)));
+      const events = await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 2, image_size: [1280, 720] }), environment(db)));
       expect(events.map((event) => event.type)).toEqual(['text_delta', 'completed']);
       expect(events[0].text).toBe(text);
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -479,7 +468,7 @@ describe('photo structured-answer message selection', () => {
     const fetch = vi.fn().mockResolvedValue(responseEvents({ ...result, output }, events));
     vi.stubGlobal('fetch', fetch);
     try {
-      expect(await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 3, image_size: [1280, 720] }), environment(db)))).toEqual([
+      expect(await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 2, image_size: [1280, 720] }), environment(db)))).toEqual([
         { type: 'error', error: { code: 'upstream_invalid_response' } },
       ]);
       expect(fetch).toHaveBeenCalledTimes(1);

@@ -753,7 +753,7 @@ class RelayPhotoConnection(OpenAIPhotoConnection):
 
     def _body(self, image: PreparedPhoto, target_language: str) -> dict:
         return {
-            "photo_protocol": 3,
+            "photo_protocol": 2,
             "request_id": self._request_id,
             "image_base64": image.jpeg_base64,
             "image_size": list(image.send_size),

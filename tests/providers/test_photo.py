@@ -206,9 +206,7 @@ async def test_luna_dedicated_preopen_send_timing_partial_blocks_and_completion(
     connections = []
     release = asyncio.Event()
     disconnected = asyncio.Event()
-    block = (
-        '{"quad":[[200,100],[600,100],[600,300],[200,300]],"source":"Hello","translation":"안녕"}'
-    )
+    block = '{"bbox":[200,100,600,300],"source":"Hello","translation":"안녕"}'
 
     async def handle(socket):
         connections.append(socket.request.headers.get("Authorization"))
@@ -260,7 +258,7 @@ async def test_luna_dedicated_preopen_send_timing_partial_blocks_and_completion(
         assert "temperature" not in request
         assert request["text"]["format"]["strict"] is True
         assert request["text"]["format"]["schema"]["properties"]["blocks"]["items"]["required"] == [
-            "quad",
+            "bbox",
             "source",
             "translation",
         ]
@@ -283,9 +281,7 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
     model: str,
 ):
     photo = await synthetic_photo(tmp_path)
-    block = (
-        '{"quad":[[200,100],[600,100],[600,400],[200,400]],"source":"Hello","translation":"안녕"}'
-    )
+    block = '{"box_2d":[100,200,400,600],"source":"Hello","translation":"안녕"}'
     chunks = [
         _google_chunk("private thought", thought=True),
         _google_chunk('{"blocks":[' + block),
@@ -304,7 +300,7 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
         assert isinstance(sent, PhotoRequestSent)
         delta = await anext(stream)
         assert delta == PhotoTextDelta('{"blocks":[' + block)
-        events = PhotoBlockParser().feed(delta.text)
+        events = PhotoBlockParser(google=True).feed(delta.text)
         assert any(event.kind == "block_complete" for event in events)
         assert server.connections == 1
         assert [request[0] for request in server.requests] == ["GET", "POST"]
@@ -321,13 +317,8 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
         assert config["mediaResolution"] == "MEDIA_RESOLUTION_HIGH"
         assert not {"temperature", "topP", "topK"}.intersection(config)
         schema = config["responseJsonSchema"]["properties"]["blocks"]["items"]
-        assert schema["required"] == ["quad", "source", "translation"]
-        assert schema["properties"]["quad"]["items"] == {
-            "type": "array",
-            "items": {"type": "number"},
-            "minItems": 2,
-            "maxItems": 2,
-        }
+        assert schema["required"] == ["box_2d", "source", "translation"]
+        assert schema["properties"]["box_2d"]["items"] == {"type": "integer"}
         assert "normalized to 0-1000" in body["systemInstruction"]["parts"][0]["text"]
         assert not server.gate.is_set()
         server.gate.set()
@@ -614,9 +605,7 @@ async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_pai
     photo = await synthetic_photo(tmp_path)
     events = [
         response_item(),
-        response_delta(
-            '{"blocks":[{"quad":[[0,0],[100,0],[100,100],[0,100]],"source":"one","translation":"하나"}'
-        ),
+        response_delta('{"blocks":[{"bbox":[0,0,100,100],"source":"one","translation":"하나"}'),
         response_delta("]}"),
         {
             "type": "response.completed",
@@ -647,7 +636,7 @@ async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_pai
         assert server.requests[0][2]["model"] == "gpt-6-luna"
         assert server.requests[0][2]["text"]["format"]["schema"]["properties"]["blocks"]["items"][
             "required"
-        ] == ["quad", "source", "translation"]
+        ] == ["bbox", "source", "translation"]
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-api-key"
 
 
@@ -683,9 +672,9 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         tokens.append(True)
         return "synthetic-puri-token"
 
-    quad = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
+    bbox = [250, 100, 500, 300]
     document = json.dumps(
-        {"blocks": [{"quad": quad, "source": "known\n?", "translation": "알려짐\n?"}]}
+        {"blocks": [{"bbox": bbox, "source": "known\n?", "translation": "알려짐\n?"}]}
     )
 
     events = [
@@ -711,15 +700,19 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
             for stage in parser.feed(event.text)
         ]
         blocks = parser.finish()
-        assert [event.kind for event in parsed] == ["quad_ready", "source_ready", "block_complete"]
-        assert blocks[0].quad == tuple(tuple(point) for point in quad)
+        assert [event.kind for event in parsed] == ["bbox_ready", "source_ready", "block_complete"]
+        assert blocks[0].bbox == tuple(bbox)
         assert blocks[0].source == "known\n?"
         assert blocks[0].translation == "알려짐\n?"
-        mapped = photo.map_quad(blocks[0].quad, google=False)
-        for actual, (x, y) in zip(mapped.quad, quad, strict=True):
-            assert actual == pytest.approx(
-                ((x - photo.offset_x) / photo.scale, (y - photo.offset_y) / photo.scale)
+        mapped = photo.map_box(blocks[0].bbox, google=False)
+        assert mapped.bbox == pytest.approx(
+            (
+                (bbox[0] - photo.offset_x) / photo.scale,
+                (bbox[1] - photo.offset_y) / photo.scale,
+                (bbox[2] - photo.offset_x) / photo.scale,
+                (bbox[3] - photo.offset_y) / photo.scale,
             )
+        )
         assert not mapped.corrected
         assert len(server.requests) == 1
         sent = server.requests[0][2]
@@ -730,7 +723,7 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
             "image_size",
             "target_language",
         }
-        assert sent["photo_protocol"] == 3
+        assert sent["photo_protocol"] == 2
         assert sent["image_size"] == [1280, 720]
         assert sent["image_base64"] == photo.jpeg_base64
         assert sent["target_language"] == "ko"
@@ -845,7 +838,7 @@ async def test_api_consumer_failure_releases_single_connection_pool_for_next_pho
         assert len(server.requests) == 2
 
 
-async def test_portrait_preparation_maps_quads_and_prompts_in_its_upright_canvas(tmp_path):
+async def test_portrait_preparation_maps_boxes_and_prompts_in_its_upright_canvas(tmp_path):
     from puripuly_heart.providers.photo import _luna_payload
 
     source = tmp_path / "source.png"
@@ -867,31 +860,21 @@ async def test_portrait_preparation_maps_quads_and_prompts_in_its_upright_canvas
         directory=tmp_path,
     )
     assert photo.send_size == (720, 1280)
-    assert photo.map_quad(((0, 640), (720, 640), (720, 1280), (0, 1280)), google=False).quad == (
-        (0.0, 1920.0),
-        (2160.0, 1920.0),
-        (2160.0, 3840.0),
-        (0.0, 3840.0),
-    )
-    assert photo.map_quad(((0, 500), (1000, 500), (1000, 1000), (0, 1000)), google=True).quad == (
-        (0.0, 1920.0),
-        (2160.0, 1920.0),
-        (2160.0, 3840.0),
-        (0.0, 3840.0),
-    )
+    assert photo.map_box((0, 640, 720, 1280), google=False).bbox == (0.0, 1920.0, 2160.0, 3840.0)
+    assert photo.map_box((500, 0, 1000, 1000), google=True).bbox == (0.0, 1920.0, 2160.0, 3840.0)
     text = _luna_payload(photo, "ko")["input"][0]["content"][1]["text"]
     assert text.endswith("The image is 720x1280 pixels.")
 
 
-async def test_openrouter_one_quad_translation_request_reaches_consumer_without_geometry_followup(
+async def test_openrouter_one_bbox_translation_request_reaches_consumer_without_geometry_followup(
     tmp_path,
 ):
     from puripuly_heart.providers.photo import OpenRouterPhotoConnection
 
     photo = await synthetic_photo(tmp_path)
-    quad = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
+    bbox = [250, 100, 500, 300]
     document = json.dumps(
-        {"blocks": [{"quad": quad, "source": "known\n?", "translation": "알려짐\n?"}]}
+        {"blocks": [{"bbox": bbox, "source": "known\n?", "translation": "알려짐\n?"}]}
     )
     events = [
         {"type": "response.output_text.delta", "delta": document},
@@ -916,14 +899,14 @@ async def test_openrouter_one_quad_translation_request_reaches_consumer_without_
                 received.extend(parser.feed(event.text))
         blocks = parser.finish()
         assert len(blocks) == 1
-        assert blocks[0].quad == tuple(tuple(point) for point in quad)
+        assert blocks[0].bbox == tuple(bbox)
         assert blocks[0].translation == "알려짐\n?"
         assert [event.kind for event in received] == [
-            "quad_ready",
+            "bbox_ready",
             "source_ready",
             "block_complete",
         ]
-        mapped = photo.map_quad(blocks[0].quad, google=False)
+        mapped = photo.map_box(blocks[0].bbox, google=False)
         assert not mapped.corrected
         assert len(server.requests) == len(credentials) == 1
         sent = server.requests[0][2]
@@ -933,7 +916,7 @@ async def test_openrouter_one_quad_translation_request_reaches_consumer_without_
             "require_parameters": True,
         }
         assert sent["text"]["format"]["schema"]["properties"]["blocks"]["items"]["required"] == [
-            "quad",
+            "bbox",
             "source",
             "translation",
         ]
@@ -1002,8 +985,8 @@ async def test_only_explicit_final_message_reaches_staged_lifecycle_before_compl
     from puripuly_heart.core.photo.lifecycle import PhotoLifecycle, PhotoRoute
 
     photo = await synthetic_photo(tmp_path)
-    quad = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
-    block = {"quad": quad, "source": "FINAL\n?", "translation": "최종\n?"}
+    bbox = [250, 100, 500, 300]
+    block = {"bbox": bbox, "source": "FINAL\n?", "translation": "최종\n?"}
     first = '{"blocks":[' + json.dumps(block, ensure_ascii=False)
     message = response_message("comment", "commentary", commentary)
     final = response_message("answer", "final_answer", first + "]}")
@@ -1055,8 +1038,8 @@ async def test_only_explicit_final_message_reaches_staged_lifecycle_before_compl
             assert owner.request_starts == len(requests) == 1
             assert staged["blocks"][0]["source"] == "FINAL\n?"
             assert staged["blocks"][0]["translation"] == "최종\n?"
-            expected = photo.map_quad(tuple(tuple(point) for point in quad), google=False)
-            assert staged["blocks"][0]["quad"] == [list(point) for point in expected.quad]
+            expected = photo.map_box(tuple(bbox), google=False)
+            assert staged["blocks"][0]["bbox"] == list(expected.bbox)
             preparations = [
                 snapshot["photo"]["preparations"]
                 for snapshot in snapshots
@@ -1065,7 +1048,7 @@ async def test_only_explicit_final_message_reaches_staged_lifecycle_before_compl
             assert preparations[0][0]["source"] is None
             assert any(items[0]["source_line_count"] == 2 for items in preparations)
             assert all(
-                item["quad"] == staged["blocks"][0]["quad"]
+                item["bbox"] == staged["blocks"][0]["bbox"]
                 for items in preparations
                 for item in items
             )

@@ -39,7 +39,6 @@ async def test_wrong_identity_unknown_control_and_old_generation_are_rejected():
             {"protocol_version": True},
             {"protocol_version": 1},
             {"protocol_version": 2},
-            {"protocol_version": 3},
         ):
             async with connect(first["bridge_url"]) as connection:
                 await connection.send(json.dumps(auth(first) | mutation))

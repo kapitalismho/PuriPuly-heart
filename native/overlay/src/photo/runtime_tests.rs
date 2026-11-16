@@ -20,7 +20,7 @@ fn feedback_requires_live_draw_and_is_once_per_attempt_even_after_snapshot_ack()
         "expected_file_id":["1","2"],
         "attempt_id":1,"phase":"completed","offer_open":false,"visible":true,
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
-        "blocks":[{"block_id":0,"quad":[[1,2],[100,2],[100,50],[1,50]],"source":"A","translation":"B"}],
+        "blocks":[{"block_id":0,"bbox":[1,2,100,50],"source":"A","translation":"B"}],
         "failure_code":null,"first_block_drawn":true,
         "excluded_blocks":[],
     }))
@@ -56,8 +56,8 @@ fn feedback_tracks_first_drawable_block_after_kept_prefix() {
         "image":{"path":"snapshot.png","width":1280,"height":720},"preparations":[],
         "excluded_blocks":[],
         "blocks":[
-            {"block_id":0,"quad":[[1,2],[100,2],[100,50],[1,50]],"source":"Brand","translation":"Brand"},
-            {"block_id":1,"quad":[[200,2],[300,2],[300,50],[200,50]],"source":"Source","translation":"Translation"}
+            {"block_id":0,"bbox":[1,2,100,50],"source":"Brand","translation":"Brand"},
+            {"block_id":1,"bbox":[200,2,300,50],"source":"Source","translation":"Translation"}
         ],"failure_code":null,"first_block_drawn":false
     }))
     .unwrap();
@@ -537,8 +537,8 @@ impl PhotoRuntime {
             "image":{"path":"synthetic.png", "width":320, "height":180}, "preparations":[],
             "excluded_blocks":[],
             "blocks":[
-                {"block_id":0, "quad":[[1,2],[100,2],[100,50],[1,50]], "source":"Brand", "translation":"Brand"},
-                {"block_id":1, "quad":[[30,45],[290,45],[290,125],[30,125]], "source":"Source", "translation":"Temporary photo"}
+                {"block_id":0, "bbox":[1,2,100,50], "source":"Brand", "translation":"Brand"},
+                {"block_id":1, "bbox":[30,45,290,125], "source":"Source", "translation":"Temporary photo"}
             ], "failure_code":null, "first_block_drawn":false
         })).unwrap();
         let blocks = std::mem::take(&mut photo.blocks);
@@ -845,8 +845,8 @@ impl PhotoRuntime {
         photo.visible = true;
         photo.image = Some(serde_json::from_value(json!({"path":"synthetic.png","width":320,"height":180})).unwrap());
         photo.blocks = serde_json::from_value(json!([
-            {"block_id":0, "quad":[[1,2],[100,2],[100,50],[1,50]], "source":"Brand", "translation":"Brand"},
-            {"block_id":1, "quad":[[30,45],[290,45],[290,125],[30,125]], "source":"Source", "translation":"Temporary photo"},
+            {"block_id":0, "bbox":[1,2,100,50], "source":"Brand", "translation":"Brand"},
+            {"block_id":1, "bbox":[30,45,290,125], "source":"Source", "translation":"Temporary photo"},
         ])).unwrap();
         publish(&mut runtime, &mut bridge, &mut socket, 8, &photo).await;
         assert!(runtime.gpu_pending());

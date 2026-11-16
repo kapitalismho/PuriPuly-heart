@@ -27,12 +27,14 @@ Brand, product, and software names may stay as written.
 
 OUTPUT
 Follow the supplied JSON schema. Emit each block in this order:
-quad: four tight text-region corners as [[x,y],[x,y],[x,y],[x,y]], clockwise in screen-y-down coordinates, ordered top-left, top-right, bottom-right, bottom-left in the TEXT-local frame (not the image axes), in pixel coordinates of this image;
+bbox: [x0, y0, x1, y1] tightly around its text, in pixel coordinates of this image;
 source: exact source, with \n for physical line breaks.
 translation: the ${targetName} translation of the whole block. If the block says the same thing in several languages, translate it once."""
 
-_QUAD_UNITS = "in pixel coordinates of this image;"
-_GOOGLE_QUAD_UNITS = "with each [x,y] axis normalized to 0-1000;"
+_BBOX_LINE = "bbox: [x0, y0, x1, y1] tightly around its text, in pixel coordinates of this image;"
+_GOOGLE_BBOX_LINE = (
+    "box_2d: [ymin, xmin, ymax, xmax] tightly around its text, normalized to 0-1000;"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +60,8 @@ def render_photo_prompt(
     target_name = get_llm_language_name(target_language)
     instructions = _INSTRUCTIONS.replace("${targetName}", target_name)
     if google:
-        instructions = instructions.replace(_QUAD_UNITS, _GOOGLE_QUAD_UNITS)
+        instructions = instructions.replace(_BBOX_LINE, _GOOGLE_BBOX_LINE)
+    coordinate_field = "box_2d" if google else "bbox"
     schema = {
         "type": "object",
         "additionalProperties": False,
@@ -69,16 +72,11 @@ def render_photo_prompt(
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["quad", "source", "translation"],
+                    "required": [coordinate_field, "source", "translation"],
                     "properties": {
-                        "quad": {
+                        coordinate_field: {
                             "type": "array",
-                            "items": {
-                                "type": "array",
-                                "items": {"type": "number"},
-                                "minItems": 2,
-                                "maxItems": 2,
-                            },
+                            "items": {"type": "integer"},
                             "minItems": 4,
                             "maxItems": 4,
                         },

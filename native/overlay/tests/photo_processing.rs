@@ -1,4 +1,4 @@
-use puripuly_heart_overlay::photo::processing::{MaskProcessor, Quad, WorkingPhoto};
+use puripuly_heart_overlay::photo::processing::{MaskProcessor, Rect, WorkingPhoto};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -25,16 +25,19 @@ fn chosen_model_infers_original_photo_against_offline_reference() {
     )
     .unwrap();
     assert!(Arc::ptr_eq(&source, &work.pixels));
-    let quad = Quad::new(
-        serde_json::from_value(fixture["quad"].clone()).unwrap(),
-        [original_dimensions.0, original_dimensions.1],
-    ).unwrap();
+    let bbox = fixture["bbox"].as_array().unwrap();
+    let bbox = Rect {
+        left: bbox[0].as_f64().unwrap() as f32,
+        top: bbox[1].as_f64().unwrap() as f32,
+        right: bbox[2].as_f64().unwrap() as f32,
+        bottom: bbox[3].as_f64().unwrap() as f32,
+    };
     let mut processor = MaskProcessor::new(&model, Some(&runtime)).unwrap();
     let mut workspace = puripuly_heart_overlay::photo::processing::Workspace::default();
     let prepared = processor
         .prepare(
             &work,
-            quad,
+            bbox,
             fixture["lines"].as_u64().unwrap() as u32,
             &work.pixels,
             &mut workspace,

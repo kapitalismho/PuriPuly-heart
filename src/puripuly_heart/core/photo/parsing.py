@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Literal
 
-Quad = tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]
+BBox = tuple[int, int, int, int]
 
 
 class PhotoParseError(ValueError):
@@ -14,22 +14,22 @@ class PhotoParseError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class PhotoBlock:
-    quad: Quad
+    bbox: BBox
     source: str
     translation: str
 
 
 @dataclass(frozen=True, slots=True)
-class QuadReady:
+class BboxReady:
     index: int
-    quad: Quad
-    kind: Literal["quad_ready"] = field(default="quad_ready", init=False)
+    bbox: BBox
+    kind: Literal["bbox_ready"] = field(default="bbox_ready", init=False)
 
 
 @dataclass(frozen=True, slots=True)
 class SourceReady:
     index: int
-    quad: Quad
+    bbox: BBox
     source: str
     source_line_count: int
     kind: Literal["source_ready"] = field(default="source_ready", init=False)
@@ -38,15 +38,15 @@ class SourceReady:
 @dataclass(frozen=True, slots=True)
 class BlockComplete:
     index: int
-    quad: Quad
+    bbox: BBox
     source: str
     translation: str
     kind: Literal["block_complete"] = field(default="block_complete", init=False)
 
 
-PhotoParseEvent = QuadReady | SourceReady | BlockComplete
+PhotoParseEvent = BboxReady | SourceReady | BlockComplete
 
-_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\Z")
+_INTEGER = re.compile(r"-?(?:0|[1-9][0-9]*)\Z")
 _WHITESPACE = " \t\r\n"
 _PUNCTUATION = {
     "root_colon": (":", "blocks_start"),
@@ -56,19 +56,18 @@ _PUNCTUATION = {
 
 
 class PhotoBlockParser:
-    def __init__(self) -> None:
-        self._fields = ("quad", "source", "translation")
+    def __init__(self, *, google: bool = False) -> None:
+        self._fields = ("box_2d" if google else "bbox", "source", "translation")
         self._state = "preamble"
         self._depth = 0
         self._string: list[str] | None = None
         self._escaped = False
         self._number: list[str] | None = None
-        self._coordinates: list[float] = []
-        self._points: list[tuple[float, float]] = []
+        self._coordinates: list[int] = []
         self._field_name: str | None = None
         self._seen_fields: set[str] = set()
         self._source_emitted = False
-        self._quad: Quad | None = None
+        self._bbox: BBox | None = None
         self._source: str | None = None
         self._translation: str | None = None
         self._blocks: list[PhotoBlock] = []
@@ -125,13 +124,13 @@ class PhotoBlockParser:
             if char in _WHITESPACE or char in ",]":
                 token = "".join(self._number)
                 self._number = None
-                if not _NUMBER.fullmatch(token):
-                    self._fail("quad coordinates must be JSON numbers")
+                if not _INTEGER.fullmatch(token):
+                    self._fail("bbox coordinates must be JSON integers")
                 try:
-                    self._coordinates.append(float(token))
+                    self._coordinates.append(int(token))
                 except ValueError:
-                    self._fail("invalid quad number")
-                self._state = "point_separator"
+                    self._fail("invalid bbox integer")
+                self._state = "bbox_separator"
             else:
                 self._number.append(char)
                 return
@@ -177,8 +176,7 @@ class PhotoBlockParser:
             self._seen_fields.clear()
             self._source_emitted = False
             self._coordinates = []
-            self._points = []
-            self._quad = None
+            self._bbox = None
             self._source = None
             self._translation = None
             self._state = "block_key"
@@ -186,48 +184,31 @@ class PhotoBlockParser:
         if self._state == "field_value":
             if self._field_name == self._fields[0]:
                 if char != "[":
-                    self._fail("quad must be an array")
+                    self._fail("bbox must be an array")
                 self._depth += 1
-                self._state = "point_start"
+                self._state = "bbox_number"
             else:
                 if char != '"':
                     self._fail(f"{self._field_name} must be a string")
                 self._string = ['"']
             return
-        if self._state == "point_start":
-            if char != "[":
-                self._fail("quad must contain exactly four coordinate pairs")
-            self._depth += 1
-            self._coordinates = []
-            self._state = "point_number"
-            return
-        if self._state == "point_number":
+        if self._state == "bbox_number":
             if char not in "-0123456789":
-                self._fail("quad coordinates must be JSON numbers")
+                self._fail("bbox coordinates must be integers")
             self._number = [char]
             return
-        if self._state == "point_separator":
-            if char == "," and len(self._coordinates) == 1:
-                self._state = "point_number"
-            elif char == "]" and len(self._coordinates) == 2:
+        if self._state == "bbox_separator":
+            if char == "," and len(self._coordinates) < 4:
+                self._state = "bbox_number"
+            elif char == "]" and len(self._coordinates) == 4:
                 self._depth -= 1
-                self._points.append((self._coordinates[0], self._coordinates[1]))
-                self._state = "quad_separator"
-            else:
-                self._fail("quad points must contain exactly two numbers")
-            return
-        if self._state == "quad_separator":
-            if char == "," and len(self._points) < 4:
-                self._state = "point_start"
-            elif char == "]" and len(self._points) == 4:
-                self._depth -= 1
-                a, b, c, d = self._points
-                self._quad = (a, b, c, d)
-                events.append(QuadReady(index=len(self._blocks), quad=self._quad))
+                a, b, c, d = self._coordinates
+                self._bbox = (a, b, c, d)
+                events.append(BboxReady(index=len(self._blocks), bbox=self._bbox))
                 self._emit_source(events)
                 self._state = "field_separator"
             else:
-                self._fail("quad must contain exactly four coordinate pairs")
+                self._fail("bbox must contain exactly four integers")
             return
         if self._state == "field_separator":
             if char == ",":
@@ -235,14 +216,14 @@ class PhotoBlockParser:
                 return
             if char != "}":
                 self._fail("expected a comma or end of block")
-            if self._quad is None or self._source is None or self._translation is None:
+            if self._bbox is None or self._source is None or self._translation is None:
                 self._fail("incomplete block")
             self._depth -= 1
-            block = PhotoBlock(self._quad, self._source, self._translation)
+            block = PhotoBlock(self._bbox, self._source, self._translation)
             events.append(
                 BlockComplete(
                     index=len(self._blocks),
-                    quad=block.quad,
+                    bbox=block.bbox,
                     source=block.source,
                     translation=block.translation,
                 )
@@ -285,11 +266,11 @@ class PhotoBlockParser:
             self._fail("unexpected JSON string")
 
     def _emit_source(self, events: list[PhotoParseEvent]) -> None:
-        if self._quad is not None and self._source is not None and not self._source_emitted:
+        if self._bbox is not None and self._source is not None and not self._source_emitted:
             events.append(
                 SourceReady(
                     index=len(self._blocks),
-                    quad=self._quad,
+                    bbox=self._bbox,
                     source=self._source,
                     source_line_count=self._source.count("\n") + 1,
                 )
