@@ -1,8 +1,8 @@
 # Command-line control
 
-The CLI controls the same application owners as the GUI. It can start a headless host or attach to a running GUI/headless instance; it is not a second translation runtime and does not edit settings JSON directly.
+The CLI starts a headless host or controls a running GUI/headless instance. Both use the same application runtime. Change settings through the CLI, not by editing JSON.
 
-This guide covers the usage model and contracts needed for safe automation. Discover command syntax with `--help`, supported operations with `capabilities`, and current values with `settings choices`. Provider internals, policy constants, and regression details belong in [the implementation](#source-map), not this guide.
+This guide covers usage and result interpretation. Discover syntax with `--help`, operations with `capabilities`, and settings with `settings choices`. See the [source map](#source-map) for implementation details.
 
 ## Entry Point and Host Lifecycle
 
@@ -24,15 +24,14 @@ uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app 
 uv run python -m puripuly_heart.main cli --config C:\work\puripuly-dev.json app stop
 ```
 
-- Use the same `--config` path for host and clients. It identifies canonical settings-file ownership; omission selects the user's normal settings. Use isolated synthetic settings for probes, not a live user's configuration. A separate settings path alone does not isolate model, secret-store or other writable runtime roots.
-- Only one host may own that settings identity. `app start` defaults to foreground; `--background` outlives the launching terminal. Ordinary no-command application launch still opens the GUI.
+- Use the same `--config` path for host and clients. Omission selects the user's normal settings. For probes, isolate settings and writable runtime roots; a separate settings file alone does not isolate secrets or models.
+- One host owns each settings identity. `app start` runs in the foreground; `--background` outlives the terminal. Launching the application without a CLI command opens the GUI.
 - `app list` lists current-user instances. `app discover` and `app status` target the selected settings identity; `app restart --background` replaces that host.
-- Discovery is a point-in-time snapshot. A pending discovery read does not retain a stopping host's ownership lease.
-- Queries and mutations never start a missing host implicitly: `instance_not_found` requires an explicit start. A PID is observation, not control identity; the CLI never kills by PID.
-- `app stop` waits for the original endpoint and observed process identity to disappear. `cleanup_outcome: unobserved` does not certify every teardown callback or resource release. `--no-wait` returns only shutdown acceptance.
+- Commands never start a missing host implicitly. On `instance_not_found`, start it explicitly.
+- `app stop` waits for host exit. `--no-wait` returns shutdown acceptance, not completed cleanup.
 - `--timeout <seconds>` bounds client waiting, not operation lifetime, and never retries a mutation. `Ctrl+C` exits 130; a background host remains independent.
 
-Source changes are not hot-reloaded. Restart a running source host after changing code or bundled resource names; installed builds require a rebuilt application payload.
+Restart source hosts after code changes. Installed builds require a rebuilt payload.
 
 ## Discover Before Acting
 
@@ -54,7 +53,7 @@ puripuly.exe models status
 puripuly.exe query providers.status
 ```
 
-Choices can depend on extensions and available devices. Query the running host rather than copying a catalog into a script. Queries are side-effect-free observations; enumeration may inspect the desktop/audio environment but does not enable recording.
+Choices depend on extensions and devices. Query the host instead of hard-coding catalogs. Queries do not enable recording.
 
 Convenience commands cover common controls:
 
@@ -65,14 +64,14 @@ puripuly.exe audio test on
 puripuly.exe overlay set on
 ```
 
-For less common operations, use the finite named catalog, not private Python APIs:
+Use named commands and queries for other operations:
 
 ```powershell
 puripuly.exe query <query-name> --file .\query.json
 puripuly.exe command <command-name> --file .\arguments.json --no-wait
 ```
 
-`--arguments '<JSON object>'` is an alternative for non-sensitive payloads. Unknown names/fields are rejected; this is not arbitrary RPC reflection. Use dedicated `secrets`, `auth`, and `text` commands for protected operations: generic dispatch rejects `secrets.set`, `secrets.verify`, `auth.login`, and `text.submit`.
+Use `--arguments '<JSON object>'` only for non-sensitive input. Unknown names and fields are rejected. Protected operations require the dedicated `secrets`, `auth`, and `text` commands.
 
 ## Settings and Runtime State
 
@@ -91,59 +90,12 @@ puripuly.exe settings current
 puripuly.exe settings apply --file .\changes.json --expected-revision <current-revision>
 ```
 
-- `--expected-revision` is optional; use it to reject a concurrent edit rather than overwrite it. Focused changes preserve unrelated settings.
-- Settings/provider changes commit together, then runtime owners apply them. A runtime failure can return `degraded` while the intent remains saved. Cancellation does not undo a durable commit.
-- Apply a translation model and its connection together using a combination from `settings choices`. For ASR, `asr set --channel self|peer|both --provider <choice>` is the convenience form.
-- Explicit provider fields can retry pending provider application; unrelated general settings edits do not. Observe committed settings and effective provider state separately, including after restart when checking persistence.
+- Use `--expected-revision` to reject concurrent edits. Focused changes preserve unrelated settings.
+- Settings commit before runtime application. `degraded` can mean saved but not applied; cancellation does not undo a commit.
+- Apply a translation model and connection together using `settings choices`. For ASR, use `asr set --channel self|peer|both --provider <choice>`.
+- Retry failed provider application explicitly. Unrelated settings edits do not retry it.
 
-### Settings Files and Retired Choices
-
-- Missing settings use canonical first-run defaults. A flat pre-vNext settings object is archived byte-for-byte, then replaced with canonical reset defaults without a UI notice; its previous values are not imported. File shape, not its legacy version number, selects this path. Reset defaults and current first-run defaults are separately owned policies.
-- Current canonical settings load normally. Recognized older canonical files are backed up and forward-migrated. Invalid JSON, non-object input, malformed canonical settings and unsupported future canonical versions fail closed rather than silently reset.
-- Backup failure leaves the original file untouched. Write or validation failure retains the archive and attempts exact-byte restoration; persistence or restoration failure remains an error, not a successful reset. Secret storage is separate and is not copied or deleted by this settings reset.
-- Fast Translation and Context mode selectors remain retired. Supported canonical historical booleans normalize to the fixed product policies and cannot restore the old selectors after save or restart. This does not preserve flat pre-vNext values or revive the retired AppSettings object facade.
-
-### GUI Settings Selection
-
-- An enabled modal option applies on its first click. Single-select dialogs close after selection; multi-select dialogs stay open and retain at least one selection.
-- Puri can still open settings and reveal a provider's secure key field without changing the selected provider. Settings no longer show the temporary Puri guidance banner or its return button; use the main navigation to return to Puri.
-- API key fields follow the selected providers. The Gemini field appears when either recognition channel selects Gemini, when active free-cloud auto-selection includes Gemini, or when Puri explicitly opens its secure key field.
-
-### Agent Chat Control
-
-- Puri admits up to 30 submitted prompts per installation per UTC day, resetting at 00:00 UTC (09:00 KST). Classification and tool continuations share their prompt's allowance; starting a new conversation or restarting the app does not reset it.
-- Puri's response model (M) prefers GPT-5.6 Terra until this Relay database has recorded 10,000,000 Terra input-plus-output tokens for the UTC day; new response turns then use GPT-6 Luna. The first response admission pins the model for that prompt turn, including tool and approval continuations, even across midnight. Classification (D), photo requests, and their existing model choices are unchanged.
-- This is a soft model preference, not a free-usage or spending guarantee. Completed usage is added atomically across installations, with cached input and reasoning output counted only once. In-flight turns can exceed the threshold; missing usage remains unknown and other applications' provider usage is not included. New UTC days select against a new counter without a scheduled reset. Apply Relay migration `0007_terra_routing.sql` before deploying this code; existing response turns stay on Luna, and the new Terra counter starts without provider-history backfill. No organization Admin API key or billing polling is used.
-- Relay cost records remain standard-price estimates, not invoices or complimentary-token confirmations. Terra uses its own input, cache-read/write and output prices, including reported 12-hour cache writes; without retention detail, writes use the 30-minute estimate. `AGENT_USAGE_RATES` continues to override Luna accounting only. Data-sharing eligibility and billing must be checked separately in the provider account; choosing Terra does not change data-sharing settings.
-- Puri uses the same application-control owners as the CLI through finite typed tools, not shell commands. It controls only the current application instance and exposes a subset of the CLI: settings changes, capture/translation/overlay switches, recognition/translation probes, microphone diagnosis, OSC discovery retry, Peer capture retry, GPU activation retry, stored-key deletion, account sign-out, desktop overlay position reset, and read-only status queries.
-- CLI-only actions remain available from the CLI but not from Puri: shutdown and restart, model download/install/import/deletion and cancellation, Gemma preparation, GPU discovery, standalone credential save/verify, account login, manual text submission, Audio Test, Peer target selection, overlay size/lock/calibration, arbitrary operation lookup/wait/cancel, and event/log observation. Puri can read the receipt of an operation retained in its current conversation without resubmitting it.
-- The current app uses protocol 7 with six typed tool families: `read_app` for observations, `set_app` for runtime switches, `probe_app` for isolated recognition/translation, microphone diagnosis and managed access checks, `retry_app` for existing recovery actions, `open_app` for explicit UI staging, and `manage_proposal` for approval cards, optional support reports, and pending-card withdrawal. Arguments stay flat and select a `topic`, `target`, `view`, or `action`. The app validates the exact selected action; missing, invalid, null, or inapplicable fields are rejected rather than discarded. The relay retains protocol 6's three-family contract alongside protocol 7; protocol-5 clients remain unsupported. Deploy the matching relay before releasing the protocol-7 app. Sparse settings proposals include only changed fields. If only the translation model or connection is supplied, the app combines it with the counterpart from its observed settings, validates the pair, and includes both values in the revision-bound approval card. Unsupported combinations and stale approvals remain rejected; host/device validation is unchanged.
-- Puri receives app state as modules: `core` (switches, channels, pending card, operations, recent diagnostics) plus `audio`, `recognition`, `translation`, `accounts`, `languages`, `output`, and `general`. For work requests, D independently selects relevant modules and whether the task continues; `core` is always observed. Missing, ambiguous or invalid selection and classification timeouts select all modules. Omitted modules are not absent or disabled; `missing` records failed local observations. A `read_app` module topic observes `core` plus that module, and `overview` observes all modules. The `diagnostics` topic returns only bounded diagnostic records, and `gpu`, `models`, `auth` and `peer_consent` return only that status. Puri has no raw settings or status query outside these topics.
-- Up to four tool calls may share a response, with at most ten calls and fifteen model requests per turn. Calls retain their order across read/action/read boundaries. Every admitted call receives an executed, failed, or explicit not-executed result; failed independent reads do not discard other read results. Approval, required user interaction, pending work, or failure stops later potentially dependent effects within that batch, not unrelated tools for the rest of the turn. After receiving the results, the model can reconsider with the normal tool set. Conversation cancellation and stale generations still prevent future work. Rejected and skipped calls still count toward the limit. Existing owners enforce actual resource/card conflicts. An uncertain accepted operation retains its request and operation IDs for receipt reconciliation, not fresh submission. Withdrawing a pending card discards only unapproved work, not accepted application operations.
-- Localized setting labels, descriptions and static options are sent in per-module `catalogs`; current values remain in module `settings`, private presence in `private`, and device/host/GPU/extension choices and availability in `options`. Later contexts append only new or changed catalogs, complete module states, and changed `core` fields; `unchanged` confirms fresh observations matching retained evidence. Included module states and catalogs replace their earlier versions, rather than merging omitted fields. `core` is merged by field: omitted fields are unchanged and a removed field is sent as `null`. Failed observations are never reported as unchanged. When supporting history is trimmed or the conversation resets, needed evidence is sent again. Filtered diagnostics remain separate query-scoped evidence. Context, account, and provider-metadata reads never stage or replace controls; `open_app` stages account or provider setup explicitly.
-- Activity timestamps are stable process-monotonic event facts with a separate observation time. Core includes all pending operations and bounded recent completions, not repeated full receipts. Diagnostic sample arrays stay out of model projections; scoped diagnosis and readiness/effect distinctions remain. Retained receipts are readable through `read_app` with `topic=operation`; missing retained evidence is not operation failure. Support-report notices preserve later completion after an earlier pending observation.
-- Same-task follow-ups retain selected and additionally read modules; new tasks, conversation reset/expiry and trimmed task history clear the previous selection. Approval and key-verification continuations use code-selected modules and their originating task, without another D call. Social requests receive display dialogue only; out-of-scope requests receive only the current message. Neither receives app snapshots, tool results or reasoning history.
-- Simulator `run` and `smoke` accept `--context-mode selected|full` (default `selected`) and record effective context decisions. Both modes use the same relay instructions and tools. D/M calls record monotonic elapsed time. First-response latency ends at the first nonempty displayed assistant message after dispatch, excluding greetings; dialogue latency ends before judging and includes intervening simulated-user/control time. Report it as completion latency only for accepted outcomes, and assess usefulness separately. Simulated-user/judge usage and transport time remain separate overhead. Recommendation scenarios assess initial advice and later updates independently of setup success, using common declared policy criteria for both versions. Regenerate the classifier module list with `uv run python agent-relay/generate-context.py`; rebuild the relay after generation. This does not authorize deployment.
-- Option labels, short descriptions, choices, and approval values come from a shared catalog localized to the current UI language (English, Korean, Japanese, Simplified Chinese, or Russian). The response language does not rename UI controls. `chatbox.activation_notice.enabled` controls the `PuriPuly ON!` notice; `stt.soniox.enable_speaker_diarization` controls Soniox speaker separation.
-- CLI/API `overlay.background_alpha` remains opacity in `[0, 1]`. Both Settings and Puri's approval card show background **transparency** as `(1 - alpha) × 100%`; `0.6` therefore displays as `40%`.
-- Settings changes, stored-key deletion, account sign-out, and desktop overlay position reset use the same revision-bound change card with before and after values. Settings cards show at most two logical changes; coupled model/connection and microphone host/device selections remain grouped. After approval the app waits for the terminal result and then shows a fixed result line; pending operations are not reported as completed.
-- Recognition/translation originals, user-authored prompts, vocabulary, custom endpoints, free-text settings, and secret values are not provided to the agent model. Private settings editing and raw-content inspection use existing app screens; there is no separate agent settings editor or local input form. Key entry uses the existing provider-setup save-and-verify card. Turning on Peer capture before its terms are accepted returns `action_required`; the terms are accepted through the dashboard LISTEN switch.
-- `settings.current` includes `private_presence` boolean metadata for protected settings. A missing presence observation is unknown, not evidence that a value is empty.
-
-### GUI Autosave
-
-- GUI settings edits are coalesced and attempted once per submitted edit. There are no timed retries or automatic runtime-only replays after failure. Saved-but-unapplied edits remain saved; persistence and effective runtime state are separate results.
-- Expected save/application failures do not show a settings failure toast, a persistent recovery row, or a dedicated Retry button. Diagnostics and unrelated operation notifications remain available.
-- Unsaved, reverted, or unknown-outcome edits remain only in the current page's memory; closing the app does not preserve them for restart. Explicitly submitting the affected setting again permits another attempt. Unrelated edits, repeated queue drains, and navigation without a new draft do not replay a failed submission.
-- This settings queue belongs to the GUI. CLI operations use the application owners and their receipts. Explicit runtime-only application and existing provider, telemetry-reporting, and model-installation recovery are unchanged. Actual persistence and resource application can still delay other ordered operations.
-
-### GUI GitHub Star Requests
-
-- Startup star requests use one app-wide record of a nonempty successful translation, regardless of connection type. Index, managed, BYOK, ChatGPT, local and custom HTTP translations all qualify; there is no managed-usage threshold.
-- Only launches with that success record count toward the first request. Changing the model or connection does not reset the record or count. Launch and repeat-display gates are owned by the [prompt service](../src/puripuly_heart/app/services/github_star_prompt.py); higher-priority startup feedback can suppress a request for that launch.
-- The GitHub action opens the repository and asynchronously saves the clicked state. A successful save suppresses future requests across restarts without checking whether the user actually starred the repository. If saving fails, a later request remains possible.
-
-### Interpret Readiness at Its Owner
+### Readiness
 
 | Observation | What it does not establish |
 | --- | --- |
@@ -153,19 +105,7 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 | Configured overlay/OSC target | Effective resource readiness, remote receipt, or physical display |
 | Applied manual-text admission | Completed translation or destination delivery |
 
-The GUI dashboard's “Ready!” means Self/TALK capture is active and its recognition provider accepts input. It does not require a first recognition result, certify an open remote connection, or guarantee recognition/translation success. Startup is shown as preparing, shutdown as stopping, and unavailable capture as failed. Readiness refreshes preserve existing conversation content and specific error/model notices; they do not clear the display.
-
-Use the terminal operation receipt together with `providers.status`, `models status`, `overlay status`, `osc status`, or the relevant owner's query. Correct the reported cause before explicitly retrying. A failed/cancelled current translation warmup turns effective translation off while retaining the selection and failure details.
-
-A failed recognition utterance does not necessarily stop capture. Use the channel's current state to distinguish recovery from terminal unavailability; a failed utterance is not replayed.
-
-An explicit SteamVR runtime shutdown turns CAPTIONS off after native cleanup, without a Desktop fallback or automatic restart. The saved VR target and calibration remain unchanged; capture and translation continue independently. Start SteamVR and use `overlay set on` to enable captions again. Initial enable without SteamVR retains the existing Desktop fallback; genuine crashes and cleanup failures remain failures. If runtime shutdown interrupts an enable operation, its receipt can be `degraded` because ON was not reached; use `overlay status` to distinguish the resulting clean OFF state from an overlay failure.
-
-Matching `translation set off` or `capture set <channel> off` can revoke pending startup. Shared model demand may keep resources alive for another channel. Runtime stops are distinct from cancelling an explicit model download/import.
-
-Open cloud Peer captions check for previews on the existing four-second cadence while translation is disabled or its provider is unavailable, without issuing new preview requests or continuously waking the event loop. After recovery, valid pending previews can resume at the next check; finals still settle without waiting for that check. Active first-preview and refresh timing is unchanged.
-
-`osc discovery retry` performs one bounded automatic-discovery attempt using the saved connection. It refreshes/reapplies target information for a running discovery service or restarts failed discovery resources; it does not rebuild a healthy receiver or change saved destinations. Manual/off, in-flight, changed connections and stopped lifecycles are rejected. The terminal receipt distinguishes `applied` with `discovery_target_applied` from `degraded` with `discovery_unavailable`; acceptance or scheduling alone is not recovery. `osc status` exposes the current destination source and a retained, timestamped local-listener observation. Unknown ownership/access remains unknown; the narrow local probe is not applicable to non-loopback destinations. Finding/applying a target or matching a listener does not prove VRChat health, receipt or display. Remote delivery remains unacknowledged; the operation submits no chatbox text and replays no old translations.
+Read the terminal receipt and the relevant status query: `providers.status`, `models status`, `overlay status`, or `osc status`. Fix the reported cause before retrying. Capture, recognition, translation, and output have separate readiness states.
 
 ### Independent Component Checks
 
@@ -173,8 +113,8 @@ These commands use application-owned synthetic inputs, not the microphone, loopb
 
 | Command | Arguments | Successful terminal result establishes |
 | --- | --- | --- |
-| `recognition.probe` | `{"channel":"self"}` or `{"channel":"peer"}` | A nonempty authoritative final recognition result for that configured recognizer's isolated test session |
-| `translation.probe` | `{"channel":"self"}` or `{"channel":"peer"}`; omitted channel defaults to Self | A nonempty synthetic translation in the requested channel's configured language direction through the currently attached shared translation backend |
+| `recognition.probe` | `{"channel":"self"}` or `{"channel":"peer"}` | Final recognition from an isolated synthetic sample |
+| `translation.probe` | `{"channel":"self"}` or `{"channel":"peer"}`; default Self | Synthetic translation through the attached backend in that channel's language direction |
 
 ```powershell
 puripuly.exe command recognition.probe --arguments '{"channel":"self"}'
@@ -183,39 +123,21 @@ puripuly.exe command translation.probe
 puripuly.exe command translation.probe --arguments '{"channel":"peer"}'
 ```
 
-Read the terminal receipt, not admission or readiness. Recognition reports `recognition_result`, final-event authority, configured/exercised provider, and captured/current revision and generation. It uses the bundled 1.194-second `data/diagnostics/eung.wav` sample without changing the configured language. `configured_language` reports the language applied to that recognition session, not a detected sample language or an accuracy guarantee. For `rolling_free`, `recognition_scope: single_eligible_rolling_member` identifies only the tested member, not full rolling-route health.
+Read the terminal result. Probes do not enable capture, publish conversation text, install models, or sign in. Provider requests may incur normal costs. Prepare missing prerequisites separately.
 
-An inactive configured recognition channel can use a probe-owned backend without enabling capture. An attached channel keeps its live sessions/model capacity; the probe owns only its isolated session. Missing assets/authentication/readiness return a prerequisite or failure, without provisioning, login, provider switching, or settings changes. Translation requires an already attached usable backend and reports `translation_result`; managed preparation is not silently performed. Existing selected-provider routing can involve more than one transport attempt and may incur its normal cost.
-
-Translation captures the requested channel's effective source and target languages when the operation starts under application ordering. Self includes its secondary target when enabled. Peer uses its input/output selections, inheriting the corresponding Self language when unset; it does not include Self's secondary target. The probe uses a synthetic sample in that source language, not private conversation text or a fixed English-to-Spanish pair. Receipts include the channel, admitted direction and per-target results; success requires every target to succeed. Later language-setting changes do not alter an already running probe.
-
-Cold recognition probe success also includes temporary-backend cleanup. Pending or failed cleanup remains runtime-owned and reserves that channel's construction capacity until reclaimed; a cancelled operation does not by itself prove resource release.
-
-A recognition probe can complete recognition but fail during cleanup. `recognition_execution_result` preserves the observed recognition result separately from the aggregate probe outcome; cleanup failure does not certify a successful probe. Expected cancellation remains cancellation even when the receipt retains an earlier failure.
-
-Empty, failed, cancelled, or stale results are not successful tests. Receipts omit recognized/translated text and explicitly mark untested stages: real capture, recognition accuracy, translation after recognition, output delivery, and display as applicable. A successful component check does not certify the whole Self/Listen path. The sample duration is not a completion-time guarantee.
-
+These checks cover individual components, not microphone input, accuracy, output delivery, or physical display.
 
 ### Peer Capture and Audio Tests
 
-Read `capture terms` first. Only an informed user's explicit choice authorizes `capture set peer on --accept-peer-terms`; never auto-supply consent. The flag is valid only for peer-on. Peer speech is excluded from the VRChat chatbox.
+Read `capture terms` before enabling Peer capture. Use `capture set peer on --accept-peer-terms` only with the user's explicit consent. Peer speech never reaches the chatbox.
 
-A capture-target change that is saved while requested Peer capture remains pending reports `degraded`, not `applied`, through both the GUI application boundary and `audio.target.set` control receipts. With Peer capture intentionally off, successful target application does not require an active capture source.
-
-After a capture failure, explicitly applying a valid target reports `applied` once the requested provider and capture configuration are ready and active. Resubmitting that unchanged healthy target also reports `applied`. Prior safe failure evidence remains available through bounded current-instance `diagnostics.history`; it does not make recovered capture degraded. Pending recovery and new current failures still prevent successful convergence.
-
-`audio test on|off` runs VAD without recognition or translation. It pauses normal capture and restores only still-valid prior intent; inspect `app status` → `audio_test` for readiness, failures, and VAD readings. Stopping waits for owned input release, not just a visual toggle.
-
-`audio diagnose` runs the cancellable `audio.diagnose {}` operation. It tests up to four actually enumerated microphone/host pairs sequentially, current route first, with a bounded three-second observation window per candidate. Present Virtual Desktop, Steam Link, Meta Link/Air Link and PICO microphone-driver routes are considered before unrelated alternatives; distinct driver routes precede duplicate host-API views of the same driver. Names only affect test order, never the measured choice or saved settings. Playback-only endpoints are excluded. A driver can remain installed while its headset session, microphone permission or passthrough is unavailable, so enumeration alone does not establish working input. The operation pauses normal capture through the same owner and restores only still-authorized intent; it never tests loopback, performs recognition, calls a cloud service, saves audio or changes the selected route.
+`audio test on|off` checks input and VAD without recognition or translation. `audio diagnose` compares available microphone routes and suggests a separate settings change. Both pause normal capture and restore still-valid intent afterward.
 
 ```powershell
 puripuly.exe audio diagnose
-puripuly.exe audio diagnose --no-wait
 ```
 
-Read each candidate's open/readiness, frame count, signal level, VAD evidence, failure and cleanup fields. The diagnosis owner alone ends the observation window; reaching that bound preserves measured frames without inventing a no-audio failure. The best measured candidate without a source or cleanup failure is a suggestion for a separate settings change, not a recovery certificate. Equal evidence preserves test order, including the current route; silence-only frames do not prove microphone speech works. Actual source and cleanup failures remain failures even after frames arrive and exclude that candidate from selection. Silence, missing frames and recognition failure are distinct. A cancelled operation can retain unresolved native cleanup debt, which blocks conflicting capture until release. A later explicit capture-off is never undone by restoration.
-
-Diagnostic history records bounded numeric evidence without raw audio, device labels or exception prose. Audio-test logging adds phase, frame/level/VAD and cleanup observations. These establish only the exercised input/VAD path, not recognition, translation or physical caption display.
+Inspect input, VAD, and cleanup results. Silence or an enumerated device alone does not show that speech input works.
 
 ### Manual Text
 
@@ -226,50 +148,19 @@ puripuly.exe text submit --file .\message.txt
 Get-Content -Raw .\message.txt | puripuly.exe text submit --stdin
 ```
 
-The receipt provides admission and turn identities with `output_delivery: unobserved`. Correlate subsequent translation events and destination evidence; the bounded typing-completion wait is not an output acknowledgment.
+The receipt confirms admission, not translation or delivery. Use its turn identity to follow subsequent events.
 
 ### Local Speech Recognition
 
-Use current `settings choices` and `models status`; retired CPU models are not installable choices. CPU Auto is the default for both Self and Peer. It routes by the configured source language, not automatic spoken-language detection, with this priority:
+Use `settings choices` to select ASR and `models status` to inspect assets. CPU Auto routes by the configured source language, not detected speech. It requires the current CPU model set.
 
-| Selected CPU model | Source language codes |
-| --- | --- |
-| Standard Fun-ASR-Nano | `zh`, including `zh-CN` and `zh-TW` |
-| Parakeet Japanese CTC | `ja` |
-| Granite Speech 5.0 Multilingual | `en`, `fr`, `de`, `es`, `pt`, `it` |
-| GigaAM-v3 e2e-CTC | `ru` |
-| Fun-ASR-MLT-Nano | `yue`, `ko`, `vi`, `id`, `th`, `ms`, `tl`, `ar`, `hi`, `bg`, `hr`, `cs`, `da`, `nl`, `et`, `fi`, `el`, `hu`, `ga`, `lv`, `lt`, `mt`, `pl`, `ro`, `sk`, `sl`, `sv` |
-
-Direct Granite selection supports seven languages: `en`, `fr`, `de`, `es`, `pt`, `it`, `ja`; Auto retains Japanese CTC for `ja`. GigaAM supports Russian only. Direct [MLT selection](https://github.com/handy-computer/transcribe.cpp/blob/8facde6fcd8fb9caa585a5788ab450df6e8ec7db/docs/models/fun-asr-nano.md#choosing-a-variant) supports its full declared 31-language scope, including `zh`, `en`, `ja` and `pt`, which Auto routes elsewhere. Regional codes are normalized to their base language. The union covers 36 base language codes; this does not add languages to the application's language picker. Ukrainian (`uk`) and languages outside that scope are explicitly unsupported, without silently switching to cloud, GPU or retired providers. Auto requires all five current CPU models installed.
-
-- Each active transcribe.cpp CPU channel owns its native Model/Session and requests two inference threads. Talk and Listen can compute concurrently with 2+2 threads, including on the same checkpoint, without preloading an inactive channel. This is not a total process-thread cap.
-- Granite, GigaAM, standard Nano and MLT use Q8_0 weight quantization, not all-INT8 execution. They use the existing CPU worker and unchanged transcribe.cpp revision `8facde6fcd8fb9caa585a5788ab450df6e8ec7db`; Japanese CTC retains sherpa-onnx.
-- Granite and GigaAM receive no language hint. Granite marker-only no-speech output becomes an empty transcript, including surrounding whitespace or terminal punctuation; real mixed lexical output is retained.
-- Fun-ASR Nano and MLT keep ISO language codes at the application/worker boundary and convert them to the checkpoint's documented Chinese language names inside the native prompt (`zh` → `中文`, `ko` → `韩文`). This is language conditioning, not a strict decoder constraint: short, ambiguous or noisy speech can still be misrecognized or produce another language.
-- GPU ASR keeps one resident Model shared by independent channel Sessions and serializes inference. Switching drains and frees the old Model before loading its replacement; it never preloads a second GPU Model.
-- Channel stops or changes revoke that channel's results and retain started native work until settlement. Another channel's unrelated resource remains owned. An admitted stop is not proof of native cleanup.
-- Legacy settings and control inputs `local_orukeet`, `local_parakeet_v3` and `local_qwen` normalize to `local_cpu_auto` on both channels and are persisted canonically through the existing recoverable migration. Queries, saved settings and choices use canonical values, including `local_granite` and `local_gigaam` for direct selection. See [OSC numeric compatibility](vrchat-osc.md#asr-ids) for legacy numeric inputs.
-- Only initial application startup, after successful recoverable canonical settings loading, removes recognized retired CPU assets and their known residue before constructing native providers. Ordinary settings reloads or telemetry verification do not authorize deletion. Locked/deferred cleanup retries on a later application startup. Unknown contents, reparse targets, Japanese/GPU assets and settings backups are preserved.
-- All five CPU models have alternate download paths. Downloads use pinned sizes and SHA-256 with the normal staged installer. The derived `hf_mirror` source serves the same files through `hf-mirror.net`, including Granite and GigaAM; source fallback changes neither the selected model nor its integrity contract. Source reachability is distinct from recognition readiness.
-- Windows Setup automatically provisions these five CPU ASR models. The optional **Re-download AI models** task forces their replacement even when installed files pass validation; leaving it unchecked still installs missing or invalid required models. Smart Turn and Silero VAD are bundled application resources, installed with the package rather than downloaded by this task. They are not loaded from the writable ASR model cache. Managed Gemma weights remain a separate on-demand download.
-
-Exact model/source pins live in the [ASR asset registry](../src/puripuly_heart/core/local_asr/local_stt_assets.py) and its packaged manifests. Granite is Apache-2.0, GigaAM is MIT, and Fun-ASR retains its model agreement; see the [third-party notices](../src/puripuly_heart/data/THIRD_PARTY_NOTICES.txt).
-
-The original [#353 comparison report](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/results/report.md), [saved summary](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/results/summary.json) and [execution evidence](https://github.com/kapitalismho/PuriPuly-heart/blob/0246def7b/docs/experiments/issue-353/execution-evidence.json) remain pinned to the merged experiment commit. That bounded English/Japanese comparison supports the English Granite and retained Japanese CTC decision; it does not benchmark-verify every declared language or Russian GigaAM.
-
-The reusable [CPU ASR benchmark harness](../benchmarks/asr/README.md) keeps scripts, frozen inputs, local model files, audio/cache data and generated results together under `benchmarks/asr/`. Large/local/generated directories are ignored; model downloads reuse the application installer and its alternate-source integrity checks.
+Model routing and assets are defined in the [ASR catalog](../src/puripuly_heart/core/local_asr/local_stt_catalog.py) and [asset registry](../src/puripuly_heart/core/local_asr/local_stt_assets.py).
 
 ### Managed Local Translation
 
-Select the model/backend through `settings choices` and `settings apply`. `gemma prepare` prepares the selected model; `gemma cancel` cancels preparation. Inspect `models status` for Gemma, not ASR-specific `gpu status`.
+Select the model and backend through `settings choices` and `settings apply`. Run `gemma prepare` to prepare the selected model, or `gemma cancel` to cancel preparation. Inspect readiness with `models status`.
 
-- Assets download on demand and are validated before atomic installation. `models status` exposes model IDs, asset state, and import requirements; use `models download|import|cancel|delete --help` for explicit asset operations.
-- Asset operations preserve provider selection. On cancellation, wait for the original operation to settle before retrying a conflict; runtime demand changes do not cancel transfers. In-use deletion is rejected.
-- E4B supports CPU/GPU and may fall back internally from GPU to CPU. 26B is Vulkan-only and never substitutes CPU, E4B, or a remote provider after failure. Resolve the cause or explicitly choose another supported selection.
-- Self, Peer, and manual requests share the managed server's bounded capacity. Model/backend changes drain owned work before replacement. Preparation success is not translation success.
-- Managed Windows servers run offline and ignore inherited llama.cpp environment settings and user/system configuration. Model provisioning remains owned by the application; this is not an operating-system network sandbox.
-
-Fixed deployment profiles are not CLI tuning settings. Exact model identities/hashes, runtime pins, and execution options live in [assets.py](../src/puripuly_heart/core/local_translation/assets.py), [runtime_profile.py](../src/puripuly_heart/core/local_translation/runtime_profile.py), and the [runtime notice](../third_party/llama.cpp/README.md).
+Use `models download|import|cancel|delete --help` for asset operations. These do not change provider selection. After cancellation, wait for the operation to settle before retrying a conflicting operation.
 
 ## Operation Results and Retries
 
@@ -290,10 +181,10 @@ puripuly.exe operation wait <operation-id>
 puripuly.exe operation cancel <operation-id>
 ```
 
-- Always inspect `terminal`, status, instance/operation identity, and effective state before proceeding. Unsupported cancellation exits 4 and may leave the original operation running.
-- An OAuth challenge can return an authorization URL with `action_required`, `operation_status: running`, and `terminal: false` (exit 5). Complete authorization, then inspect/wait for that same operation.
-- A timeout or lost response can leave execution unknown. Inspect host/operation state before deciding whether to retry; the CLI never automatically replays an ambiguous mutation.
-- `command --request-id <id>` supplies a stable request identity. Matching identities/payloads are deduplicated only while retained; different content with the same ID is rejected. Retention is bounded and resets with the host: old operation IDs cannot resume on a new instance.
+- Check `terminal`, status, operation identity, and effective state. Unsupported cancellation can leave the operation running.
+- An OAuth challenge can return `action_required` with `terminal: false`. Complete authorization, then wait for the same operation.
+- Timeout or lost response leaves execution uncertain. Inspect state before retrying; the CLI never automatically replays a mutation.
+- `command --request-id <id>` deduplicates matching requests while retained. Reusing the ID with different input is rejected. Request and operation history resets with the host.
 
 ## Credentials, Authorization, and Consent
 
@@ -307,15 +198,7 @@ puripuly.exe secrets verify <secret-id>
 puripuly.exe secrets presence
 ```
 
-`set` and `verify` accept `--stdin`; discover identifiers through `capabilities`. Verification takes protected input and is separate from storage. Secret values are never returned in settings, receipts, queries, or logs.
-
-Saving an active BYOK translation key applies it to subsequent work without enabling capture/translation. A saved-but-unapplied key can report `degraded`; keep storage success distinct from runtime adoption. A verification probe is not proof of live recognition/translation health, and unavailable verification reports `action_required` rather than success.
-
-Gemini speech recognition and photo translation share `gemini_api_key`, displayed as **Gemini API Key** in settings regardless of the selected speech provider. At secret-store initialization, the former `gemini_transcribe_api_key` is moved to that identifier unless a canonical value already exists. The retired `google_api_key` is deleted, never imported; both former identifiers are rejected by control commands. Existing keys are not verified automatically. The shared verification action probes API authentication, not model readiness, free-tier eligibility, or remaining quota.
-
-The OCR checkout keeps Relay source and its published protocol-6 schema identical to upstream `dev`. At the app boundary only, Puri's `google` and `gemini_transcribe` provider identifiers resolve to the shared Gemini setup. Proposals to delete `google_api_key` or `gemini_transcribe_api_key` require approval for deleting the actual shared `gemini_api_key`; direct control commands still reject the retired identifiers. The current settings catalog continues to reject Gemini Flash proposals even though that model remains in upstream's schema. Do not regenerate the published Relay schema from OCR-local settings choices under the same protocol number; the catalogs intentionally differ. Photo requests remain separate from the chatbot contract, as required by [#386](https://github.com/kapitalismho/PuriPuly-heart/issues/386).
-
-Gemini 3.8 Flash is no longer a speech/text translation choice, through either the official API or OpenRouter. Saved selections migrate to the current managed Gemma default; unrelated selections and credentials are retained.
+`set` and `verify` accept `--stdin`. Discover secret identifiers through `capabilities`. Storage, verification, and runtime adoption are separate results; secret values are never returned.
 
 ### Authentication and Recovery
 
@@ -326,25 +209,15 @@ puripuly.exe auth login chatgpt --open-browser
 puripuly.exe auth logout chatgpt
 ```
 
-- Login is explicit authorization. Translation/settings changes do not implicitly initiate OAuth. Browser opening requires `--open-browser`; consent is never auto-accepted.
-- QQ uses hidden identity/credential prompts or `auth login qq --stdin` with a protected JSON object containing `qq_identity` and `credential`. Never place those values in generic arguments.
-- Authorization, local credential persistence, remote delivery acknowledgment, and runtime activation are distinct. A pending managed delivery or a network failure is not permission to claim another key.
-- `puripuly.exe command accounts.managed.refresh` re-reads the selected managed credential's OpenRouter key metadata without a translation request. `managed_access` is `usable`, `unusable` (rejected with HTTP 401/403 or allowance exhausted) or `unknown`, with `managed_remaining_percent` when known. A missing or unselected managed credential reports `action_required`. It does not show the founder letter, disable translation, sign in, or issue a new key.
-- For `resolve_pending_authorization` / `remote_delivery_ack_pending`, preserve settings/secrets and explicitly retry the same source's login after correcting the cause. Saved authority resumes reconciliation; it does not prove a recovery task is running. A retained unacknowledged modern key is not automatically usable after restart.
-- Storage-read failure is unknown state (`signed_in: null`), not logout. Do not delete settings, encrypted secrets, or their `.lock` file as a recovery shortcut. If authentication succeeded but provider activation failed, retry translation enablement after correcting the runtime cause.
-- Logout is local-only except ChatGPT, which also requests refresh-token revocation. Inspect the reported scope; local deletion alone does not prove remote revocation.
-- ChatGPT logout waits for already-started credential mutations before confirming local removal. A cancelled refresh cannot restore the removed credential. If a later successful explicit login supersedes removal, its credentials are preserved and the earlier logout reports `local_credentials_removed: false`; remote revocation is reported independently. A failed login with rolled-back credentials does not cancel removal.
-- Browser authorization and app-to-service traffic can use different routes. Correct proxy/TLS configuration rather than disabling certificate verification. Share only sanitized diagnostic fields, never OAuth codes, keys, tokens, proxy URLs, or full settings/secret files.
-
-### Proxy Changes
-
-- Shared external HTTP clients read the currently visible proxy settings when dispatching each request. Generic WebSocket connectors read them when opening a connection, including redirected connection attempts. Changing the proxy does not migrate an existing request or socket, or automatically restart recognition.
-- Gemini Live and ordinary Hugging Face/Xet worker downloads retain a proxy snapshot selected during session or operation setup. Start a new session or operation to pick up changed settings in those paths.
-- Environment settings are read from the running process; editing operating-system environment variables does not necessarily update that process. Proxy refresh does not reload an existing client's explicit CA-file configuration.
+- Login requires explicit authorization. Use `--open-browser` to open the browser.
+- QQ accepts hidden prompts or `auth login qq --stdin` with protected `qq_identity` and `credential` fields.
+- For pending managed delivery, correct the cause and retry the same source's login. Do not request a replacement key or delete settings/secrets to clear uncertainty.
+- Logout reports local removal and any remote revocation separately. Storage-read failure means unknown state, not logout.
+- Correct proxy/TLS configuration instead of disabling certificate verification. Existing connections may need restarting after proxy changes.
 
 ## Events and Privacy
 
-Normal CLI results are UTF-8 JSON with `output_version: 1` on stdout; diagnostics/errors use stderr. Help is human-readable. Follow commands emit one JSON event per line. The local protocol authenticates same-user instance identity and token over loopback; it is not an unauthenticated management API.
+Results are UTF-8 JSON on stdout with `output_version: 1`; errors use stderr. Follow commands emit one JSON event per line. The local endpoint requires same-user authentication over loopback.
 
 ```powershell
 puripuly.exe events follow --topic operation --topic settings
@@ -352,17 +225,10 @@ puripuly.exe logs follow --level warning
 puripuly.exe events follow --topic translation --channel peer --include-translations
 ```
 
-- Default query/event/log views exclude credentials and conversation content. Content subscriptions require the corresponding `transcript`/`translation` topic and explicit `--include-transcripts`/`--include-translations`. Keep them off unless needed and protect the output.
-- Subscribers have independent bounded buffers. Slow consumers cannot block producers; gaps require refreshing owner snapshots. Ordering is per owner/topic/channel, not global.
-- Use `--after <event-sequence> --instance-id <originating-instance>` for replay. Without `--after`, follow observes new events only.
-- CLI logs are sanitized metadata, not a copy of Agent history or the main file. Main logs may contain permitted conversation records: review/redact them before sharing.
-
-## Log Audiences and Local Files
-
-- Agent history retains bounded session-only Self/manual and current Peer conversation records independently of technical logging. There is no GUI Logs surface or technical realtime UI buffer.
-- Ordinary Basic console delivery includes accepted Self/Peer source text and completed translations, including source-only outcomes, plus concise measured recognition RTF, VAD/SmartTurn activity, useful local latency and meaningful failures or state changes. Selected technical diagnostics use the existing main file rather than Basic delivery, regardless of severity. A concise Basic failure and its structured diagnostic are different projections of the same owning cause. CLI `logs follow` is sanitized metadata, not a mirror of Agent history, console output or every file row. Foreground console capture is not guaranteed conversation-free; review it before sharing.
-- RTF is decode time divided by processed audio duration, not end-to-end latency. Missing measurements remain unavailable. Admission, local output acceptance, transport send, renderer observation and physical display are distinct; neither a successful UDP send nor a local latency row proves remote receipt or display.
-- One bounded asynchronous writer batches actual main-file writes; warning/error/terminal records request early delivery. Live Basic delivery does not wait for ordinary file batching. Flush is not fsync, and full queues, failed/stalled I/O, shutdown timeouts or forced termination can lose records. Consult delivery health rather than assuming enqueue or aggregate written counts prove individual persistence. Exact batching constants belong in the owning implementation. Review conversation-bearing files before sharing; see [local information](../PRIVACY.md#5-local-information-and-deletion) for rotation/retention and the separate explicit support-upload policy.
+- Conversation content requires explicit `--include-transcripts` or `--include-translations` on the matching topic.
+- Buffers are bounded. Refresh status after gaps; events have no global ordering.
+- Replay with `--after <event-sequence> --instance-id <originating-instance>`. Without `--after`, only new events are observed.
+- CLI logs are sanitized metadata. Console and main-file logs can contain conversation text; redact them before sharing. See [local information](../PRIVACY.md#5-local-information-and-deletion).
 
 ## Retained Diagnostics and Delivery Health
 
@@ -374,21 +240,13 @@ puripuly.exe query diagnostics.history --arguments '{"operation_id":"<operation-
 puripuly.exe query diagnostics.health
 ```
 
-Use returned identities, not invented placeholders. `capabilities.query_arguments` describes supported history filters and limits.
+Use returned identities and the filters in `capabilities.query_arguments`.
 
-- Records preserve safe typed causes and known relationships. Missing relationships remain unknown; secondary cleanup failures do not replace the primary cause. Owner state and terminal receipts remain authoritative.
-- Failures share a bounded safe cause value across operation receipts, history, Puri, and support reports. Compound failures retain individual attempts; a missing common HTTP status does not mean the attempts lacked statuses. Inspect nested causes and explicit truncation rather than inferring a cause from the summary category.
-- Successful fallback remains successful and can carry recovered failure evidence. Cancellation is not a failed attempt. Configured provider/model choices do not establish which provider/model actually executed.
-- Failure results do not depend on diagnostic recording succeeding. A diagnostic reference identifies the originating cause; it does not guarantee that history or file delivery retained it.
-- History is bounded, in-memory, and current-instance only. Inspect gaps, eviction/truncation, and lookup outcomes. An unfiltered cursor at the current tail returns `no_new_records`: no newer retained diagnostic at that snapshot, not proof of recovery. Missing requested identities remain `not_retained`; neither that nor `foreign_instance` or `invalid_cursor` proves an operation succeeded or never failed.
-- History's `next_after` is a diagnostic cursor. An event's `sequence` is a replay cursor. They are not interchangeable; retain the originating instance with either.
-- `diagnostics.health` reports history/event/file/output delivery health independently of a working file sink. Enqueued is not written; written is not durable. Aggregate counters do not prove persistence of an individual record.
-- Terminal file records trigger delivery without waiting for ordinary batch expiry; their severity is unchanged. This does not bypass a blocked sink or the bounded close deadline: a timeout remains visible and cleanup stays listener-owned.
-- Diagnostics cannot establish remote UDP receipt or physical display. They exclude raw exceptions, arbitrary child output, personal paths, credentials, audio, and conversation content.
+- History is bounded and current-instance only. Missing records do not imply success.
+- Diagnostic `next_after` and event `sequence` are different cursors. Keep the originating instance with each.
+- `diagnostics.health` reports delivery failures. Queued records are not proof of file persistence or remote display.
 
-Exact schemas, bounds, and projections live in [diagnostics](../src/puripuly_heart/core/diagnostics.py), [runtime logging](../src/puripuly_heart/core/runtime_logging.py), and [control events](../src/puripuly_heart/app/services/application_control_events.py).
-
-Support reports still require an explicit user click. They include available safe structured diagnostics and coverage information. Optional runtime-log collection failure does not discard the rest of the bundle; missing material is identified explicitly rather than represented as an empty successful log.
+Read owner state and terminal receipts for the operation outcome. See the [diagnostic schema](../src/puripuly_heart/core/diagnostics.py) for record details.
 
 ## Exit Codes
 

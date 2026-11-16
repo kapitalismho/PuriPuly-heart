@@ -1,19 +1,16 @@
 # VRChat OSC controls
 
-- Purpose: exchange PuriPuly dashboard state with VRChat through OSC
+- Purpose: control PuriPuly from VRChat and synchronize dashboard state
 - PuriPuly setting: **Settings > General > VRChat OSC**
 - VRChat setting: **Action Menu > Settings > OSC > Enable**
 - Automatic: OSCQuery discovery and dynamic receive port
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
-- The OSC-enable warning follows the effective destination. It clears when OSC is Off or automatic discovery is starting; results from an earlier connection state cannot restore it.
-- Automatic discovery rechecks known candidates after temporary OSCQuery information failures; actual service removal still clears them. The existing fallback remains in effect while no usable target is discovered.
-- For missing Chatbox output, the assistant can inspect safe app evidence and perform bounded discovery recovery without changing saved destinations, restarting working recognition/translation or sending test messages. Its result confirms internal target application or reports unavailability, not game display. No technical inspection or test-sentence report is required from the user.
 
 ## Progressive Self chatbox translations
 
 - Self translations update the chatbox as speech is recognized, even when the VR overlay is off.
-- Later results can correct earlier previews. An identical final result is not resent if its compatible preview was already sent successfully.
+- Later results can correct earlier previews.
 - Not every intermediate update or page is shown. Text already read by others cannot be retracted.
 - A successful local OSC send does not confirm that VRChat received or displayed the text.
 
@@ -22,35 +19,33 @@
 - Add only the parameters you need to the avatar's Expression Parameters.
 - Match names, capitalization, and types exactly.
 
-| Parameter | Meaning | Type | Default | Saved | Synced |
-| --- | --- | --- | ---: | --- | --- |
-| `PuriPuly_Talk` | Self capture | Bool | False | Off | Off |
-| `PuriPuly_Listen` | Peer capture | Bool | False | Off | Off |
-| `PuriPuly_Trans` | Translation | Bool | False | Off | Off |
-| `PuriPuly_Captions` | Captions | Bool | False | Off | Off |
-| `PuriPuly_PeerAuto` | Peer source auto-detection | Bool | False | Off | Off |
-| `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False | Off | Off |
-| `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False | Off | Off |
-| `PuriPuly_SelfSrcLang` | Self source language | Int | 17 | Off | Off |
-| `PuriPuly_SelfDstLang` | Self primary target language | Int | 7 | Off | Off |
-| `PuriPuly_SelfDstLang2` | Self secondary target language; 255 disables it | Int | 255 | Off | Off |
-| `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 | Off | Off |
-| `PuriPuly_PeerDstLang` | Peer target language | Int | 17 | Off | Off |
-| `PuriPuly_SelfASR` | Self ASR provider | Int | 0 | Off | Off |
-| `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 | Off | Off |
-| `PuriPuly_Translator` | Translation model | Int | 16 | Off | Off |
+| Parameter | Meaning | Type | Default |
+| --- | --- | --- | ---: |
+| `PuriPuly_Talk` | Self capture | Bool | False |
+| `PuriPuly_Listen` | Peer capture | Bool | False |
+| `PuriPuly_Trans` | Translation | Bool | False |
+| `PuriPuly_Captions` | Captions | Bool | False |
+| `PuriPuly_PeerAuto` | Peer source auto-detection | Bool | False |
+| `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False |
+| `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False |
+| `PuriPuly_SelfSrcLang` | Self source language | Int | 17 |
+| `PuriPuly_SelfDstLang` | Self primary target language | Int | 7 |
+| `PuriPuly_SelfDstLang2` | Self secondary target language; 255 disables it | Int | 255 |
+| `PuriPuly_PeerSrcLang` | Peer source language | Int | 7 |
+| `PuriPuly_PeerDstLang` | Peer target language | Int | 17 |
+| `PuriPuly_SelfASR` | Self ASR provider | Int | 0 |
+| `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 |
+| `PuriPuly_Translator` | Translation model | Int | 16 |
 
-- Default: PuriPuly fresh runtime value
-- Saved: Off; PuriPuly owns persistence and republishes its current state
-- Synced: Off; local application controls do not require avatar network sync
-- Remote visual effects: drive separate synced visual parameters
+- Defaults are fresh runtime values.
+- Set **Saved** and **Synced** to **Off** for all controls. PuriPuly stores and republishes state.
+- Use separate synced parameters for remote visual effects.
 - `MuteSelf`: VRChat-provided; do not add as a custom Expression Parameter
 - Bool menu controls: use Toggle
 - Int menu controls: use Bool proxies with Avatar Parameter Drivers
 - Avoid Button/Sub-Menu for Int values; they reset to zero when deactivated
 
-- `PuriPuly_Fallback` is retired and ignored. Remove it from existing avatar Expression Parameters.
-- `PuriPuly_SmartTurn` is retired: peer endpoint inference is always active for supported languages. Remove it from existing avatar Expression Parameters.
+- Remove retired `PuriPuly_Fallback` and `PuriPuly_SmartTurn` parameters.
 
 ## Parameter ABI
 
@@ -58,10 +53,9 @@
 - Bool payload: OSC boolean
 - Int payload: fixed ABI ID
 - Int ID policy: append-only; never reuse an ID
-- Int IDs are the OSC payload; the tables below map each ID to its human-readable name
-- Bool controls request absolute enabled states; explicit runtime retries remain supported.
-- State synchronization: suppress equal input reflections; publish app changes and corrections.
-- Delivery is unacknowledged; delayed Bool packets may be interpreted as new commands.
+- Bool controls request absolute enabled states, not toggles.
+- The app publishes current state and corrections.
+- Delivery is unacknowledged; delayed Bool packets can act as new commands.
 
 ### Language IDs
 
@@ -81,7 +75,7 @@
 | 11 | French | 23 | Polish | | |
 
 - Used by: `PuriPuly_SelfSrcLang`, `PuriPuly_SelfDstLang`, `PuriPuly_SelfDstLang2`, `PuriPuly_PeerSrcLang`, `PuriPuly_PeerDstLang`
-- `PuriPuly_SelfDstLang2` additionally reserves ID `255` for Off. Selecting the current primary target also normalizes the secondary target to Off.
+- `PuriPuly_SelfDstLang2`: `255` means Off. Selecting the primary target also disables the secondary target.
 
 ### ASR IDs
 
@@ -107,7 +101,7 @@
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
 - ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.
-- Legacy IDs `1` and `3` are accepted as input but publish canonical Auto ID `0` on both channels. All other numeric meanings are unchanged. Retired CPU providers are not advertised or restored as fallbacks.
+- Legacy inputs `1` and `3` normalize to Auto ID `0` on both channels.
 
 ### Translation model IDs
 
@@ -126,5 +120,6 @@
 | 16 | Index-Translate 35B |
 
 - Used by: `PuriPuly_Translator`
-- Translation IDs `5` and legacy `6` are retired and rejected as unknown values. Existing IDs are not renumbered.
+- IDs `5` and `6` are retired and rejected. Existing IDs are not renumbered.
 
+Implementation: [parameter schema](../src/puripuly_heart/core/osc/control_schema.py), [control runtime](../src/puripuly_heart/app/services/osc/control_runtime.py).

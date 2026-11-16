@@ -1,20 +1,18 @@
 # Architecture
 
-System map for PuriPuly Heart: who owns state, how work crosses boundaries, and where to read the implementation. For commands and result interpretation, see the [CLI guide](cli.md).
+System map: state ownership, component boundaries, and implementation entry points. For commands, see the [CLI guide](cli.md).
 
-Keep this map about ownership, dependency direction, and cross-component invariants. Update the relevant section when a boundary changes; do not append fix histories, policy values, field catalogs, or test acceptance criteria. Those belong in the owning code and behavior tests.
+Keep ownership and cross-component rules here. Put implementation details in code and tests, not this map.
 
 ## System Model
 
-- One Python application runtime serves GUI and headless hosts. Presentation is an adapter, not a second runtime.
-- Runtime owners hold state and resources; ports define their contracts; adapters connect UI, audio, providers, storage, and child processes.
-- Composition constructs and connects owners. Core code must not depend on UI or composition code.
-- The application owns capture, recognition, translation, and output. Native workers own native execution/rendering, not application policy.
-- Broker provides managed identity, entitlement, and credential release. It is a control-plane dependency, not part of the normal utterance path.
+- GUI and headless hosts share one Python runtime. Presentation is an adapter.
+- Owners hold state and resources. Ports define contracts; adapters connect external systems.
+- Composition connects owners. Core code must not depend on UI or composition.
+- Python owns application policy. Native workers own inference and rendering.
+- Broker owns managed identity, entitlement, and credential release. Speech requests do not pass through Broker.
 
-[Application composition](../src/puripuly_heart/composition/application_runtime.py) loads settings and secrets, selects adapters, connects services, and installs startup/shutdown. Long-lived resources must transfer to explicit owners. The [runtime pipeline launcher](../src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py) installs replaceable capture/provider/output components; callers must not retain them across replacement unless the API permits it.
-
-Python callers use canonical module paths and the current package facades. Pre-grouping app/core import aliases and the synchronous `puripuly_heart.providers.llm.qwen` import are unsupported; Qwen translation uses the [asynchronous adapter](../src/puripuly_heart/providers/llm/qwen_async.py).
+[Application composition](../src/puripuly_heart/composition/application_runtime.py) connects services and installs startup/shutdown. The [pipeline launcher](../src/puripuly_heart/app/wiring/wiring_runtime_pipeline.py) replaces capture, provider, and output components. Do not retain replaced components beyond their API's lifetime.
 
 ## Runtime Ownership
 
@@ -23,25 +21,23 @@ Paths below are navigation entry points, not an exhaustive class inventory.
 | Area | Responsibility | Entry points |
 | --- | --- | --- |
 | Application boundary | UI intents; typed control operations, queries, and mutation ordering | [UI boundary](../src/puripuly_heart/app/services/ui_application.py), [control owner](../src/puripuly_heart/app/services/application_control.py) |
-| Agent conversation | Conversation lifetime, app-context projection, and model tool dispatch | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context adapter](../src/puripuly_heart/app/services/agent_chat/context.py), [context modules](../src/puripuly_heart/app/services/agent_chat/modules.py) |
+| Agent conversation | Conversation lifetime, context, and tool dispatch | [Chat owner](../src/puripuly_heart/app/services/agent_chat/owner.py), [context](../src/puripuly_heart/app/services/agent_chat/context.py) |
 | Local control host | Authenticated endpoint and instance lifetime | [Host](../src/puripuly_heart/cli/host.py), [instance ownership](../src/puripuly_heart/core/control_instance.py) |
 | Settings | Canonical intent, persistence, and runtime application coordination | [Persistence](../src/puripuly_heart/app/services/canonical_settings_persistence.py), [settings application](../src/puripuly_heart/app/services/settings/settings_application.py) |
 | Capture | Source authority, audio ordering, segmentation, and capture lifecycle | [Self](../src/puripuly_heart/core/runtime/self_capture.py), [Peer](../src/puripuly_heart/core/runtime/peer_channel.py) |
 | Recognition | Channel-scoped STT; shared local ASR resources and backend transitions | [Scoped engine](../src/puripuly_heart/core/stt/scoped_engine.py), [local ASR runtime](../src/puripuly_heart/core/runtime/local_asr_provider_runtime.py) |
-| Translation | Channel-scoped source progression, caption/turn admission, cancellation and publication authority | [Self channel](../src/puripuly_heart/core/orchestrator/self_translation_channel.py), [cloud Peer captions](../src/puripuly_heart/core/orchestrator/peer_caption.py), [turn lifecycle](../src/puripuly_heart/core/orchestrator/translation_turn.py) |
+| Translation | Channel admission, cancellation, and publication | [Self](../src/puripuly_heart/core/orchestrator/self_translation_channel.py), [Peer](../src/puripuly_heart/core/orchestrator/peer_caption.py), [turns](../src/puripuly_heart/core/orchestrator/translation_turn.py) |
 | Provider requests | Request preparation and provider authority; provider replacement | [Request owner](../src/puripuly_heart/core/orchestrator/translation_request.py), [provider rebuild](../src/puripuly_heart/core/runtime/provider_rebuild.py) |
 | Local models | Asset operations; managed translation server and model lifecycle | [Model assets](../src/puripuly_heart/app/services/model_assets.py), [Gemma runtime](../src/puripuly_heart/core/local_translation/runtime.py) |
 | Output | Routing, independent destination delivery, and delivery history | [Output runtime](../src/puripuly_heart/core/runtime/output.py), [translation projection](../src/puripuly_heart/core/orchestrator/translation_output_projection.py) |
 | Overlays | Target selection, logical captions, child lifecycle, and native rendering | [Application owner](../src/puripuly_heart/app/services/overlay/overlay_application.py), [Python runtime](../src/puripuly_heart/core/runtime/overlay.py), [native runtime](../native/overlay/src/runtime.rs) |
-| Photo translation | Passive photo capture, pull authorization, retained requests, and an independent native photo child | [Application owner](../src/puripuly_heart/app/services/photo_application.py), [photo lifecycle](../src/puripuly_heart/core/photo/lifecycle.py), [native photo role](../native/overlay/src/photo/) |
+| Photo translation | Capture, authorization, requests, and native child lifecycle | [Application owner](../src/puripuly_heart/app/services/photo_application.py), [photo lifecycle](../src/puripuly_heart/core/photo/lifecycle.py), [native role](../native/overlay/src/photo/) |
 | Accounts | Managed authentication/credentials; separate ChatGPT session | [Managed wiring](../src/puripuly_heart/app/wiring/wiring_managed_account.py), [ChatGPT owner](../src/puripuly_heart/app/services/chatgpt_account.py) |
 | VRChat integration | OSC control/state; independent scene-context observation | [OSC runtime](../src/puripuly_heart/app/services/osc/control_runtime.py), [scene owner](../src/puripuly_heart/core/vrchat_scene_service.py) |
-| Diagnostics | Console/file/Logs delivery and bounded current-instance evidence | [Logging service](../src/puripuly_heart/app/services/application_runtime_logging.py) |
+| Diagnostics | Console/file delivery and current-instance evidence | [Logging service](../src/puripuly_heart/app/services/application_runtime_logging.py) |
 | Shutdown | Ordered teardown across owners | [Shutdown adapter](../src/puripuly_heart/app/adapters/application_runtime_shutdown.py) |
 
-An owner may span several processing stages. GUI, CLI, and OSC mutations share application ordering and resource-conflict boundaries; operations belong to the application, not the requesting connection. Queries distinguish saved intent from effective runtime state. Presentation and notifications are never state authorities.
-
-OSC discovery and recovery share the existing monitor, runtime lock, and connection fences. Recovery awaits bounded target reapplication; passive queries read retained observations without starting probes.
+GUI, CLI, and OSC share mutation ordering and resource-conflict boundaries. Operations belong to the application, not the requesting connection. Presentation reads owner state; it never owns runtime authority.
 
 ## Data Handoffs
 
@@ -62,72 +58,50 @@ flowchart LR
 
 ### Capture and recognition
 
-- Capture owns source order, timing, and audio scope. Audio loss is explicit, not silence; segmentation does not depend on provider readiness.
-- Self and Peer share audio contracts but retain separate endpoint policies and recognition lifecycles. Local resources may be shared without sharing channel authority.
-- Provider adapters translate native events into shared STT contracts. Local audio completion and transcript delivery are distinct; provider recovery stays inside the recognition boundary.
-- [Direct Qwen Audio](../src/puripuly_heart/providers/stt/qwen_audio.py) owns two logical recognition slots per Self/Peer channel, targeting two reusable connections. Replacing idle transports may temporarily raise physical connections to three or four per channel, with at most one retiring transport per slot. The prior retiring transport must finish cleanup before that slot can replace its current transport again. This bounded overlap adds no recognition capacity: no third slot, general connection pool or per-speaker sockets.
-- Healthy replacement recognition may proceed while its old idle transport retires; cleanup-uncertain transports remain owned and cannot supply current results. Failed-readiness attempts must clean up before retry, and re-enable or cross-scope/provider replacement must reclaim prior owners first. Matching task readiness gates real input; source order and generation fences remain authoritative, with no age-based eviction of active/draining tasks, uncertain replay, empty successors or standby tasks.
-- Peer segment snapshots carry capture-boundary evidence through recognition settlement into caption joining.
-- Dashboard readiness is a projection of the Self capture owner's lifecycle, not recognition-result/session events. Presentation retains readiness independently of conversation content and specific errors/notices; it does not own runtime state.
-- Source completion drains admitted input. Stop, discontinuity, and replacement revoke affected authority so late results cannot enter current work.
-- VAD-only audio tests and microphone diagnosis share the audio-test owner and exclude normal capture. The owner releases input before restoring still-authorized capture; unfinished cleanup prevents conflicting reuse.
+- Capture owns audio order, timing, and segmentation. Self and Peer retain separate recognition lifecycles.
+- Provider adapters convert native events to shared STT contracts. Recognition recovery stays within that boundary.
+- Audio tests and diagnosis share an owner and exclude normal capture.
 
-Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [audio delivery](../src/puripuly_heart/core/audio/listen_delivery.py), [audio-test owner](../src/puripuly_heart/app/services/audio_test.py). Behavior: [scoped recognition tests](../tests/core/test_stt_scoped_engine.py), [Qwen replacement tests](../tests/providers/test_qwen_audio_connection_replacement.py).
+Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [delivery](../src/puripuly_heart/core/audio/listen_delivery.py), [audio tests](../src/puripuly_heart/app/services/audio_test.py).
 
 ### Local ASR ownership
 
-- Granite, GigaAM and the two Fun-ASR CPU providers use the authenticated [ASR worker](../native/asr_worker/) through the existing [process adapter](../src/puripuly_heart/app/adapters/asr_worker_process.py), with the unchanged transcribe.cpp revision `8facde6fcd8fb9caa585a5788ab450df6e8ec7db`. Each active channel owns a lazy worker, native Model and mutable Session, even for the same checkpoint. The installed file is reused; inference can overlap across channels. Each Session requests two inference threads, not a cap on process/helper threads. Japanese CTC retains its sherpa runtime.
-- GPU ASR retains one shared worker and exactly one resident native Model, with independent channel Sessions and serialized compute. Replacement drains work and releases the previous Model before loading another. Releasing one channel must preserve the other channel's lease and Session.
-- Channel generations fence cancelled or replaced results. Started native work remains owned until settlement; requesting cancellation does not authorize early Model/Session destruction.
-- The [asset catalog](../src/puripuly_heart/core/local_asr/local_stt_catalog.py) owns language routing and readiness. CPU Auto is the default on both channels and requires all five current CPU assets: multilingual Granite Q8_0, Russian GigaAM-v3 e2e-CTC Q8_0, standard Fun-ASR-Nano Q8_0, Fun-ASR-MLT-Nano Q8_0 and Japanese CTC INT8. Auto prioritizes standard Nano for Chinese, Japanese CTC for Japanese, Granite for its six remaining languages, GigaAM for Russian, then MLT for the rest of its declared 31-language scope. The union is 36 base languages; Ukrainian (`uk`) is explicitly unsupported. Unsupported languages and missing assets do not select a retired, cloud or GPU fallback. Granite and GigaAM receive no language hint; Fun-ASR conditioning is unchanged. The [CLI contract](cli.md#local-speech-recognition) describes routing, migration and control behavior.
-
-Behavior: [production-composition evidence checks](../tests/release_evidence/test_local_asr_production_composition.py) distinguish a present GPU worker from a resident model using synthetic snapshots; they do not qualify native inference or native Model counts.
-
+- CPU workers own per-channel models and sessions. GPU ASR shares one resident model, with separate channel sessions and serialized inference.
+- Releasing one channel preserves the other's resources. Model replacement waits for started work to settle.
+- The [ASR catalog](../src/puripuly_heart/core/local_asr/local_stt_catalog.py) owns language routing and readiness. The [process adapter](../src/puripuly_heart/app/adapters/asr_worker_process.py) connects native workers.
 
 ### Translation
 
-- Provider adapters own provider-specific authentication, requests, streaming, and errors behind the common provider boundary. Turn owners own admission, cancellation, stale-result rejection, and publication.
-- Self source closure and translation completion are independent. Speculative results are not accepted history; source/target revisions and turn identity govern presentation.
-- Self and Peer have separate admission while sharing provider capacity. Cloud Peer owns caption revisions and adjacent-caption repair; local Peer retains per-final translation. Ordinary caption revisions retain their initial context.
-- Manual text bypasses capture/STT and uses Self publication. Admission, translation completion, and destination delivery are separate outcomes.
-- Managed local translation owns its server, model, and capacity behind the same provider boundary. Requests retain native resources until settlement; model/backend replacement drains work before admitting a replacement.
-
-Behavior: [turn lifecycle](../tests/core/test_translation_turn_owner.py), [request ownership](../tests/core/test_translation_request_owner.py), [managed local runtime](../tests/core/local_translation/test_gemma_runtime.py). Model assets and execution profiles live in [assets.py](../src/puripuly_heart/core/local_translation/assets.py) and [runtime_profile.py](../src/puripuly_heart/core/local_translation/runtime_profile.py), not this map.
+- Providers own authentication, transport, and errors. Turn owners control admission, cancellation, and publication.
+- Self and Peer admit work independently and share provider capacity. Previews remain separate from accepted history.
+- Manual text bypasses capture/STT and enters the Self path.
+- [Managed local translation](../src/puripuly_heart/core/local_translation/runtime.py) owns its server, model, and request capacity.
 
 ### Output and context
 
-- Destinations have independent bounded delivery. One destination's failure must not block another or replay recognition/translation. Peer speech never reaches the chatbox; system disclosures require an explicit route.
-- Output preserves turn/publication identity. Revisions may update retained turns without refocusing the dashboard or reviving retired captions. Preview presentation is separate from final accepted history.
-- Peer logging retains append-only caption revisions; GUI history converges on one current record per caption.
-- Python owns logical caption state and lifetime; native overlays own rendering. Presentation does not gate translation, and delivery receipts do not prove physical display or remote UDP receipt.
-- The VRChat scene owner survives pipeline rebuilds and has no audio, VAD, or OSC dependency. Only trusted, sanitized population context reaches translation; names/raw logs stay local, and custom HTTP extensions receive no scene data.
+- Destinations deliver independently. One failure cannot block another or replay translation. Peer speech never reaches the chatbox.
+- Output preserves turn identity across revisions. Python owns caption lifetime; native code renders it.
+- The scene owner observes VRChat independently of audio and OSC. Only sanitized population context reaches translation.
 
-Behavior: [output runtime](../tests/core/runtime/test_output_runtime.py), [Self caption policy](../tests/core/test_self_caption_policy.py), [Peer lifecycle](../tests/core/test_peer_caption_lifecycle.py), [Peer history](../tests/ui/test_peer_caption_history.py), [overlay presenter](../tests/core/test_overlay_presenter.py). Protocols: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
+Interfaces: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
 
 ### Isolated photo requests
 
-- The photo application owner is a sibling of the caption owner, not an output destination or caption setting. It owns passive capture, route eligibility, authorization, request attempts, retention and child cleanup. Photo renderer recovery cannot restart a model request or satisfy caption freshness.
-- Photo providers reuse the existing ChatGPT session and secret/network owners through dedicated image connections. Luna uses Sign in with ChatGPT, not an OpenAI API key. Image requests do not lease speech connections or speech admission capacity.
-- After an authorized pull, the native photo worker decodes the selected source and prepares the send JPEG off its render/input loop. Python reads and serializes the completed JPEG; it does not perform pixel preparation. Private files and source-coordinate metadata cross the text bridge rather than pixel buffers or credentials.
-- Photo snapshots contain every completed block for the current attempt. Photo, attempt and renderer identities fence late work; snapshot coalescing does not discard independent blocks. Validated bbox, complete source and complete translation are distinct preparation stages.
-- The native photo process owns one OpenVR session across independent surface handles. Its image worker reuses the decoded source for display resampling, CPU ONNX masking, sequential Rust Telea, source measurement and DirectWrite shaping/fitting. Masking and measurement use the original; Telea uses an attempt-local background containing only completed, accepted erase patches. Immutable completed placements cross to the renderer; the interaction loop does not perform image inference or text fitting. Caption startup does not initialize photo models.
-- Photo rendering keeps the original image, erase patches and prepared text separate. A completed translation reveals its erase and text together; original viewing disables the upper layers. Retry discards the failed attempt's placements without replacing the original image. Temporary native controls and offline rendering are verification surfaces, not Python product OCR UI or proof of headset legibility.
-- Temporary VR interaction belongs to the native photo process: it reads shared controller input, tracks wrist-relative grabs, positions the icon/held photo and animates presentation without owning provider policy. Valid-pull feedback uses the left controller; application-authorized first-drawn-block feedback uses the right. Grab-start is silent. Shared VRChat input is intentional.
+- Photo translation has its own application owner and native process, separate from captions.
+- Python owns authorization, provider requests, and retention. Native code owns pixel processing and VR interaction.
+- Image upload requires an authorized pull. Photo requests reuse account/network owners without sharing speech sessions.
+- Renderer recovery does not restart provider requests. Photo, attempt, and renderer identities reject late results.
 
-Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [provider adapters](../src/puripuly_heart/providers/photo.py), [native ownership and verification](../native/overlay/README.md#photo-runtime-boundary). Product sequencing and image-composition obligations remain in [#338](https://github.com/kapitalismho/PuriPuly-heart/issues/338) and its child issues.
-
+Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [providers](../src/puripuly_heart/providers/photo.py), [native photo boundary](../native/overlay/README.md#photo-runtime-boundary).
 
 ### Agent conversation
 
-- Python owns conversation lifetime and tool execution. The relay owns model requests, trusted instructions, and tool definitions; Broker supplies installation authentication. The relay serves only the app protocols in its contract registry. A contract change adds a protocol that reaches the relay before the app release; a retired protocol is rejected rather than translated.
-- App context is an allowlisted projection through the application control boundary. Tools use existing application owners and the current settings catalog; model output cannot expand their permissions.
-- Every settings change requires approval of the proposed values. The settings-tool owner queues coupled changes and advances after successful application. Cancellation discards unapproved work without undoing saved changes or cancelling accepted operations.
-- Only completed model responses admit tool calls. Generation fences reject interrupted text and late results. UI renders owner snapshots; active model context is bounded separately from the chat archive.
-- Provider setup and account actions reuse existing authentication, secret storage, and verification owners. Credentials use secure app controls, not chat. Support uploads require an explicit user click.
-- Recognition and translation probes are isolated application operations using existing runtime owners. Their results stay outside normal transcript/output publication, and resources remain owned until settlement.
-- The [scenario simulator](../src/puripuly_heart/release_evidence/agent_chat_simulator/) substitutes synthetic application state beneath the production chat adapters. It is a development caller, not a second runtime or evidence of real device/UI behavior.
+- Python owns conversations and tool execution. Relay owns model requests, instructions, and tool definitions. Broker supplies installation authentication.
+- Context is an allowlisted view of application state. Tools use existing application owners and cannot expand their permissions.
+- Settings changes require approval. Cancellation discards unapproved work, not committed changes.
+- Credentials use secure app controls, not chat. Support uploads require a user click.
 
-Service boundaries and development: [Agent relay](../agent-relay/README.md).
+Service contract and development: [Agent relay](../agent-relay/README.md).
 
 ## Settings and Credentials
 
@@ -137,39 +111,30 @@ Service boundaries and development: [Agent relay](../agent-relay/README.md).
 | Resolved configuration | [Resolution](../src/puripuly_heart/config/resolved.py) and [runtime selection](../src/puripuly_heart/config/runtime_resolution.py) |
 | Effective runtime state | The owner of the active resource or operation |
 
-- UI surfaces consume frozen snapshots and emit focused typed intents. The settings owner rebases changes onto current canonical state and serializes commit/rollback; observers publish afterward in commit order.
-- Persistence and runtime application are distinct. Runtime effects cannot assign canonical settings; failed application must remain degraded/retryable rather than appear applied or silently undo durable intent.
-- Capture-target application uses Peer-owned runtime convergence to classify the result. Saved intent with requested capture still pending is degraded, not applied; intentionally disabled capture does not require an active source for successful application. Successful activation reconciles current failure state independently of retained diagnostic history. Diagnostic delivery from retired work cannot reassert a current failure.
-- GUI autosave coalesces the latest submitted intents and attempts each generation once, without timed retries or a recovery-specific notification surface. Unsaved, reverted, and unknown-outcome edits remain dormant in page memory until the affected setting is explicitly resubmitted. Saved-but-unapplied edits are acknowledged as saved without scheduling a runtime-only replay. Unrelated edits and navigation without a new draft do not restart failed submissions.
-- Prompt commits supersede queued or in-flight prompt edits, including restoration of the saved value and prompts merged with provider changes. Older completions cannot discard newer edits or replace their editor presentation. The application boundary returns an attempt-scoped persistence/application outcome; the page owns the settings queue and stops it at shutdown.
-- Transactional application uses the current committed snapshot. Explicit runtime-only overrides remain ephemeral and retain their admitted configuration throughout resource construction/recovery.
-- Retired CPU ASR identifiers `local_orukeet`, `local_parakeet_v3` and `local_qwen` normalize to `local_cpu_auto` on both channels before canonical persistence. Recoverable persistence is necessary but not sufficient for [recognized old-asset cleanup](../src/puripuly_heart/core/local_asr/retired_cpu_assets.py): only initial `SettingsOwner.start` explicitly authorizes it, before native providers are constructed. Ordinary reloads, telemetry verification and repeated same-owner starts remain nondestructive. Cleanup holds the provisioning lease, preserves unknown contents/reparse targets, never restores retired backups, and retries pending deletion at later application startups. It does not claim ownership of other running applications.
-- Secret-store instances observe one backend, not independent credential snapshots. Mutations preserve unrelated entries across instances/processes; unreadable storage is unknown state, not proof of absent credentials.
-- Managed identity authority belongs to the settings owner. Credential storage, remote acknowledgment, authentication completion, and provider activation are separate transitions. Modern credentials require matching durable delivery proof and canonical authority; recovery resumes the same operation rather than issuing a replacement on uncertainty.
-- ChatGPT authentication is separate from Broker and survives provider replacement. Refresh credentials use the secret store; access tokens remain in memory.
-- The ChatGPT session owns credential mutations through cancellation. Logout retires refresh admission and orders local removal after started mutations; only a successfully persisted explicit sign-in establishes new authority that stale refresh persistence and rejection cleanup cannot overwrite or delete. A failed sign-in rolled back to prior credentials does not supersede pending removal. Removal results describe the logout attempt, not credentials established by a later authorization.
+- Settings owners serialize commits. UI consumes snapshots and submits typed intents.
+- Persistence and runtime application are separate. Runtime failure cannot silently undo saved intent.
+- Secret storage preserves unrelated entries. A read failure means unknown state, not absent credentials.
+- Managed authentication separates local persistence, remote acknowledgment, and activation. Recovery resumes the same operation.
+- ChatGPT authentication is separate from Broker and survives provider replacement.
 
-Entry points: [provider application](../src/puripuly_heart/app/services/provider/provider_runtime_apply.py), [secret storage](../src/puripuly_heart/core/storage/secrets.py), [managed authentication](../src/puripuly_heart/app/services/managed/), [credential proof](../src/puripuly_heart/core/managed_credential.py). Behavior: [control contract](../tests/app/test_application_control_contract.py), [provider application](../tests/app/test_stt_provider_apply_vertical.py), [secret persistence](../tests/core/test_encrypted_secret_store.py).
+Entry points: [provider application](../src/puripuly_heart/app/services/provider/provider_runtime_apply.py), [secret storage](../src/puripuly_heart/core/storage/secrets.py), [managed authentication](../src/puripuly_heart/app/services/managed/).
 
 ## Lifecycle and Concurrency
 
-- Every task, source, process, and provider session has an owner before work starts. That owner stops ingress, cancels or drains work, rejects late callbacks, and releases resources.
-- Generations, attachment tokens, and request identities fence retired work. Replacement revokes old authority; retired resources remain owned until cleanup completes. Caller cancellation is not proof that native/thread/process work settled.
-- Application orchestration and async clients stay on the Python event loop. Blocking device/model/storage/startup work uses owned threads, executors, or child processes; [owned-thread cancellation](../src/puripuly_heart/core/owned_thread.py) drains started synchronous work before resource release.
-- ChatGPT credential transactions serialize session-owned authority and token-cache publication with synchronous storage under one mutation lock, extending the existing worker-thread sign-in boundary. Cached-token observations are not transactional snapshots.
-- Events cross ports, callbacks, or owned queues. Receivers mutate their own state. Ordering is local to the owner/channel, not global across UI, Self, Peer, and providers.
-- Matching stops may preempt pending starts, while cleanup fences older queued starts and later replacements. Removing one channel's demand does not revoke another channel's shared resource.
-- Shutdown freezes ingress and startup, drains/cancels owned work, closes external resources, then clears runtime references. Primary operational failures and secondary cleanup failures remain distinct; failed cleanup stays owned and visible.
+- Every task, source, process, and session has an owner before work starts.
+- Stop and replacement revoke old authority. Generations and request identities reject late results.
+- Cancellation is not cleanup. Started native, thread, and process work stays owned until settlement.
+- Async orchestration runs on the Python event loop. Blocking work uses owned threads or child processes.
+- Ordering is local to each owner/channel. Shared resources remain alive while another channel needs them.
+- Shutdown stops ingress, settles work, and releases resources. Cleanup failures remain visible and owned.
 
-[Dependency checks](../tests/architecture/test_dependency_boundaries.py) enforce import boundaries and record narrow pre-existing localization and application-wiring exceptions. These exact-edge exceptions do not permit additional dependencies from the same modules. [Task-ownership checks](../tests/architecture/test_lifecycle_task_guard.py) record reviewed creation sites and remaining lifetime debt. These structural checks do not prove runtime draining or cleanup; owner behavior tests do.
+Checks: [dependencies](../tests/architecture/test_dependency_boundaries.py), [task ownership](../tests/architecture/test_lifecycle_task_guard.py). Blocking-work contract: [owned threads](../src/puripuly_heart/core/owned_thread.py).
 
 ## Diagnostics and Runtime Layout
 
-- Owners produce typed causes and known operation/request/turn identities before reducing them to user messages. [Diagnostics](../src/puripuly_heart/core/diagnostics.py) and [runtime logging](../src/puripuly_heart/core/runtime_logging.py) validate and project that evidence; arbitrary exception prose is not a classification source.
-- Technical diagnostics exclude credentials, conversation content, audio, arbitrary child output, and personal paths. Accepted conversation records have a separate protected path; CLI content requires explicit opt-in.
-- History, subscribers, and file delivery are bounded. Loss and cleanup failure remain observable independently of a failed sink. Enqueued, written, durable, and physically displayed are different claims; current-instance history is not a durable audit. See [CLI diagnostics](cli.md#retained-diagnostics-and-delivery-health).
-- [Runtime layout](../src/puripuly_heart/runtime_layout.py) separates interpreter/host paths, immutable resources, and writable user data. Windows distributions use the native host; source/developer execution remains supported. The PyInstaller packaging backend is unsupported. Features use this boundary rather than the working directory or launcher flags. Packaged code changes require rebuilding the payload; startup never writes into installed directories.
-- Model registries own pinned sources and integrity contracts. Python provisioning validates owned staging before atomic replacement; changing download sources does not change asset identity. Explicit asset operations have their own cancellation lifetime, separate from runtime demand. See [ASR installation](../src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py) and [translation provisioning](../src/puripuly_heart/core/local_translation/provisioning.py).
-- Windows Setup provisions required [local ASR](../installer/local-asr.iss) and [photo inference](../installer/photo-model.iss) assets. Runtime owners resolve installed assets through the runtime layout; native workers consume supplied paths without owning downloads. The [ASR build-time generator](../src/puripuly_heart/release_evidence/local_asr_installer.py) keeps Setup metadata aligned with the canonical model manifests. Setup and Python ASR provisioning share the same lease.
+- Owners produce typed causes and operation identities. Technical diagnostics exclude secrets and conversation content; conversation logs use a separate path.
+- Diagnostic history and delivery queues are bounded. Use [CLI diagnostics](cli.md#retained-diagnostics-and-delivery-health) to inspect failures and gaps.
+- [Runtime layout](../src/puripuly_heart/runtime_layout.py) separates installed resources from writable user data. Windows uses the native host; source execution remains supported.
+- Model registries own asset identity. Setup and Python provisioning install assets; native workers consume supplied paths.
 
-Behavior: [runtime logging](../tests/core/test_runtime_logging.py), [output diagnostics](../tests/core/test_output_logging.py), [packaged layout](../tests/release_evidence/test_native_runtime_layout.py), [model provisioning](../tests/core/local_translation/test_gemma_provisioning.py).
+Entry points: [diagnostics](../src/puripuly_heart/core/diagnostics.py), [runtime logging](../src/puripuly_heart/core/runtime_logging.py), [ASR provisioning](../src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py), [translation provisioning](../src/puripuly_heart/core/local_translation/provisioning.py).

@@ -9,19 +9,17 @@ Resident-model comparisons and paced replay on frozen English/Japanese conversat
 
 ## Prepare data
 
-English uses AMI IHM test data: AMI Consortium, Carletta et al. (2005), CC-BY-4.0. Japanese uses IngCrowd Inc. / 株式会社イングクラウド data under CC-BY-NC-4.0, including its noncommercial restriction. IBM lists AMI among training sources; exact overlap is unknown. IngCrowd is unsplit.
-
-Reuse existing audio or prepare it explicitly from the repository root. PyArrow is preparation-only:
+Reuse existing audio or run [prepare.py](prepare.py) from the repository root. PyArrow is preparation-only:
 
 ```powershell
 uv run --no-sync --with pyarrow==23.0.1 python benchmarks/asr/prepare.py --language all
 ```
 
-`--offline` requires cached pinned sources; `--check-only` validates existing inputs without downloading or rendering. Reference text must not come from candidate output.
+`--offline` requires cached pinned sources. `--check-only` validates existing inputs without downloading or rendering.
 
 ## Run
 
-Use the locked project environment and a [staged ASR worker](../../.github/CONTRIBUTING.md#native-asr-worker-builds), keeping its DLLs and inventory together. The default worker is `build/asr_worker/PuriPulyHeartASRWorker.exe`; `--worker` selects another build.
+Run [run.py](run.py) in the locked project environment with a [staged ASR worker](../../.github/CONTRIBUTING.md#native-asr-worker-builds). Keep its DLLs and inventory together. The default is `build/asr_worker/PuriPulyHeartASRWorker.exe`; `--worker` selects another build.
 
 ```powershell
 uv run --locked python benchmarks/asr/run.py --mode download --model granite --source hf_mirror
@@ -35,8 +33,11 @@ Substitute a model/language supported by the catalog, such as `sherpa-ja`/`ja`. 
 
 ## Interpret and extend
 
-- [score.py](score.py) regenerates `results/summary.json` from saved results without inference. English uses pooled WER; Japanese uses pooled CER. Empty and failed speech remain in denominators; noise is compared with its clean parents.
-- Replay measures the paced Self endpoint/queue path, not capture or GUI latency. Compare recorded model/runtime identities; historical scores are not a current baseline.
-- Add models through `models.json` or a thin [adapter](adapters.py). Other languages require frozen manifests and audio via `--inputs` and `--data-root`, not just a different language flag. Reuse the common scoring contract.
+[score.py](score.py) regenerates `results/summary.json` from saved results without inference.
 
-[Original experiment and results](https://github.com/kapitalismho/PuriPuly-heart/tree/0246def7b70f737c374525c628b5ea0251b88eed/docs/experiments/issue-353).
+- Compare candidates on the same frozen audio and independent references. English uses pooled WER; Japanese uses pooled CER. Empty and failed speech count toward accuracy.
+- Primary timings cover preloaded PCM-to-text. Replay covers the paced Self endpoint/queue path. Neither measures end-to-end latency.
+- AMI IHM (AMI Consortium, Carletta et al., 2005) is CC-BY-4.0. IngCrowd Inc. / 株式会社イングクラウド is CC-BY-NC-4.0 (noncommercial).
+- IBM lists AMI among training sources; exact overlap is unknown. IngCrowd is unsplit.
+
+Add models through [models.json](models.json) or a thin [adapter](adapters.py). Other languages need frozen manifests and audio via `--inputs` and `--data-root`. Reuse the common scoring contract.
