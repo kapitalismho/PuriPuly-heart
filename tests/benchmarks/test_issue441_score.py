@@ -275,3 +275,166 @@ def test_unanchored_reference_limits_accuracy_not_native_change_observation():
     assert change["missed_change"] is False
     assert change["correct_identity_pair"] is None
     assert result["timing"]["new_speaker_cases"][1]["status"] == "reference_unanchored"
+
+
+def metadata_run(speakers, exported, *, punctuation=""):
+    words = []
+    for index, (text, identity) in enumerate(zip(("we", "do", "not"), speakers, strict=True)):
+        words.append({"type": "word", "text": text, "start": index / 3, "end": (index + 1) / 3,
+                      "speaker_id": identity})
+        if index != 2:
+            words.append({"type": "spacing", "text": " ", "speaker_id": "not_source"})
+    words.insert(2, {"type": "audio_event", "text": "[noise]", "speaker_id": "not_source"})
+    if punctuation:
+        words.append({"type": "word", "text": punctuation, "speaker_id": None})
+    data = run([event(0, 1.1, "committed_transcript", segment_index=0, text="we do not"),
+                event(1, 2, "diarized_transcript", segment_index=0, words=words)])
+    if exported:
+        data["observations"] = [{"arrival_s": 1.1, "text": "we do not", "speaker": None,
+                                 "start_s": None, "end_s": None, "segment_index": 0,
+                                 "settled": True, "raw": data["events"][0]["raw"]}]
+        data["observations"].extend(
+            {"arrival_s": 2, "text": word["text"], "speaker": word.get("speaker_id"),
+             "start_s": word.get("start"), "end_s": word.get("end"), "segment_index": 0,
+             "settled": True, "raw": word} for word in words)
+        data["snapshots"] = [
+            {"event_seq": 0, "arrival_s": 1.1, "revision": 0, "session_id": "session",
+             "snapshot_key": "scribe:segment:0:committed_transcript", "operation": "replace",
+             "observation_indices": [0]},
+            {"event_seq": 1, "arrival_s": 2, "revision": 1, "session_id": "session",
+             "snapshot_key": "scribe:segment:0:diarized", "operation": "replace",
+             "observation_indices": list(range(1, len(words) + 1))},
+        ]
+    return data
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+@pytest.mark.parametrize(("speakers", "consequence", "groups"), [
+    (("A", None, "A"), "identity_only", 1),
+    ((None, "A", "A"), "identity_only", 1),
+    (("A", "A", "A"), "identity_only", 1),
+    (("A", None, "B"), "regroup_retranslate_required", 2),
+    (("A", "B", "A"), "regroup_retranslate_required", 3),
+])
+def test_late_metadata_uses_source_group_partitions_not_word_run_counts(exported, speakers, consequence, groups):
+    result = late_metadata(Journal(metadata_run(speakers, exported)))
+    case = result["cases"][0]
+    assert result["projection"] == "counterfactual_current_composition"
+    assert case["consequence"] == consequence
+    assert len(case["eventual_source_groups"]) == groups
+    assert "".join(group["normalized_source_text"] for group in case["eventual_source_groups"]) == "wedonot"
+    assert case["text_changed"] is False
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+def test_meaningful_punctuation_revision_is_not_erased_as_identity_only(exported):
+    result = late_metadata(Journal(metadata_run(("A", None, "A"), exported, punctuation="?")))
+    case = result["cases"][0]
+    assert case["consequence"] == "source_text_changed"
+    assert case["text_changed"] is True
+    assert case["grouping_changed"] is None
+    assert case["eventual_source_groups"][0]["normalized_source_text"] == "wedonot?"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("speakers", "groups"), [
+    (("A", None, "A"), 1), ((None, "A", "A"), 1), (("A", "A", "A"), 1),
+    (("A", None, "B"), 2), (("A", "B", "A"), 3),
+])
+async def test_counterfactual_partition_matches_actual_native_consumer_requests_and_captions(speakers, groups):
+    from benchmarks.asr.issue441_score import compact_source_text
+    from tests.core.test_native_peer_caption import final, idle, native, setup
+
+    harness, backend, events, _ = setup()
+    try:
+        await harness.start()
+        await final(harness, native(tuple(zip(("we ", "do ", "not"), speakers, strict=True))))
+        await idle(harness)
+        expected = late_metadata(Journal(metadata_run(speakers, False)))["cases"][0]["eventual_source_groups"]
+        assert [compact_source_text(call.text) for call in backend.calls] == [
+            group["normalized_source_text"] for group in expected]
+        assert len(backend.calls) == groups
+        assert len({item.utterance_id for item in events if getattr(item, "is_final", False)}) == groups
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.parametrize("reason", ["cap", "eof"])
+@pytest.mark.parametrize("receipt", [1.10, 1.151], ids=["in-flight", "just-completed"])
+def test_manual_send_interval_races_never_count_as_useful_prediction(reason, receipt):
+    data = run([
+        event(0, receipt, "committed_transcript", segment_index=0, text="no"),
+        diarized(1, 1.3, 0, 0, "A"),
+        event(2, 3.2, "committed_transcript", segment_index=1, text="no"),
+        diarized(3, 3.3, 1, 2, "A"),
+    ])
+    data["sends"] = [{"kind": f"{reason}_commit", "start_s": 1.05, "completed_s": 1.15,
+                     "status": "completed", "session_id": "session",
+                     "control": {"reason": reason, "last_native_commit_seq": None}}]
+    reference = recording()
+    reference["turn_opportunities"] = [{"id": "intermediate", "kind": "intermediate", "time_s": 1,
+                                        "start_s": 1, "end_s": 2, "span_ids": ["a", "b"],
+                                        "reference_text": "no | no"}]
+    result = turn_score(reference, Journal(data))
+    assert result["counts"]["fragments_translation_triggers"] == 2
+    assert result["counts"]["useful_intermediate"] == 0
+    assert result["opportunities"][0]["cap_eof_context_excluded_from_useful"]
+    contexts = result["commits"][0]["possible_manual_commands"]
+    assert contexts[0]["association"] == ("in_flight_send" if receipt <= 1.15 else "first_receipt_after_send")
+    assert result["commits"][0]["cause"] == "unavailable"
+
+
+def test_clean_native_intermediate_remains_positive_without_manual_control():
+    data = run([event(0, 1.2, "committed_transcript", segment_index=0, text="no"),
+                diarized(1, 1.3, 0, 0, "A"),
+                event(2, 3.2, "committed_transcript", segment_index=1, text="no"),
+                diarized(3, 3.3, 1, 2, "A")])
+    reference = recording()
+    reference["turn_opportunities"] = [{"id": "intermediate", "kind": "intermediate", "time_s": 1,
+                                        "start_s": 1, "end_s": 2, "span_ids": ["a", "b"],
+                                        "reference_text": "no | no"}]
+    result = turn_score(reference, Journal(data))
+    assert result["counts"]["useful_intermediate"] == 1
+    assert result["opportunities"][0]["cap_eof_context_excluded_from_useful"] is False
+
+
+@pytest.mark.parametrize("observed", ["first", "first not", ""])
+def test_missing_ending_or_negation_retains_opportunity_without_fast_completion(observed):
+    events = []
+    if observed:
+        words = [{"text": word, "start": index / 5, "end": (index + 1) / 5, "speaker_id": "A"}
+                 for index, word in enumerate(observed.split())]
+        events = [event(0, 1, "committed_transcript", segment_index=0, text=observed),
+                  event(1, 1.2, "diarized_transcript", segment_index=0, words=words)]
+    reference = recording()
+    reference["spans"][0].update(end_s=10, text="first no")
+    reference["turn_opportunities"] = [{"id": "end", "kind": "ending", "time_s": 10,
+                                        "start_s": 10, "end_s": 10, "span_ids": ["a"],
+                                        "reference_text": "first no"}]
+    result = turn_score(reference, Journal(run(events)))
+    assert result["counts"]["opportunities"] == 1
+    assert result["counts"]["endings_latency_unavailable"] == 1
+    assert result["ending_to_commit"]["n"] == 0
+    assert result["opportunities"][0]["ending_to_commit_s"] is None
+    assert result["opportunities"][0]["content"]["reference"] == "first no"
+    assert result["opportunities"][0]["content"]["reference_contained"] is False
+
+
+def test_full_reference_tail_preserves_legitimate_signed_timing():
+    reference = recording()
+    reference["spans"][0].update(end_s=10, text="first no")
+    reference["turn_opportunities"] = [{"id": "end", "kind": "ending", "time_s": 10,
+                                        "start_s": 10, "end_s": 10, "span_ids": ["a"],
+                                        "reference_text": "first no"}]
+    data = run([
+        event(0, 4.1, "committed_transcript", segment_index=0, text="first"),
+        event(1, 4.2, "diarized_transcript", segment_index=0, words=[
+            {"text": "first", "start": 0, "end": 4, "speaker_id": "A"}]),
+        event(2, 9.9, "committed_transcript", segment_index=1, text="no"),
+        event(3, 10.2, "diarized_transcript", segment_index=1, words=[
+            {"text": "no", "start": 9.5, "end": 9.8, "speaker_id": "A"}]),
+    ])
+    result = turn_score(reference, Journal(data))
+    assert result["counts"]["endings_latency_eligible"] == 1
+    assert result["opportunities"][0]["ending_to_commit_s"] == pytest.approx(-0.1)
+    assert result["ending_to_commit"]["n"] == 1

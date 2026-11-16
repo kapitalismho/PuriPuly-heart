@@ -36,6 +36,75 @@ def normalized(text):
     return "".join(char for char in unicodedata.normalize("NFKC", str(text)).casefold() if char.isalnum())
 
 
+def source_lexical_unit(unit):
+    raw = unit.get("raw") or {}
+    return lexical(unit.get("text")) and raw.get("type") not in {"spacing", "audio_event"}
+
+
+def compact_source_text(text):
+    return "".join(char for char in unicodedata.normalize("NFKC", str(text)) if not char.isspace())
+
+
+def current_composition_projection(units):
+    groups = []
+    leading = ""
+    for unit in units:
+        raw = unit.get("raw") or {}
+        if raw.get("type") in {"spacing", "audio_event"}:
+            continue
+        text = compact_source_text(unit.get("text", ""))
+        if not lexical(text):
+            if groups:
+                groups[-1]["normalized_source_text"] += text
+            else:
+                leading += text
+            continue
+        text, leading = leading + text, ""
+        scope = unit.get("session")
+        language = unit.get("language")
+        identity = speaker(unit.get("speaker"))
+        previous = groups[-1] if groups else None
+        if (previous is not None and previous["scope"] == scope and previous["language"] == language
+                and (previous["representative"] is None or identity is None or previous["representative"] == identity)):
+            previous["normalized_source_text"] += text
+            if previous["representative"] is None:
+                previous["representative"] = identity
+        else:
+            groups.append({"normalized_source_text": text, "scope": scope,
+                           "language": language, "representative": identity})
+    return groups
+
+
+def lexical_reference_matches(pieces, reference):
+    observed = "".join(pieces)
+    boundaries = {0, *itertools.accumulate(map(len, pieces))}
+    result = []
+    position = observed.find(reference) if reference else -1
+    while position >= 0:
+        end = position + len(reference)
+        if position in boundaries and end in boundaries:
+            result.append(end)
+        position = observed.find(reference, position + 1)
+    return result
+
+
+def ending_completion(words, reference_text, ending_s):
+    ordered = sorted(words, key=lambda row: (row[1]["start_s"], row[1]["end_s"]))
+    pieces = [normalized(word["text"]) for _, word in ordered]
+    reference = normalized(reference_text or "")
+    ends = list(itertools.accumulate(map(len, pieces)))
+    matches = lexical_reference_matches(pieces, reference)
+    if matches:
+        index = next(index for index, endpoint in enumerate(ends) if endpoint == matches[0])
+        commit, word = ordered[index]
+        return {"status": "supported", "delay_s": commit["arrival_s"] - ending_s,
+                "commit_evidence": commit["evidence"], "ending_word_end_s": word["end_s"],
+                "support": "Frozen reference text fully represented by source-ordered timed words at lexical-unit boundaries, correlated to commits only by segment index."}
+    return {"status": "reference_ending_content_not_represented" if reference else "reference_text_unavailable",
+            "delay_s": None, "observed_reference_span_text": "".join(word["text"] for _, word in ordered),
+            "support": "No completion latency assigned without full frozen reference-text endpoint support; substitutions, missing content, and unlocalizable timing remain unavailable."}
+
+
 def speaker(value):
     return None if value is None or value == "" else str(value)
 
@@ -82,7 +151,7 @@ def merge_pairs(raw):
 def word_units(words, row, session="0"):
     units = []
     for index, word in enumerate(words or []):
-        if word.get("type") in {"spacing", "audio_event"} or not lexical(word.get("text")):
+        if word.get("type") in {"spacing", "audio_event"} or not str(word.get("text", "")).strip():
             continue
         start = word.get("start", word.get("start_s"))
         end = word.get("end", word.get("end_s"))
@@ -313,7 +382,7 @@ class Journal:
             result.append(commit)
         for commit in result:
             units = [unit for unit in self.snapshot() if unit.get("segment_index") == commit["segment_index"] and unit["session"] == commit["session"]] if commit["segment_index"] is not None else []
-            timed = [unit for unit in units if number(unit.get("start_s")) and number(unit.get("end_s"))]
+            timed = [unit for unit in units if source_lexical_unit(unit) and number(unit.get("start_s")) and number(unit.get("end_s"))]
             commit["start_s"] = min((unit["start_s"] for unit in timed), default=None)
             commit["end_s"] = max((unit["end_s"] for unit in timed), default=None)
             commit["words"] = timed
@@ -323,8 +392,7 @@ class Journal:
             if controls:
                 commit["cause"] = controls[0]["raw"].get("cause", commit["cause"])
                 commit["control_state"] = controls[0]["raw"]
-                command = controls[0]["raw"].get("last_command") or {}
-                commit["possible_manual_command"] = command if command and command.get("last_native_commit_seq") == commit["previous_native_commit_seq"] else None
+            commit["possible_manual_commands"] = self.manual_command_contexts(commit, result)
             matching = [item for item in self.run.get("commits", []) if item.get("segment_index") == commit["segment_index"] and commit["segment_index"] is not None]
             if matching:
                 commit["cause"] = matching[0].get("cause", matching[0].get("reason", commit["cause"]))
@@ -333,6 +401,30 @@ class Journal:
             commit["last_in_session"] = commit is siblings[-1]
             commit["empty_text"] = not lexical(commit["text"])
         return result
+
+    def manual_command_contexts(self, commit, commits):
+        contexts = []
+        for index, sent in enumerate(self.run.get("sends", [])):
+            command = sent.get("control") or {}
+            reason = command.get("reason", sent.get("kind", "").removesuffix("_commit"))
+            if reason not in {"cap", "eof"} or str(sent.get("session_id", "0")) != commit["session"]:
+                continue
+            start, end = sent.get("start_s"), sent.get("completed_s")
+            if not number(start) or commit["arrival_s"] < start:
+                continue
+            during = not number(end) or commit["arrival_s"] <= end
+            after = [row for row in commits if row["session"] == commit["session"]
+                     and number(end) and row["arrival_s"] >= end]
+            first_after = bool(after) and min(after, key=lambda row: row["arrival_s"]) is commit
+            predecessor = "last_native_commit_seq" in command and command["last_native_commit_seq"] == commit["previous_native_commit_seq"]
+            if during or first_after or predecessor:
+                contexts.append({**command, "reason": reason, "send_start_s": start, "send_completed_s": end,
+                                 "association": "in_flight_send" if during else "first_receipt_after_send" if first_after else "recorded_command_predecessor",
+                                 "evidence": f"{self.evidence}#sends/{index}"})
+        command = (commit.get("control_state") or {}).get("last_command") or {}
+        if command and command.get("last_native_commit_seq") == commit["previous_native_commit_seq"]:
+            contexts.append({**command, "association": "receipt_control_state_predecessor"})
+        return contexts
 
 
 def at_anchor(units, anchor, recording, activity=False):
@@ -599,11 +691,14 @@ def turn_score(recording, journal):
             unsafe_cut = intermediate = None
         all_words = left_words + right_words
         unique_words = {id(word): word for _, word in all_words}
-        text = "".join(word["text"] for word in sorted(unique_words.values(), key=lambda row: (row["start_s"], row["end_s"])))
+        ordered_words = sorted(unique_words.values(), key=lambda row: (row["start_s"], row["end_s"]))
+        text = "".join(word["text"] for word in ordered_words)
         observed = normalized(text)
         references = [normalized(part) for part in opportunity.get("reference_text", "").split("|") if normalized(part)]
+        occurrences = [len(lexical_reference_matches([normalized(word["text"]) for word in ordered_words], part)) for part in references]
+        completion = ending_completion(left_words, opportunity.get("reference_text"), time) if opportunity["kind"] == "ending" else None
         contexts = [commit.get("control_state", {}).get("last_command") or {} for commit in (last, first_right) if commit]
-        manual_contexts = [commit.get("possible_manual_command") or {} for commit in (last, first_right) if commit]
+        manual_contexts = [context for commit in (last, first_right) if commit for context in commit["possible_manual_commands"]]
         excluded_context = any(context.get("reason") in {"cap", "eof"} for context in manual_contexts)
         evidence = list(dict.fromkeys(commit["evidence"] for commit, _ in all_words))
         cases.append({"id": opportunity["id"], "kind": opportunity["kind"], "time_s": time,
@@ -611,16 +706,18 @@ def turn_score(recording, journal):
                       "timing_available": timing_available, "pair_available": pair_available,
                       "premature_cut": unsafe_cut if opportunity["kind"] == "unsafe" else None,
                       "merged_boundary": not split if opportunity["kind"] == "ending" and pair_available else None,
-                      "ending_to_commit_s": last["arrival_s"] - time if opportunity["kind"] == "ending" and last else None,
+                      "ending_to_commit_s": completion["delay_s"] if completion else None,
+                      "ending_completion": completion,
                       "intermediate_output": intermediate if opportunity["kind"] == "intermediate" and not excluded_context else None,
                       "nearest_boundary_delta_s": nearest["end_s"] - time if nearest else None,
                       "nearest_boundary_evidence": nearest["evidence"] if nearest else None,
                       "cause": last["cause"] if last else None, "command_contexts_not_causal": contexts,
+                      "possible_manual_contexts_not_causal": manual_contexts,
                       "cap_eof_context_excluded_from_useful": excluded_context,
                       "content": {"reference": opportunity.get("reference_text"), "observed": text,
                                   "exact_normalized": observed == "".join(references) if references else None,
-                                  "reference_contained": all(part in observed for part in references) if references else None,
-                                  "part_occurrences": [observed.count(part) for part in references]},
+                                  "reference_contained": all(occurrences) if references else None,
+                                  "part_occurrences": occurrences},
                       "commit_evidence": evidence,
                       "boundary_limit": "Single-point internal-clause hypotheses have no tolerance window; nearest signed boundary offset is reported, not a manufactured binary success/failure." if len(selected_spans) == 1 and start == end and opportunity["kind"] != "ending" else None})
     delays = [row["ending_to_commit_s"] for row in cases if row["ending_to_commit_s"] is not None]
@@ -632,8 +729,8 @@ def turn_score(recording, journal):
         boundaries = [commit for commit in commits if number(commit["end_s"]) and span["start_s"] < commit["end_s"] < span["end_s"]]
         long_speech.append({"span_id": span["id"], "duration_s": span["end_s"] - span["start_s"],
                             "intermediate_commits": len(boundaries),
-                            "non_cap_eof_context_commits": sum(not row.get("empty_text") and (row.get("possible_manual_command") or {}).get("reason") not in {"cap", "eof"} for row in boundaries),
-                            "boundaries": [{key: row.get(key) for key in ("end_s", "arrival_s", "cause", "control_state", "evidence")} for row in boundaries]})
+                            "non_cap_eof_context_commits": sum(not row["empty_text"] and not any(context.get("reason") in {"cap", "eof"} for context in row["possible_manual_commands"]) for row in boundaries),
+                            "boundaries": [{key: row.get(key) for key in ("end_s", "arrival_s", "cause", "control_state", "possible_manual_commands", "evidence")} for row in boundaries]})
     return {"opportunities": cases, "commits": [{key: value for key, value in row.items() if key != "words"} for row in commits],
             "long_speech": long_speech,
             "counts": {"opportunities": len(cases), "commits_total": len(commits),
@@ -645,6 +742,8 @@ def turn_score(recording, journal):
                        "endings_pair_evaluable": sum(row["merged_boundary"] is not None for row in cases),
                        "useful_intermediate": sum(row["intermediate_output"] is True for row in cases),
                        "intermediate_evaluable": sum(row["intermediate_output"] is not None for row in cases),
+                       "endings_latency_eligible": sum(row["ending_to_commit_s"] is not None for row in cases),
+                       "endings_latency_unavailable": sum(row["kind"] == "ending" and row["ending_to_commit_s"] is None for row in cases),
                        "timing_unavailable_commits": sum(not number(row["end_s"]) for row in commits),
                        "causes": dict(Counter(row["cause"] for row in commits)),
                        "commands_not_causal": dict(Counter(row["raw"].get("reason") for row in commands))},
@@ -660,17 +759,20 @@ def late_metadata(journal):
             continue
         before = [unit for unit in journal.snapshot(commit["arrival_s"]) if unit.get("segment_index") == index and unit["session"] == commit["session"]]
         after = [unit for unit in journal.snapshot() if unit.get("segment_index") == index and unit["session"] == commit["session"]]
-        def boundaries(units):
-            return [position for position in range(1, len(units)) if units[position - 1].get("speaker") != units[position].get("speaker")]
-        earlier, later = boundaries(before), boundaries(after)
-        changed = [unit.get("speaker") for unit in before] != [unit.get("speaker") for unit in after]
-        text_changed = normalized("".join(unit.get("text", "") for unit in after)) != normalized(commit["text"])
+        earlier = current_composition_projection(before)
+        later = current_composition_projection(after)
+        before_text = [group["normalized_source_text"] for group in earlier]
+        after_text = [group["normalized_source_text"] for group in later]
+        changed = [(group["scope"], group["representative"]) for group in earlier] != [(group["scope"], group["representative"]) for group in later]
+        text_changed = "".join(before_text) != "".join(after_text)
         cases.append({"segment_index": index, "evidence": commit["evidence"], "speaker_changed": changed,
-                      "consequence": "regroup_retranslate_required" if earlier != later or text_changed else "identity_only" if changed else "none",
-                      "before_boundaries": earlier, "eventual_boundaries": later,
+                      "consequence": "source_text_changed" if text_changed else "regroup_retranslate_required" if before_text != after_text else "identity_only" if changed else "none",
+                      "before_source_groups": earlier, "eventual_source_groups": later,
                       "text_changed": text_changed,
-                      "limit": "Required source-group consequence only; no actual Scribe MT/caption integration executed."})
-    return {"counts": dict(Counter(row["consequence"] for row in cases)), "cases": cases}
+                      "grouping_changed": before_text != after_text if not text_changed else None})
+    return {"projection": "counterfactual_current_composition",
+            "counts": dict(Counter(row["consequence"] for row in cases)), "cases": cases,
+            "limit": "Identity-neutral counterfactual projection of current #373 unknown attachment onto source text (NFKC and whitespace-only normalization, punctuation/case preserved). Text changes are separate from comparable source partitions. Real Scribe payloads are never labeled Soniox; unobserved language boundaries cannot be evaluated. This is not actual Scribe late-repair/MT/caption integration, and no translated string is split."}
 
 
 def caption_structure(run, recording, journal, mapping):
@@ -811,7 +913,8 @@ def aggregate(results):
         "counts": {key: sum(turn["counts"][key] for turn in turns)
                    for key in ("opportunities", "commits_total", "fragments_translation_triggers", "empty_commits",
                                "premature_cuts", "unsafe_evaluable", "merged_endings", "endings_pair_evaluable",
-                               "useful_intermediate", "intermediate_evaluable", "timing_unavailable_commits")},
+                               "useful_intermediate", "intermediate_evaluable", "timing_unavailable_commits",
+                               "endings_latency_eligible", "endings_latency_unavailable")},
         "ending_to_commit": timing([row["ending_to_commit_s"] for turn in turns for row in turn["opportunities"]
                                     if row["ending_to_commit_s"] is not None]),
         "commands_not_causal": dict(sum((Counter(turn["counts"]["commands_not_causal"]) for turn in turns), Counter())),
