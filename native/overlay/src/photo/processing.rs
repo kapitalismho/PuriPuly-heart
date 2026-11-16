@@ -32,6 +32,23 @@ impl Rect {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Ownership {
+    bbox: Rect,
+    #[cfg(feature = "photo-experiment")]
+    quad: Option<super::experiment::Quad>,
+}
+
+impl From<Rect> for Ownership {
+    fn from(bbox: Rect) -> Self {
+        Self {
+            bbox,
+            #[cfg(feature = "photo-experiment")]
+            quad: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PixelRect {
     pub x: u32,
@@ -351,6 +368,31 @@ impl MaskProcessor {
         erase_source: &RgbImage,
         workspace: &mut telea::Workspace,
     ) -> Result<PreparedRegion, String> {
+        self.prepare_owned(photo, bbox, source_line_count, erase_source, workspace, bbox.into())
+    }
+
+    #[cfg(feature = "photo-experiment")]
+    pub(super) fn prepare_quad(
+        &mut self,
+        photo: &WorkingPhoto,
+        bbox: Rect,
+        source_line_count: u32,
+        erase_source: &RgbImage,
+        workspace: &mut telea::Workspace,
+        quad: super::experiment::Quad,
+    ) -> Result<PreparedRegion, String> {
+        self.prepare_owned(photo, bbox, source_line_count, erase_source, workspace, Ownership { bbox, quad: Some(quad) })
+    }
+
+    fn prepare_owned(
+        &mut self,
+        photo: &WorkingPhoto,
+        bbox: Rect,
+        source_line_count: u32,
+        erase_source: &RgbImage,
+        workspace: &mut telea::Workspace,
+        ownership: Ownership,
+    ) -> Result<PreparedRegion, String> {
         let mask_start = Instant::now();
         if erase_source.dimensions() != photo.pixels.dimensions() {
             return Err("photo_erase_source_dimensions".into());
@@ -403,14 +445,14 @@ impl MaskProcessor {
             merge_tile_mask(&mut foreground, roi, tile, whole, values);
         }
         let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
-            Luma([if inside(roi, bbox, x, y) {
+            Luma([if inside(roi, ownership, x, y) {
                 foreground.get_pixel(x, y)[0]
             } else {
                 0
             }])
         });
         let vertical = bbox.height() > 1.6 * bbox.width();
-        let owned = owned_lines(&foreground, roi, bbox, glyph_size, vertical);
+        let owned = owned_lines(&foreground, roi, ownership, glyph_size, vertical);
         let recovered = GrayImage::from_fn(roi.width, roi.height, |x, y| {
             Luma([if owned.get_pixel(x, y)[0] != 0 || core.get_pixel(x, y)[0] != 0 {
                 255
@@ -445,7 +487,13 @@ impl MaskProcessor {
 
 const RECOVERY_REACH: f32 = 0.8;
 
-fn inside(roi: PixelRect, bbox: Rect, x: u32, y: u32) -> bool {
+fn inside(roi: PixelRect, ownership: impl Into<Ownership>, x: u32, y: u32) -> bool {
+    let ownership = ownership.into();
+    #[cfg(feature = "photo-experiment")]
+    if let Some(quad) = ownership.quad {
+        return quad.contains(f64::from(x) + f64::from(roi.x) + 0.5, f64::from(y) + f64::from(roi.y) + 0.5);
+    }
+    let bbox = ownership.bbox;
     let px = x as f32 + roi.x as f32 + 0.5;
     let py = y as f32 + roi.y as f32 + 0.5;
     px >= bbox.left && px < bbox.right && py >= bbox.top && py < bbox.bottom
@@ -460,10 +508,11 @@ struct Part {
 fn owned_lines(
     foreground: &GrayImage,
     roi: PixelRect,
-    bbox: Rect,
+    ownership: impl Into<Ownership>,
     glyph: f32,
     vertical: bool,
 ) -> GrayImage {
+    let ownership = ownership.into();
     let (width, height) = foreground.dimensions();
     let mut labels = vec![u32::MAX; (width * height) as usize];
     let mut parts: Vec<Part> = Vec::new();
@@ -489,7 +538,7 @@ fn owned_lines(
             part.bounds[2] = part.bounds[2].max(i64::from(x) + 1);
             part.bounds[3] = part.bounds[3].max(i64::from(y) + 1);
             part.total += 1;
-            part.inside += u32::from(inside(roi, bbox, x, y));
+            part.inside += u32::from(inside(roi, ownership, x, y));
             for dy in -1i64..=1 {
                 for dx in -1i64..=1 {
                     let (nx, ny) = (i64::from(x) + dx, i64::from(y) + dy);

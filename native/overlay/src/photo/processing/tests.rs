@@ -951,3 +951,48 @@ fn recovery_follows_owned_lines_past_a_short_box_but_leaves_neighbor_lines() {
     assert_eq!(owned.get_pixel(30, 48)[0], 0, "line below belongs to another block");
     assert_ne!(owned.get_pixel(30, 20)[0], 0);
 }
+
+#[cfg(feature = "photo-experiment")]
+#[test]
+fn quad_ownership_changes_line_recovery_not_only_core_seeds() {
+    let roi = PixelRect { x: 0, y: 0, width: 100, height: 100 };
+    let bbox = Rect { left: 10.0, top: 10.0, right: 90.0, bottom: 90.0 };
+    let quad = super::super::experiment::Quad::new(
+        [[10.0,10.0],[90.0,70.0],[90.0,90.0],[10.0,30.0]], [100,100],
+    ).unwrap();
+    let ownership = Ownership { bbox, quad: Some(quad) };
+    let foreground = GrayImage::from_fn(100,100,|x,y| {
+        let target = (10..95).contains(&x) && i64::from(y) >= 10 + i64::from(x)*3/4
+            && i64::from(y) < 20 + i64::from(x)*3/4;
+        let neighbor = (65..85).contains(&x) && (10..20).contains(&y);
+        Luma([if target || neighbor { 255 } else { 0 }])
+    });
+    let baseline = owned_lines(&foreground,roi,bbox,10.0,false);
+    let candidate = owned_lines(&foreground,roi,ownership,10.0,false);
+    assert_eq!(baseline.get_pixel(75,15)[0],255);
+    assert_eq!(candidate.get_pixel(75,15)[0],0);
+    assert!(!inside(roi,ownership,75,15));
+    assert_eq!(candidate.get_pixel(92,86)[0],255);
+    assert!(!inside(roi,ownership,92,86));
+    assert_eq!(candidate.get_pixel(40,43)[0],255);
+    let empty = GrayImage::new(100,100);
+    assert_eq!(owned_lines(&empty,roi,ownership,10.0,false),empty);
+}
+
+#[cfg(feature = "photo-experiment")]
+#[test]
+fn axis_aligned_quad_matches_aabb_pixel_membership_and_owned_recovery() {
+    let roi = PixelRect { x: 10, y: 20, width: 30, height: 30 };
+    let bbox = Rect { left: 15.5, top: 25.5, right: 35.5, bottom: 45.5 };
+    let quad = super::super::experiment::Quad::new(
+        [[15.5,25.5],[35.5,25.5],[35.5,45.5],[15.5,45.5]], [100,100],
+    ).unwrap();
+    let ownership = Ownership { bbox, quad: Some(quad) };
+    let foreground = GrayImage::from_fn(30,30,|x,y| Luma([if (x+y)%3!=0 { 255 } else { 0 }]));
+    for y in 0..30 {
+        for x in 0..30 {
+            assert_eq!(inside(roi,bbox,x,y),inside(roi,ownership,x,y));
+        }
+    }
+    assert_eq!(owned_lines(&foreground,roi,bbox,5.0,false),owned_lines(&foreground,roi,ownership,5.0,false));
+}

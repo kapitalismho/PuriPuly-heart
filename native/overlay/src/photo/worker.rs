@@ -108,6 +108,8 @@ pub(crate) struct ImagePipeline {
     commit_revision: u64,
     changes: Vec<(u64, Vec<PixelRect>)>,
     font_reported: bool,
+    #[cfg(feature = "photo-experiment")]
+    pub(super) quads: Option<Arc<super::experiment::QuadRegistry>>,
 }
 
 impl ImagePipeline {
@@ -129,6 +131,8 @@ impl ImagePipeline {
             telea: super::telea::Workspace::default(),
             changes: Vec::new(),
             font_reported: false,
+            #[cfg(feature = "photo-experiment")]
+            quads: Default::default(),
         }
     }
 
@@ -240,6 +244,7 @@ impl ImagePipeline {
                     None => {
                         let region = self.prepare_region(
                             &working,
+                            block.block_id,
                             block.bbox,
                             block.source.split('\n').count() as u32,
                         )?;
@@ -375,7 +380,7 @@ impl ImagePipeline {
             }
             if let (Some(_), Some(lines)) = (&preparation.source, preparation.source_line_count) {
                 if !self.prepared.contains_key(&preparation.block_id) {
-                    let region = self.prepare_region(&working, preparation.bbox, lines)?;
+                    let region = self.prepare_region(&working, preparation.block_id, preparation.bbox, lines)?;
                     if !emit_preparation_costs(preparation.block_id, &region, &mut emit) {
                         return Ok(());
                     }
@@ -442,6 +447,7 @@ impl ImagePipeline {
     fn prepare_region(
         &mut self,
         working: &WorkingPhoto,
+        block_id: u64,
         bbox: [f64; 4],
         lines: u32,
     ) -> Result<PreparedRegion, &'static str> {
@@ -459,6 +465,16 @@ impl ImagePipeline {
                     .map_err(|_| "mask_runtime_unavailable")?,
             );
         }
+        #[cfg(feature = "photo-experiment")]
+        if let Some(quad) = self.quads.as_ref().and_then(|quads| quads.get(&block_id)) {
+            return self.processor.as_mut().unwrap().prepare_quad(
+                working, mapped_rect(bbox, working), lines,
+                self.erase_source.as_ref().unwrap_or(working.pixels.as_ref()),
+                &mut self.telea, quad.mapped(working),
+            ).map_err(|_| "mask_processing_failed");
+        }
+        #[cfg(not(feature = "photo-experiment"))]
+        let _ = block_id;
         self.processor
             .as_mut()
             .unwrap()

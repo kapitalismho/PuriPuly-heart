@@ -1,5 +1,6 @@
 use image::{codecs::jpeg::JpegEncoder, imageops, Rgb, RgbImage};
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
@@ -30,6 +31,40 @@ pub struct SourceRequest {
 
 pub fn send_size(width: u32, height: u32) -> [u32; 2] {
     if height > width { [720, 1280] } else { [1280, 720] }
+}
+
+pub(super) struct SendCanvas<'a> {
+    pub pixels: Cow<'a, RgbImage>,
+    pub scale: f64,
+    pub offset_x: u32,
+    pub offset_y: u32,
+}
+
+pub(super) fn send_canvas(original: &RgbImage) -> SendCanvas<'_> {
+    let [send_width, send_height] = send_size(original.width(), original.height());
+    let scale = (f64::from(send_width) / f64::from(original.width()))
+        .min(f64::from(send_height) / f64::from(original.height()));
+    let width = (f64::from(original.width()) * scale)
+        .round_ties_even()
+        .clamp(1.0, f64::from(send_width)) as u32;
+    let height = (f64::from(original.height()) * scale)
+        .round_ties_even()
+        .clamp(1.0, f64::from(send_height)) as u32;
+    let offset_x = (send_width - width) / 2;
+    let offset_y = (send_height - height) / 2;
+    let pixels = if original.dimensions() == (send_width, send_height) {
+        Cow::Borrowed(original)
+    } else {
+        let resized = imageops::resize(original, width, height, imageops::FilterType::Lanczos3);
+        if (width, height) == (send_width, send_height) {
+            Cow::Owned(resized)
+        } else {
+            let mut canvas = RgbImage::from_pixel(send_width, send_height, Rgb([16, 18, 24]));
+            imageops::replace(&mut canvas, &resized, i64::from(offset_x), i64::from(offset_y));
+            Cow::Owned(canvas)
+        }
+    };
+    SendCanvas { pixels, scale, offset_x, offset_y }
 }
 
 #[derive(PartialEq, Eq)]
@@ -554,35 +589,7 @@ fn prepare_loaded(
         source_file.write_all(&source.bytes).map_err(|_| "output_unavailable")?;
         drop(source_file);
         let resize_start = Instant::now();
-        let [send_width, send_height] = send_size(original.width(), original.height());
-        let scale = (f64::from(send_width) / f64::from(original.width()))
-            .min(f64::from(send_height) / f64::from(original.height()));
-        let width = (f64::from(original.width()) * scale)
-            .round_ties_even()
-            .clamp(1.0, f64::from(send_width)) as u32;
-        let height = (f64::from(original.height()) * scale)
-            .round_ties_even()
-            .clamp(1.0, f64::from(send_height)) as u32;
-        let offset_x = (send_width - width) / 2;
-        let offset_y = (send_height - height) / 2;
-        let canvas = if original.width() == send_width && original.height() == send_height {
-            None
-        } else {
-            let resized =
-                imageops::resize(original.as_ref(), width, height, imageops::FilterType::Lanczos3);
-            if width == send_width && height == send_height {
-                Some(resized)
-            } else {
-                let mut canvas = RgbImage::from_pixel(send_width, send_height, Rgb([16, 18, 24]));
-                imageops::replace(
-                    &mut canvas,
-                    &resized,
-                    i64::from(offset_x),
-                    i64::from(offset_y),
-                );
-                Some(canvas)
-            }
-        };
+        let canvas = send_canvas(original);
         let resize_ms = resize_start.elapsed().as_secs_f64() * 1000.0;
         cancelled(cancel)?;
         let jpeg_start = Instant::now();
@@ -594,7 +601,7 @@ fn prepare_loaded(
         jpeg_created = true;
         let mut jpeg = BufWriter::new(jpeg);
         JpegEncoder::new_with_quality(&mut jpeg, 85)
-            .encode_image(canvas.as_ref().unwrap_or(original.as_ref()))
+            .encode_image(canvas.pixels.as_ref())
             .map_err(|_| "jpeg_failed")?;
         jpeg.flush().map_err(|_| "jpeg_failed")?;
         drop(jpeg);
@@ -606,9 +613,9 @@ fn prepare_loaded(
             jpeg_path: jpeg_path.clone(),
             original: original.clone(),
             working: source.working.clone(),
-            scale,
-            offset_x,
-            offset_y,
+            scale: canvas.scale,
+            offset_x: canvas.offset_x,
+            offset_y: canvas.offset_y,
             preparation_ms: start.elapsed().as_secs_f64() * 1000.0,
             decode_ms: if reused { 0.0 } else { source.decode_ms },
             resize_ms,
