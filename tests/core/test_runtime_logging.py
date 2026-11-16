@@ -2250,3 +2250,62 @@ def test_peer_revision_retention_is_bounded_and_legacy_logging_is_unchanged() ->
         assert len(session._conversation_record_keys) == 2
     finally:
         session.close()
+
+
+def test_recognition_turn_metadata_survives_file_sink_without_content(tmp_path) -> None:
+    recognition_logger = logging.getLogger(f"test.runtime_logging.recognition.{uuid4()}")
+    recognition_logger.propagate = False
+    previous_level = recognition_logger.level
+    sinks = configure_main_logging(root_logger=recognition_logger, log_dir=tmp_path)
+    utterance = str(uuid4())
+    epoch = uuid4().hex
+    turn = uuid4().hex
+    accepted = [
+        f"[Recognition] terminal channel=peer utterance_id={utterance} provider=qwen_audio "
+        f"epoch={epoch} turn={turn} outcome=empty cause=none text_authority=authoritative "
+        "successful_payloads=4 successful_samples=64000 successful_bytes=128000 "
+        "content_bytes=128000 context_bytes=0 activation_generation=16 final_wait_ms=812 "
+        "final_timeout_ms=5000 failure_retryable=0 recovery_pending=0",
+        f"[Recognition] terminal channel=peer utterance_id={utterance} generation=3 "
+        "provider=soniox epoch=none turn=none outcome=expired cause=provider_final_timeout "
+        "text_authority=none successful_payloads=0 successful_samples=0 successful_bytes=0 "
+        "content_bytes=0 context_bytes=0 sealed_wait_ms=1200 ttl_ms=8000",
+        f"[Recognition] payload_received channel=peer utterance_id={utterance} "
+        f"provider=qwen_audio epoch={epoch} turn={turn} successful_payloads=1 "
+        "successful_samples=1600 successful_bytes=3200 context_only=0",
+        f"[Recognition] session_retired channel=peer provider=qwen_audio epoch={epoch} "
+        "cause=provider_final_timeout recovery=none",
+        "[QwenAudio] task_failed channel=peer reason=qwen_final_timeout cause_class=TimeoutError",
+        "[VAD] window channel=peer reason=interval generation=3 observed_audio_ms=1000 "
+        "input_rms=0.01234 max_probability=0.9123 threshold_min=0.4000 threshold_max=unknown "
+        "threshold_hits=12 candidate_discarded=0 candidate_max_run_ms=64.0 "
+        "candidate_pending_chunks=0 committed=1 rollovers=0 onset_threshold=0.5 "
+        "continuation_threshold=0.35 start_debounce_chunks=2 start_commit_chunks=3",
+        f"[VAD] committed channel=peer utterance_id={utterance} kind=onset "
+        "applied_threshold=0.5000 onset_threshold=0.5 continuation_threshold=0.35 "
+        "start_commit_chunks=3",
+    ]
+    rejected = [
+        f"[Recognition] terminal channel=peer utterance_id={utterance} cause=private_reason",
+        f"[Recognition] terminal channel=peer utterance_id={utterance} text=private-transcript",
+        "[Recognition] terminal channel=peer provider=private-provider outcome=final",
+        "[Recognition] terminal channel=peer final_wait_ms=-1 outcome=private",
+        "[Recognition] All configured speech recognition services are unavailable private.",
+        "[QwenAudio] task_failed channel=peer reason=private_reason cause_class=TimeoutError",
+        "[QwenAudio] task_failed channel=peer reason=qwen_final_timeout cause_class=private-detail",
+        "[VAD] window channel=peer reason=private input_rms=0.1",
+        "[VAD] committed channel=peer kind=onset kind=rollover private=1",
+    ]
+    try:
+        recognition_logger.setLevel(logging.INFO)
+        for message in accepted + rejected:
+            recognition_logger.info(message)
+    finally:
+        sinks.close()
+        recognition_logger.setLevel(previous_level)
+    records = sinks.log_file.read_text(encoding="utf-8").splitlines()
+    assert len(records) == len(accepted) + len(rejected)
+    for record, message in zip(records, accepted, strict=False):
+        assert record.endswith(f": {message}")
+    assert all("untrusted_record_redacted" in record for record in records[len(accepted) :])
+    assert "private" not in "\n".join(records)
