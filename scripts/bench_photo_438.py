@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import math
+import shutil
 import statistics
 import sys
 import time
@@ -116,6 +117,23 @@ class CaptureStream(httpx.AsyncByteStream):
         await self.original.aclose()
 
 
+def select_final_answer(events: list[dict]) -> tuple[str, dict]:
+    responses = [event.get("response") for event in events if event.get("type") == "response.completed"]
+    if len(responses) != 1 or not isinstance(responses[0], dict):
+        raise ValueError("expected exactly one completed terminal response")
+    messages = [item for item in responses[0].get("output", []) if item.get("type") == "message"]
+    final = [message for message in messages if message.get("phase") == "final_answer"]
+    if len(final) != 1:
+        raise ValueError(f"expected exactly one explicit final_answer message, got {len(final)}")
+    parts = [part.get("text") for part in final[0].get("content", []) if part.get("type") == "output_text"]
+    if not parts or any(not isinstance(part, str) for part in parts):
+        raise ValueError("final_answer must contain output_text")
+    return "".join(parts), {
+        "message_id": final[0].get("id"), "message_phases": [message.get("phase") for message in messages],
+        "source": "completed terminal response; explicit message phase=final_answer",
+    }
+
+
 def validate_quads(raw: str, blocks: list[dict], image: PreparedPhoto) -> dict:
     result = {"raw_predictions": None, "errors": [], "per_block": {}, "sidecar": None}
     expected = [b["block_id"] for b in blocks]
@@ -195,6 +213,75 @@ def quad_overlay(path: Path, quads: dict, image: PreparedPhoto) -> None:
     path.write_text("".join(parts) + "</svg>", encoding="utf-8")
 
 
+def extract_response(directory: Path, photo: PreparedPhoto, arm: str, canonical, record: dict) -> None:
+    record.update(parse_errors=[], structured_parse_status="failed", phase_selection_error=None, phase_selection=None, block_count=None)
+    record["first_text_timing_boundary"] = "first raw provider output text; may include commentary"
+    try:
+        text, selection = select_final_answer(load(directory / "terminal-events.json"))
+    except (ValueError, OSError) as error:
+        record["phase_selection_error"] = str(error)
+        record["parse_errors"].append(str(error))
+        record["timing_ms"]["request_start_to_first_block"] = None
+        record["first_block_unavailable_reason"] = "explicit final_answer selection failed"
+        for name in ("blocks.json", "quad-original.json"):
+            (directory / name).unlink(missing_ok=True)
+        if arm == "quad":
+            record.update(geometry_available=False, unavailable_block_ids=[str(block["block_id"]) for block in canonical],
+                          geometry_errors=[str(error)], block_count=len(canonical))
+            save(directory / "quads.json", {
+                "raw_predictions": None, "errors": [str(error)], "sidecar": None,
+                "per_block": {str(block["block_id"]): {"status": "unavailable", "errors": [str(error)],
+                              "quad_send": None, "quad_original": None} for block in canonical},
+            })
+            (directory / "quad-overlay.svg").unlink(missing_ok=True)
+        return
+    record["phase_selection"] = selection
+    (directory / "final-answer.txt").write_text(text, encoding="utf-8")
+    raw_text = (directory / "response.txt").read_text(encoding="utf-8")
+    if selection["message_phases"] != ["final_answer"] or raw_text != text:
+        record["timing_ms"]["request_start_to_first_block"] = None
+        record["first_block_unavailable_reason"] = "raw stream spans other output phases; final block timing not observed"
+    else:
+        record["first_block_timing_boundary"] = "completed block streamed in sole explicit final_answer message"
+    if arm == "quad":
+        quads = validate_quads(text, canonical, photo)
+        save(directory / "quads.json", quads)
+        quad_overlay(directory / "quad-overlay.svg", quads, photo)
+        record["geometry_available"] = quads["sidecar"] is not None
+        record["unavailable_block_ids"] = [key for key, value in quads["per_block"].items() if value["status"] != "available"]
+        record["geometry_errors"] = quads["errors"]
+        record["first_block_unavailable_reason"] = "quad extraction is not the photo block streaming protocol"
+        if quads["sidecar"] is not None:
+            save(directory / "quad-original.json", quads["sidecar"])
+            record["structured_parse_status"] = "completed"
+        else:
+            (directory / "quad-original.json").unlink(missing_ok=True)
+        record["block_count"] = len(canonical)
+        return
+    parser = PhotoBlockParser()
+    events = parser.feed(text)
+    lines = {event.index: event.source_line_count for event in events if isinstance(event, SourceReady)}
+    blocks = []
+    try:
+        for index, block in enumerate(parser.finish()):
+            item = {"block_id": index, "bbox_send": block.bbox, "source": block.source,
+                    "translation": block.translation, "source_line_count": lines[index], "bbox": None}
+            try:
+                mapped = photo.map_box(block.bbox, google=False)
+                item.update(bbox=list(mapped.bbox), bbox_corrected=mapped.corrected)
+            except ValueError as error:
+                item["mapping_error"] = str(error)
+                record["parse_errors"].append({"block_id": index, "mapping_error": str(error)})
+            blocks.append(item)
+        record["block_count"] = len(blocks)
+        record["structured_parse_status"] = "failed" if record["parse_errors"] else "completed"
+        save(directory / "blocks.json", {"blocks": blocks, "parse_events": [asdict(event) for event in events]})
+    except ValueError as error:
+        record["parse_errors"].append(str(error))
+        (directory / "blocks.json").unlink(missing_ok=True)
+        save(directory / "partial-parse-events.json", [asdict(event) for event in events])
+
+
 async def request(root: Path, image_info: dict, meta: dict, arm: str, order: int, key: str):
     directory = root / image_info["id"] / "requests" / arm / "attempt-01"
     measurement_path = directory / "measurement.json"
@@ -223,8 +310,6 @@ async def request(root: Path, image_info: dict, meta: dict, arm: str, order: int
     save(measurement_path, record)
     raw = []
     parser = PhotoBlockParser()
-    lines = {}
-    parse_events = []
     completed = False
     start = time.monotonic()
 
@@ -253,9 +338,6 @@ async def request(root: Path, image_info: dict, meta: dict, arm: str, order: int
                     raw.append(event.text)
                     if arm != "quad":
                         for parsed_event in parser.feed(event.text):
-                            parse_events.append(asdict(parsed_event))
-                            if isinstance(parsed_event, SourceReady):
-                                lines[parsed_event.index] = parsed_event.source_line_count
                             if isinstance(parsed_event, BlockComplete) and record["timing_ms"]["request_start_to_first_block"] is None:
                                 record["timing_ms"]["request_start_to_first_block"] = elapsed
                 elif isinstance(event, PhotoStreamCompleted):
@@ -293,35 +375,7 @@ async def request(root: Path, image_info: dict, meta: dict, arm: str, order: int
                 if record["model"] is None:
                     record["model"] = response.get("model")
         save(directory / "terminal-events.json", terminal_events)
-    if arm == "quad":
-        quads = validate_quads(text, canonical, photo)
-        save(directory / "quads.json", quads)
-        quad_overlay(directory / "quad-overlay.svg", quads, photo)
-        record["geometry_available"] = quads["sidecar"] is not None
-        record["unavailable_block_ids"] = [k for k, v in quads["per_block"].items() if v["status"] != "available"]
-        record["geometry_errors"] = quads["errors"]
-        record["first_block_unavailable_reason"] = "quad extraction is not the photo block streaming protocol"
-        if quads["sidecar"] is not None:
-            save(directory / "quad-original.json", quads["sidecar"])
-        record["block_count"] = len(canonical)
-    else:
-        blocks = []
-        try:
-            for index, block in enumerate(parser.finish()):
-                item = {"block_id": index, "bbox_send": block.bbox, "source": block.source,
-                        "translation": block.translation, "source_line_count": lines[index], "bbox": None}
-                try:
-                    mapped = photo.map_box(block.bbox, google=False)
-                    item.update(bbox=list(mapped.bbox), bbox_corrected=mapped.corrected)
-                except ValueError as error:
-                    item["mapping_error"] = str(error)
-                    record["parse_errors"].append({"block_id": index, "mapping_error": str(error)})
-                blocks.append(item)
-            record["block_count"] = len(blocks)
-            save(directory / "blocks.json", {"blocks": blocks, "parse_events": parse_events})
-        except ValueError as error:
-            record["parse_errors"].append(str(error))
-            save(directory / "partial-parse-events.json", parse_events)
+    extract_response(directory, photo, arm, canonical, record)
     save(measurement_path, record)
     with (root / "attempts.jsonl").open("a", encoding="utf-8") as output:
         output.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -371,6 +425,37 @@ def summarize(root: Path):
     save(root / "measurements.json", {"attempts": records, "aggregate": aggregate,
          "usage_detail_policy": "usage_raw retains reported subsets; cached/reasoning/image details are not added to totals"})
     return aggregate
+
+
+def reparse(root: Path, images: list[dict]) -> None:
+    rows = []
+    for image in images:
+        meta = load(root / image["id"] / "preparation/preparation.json")
+        for arm in (*ARMS, "quad"):
+            directory = root / image["id"] / "requests" / arm / "attempt-01"
+            record = load(directory / "measurement.json")
+            old_usage = record["usage_raw"]
+            old_blocks = load(directory / "blocks.json") if (directory / "blocks.json").exists() else None
+            old_quads = load(directory / "quads.json") if (directory / "quads.json").exists() else None
+            superseded = directory / "superseded-concatenated-adapter"
+            superseded.mkdir(exist_ok=True)
+            for name in ("measurement.json", "blocks.json", "quads.json", "quad-overlay.svg", "quad-original.json", "partial-parse-events.json"):
+                source = directory / name
+                if source.exists() and not (superseded / name).exists():
+                    shutil.copy2(source, superseded / name)
+            canonical = load(root / image["id"] / "requests/jpeg85/attempt-01/blocks.json")["blocks"] if arm == "quad" else None
+            extract_response(directory, prepared(meta, "jpeg85" if arm == "quad" else arm), arm, canonical, record)
+            record["reextracted_from_captured_terminal"] = True
+            save(directory / "measurement.json", record)
+            rows.append({
+                "image_id": image["id"], "arm": arm, "structured_parse_status": record["structured_parse_status"],
+                "blocks_unchanged": load(directory / "blocks.json") == old_blocks if arm != "quad" and (directory / "blocks.json").exists() else None,
+                "quads_unchanged": load(directory / "quads.json") == old_quads if arm == "quad" else None,
+                "usage_unchanged": record["usage_raw"] == old_usage,
+                "geometry_available": record.get("geometry_available"), "phase_selection_error": record["phase_selection_error"],
+            })
+    save(root / "phase-reextraction.json", {"new_provider_calls": 0, "secret_access": False, "rows": rows})
+    summarize(root)
 
 
 async def run(args):
@@ -438,6 +523,8 @@ async def run(args):
                     await request(root, image, meta, arm, position, key)
         await asyncio.gather(*(per_image(image) for image in images))
         summarize(root)
+    elif args.phase == "reparse":
+        reparse(root, images)
     elif args.phase == "replay":
         for image in images:
             for arm in (*ARMS, "quad"):
@@ -445,6 +532,10 @@ async def run(args):
                 if (directory / "process.json").exists():
                     continue
                 source_arm = "jpeg85" if arm == "quad" else arm
+                measurement = load(root / image["id"] / "requests" / source_arm / "attempt-01/measurement.json")
+                if measurement.get("structured_parse_status") != "completed":
+                    save(directory / "unavailable.json", {"reason": "explicit final_answer structured parse unavailable"})
+                    continue
                 blocks_path = root / image["id"] / "requests" / source_arm / "attempt-01/blocks.json"
                 if not blocks_path.exists():
                     save(directory / "unavailable.json", {"reason": "parsed blocks unavailable"})
@@ -473,7 +564,7 @@ async def run(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", choices=("prepare", "provider", "replay", "summary"), required=True)
+    parser.add_argument("--phase", choices=("prepare", "provider", "reparse", "replay", "summary"), required=True)
     parser.add_argument("--root", type=Path, default=Path("build/issue-438"))
     parser.add_argument("--exe", type=Path, default=Path("build/issue-438/native/PuriPulyHeartOverlay.exe"))
     parser.add_argument("--model", type=Path)
