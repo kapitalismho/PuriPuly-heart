@@ -336,19 +336,26 @@ def test_general_surface_has_only_its_five_card_rows() -> None:
     assert len(surface.rows) == 5
 
 
-def test_photo_surface_uses_one_three_card_row_then_route_cards() -> None:
+def test_photo_surface_puts_model_and_connection_beside_the_switch_then_route_cards() -> None:
+    placeholders: list[ft.Control] = []
     slots = SettingsPhotoSurfaceSlots(
         **{name: ft.Text(name) for name in SettingsPhotoSurfaceSlots.__dataclass_fields__}
     )
-    surface = compose_settings_photo_surface(slots)
+    surface = compose_settings_photo_surface(
+        slots,
+        placeholder_factory=lambda: _track(placeholders),
+    )
 
-    assert len(surface.rows) == 4
-    assert surface.rows[0].content.controls == [
-        slots.enabled,
-        slots.route,
-        slots.delete_translated,
-    ]
-    assert surface.rows[1:] == (slots.remaining, slots.chatgpt_account, slots.gemini_key)
+    assert len(surface.rows) == 6
+    assert surface.rows[0].content.controls == [slots.enabled, slots.model, slots.route]
+    assert surface.rows[1].content.controls == [slots.delete_translated, *placeholders]
+    assert len(placeholders) == 2
+    assert surface.rows[2:] == (
+        slots.remaining,
+        slots.chatgpt_account,
+        slots.openai_key,
+        slots.gemini_key,
+    )
 
 
 def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> None:

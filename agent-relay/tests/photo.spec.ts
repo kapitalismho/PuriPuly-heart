@@ -184,7 +184,7 @@ The image is ${text} pixels.`);
     sqlite.close();
   });
 
-  it('admits 25 photos per installation UTC day and resets only at the next midnight', async () => {
+  it('admits 50 photos per installation UTC day and resets only at the next midnight', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.UTC(2026, 10, 13, 23, 59));
     const { db, sqlite } = accountingDatabase();
@@ -192,26 +192,26 @@ The image is ${text} pixels.`);
     const upstream = vi.fn().mockImplementation(() => Promise.resolve(responseEvents(result)));
     vi.stubGlobal('fetch', upstream);
     try {
-      for (let index = 1; index <= 25; index++) {
+      for (let index = 1; index <= 50; index++) {
         const response = await relay.fetch(request({ ...body, request_id: index.toString(16).padStart(32, '0') }), env);
         expect(response.status).toBe(200);
         expect((await relayEvents(response)).map((event) => event.type)).toEqual(['completed']);
       }
-      expect(upstream).toHaveBeenCalledTimes(25);
+      expect(upstream).toHaveBeenCalledTimes(50);
       vi.setSystemTime(Date.UTC(2026, 10, 13, 23, 59, 59, 999));
-      const nextPhoto = { ...body, request_id: (26).toString(16).padStart(32, '0') };
+      const nextPhoto = { ...body, request_id: (51).toString(16).padStart(32, '0') };
       const denied = await relay.fetch(request(nextPhoto), env);
       expect(denied.status).toBe(429);
       expect(await denied.json()).toEqual({ error: { code: 'service_allowance_exhausted' } });
       expect(denied.headers.get('retry-after')).toBe('1');
-      expect(upstream).toHaveBeenCalledTimes(25);
+      expect(upstream).toHaveBeenCalledTimes(50);
       vi.setSystemTime(Date.UTC(2026, 10, 14));
       const renewed = await relay.fetch(request(nextPhoto), env);
       expect(renewed.status).toBe(200);
       expect((await relayEvents(renewed)).map((event) => event.type)).toEqual(['completed']);
       expect((await relay.fetch(request({ ...body, request_id: '1'.padStart(32, '0') }), env)).status).toBe(409);
-      expect(upstream).toHaveBeenCalledTimes(26);
-      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions WHERE settled = 1').get()!.n).toBe(26);
+      expect(upstream).toHaveBeenCalledTimes(51);
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions WHERE settled = 1').get()!.n).toBe(51);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM prompt_turns').get()!.n).toBe(0);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM usage_daily').get()!.n).toBe(0);
     } finally {
@@ -265,14 +265,14 @@ The image is ${text} pixels.`);
     try {
       const fresh = await allowance();
       expect(fresh.status).toBe(200);
-      expect(await fresh.json()).toEqual({ allowance: 25, remaining: 25, reset_after_s: 3600 });
+      expect(await fresh.json()).toEqual({ allowance: 50, remaining: 50, reset_after_s: 3600 });
       for (const id of ['a', 'b']) {
         await relayEvents(await relay.fetch(request({ ...body, request_id: id.repeat(32) }), env));
       }
-      expect(await (await allowance()).json()).toEqual({ allowance: 25, remaining: 23, reset_after_s: 3600 });
+      expect(await (await allowance()).json()).toEqual({ allowance: 50, remaining: 48, reset_after_s: 3600 });
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions').get()!.n).toBe(2);
       vi.setSystemTime(Date.UTC(2026, 10, 14));
-      expect(await (await allowance()).json()).toEqual({ allowance: 25, remaining: 25, reset_after_s: 86400 });
+      expect(await (await allowance()).json()).toEqual({ allowance: 50, remaining: 50, reset_after_s: 86400 });
       expect((await relay.fetch(new Request('https://relay.test/v1/photo/allowance', { method: 'POST', body: '{}' }), env)).status).toBe(401);
       expect((await relay.fetch(new Request('https://relay.test/v1/photo/allowance', {
         method: 'POST', headers: { authorization: `Bearer ${signToken()}` }, body: '{}',

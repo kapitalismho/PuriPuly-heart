@@ -224,7 +224,7 @@ async def test_photo_settings_change_through_the_normal_approval_card(catalog):
             "photo.delete_translated": True,
         }
         rejected = await tools.execute(
-            "manage_proposal", {"action": "settings", "changes": {"photo.route": "openai"}}
+            "manage_proposal", {"action": "settings", "changes": {"photo.route": "openai-api"}}
         )
         assert rejected["status"] != "needs_confirmation"
     finally:
