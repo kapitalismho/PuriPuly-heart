@@ -13,6 +13,10 @@ describe('broker hosting assumptions', () => {
 
     expect(wranglerConfig).toContain('"main": "src/index.ts"');
     expect(wranglerConfig).toContain(`"binding": "${REQUIRED_BINDINGS.d1}"`);
+    expect(JSON.parse(wranglerConfig).d1_databases).toEqual([
+      { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: 'REQUIRED_AT_DEPLOY_TIME' },
+      { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: 'AGENT_USAGE_REQUIRED_AT_DEPLOY_TIME', migrations_dir: '../agent-relay/migrations' },
+    ]);
     expect(wranglerConfig).toMatch(/"crons"\s*:\s*\[\s*"\* \* \* \* \*"\s*\]/u);
     expect(wranglerConfig).not.toContain('"location_hint":');
   });

@@ -138,16 +138,21 @@ describe('manual relay deployment preparation', () => {
     }, options);
   });
 
-  it('preserves enabled models without reading provider or webhook secret inputs', async () => {
+  it.each<[string, string, string[]]>([
+    ['false', 'false', []],
+    ['true', 'false', ['OPENAI_API_KEY']],
+    ['false', 'true', ['PHOTO_OPENAI_API_KEY']],
+    ['true', 'true', ['OPENAI_API_KEY', 'PHOTO_OPENAI_API_KEY']],
+  ])('requires only enabled service keys with chatbot=%s photo=%s without reading runtime secrets', async (agentEnabled, photoEnabled, keys) => {
     const path = await directory();
-    const env = { ...base, AGENT_SERVICE_ENABLED: 'true' };
-    for (const name of ['AGENT_RELAY_OPENAI_API_KEY_PRODUCTION', 'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION']) {
+    const env = { ...base, AGENT_SERVICE_ENABLED: agentEnabled, PHOTO_SERVICE_ENABLED: photoEnabled };
+    for (const name of ['OPENAI_API_KEY', 'PHOTO_OPENAI_API_KEY', 'AGENT_RELAY_OPENAI_API_KEY_PRODUCTION', 'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION']) {
       Object.defineProperty(env, name, { get() { throw new Error('Deployment must not read runtime secrets.'); } });
     }
     await prepareDeployment({ env, directory: path });
     const config = JSON.parse(await readFile(join(path, 'wrangler.json'), 'utf8'));
-    expect(config.vars).toMatchObject({ AGENT_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'false' });
-    expect(config.secrets.required).toEqual(['PURI_TOKEN_SECRET', 'OPENAI_API_KEY']);
+    expect(config.vars).toMatchObject({ AGENT_SERVICE_ENABLED: agentEnabled, PHOTO_SERVICE_ENABLED: photoEnabled, SUPPORT_REPORTS_ENABLED: 'false' });
+    expect(config.secrets.required).toEqual(['PURI_TOKEN_SECRET', ...keys]);
     expect(await readdir(path)).toEqual(['wrangler.json']);
   });
 
@@ -195,6 +200,35 @@ describe('manual relay deployment preparation', () => {
     await expect(verifyDeploymentSchema({ payload, initializedOnly: true })).rejects.toThrow();
   });
 
+  it('adds a nullable indexed admission timestamp without rewriting legacy request dates or quota periods', async () => {
+    const database = new DatabaseSync(':memory:');
+    try {
+      const migration = '0008_photo_request_timestamp.sql';
+      for (const name of (await readdir(new URL('../migrations/', import.meta.url)))
+        .filter((name) => name.endsWith('.sql') && name < migration).sort()) {
+        database.exec(await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
+      }
+      const period = Date.UTC(2026, 10, 13, 12);
+      database.prepare(`
+        INSERT INTO photo_admissions (installation_hash, request_id, period_start, owner, expires_at, settled, missing_usage, cost_usd)
+        VALUES ('installation', 'settled', ?, 'owner-a', ?, 1, 0, 0.25),
+          ('installation', 'unsettled', ?, 'owner-b', ?, 0, 1, 0)
+      `).run(period, period + 300_000, period, period + 300_000);
+      database.exec(await readFile(new URL(`../migrations/${migration}`, import.meta.url), 'utf8'));
+      expect(database.prepare(`
+        SELECT request_id, period_start, requested_at, settled, missing_usage, cost_usd
+        FROM photo_admissions ORDER BY request_id
+      `).all()).toEqual([
+        { request_id: 'settled', period_start: period, requested_at: null, settled: 1, missing_usage: 0, cost_usd: 0.25 },
+        { request_id: 'unsettled', period_start: period, requested_at: null, settled: 0, missing_usage: 1, cost_usd: 0 },
+      ]);
+      expect(database.prepare('SELECT COUNT(*) AS used FROM photo_admissions WHERE installation_hash = ? AND period_start = ?')
+        .get('installation', period)!.used).toBe(2);
+    } finally {
+      database.close();
+    }
+  });
+
   it('validates real checked-in schema and requires every current migration and runtime column', async () => {
     const database = new DatabaseSync(':memory:');
     const rows: Array<{ kind: string; name: string; table_name: string }> = [];
@@ -211,6 +245,8 @@ describe('manual relay deployment preparation', () => {
     } finally { database.close(); }
     const payload = (results: typeof rows) => [{ success: true, results }];
     await verifyDeploymentSchema({ payload: payload(rows) });
+    await expect(verifyDeploymentSchema({ payload: payload(rows.filter((row) =>
+      row.table_name !== 'photo_admissions' || row.name !== 'requested_at')) })).rejects.toThrow('photo_admissions.requested_at');
     const initialized = rows.filter((row) => row.table_name === 'usage_daily' || row.name === '0001_usage_daily.sql');
     await verifyDeploymentSchema({ payload: payload(initialized), initializedOnly: true });
     await expect(verifyDeploymentSchema({ payload: payload(initialized) })).rejects.toThrow();

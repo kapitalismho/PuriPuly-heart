@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import legacyContract from '../src/photo-contract.json';
 import quadContract from '../src/photo-quad-contract.json';
 import relay from '../src/index';
-import { checkPhotoAllowance, photoPolicy } from '../src/usage';
+import { checkPhotoAllowance, photoAllowanceUsed, photoPolicy } from '../src/usage';
 import { accountingDatabase, installationHash, relayEvents, responseEvents, signToken, tokenSecret } from './fixtures';
 
 const body = {
@@ -16,7 +16,7 @@ function request(value: unknown = body, claims = {}) {
   });
 }
 function environment(db: D1Database) {
-  return { AGENT_USAGE_DB: db, PURI_TOKEN_SECRET: tokenSecret, OPENAI_API_KEY: 'server-only-key', PHOTO_SERVICE_ENABLED: 'true' };
+  return { AGENT_USAGE_DB: db, PURI_TOKEN_SECRET: tokenSecret, PHOTO_OPENAI_API_KEY: 'photo-only-key', PHOTO_SERVICE_ENABLED: 'true' };
 }
 function message(id = 'answer', phase: string | null = 'final_answer', text = '') {
   return { id, type: 'message', role: 'assistant', phase, content: [{ type: 'output_text', text }] };
@@ -34,19 +34,20 @@ afterEach(() => {
 });
 
 describe('photo-only Relay admission', () => {
-  it('streams useful output with server-selected Luna and durable photo-only settlement', async () => {
+  it.each([undefined, 'chat-only-key'])('streams and settles photos with a separate key when the chatbot key is %s', async (chatKey) => {
     const { db, sqlite } = accountingDatabase();
     const upstream = vi.fn().mockResolvedValue(responseEvents(result, [
       { type: 'response.output_text.delta', delta: '{"blocks":[]}' },
     ]));
     vi.stubGlobal('fetch', upstream);
-    const response = await relay.fetch(request(), environment(db));
+    const response = await relay.fetch(request(), { ...environment(db), OPENAI_API_KEY: chatKey });
     expect(response.status).toBe(200);
     const events = await relayEvents(response);
     expect(events.map((event) => event.type)).toEqual(['text_delta', 'completed']);
     expect(upstream).toHaveBeenCalledTimes(1);
     const [endpoint, init] = upstream.mock.calls[0];
     expect(endpoint).toBe('https://api.openai.com/v1/responses');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer photo-only-key');
     const sent = JSON.parse(init.body);
     expect(sent.model).toBe('gpt-6-luna');
     expect(sent.safety_identifier).toBe(installationHash);
@@ -61,6 +62,26 @@ describe('photo-only Relay admission', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM prompt_turns').get()!.n).toBe(0);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM usage_daily').get()!.n).toBe(0);
     sqlite.close();
+  });
+
+  it.each([undefined, ''])('rejects photo requests and allowance checks without a photo key (%s), even with a chatbot key', async (photoKey) => {
+    const { db, sqlite } = accountingDatabase();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const env = { ...environment(db), PHOTO_OPENAI_API_KEY: photoKey, OPENAI_API_KEY: 'chat-only-key' };
+    try {
+      for (const incoming of [request(), new Request('https://relay.test/v1/photo/allowance', {
+        method: 'POST', headers: { authorization: `Bearer ${signToken()}` }, body: '{}',
+      })]) {
+        const response = await relay.fetch(incoming, env);
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: { code: 'service_shutdown' } });
+      }
+      expect(upstream).not.toHaveBeenCalled();
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions').get()!.n).toBe(0);
+    } finally {
+      sqlite.close();
+    }
   });
 
   it('states the client image size to the model and accepts only the two upright send canvases', async () => {
@@ -193,6 +214,40 @@ The image is ${text} pixels.`);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions WHERE settled = 1').get()!.n).toBe(26);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM prompt_turns').get()!.n).toBe(0);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM usage_daily').get()!.n).toBe(0);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('preserves admission milliseconds across midnight settlement without resetting a custom allowance period', async () => {
+    vi.useFakeTimers();
+    const admittedAt = Date.UTC(2026, 10, 13, 23, 59, 59, 500);
+    const settledAt = Date.UTC(2026, 10, 14, 0, 0, 0, 500);
+    vi.setSystemTime(admittedAt);
+    const { db, sqlite } = accountingDatabase();
+    const policy = photoPolicy(JSON.stringify({ periodMs: 30 * 3_600_000, allowance: 1 }));
+    const period = Math.floor(admittedAt / policy.periodMs) * policy.periodMs;
+    const env = { ...environment(db), PHOTO_POLICY: JSON.stringify(policy) };
+    const upstream = vi.fn(async () => {
+      expect(sqlite.prepare('SELECT requested_at FROM photo_admissions').get()!.requested_at).toBe(admittedAt);
+      vi.setSystemTime(settledAt);
+      return responseEvents(result);
+    });
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await relay.fetch(request(), env);
+      expect(response.status).toBe(200);
+      expect((await relayEvents(response)).map((event) => event.type)).toEqual(['completed']);
+      const row = sqlite.prepare('SELECT period_start, requested_at, settled, cost_usd FROM photo_admissions').get()!;
+      expect(row).toMatchObject({ period_start: period, requested_at: admittedAt, settled: 1 });
+      expect(row.cost_usd).toBeCloseTo(0.001465675, 10);
+      expect(Math.floor(settledAt / policy.periodMs) * policy.periodMs).toBe(period);
+      const resetAfter = Math.ceil((period + policy.periodMs - settledAt) / 1000);
+      expect(await photoAllowanceUsed(env, installationHash, policy)).toEqual({ used: 1, resetAfter });
+      expect(await checkPhotoAllowance(env, installationHash, 'next-request', policy)).toEqual({
+        error: 'service_allowance_exhausted', retryAfter: resetAfter,
+      });
+      expect(upstream).toHaveBeenCalledTimes(1);
     } finally {
       sqlite.close();
     }

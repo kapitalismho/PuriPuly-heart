@@ -124,7 +124,7 @@ describe('authenticated agent relay', () => {
       expect(await unknown.json()).toMatchObject({ error: { code: 'not_found' } });
     }
     expect((await relay.fetch(new Request('http://localhost/v1/respond'), env)).status).toBe(405);
-    const missing = await relay.fetch(request(), { ...env, OPENAI_API_KEY: undefined });
+    const missing = await relay.fetch(request(), { ...env, OPENAI_API_KEY: undefined, PHOTO_OPENAI_API_KEY: 'photo-only-key' });
     expect(missing.status).toBe(503);
     expect(await missing.json()).toMatchObject({ error: { code: 'service_shutdown' } });
     expect(fetch).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe('authenticated agent relay', () => {
       { type: 'configuration_update', reasoning: { effort } },
       { role: 'user', content: 'Follow-up' },
     ];
-    const response = await relay.fetch(request({ ...body, route, effort, input }), env);
+    const response = await relay.fetch(request({ ...body, route, effort, input }), { ...env, PHOTO_OPENAI_API_KEY: 'photo-only-key' });
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await relayEvents(response)).toEqual([{ type: 'completed', response: returned }]);

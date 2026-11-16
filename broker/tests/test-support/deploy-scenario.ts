@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -14,12 +14,18 @@ import { app } from '../../src/app';
 import { applyBrokerMigrations, BROKER_MIGRATION_FILENAMES } from './migrations';
 
 const brokerRoot = fileURLToPath(new URL('../../', import.meta.url));
+const relayRoot = fileURLToPath(new URL('../../../agent-relay/', import.meta.url));
 const workflow = readFileSync(new URL('../../../.github/workflows/deploy-broker-direct.yml', import.meta.url), 'utf8');
+const shellPath = (path: string) => path.replaceAll('\\', '/');
+const bash = process.platform === 'win32'
+  ? join(dirname(dirname(execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/u)[0]!)), 'bin', 'bash.exe')
+  : 'bash';
 
 export interface DeployScenario {
   root: string;
   broker: string;
   databasePath: string;
+  usageDatabasePath: string;
   workerPath: string;
   env: NodeJS.ProcessEnv;
 }
@@ -66,6 +72,18 @@ export function createDeployScenario(options: {
   } finally {
     db.close();
   }
+  const usageDatabasePath = join(root, 'synthetic-usage.sqlite');
+  const usageDb = new DatabaseSync(usageDatabasePath);
+  try {
+    usageDb.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)');
+    for (const name of readdirSync(join(relayRoot, 'migrations')).filter((name) => name.endsWith('.sql')).sort()) {
+      usageDb.exec(readFileSync(join(relayRoot, 'migrations', name), 'utf8'));
+      usageDb.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name);
+    }
+    usageDb.exec("CREATE TABLE relay_deploy_sentinel (value TEXT); INSERT INTO relay_deploy_sentinel VALUES ('preserve-relay');");
+  } finally {
+    usageDb.close();
+  }
   const workerPath = join(root, 'worker.json');
   writeFileSync(workerPath, JSON.stringify({
     deployments: 0,
@@ -75,8 +93,8 @@ export function createDeployScenario(options: {
     issuedKeys: [],
   }));
   writeFileSync(join(root, 'ports.mjs'), cloudflarePort);
-  writeFileSync(join(root, 'bash-env.sh'), `node() { '${process.execPath}' "$@"; }
-pnpm() { node "$SCENARIO_ROOT/ports.mjs" "$@"; }
+  writeFileSync(join(root, 'bash-env.sh'), `node() { '${shellPath(process.execPath)}' "$@"; }
+${process.platform === 'win32' ? 'python3() { python "$@"; }\n' : ''}pnpm() { node "$SCENARIO_ROOT/ports.mjs" "$@"; }
 curl() {
   local args=()
   for arg in "$@"; do
@@ -96,18 +114,21 @@ sleep() { :; }
     root,
     broker,
     databasePath,
+    usageDatabasePath,
     workerPath,
     env: {
       PATH: process.env.PATH,
-      HOME: root,
-      BASH_ENV: join(root, 'bash-env.sh'),
-      SCENARIO_ROOT: root,
+      SystemRoot: process.env.SystemRoot,
+      HOME: shellPath(root),
+      BASH_ENV: shellPath(join(root, 'bash-env.sh')),
+      SCENARIO_ROOT: shellPath(root),
       MODE: options.mode ?? '',
       GITHUB_REF: 'refs/heads/dev',
       CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
       CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
       CLOUDFLARE_ACCOUNT_ID: 'synthetic-cloudflare-account',
-      BROKER_D1_DATABASE_ID_PRODUCTION: 'synthetic-database',
+      BROKER_D1_DATABASE_ID_PRODUCTION: '22222222-2222-4222-8222-222222222222',
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: '11111111-1111-4111-8111-111111111111',
       BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.synthetic.workers.dev',
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '7',
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '',
@@ -161,7 +182,7 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
       const scriptPath = join(scenario.root, 'step.sh');
       writeFileSync(scriptPath, script);
       executed.push(name);
-      const child = spawn('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', scriptPath], {
+      const child = spawn(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', shellPath(scriptPath)], {
         cwd: block.includes('working-directory: broker') ? scenario.broker : scenario.root,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -202,30 +223,47 @@ assert.deepEqual(args.slice(0, 2), ['exec', 'wrangler']);
 const configPath = args[args.indexOf('--config') + 1];
 const config = JSON.parse(readFileSync(configPath, 'utf8').replace(/^\\s*\\/\\/.*$/gm, ''));
 assert.equal(config.name, 'puripuly-heart-broker');
-assert.equal(config.d1_databases[0].binding, 'BROKER_DB');
-assert.equal(config.d1_databases[0].database_name, 'puripuly-heart-broker');
-assert.equal(config.d1_databases[0].database_id, 'synthetic-database');
+const brokerBinding = config.d1_databases.find((database) => database.binding === 'BROKER_DB');
+assert.equal(brokerBinding.database_name, 'puripuly-heart-broker');
+assert.equal(brokerBinding.database_id, process.env.BROKER_D1_DATABASE_ID_PRODUCTION);
+if (args[2] === 'd1' && args[3] === 'migrations') {
+  assert.deepEqual(config.d1_databases, [brokerBinding]);
+} else {
+  assert.equal(config.d1_databases.length, 2);
+  const usageBinding = config.d1_databases.find((database) => database.binding === 'AGENT_USAGE_DB');
+  assert.equal(usageBinding.database_name, 'puripuly-heart-agent-usage');
+  assert.equal(usageBinding.database_id, process.env.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION);
+  assert.notEqual(usageBinding.database_id, brokerBinding.database_id);
+}
 const databasePath = join(root, 'synthetic.sqlite');
 if (args[2] === 'types') {
   event({ event: 'validate' });
   if (process.env.MODE === 'config-failure') process.exit(31);
 } else if (args[2] === 'd1' && args[3] === 'execute') {
-  assert.equal(args[4], 'puripuly-heart-broker');
+  const usageRead = args[4] === 'puripuly-heart-agent-usage';
+  if (!usageRead && args[4] !== 'puripuly-heart-broker') forbidden();
   assert(args.includes('--remote') && args.includes('--json'));
   const sql = args[args.indexOf('--command') + 1];
   if (!args.includes('--command') || !sql.startsWith('SELECT ') || args.includes('--file')) forbidden();
-  event({ event: 'read' });
-  if (process.env.MODE === 'read-failure') process.exit(32);
-  if (process.env.MODE === 'final-read-failure' && sql.includes("'migration' AS kind")) process.exit(32);
-  if (process.env.MODE === 'malformed-read') { process.stdout.write('{}'); process.exit(0); }
-  const db = new DatabaseSync(databasePath, { readOnly: true });
-  try { process.stdout.write(JSON.stringify([{ success: process.env.MODE !== 'unsuccessful-read', results: db.prepare(sql).all() }])); }
+  event({ event: usageRead ? 'relay-read' : 'read' });
+  if (usageRead) {
+    assert(sql.includes('pragma_table_info') && sql.includes('usage_daily') && sql.includes('photo_admissions'));
+    if (process.env.MODE === 'relay-read-failure') process.exit(32);
+    if (process.env.MODE === 'relay-malformed-read') { process.stdout.write('{}'); process.exit(0); }
+    if (process.env.MODE === 'relay-malformed-rows') { process.stdout.write(JSON.stringify([{ success: true, results: [null] }])); process.exit(0); }
+  } else {
+    if (process.env.MODE === 'read-failure') process.exit(32);
+    if (process.env.MODE === 'final-read-failure' && sql.includes("'migration' AS kind")) process.exit(32);
+    if (process.env.MODE === 'malformed-read') { process.stdout.write('{}'); process.exit(0); }
+  }
+  const db = new DatabaseSync(usageRead ? join(root, 'synthetic-usage.sqlite') : databasePath, { readOnly: true });
+  try { process.stdout.write(JSON.stringify([{ success: process.env.MODE !== (usageRead ? 'relay-unsuccessful-read' : 'unsuccessful-read'), results: db.prepare(sql).all() }])); }
   finally { db.close(); }
 } else if (args[2] === 'd1' && args[3] === 'migrations' && args[4] === 'apply') {
   assert.equal(process.env.APPLY_MIGRATIONS, 'true');
   assert.equal(args[5], 'puripuly-heart-broker');
   assert(args.includes('--remote'));
-  const dir = resolve(dirname(configPath), config.d1_databases[0].migrations_dir);
+  const dir = resolve(dirname(configPath), brokerBinding.migrations_dir);
   const names = readdirSync(dir).sort();
   const db = new DatabaseSync(databasePath);
   try {

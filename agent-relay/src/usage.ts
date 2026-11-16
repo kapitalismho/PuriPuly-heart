@@ -255,15 +255,15 @@ export async function checkPhotoAllowance(
   const owner = crypto.randomUUID();
   const period = Math.floor(now / policy.periodMs) * policy.periodMs;
   const admitted = await db.prepare(`
-    INSERT INTO photo_admissions (installation_hash, request_id, period_start, owner, expires_at)
-    SELECT ?, ?, ?, ?, ?
+    INSERT INTO photo_admissions (installation_hash, request_id, period_start, owner, expires_at, requested_at)
+    SELECT ?, ?, ?, ?, ?, ?
     WHERE NOT EXISTS (SELECT 1 FROM photo_admissions WHERE installation_hash = ? AND request_id = ?)
       AND (SELECT COUNT(*) FROM photo_admissions WHERE installation_hash = ? AND period_start = ?) < ?
       AND (SELECT COUNT(*) FROM photo_admissions
         WHERE installation_hash = ? AND settled = 0 AND expires_at > ?) < ?
     ON CONFLICT(installation_hash, request_id) DO NOTHING
     RETURNING owner
-  `).bind(installation, requestId, period, owner, now + policy.deadlineMs + 60_000,
+  `).bind(installation, requestId, period, owner, now + policy.deadlineMs + 60_000, now,
     installation, requestId, installation, period, policy.allowance,
     installation, now, policy.concurrency).all<{ owner: string }>();
   if (!admitted.success) throw new Error('accounting_unavailable');

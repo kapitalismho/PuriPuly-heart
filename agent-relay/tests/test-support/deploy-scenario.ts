@@ -66,7 +66,8 @@ export function createDeployScenario(options: {
   const workerPath = join(root, 'worker.json');
   writeFileSync(workerPath, JSON.stringify({
     deployments: 0,
-    secrets: { PURI_TOKEN_SECRET: tokenSecret, OPENAI_API_KEY: 'deployed-only-provider-key', DISCORD_OPERATIONS_WEBHOOK_URL: 'deployed-only-webhook' },
+    secrets: { PURI_TOKEN_SECRET: tokenSecret, OPENAI_API_KEY: 'deployed-only-provider-key',
+      PHOTO_OPENAI_API_KEY: 'deployed-only-photo-key', DISCORD_OPERATIONS_WEBHOOK_URL: 'deployed-only-webhook' },
     vars: { AGENT_SERVICE_ENABLED: 'true', PHOTO_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true', NON_OWNED_RUNTIME_SETTING: 'preserve-me' },
     reportsBound: true,
   } satisfies WorkerState));

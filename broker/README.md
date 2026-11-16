@@ -18,11 +18,27 @@ See [application ownership](../docs/architecture.md) and [client authentication 
 
 `PURI_TOKEN_SECRET` gives Broker and Relay signing authority; coordinate its rotation. `PURI_IDENTITY_HMAC_SECRET` stays Broker-only; changing it changes accounting subjects. See the [token handler](src/puri-token.ts) and [secret provisioning tool](scripts/manage-puri-secrets.mjs).
 
+## Daily Discord Report
+
+The existing daily Discord report uses a UTC calendar date and reuses the existing webhook. Broker reads only aggregate usage from Relay's dedicated D1 through `AGENT_USAGE_DB`; no public usage endpoint or additional secret is needed.
+
+- Chatbot calls are recorded response calls plus classification calls, not the number of user questions. One question can trigger multiple recorded calls.
+- Photo requests count Relay photo admissions on the report date. Direct personal-key and ChatGPT photo routes outside Relay are excluded.
+- **Cost (USD)** sums the recorded `cost_usd` for chatbot and photo usage, calculated from recorded usage and configured token rates.
+- Nonzero flags identify incomplete usage, pending photo requests, and approximate dates for legacy photo records without `requested_at` (using `period_start`). Pending requests may settle later; missing usage is not treated as complete.
+- If Relay usage cannot be read, Broker retains the pending daily report for retry rather than sending zero usage.
+
+Reporting uses stored usage records and does not require access to chatbot or photo provider keys.
+
 ## Deployment and Maintenance
 
 Run the [direct-deploy workflow](../.github/workflows/deploy-broker-direct.yml) from `dev` with confirmation `deploy puripuly-heart-broker from dev`. Use an initialized, supported database. Configuration lives in the workflow and [renderer](scripts/render-production-wrangler-config.mjs).
 
 Leave `apply_migrations` off for code-only updates. Pending ordinary migrations block deployment; never force journal entries. Ordinary migrations exclude destructive `0025` and `0027`.
+
+Set the existing production secret `AGENT_USAGE_D1_DATABASE_ID_PRODUCTION` to Relay's dedicated `puripuly-heart-agent-usage` database UUID, distinct from `BROKER_D1_DATABASE_ID_PRODUCTION`. The renderer requires both `--database-id` and `--agent-usage-database-id`; checked-in placeholders are not deployable IDs. Broker binds `BROKER_DB` to its own database and `AGENT_USAGE_DB` to Relay's database.
+
+For this reporting rollout, first apply Relay migration `0008_photo_request_timestamp.sql` and deploy the corresponding Relay code, then deploy Broker. Broker's read-only pre-deploy readiness check requires the Relay usage/photo schema, including nullable `photo_admissions.requested_at`. Broker's optional migration step targets only Broker D1; Relay migrations remain Relay-owned.
 
 Deployment preserves secrets. Coordinate rotation with [network key versions](src/network-identity.ts); changing `QQ_AUTH_HMAC_PSK` requires subject-reference migration. The [fingerprint helper](scripts/render-fingerprint-bootstrap-sql.mjs) initializes state; do not use it for rotation.
 
@@ -49,6 +65,8 @@ pnpm --filter @puripuly-heart/broker dev --local --ip 127.0.0.1
 ```
 
 Initialize local state with [migrations](migrations/) and the fingerprint helper. Keep production credentials out of local bindings. [PR CI](../.github/workflows/pr-ci.yml) defines automated checks.
+
+The local config also binds `AGENT_USAGE_DB` to isolated Relay D1, with a distinct local placeholder ID and Relay's own `migrations_dir`. Apply Relay's [migrations](../agent-relay/migrations/) to that local database before exercising the daily report; never apply Broker migrations to it or connect local development to production D1. For end-to-end local reporting, use local-only configs with matching Relay database IDs and the same explicit `--persist-to` directory for both Workers.
 
 ## Source Map
 

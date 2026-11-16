@@ -30,7 +30,11 @@ function scenario(options: Parameters<typeof createDeployScenario>[0] = {}) {
 }
 
 function changeDatabase(value: DeployScenario, sql: string) {
-  const db = new DatabaseSync(value.databasePath);
+  changeSqliteDatabase(value.databasePath, sql);
+}
+
+function changeSqliteDatabase(path: string, sql: string) {
+  const db = new DatabaseSync(path);
   try {
     db.exec(sql);
   } finally {
@@ -42,13 +46,15 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
   it.each([...codeOnlyInputs, { selection: 'empty value', env: { APPLY_MIGRATIONS: '' } }])('deploys code once with $selection without database, secret, policy or issuance mutations', async ({ env }) => {
     const value = scenario({ env });
     const databaseBefore = readFileSync(value.databasePath);
+    const usageBefore = readFileSync(value.usageDatabasePath);
     const workerBefore = readWorker(value);
     const result = await runDeployWorkflow(value);
 
     expect(result.status, result.stderr).toBe(0);
     expect(readFileSync(value.databasePath)).toEqual(databaseBefore);
+    expect(readFileSync(value.usageDatabasePath)).toEqual(usageBefore);
     expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 1 });
-    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'read', 'read', 'read', 'deploy']);
+    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'read', 'deploy']);
     expect(result.requests).toEqual(['GET /healthz', 'GET /v1/foundation']);
     expect(result.stdout).toContain('Deployed Broker health and public foundation verified.');
     expect(existsSync(join(value.broker, '.deploy-direct'))).toBe(false);
@@ -69,6 +75,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
   it('applies only the pending ordinary migration, preserves records and held surfaces, then deploys and verifies public responses', async () => {
     const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
     const workerBefore = readWorker(value);
+    const usageBefore = readFileSync(value.usageDatabasePath);
     const result = await runDeployWorkflow(value);
     expect(result.status, result.stderr).toBe(0);
     const db = new DatabaseSync(value.databasePath, { readOnly: true });
@@ -93,8 +100,9 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
       db.close();
     }
     expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 1 });
+    expect(readFileSync(value.usageDatabasePath)).toEqual(usageBefore);
     expect(readEvents(value)).toEqual([
-      { event: 'validate' }, { event: 'read' }, { event: 'read' },
+      { event: 'validate' }, { event: 'relay-read' }, { event: 'read' }, { event: 'read' },
       { event: 'migrate', pending: ['0031_photo_managed_access.sql'] }, { event: 'read' }, { event: 'deploy' },
     ]);
     expect(result.requests).toEqual(['GET /healthz', 'GET /v1/foundation']);
@@ -114,7 +122,9 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     { GITHUB_REF: 'refs/heads/main' },
     { CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev ' },
     { APPLY_MIGRATIONS: 'yes' },
-    ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION'].flatMap((key) => [{ [key]: undefined }, { [key]: ' \t ' }]),
+    ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION', 'AGENT_USAGE_D1_DATABASE_ID_PRODUCTION'].flatMap((key) => [{ [key]: undefined }, { [key]: ' \t ' }]),
+    ...['REQUIRED_AT_DEPLOY_TIME', 'not-a-uuid', '00000000-0000-0000-0000-000000000000', '22222222-2222-4222-8222-222222222222'].map((id) => ({ AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: id })),
+    ...['REQUIRED_AT_DEPLOY_TIME', 'not-a-uuid', '00000000-0000-0000-0000-000000000000'].map((id) => ({ BROKER_D1_DATABASE_ID_PRODUCTION: id })),
     ...['', 'https://other.synthetic.workers.dev', 'https://puripuly-heart-broker.synthetic.workers.dev/extra', 'https://puripuly-heart-broker.synthetic.workers.dev:443', 'http://puripuly-heart-broker.synthetic.workers.dev'].map((url) => ({ BROKER_CANONICAL_WORKERS_DEV_URL: url })),
     ...['', '0', '01', 'v7', '9007199254740992'].map((version) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: version })),
     ...['0', 'v6', '7', '9007199254740992'].map((version) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: version })),
@@ -150,7 +160,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(result.status).not.toBe(0);
     expect(readFileSync(value.databasePath)).toEqual(before);
     expect(readWorker(value)).toEqual(workerBefore);
-    expect(readEvents(value).every(({ event }) => ['validate', 'read'].includes(event))).toBe(true);
+    expect(readEvents(value).every(({ event }) => ['validate', 'relay-read', 'read'].includes(event))).toBe(true);
     expect(result.requests).toEqual([]);
   });
 
@@ -162,6 +172,48 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(result.status).not.toBe(0);
     expect(readFileSync(value.databasePath)).toHaveLength(0);
     expect(readWorker(value).deployments).toBe(0);
+    expect(result.requests).toEqual([]);
+  });
+
+  it.each([
+    "DELETE FROM d1_migrations WHERE name = '0008_photo_request_timestamp.sql'",
+    'DROP TABLE usage_daily',
+    'DROP TABLE photo_admissions',
+    'ALTER TABLE usage_daily DROP COLUMN responses_calls',
+    'ALTER TABLE usage_daily DROP COLUMN missing_usage_count',
+    'DROP INDEX photo_admissions_requested_date; ALTER TABLE photo_admissions DROP COLUMN requested_at',
+    'DROP INDEX photo_admissions_requested_date; DROP INDEX photo_admissions_period; ALTER TABLE photo_admissions DROP COLUMN period_start',
+    'ALTER TABLE photo_admissions DROP COLUMN cost_usd',
+    'ALTER TABLE photo_admissions RENAME COLUMN requested_at TO old_requested_at; ALTER TABLE photo_admissions ADD COLUMN requested_at INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE photo_admissions RENAME COLUMN requested_at TO old_requested_at; ALTER TABLE photo_admissions ADD COLUMN requested_at TEXT',
+    'DROP TABLE d1_migrations',
+  ])('requires the Relay migration and actual report schema before any opted-in Broker migration: %s', async (sql) => {
+    const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
+    changeSqliteDatabase(value.usageDatabasePath, sql);
+    const brokerBefore = readFileSync(value.databasePath);
+    const usageBefore = readFileSync(value.usageDatabasePath);
+    const workerBefore = readWorker(value);
+    const result = await runDeployWorkflow(value);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('deploy Relay and apply 0008_photo_request_timestamp.sql before Broker');
+    expect(readFileSync(value.databasePath)).toEqual(brokerBefore);
+    expect(readFileSync(value.usageDatabasePath)).toEqual(usageBefore);
+    expect(readWorker(value)).toEqual(workerBefore);
+    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read']);
+    expect(result.requests).toEqual([]);
+  });
+
+  it.each(['relay-read-failure', 'relay-malformed-read', 'relay-malformed-rows', 'relay-unsuccessful-read'])('fails closed on %s before Broker mutations or deployment', async (mode) => {
+    const value = scenario({ pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' }, mode });
+    const brokerBefore = readFileSync(value.databasePath);
+    const usageBefore = readFileSync(value.usageDatabasePath);
+    const result = await runDeployWorkflow(value);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('deploy Relay and apply 0008_photo_request_timestamp.sql before Broker');
+    expect(readFileSync(value.databasePath)).toEqual(brokerBefore);
+    expect(readFileSync(value.usageDatabasePath)).toEqual(usageBefore);
+    expect(readWorker(value).deployments).toBe(0);
+    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read']);
     expect(result.requests).toEqual([]);
   });
 
@@ -207,7 +259,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(result.status).not.toBe(0);
     expect(readWorker(value).deployments).toBe(0);
     expect(result.requests).toEqual([]);
-    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'read', 'read', 'migrate', 'read']);
+    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'migrate', 'read']);
     const db = new DatabaseSync(value.databasePath, { readOnly: true });
     try {
       expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0031_photo_managed_access.sql'").get()).toBeDefined();
@@ -229,7 +281,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     const events = readEvents(value).map(({ event }) => event);
     expect(events).not.toContain('forbidden');
     if (mode === 'deploy-failure') {
-      expect(events).toEqual(['validate', 'read', 'read', 'migrate', 'read', 'deploy']);
+      expect(events).toEqual(['validate', 'relay-read', 'read', 'read', 'migrate', 'read', 'deploy']);
       const db = new DatabaseSync(value.databasePath, { readOnly: true });
       try {
         expect(db.prepare("SELECT name FROM d1_migrations WHERE name = '0031_photo_managed_access.sql'").get()).toBeDefined();
@@ -239,7 +291,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     } else {
       expect(readFileSync(value.databasePath)).toEqual(databaseBefore);
       expect(events).not.toContain('deploy');
-      if (mode === 'migration-failure') expect(events).toEqual(['validate', 'read', 'read', 'migrate', 'migration-failed']);
+      if (mode === 'migration-failure') expect(events).toEqual(['validate', 'relay-read', 'read', 'read', 'migrate', 'migration-failed']);
       else expect(events).not.toContain('migrate');
     }
   });
@@ -269,7 +321,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(result.requests).toHaveLength(24);
     expect(readWorker(value).deployments).toBe(1);
     expect(readFileSync(value.databasePath)).toEqual(before);
-    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'read', 'read', 'read', 'deploy']);
+    expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'read', 'deploy']);
   });
 
   it('fails renderer rejection before remote admission when canonical configuration has drifted', async () => {

@@ -43,6 +43,11 @@ describe('PuriPuly daily summary v2', () => {
         app_dau: 0,
         app_wau: 0,
         app_mau: 0,
+        model_usage: {
+          chatbot: { classification_calls: 0, response_calls: 0, missing_usage_calls: 0, cost_usd: 0 },
+          photo: { requests: 0, unsettled_requests: 0, missing_usage_requests: 0, estimated_date_requests: 0, cost_usd: 0 },
+          total_cost_usd: 0,
+        },
       },
     });
     expect(sent.sent).toBe(true);
@@ -87,6 +92,21 @@ describe('PuriPuly daily summary v2', () => {
       {
         name: 'App usage',
         value: 'dau=0\nwau=0\nmau=0',
+        inline: true,
+      },
+      {
+        name: 'Chatbot',
+        value: 'recorded_calls=0\nresponses=0\nclassifications=0\ncost_usd=0.000000',
+        inline: true,
+      },
+      {
+        name: 'Photo translation',
+        value: 'requests=0\ncost_usd=0.000000',
+        inline: true,
+      },
+      {
+        name: 'Total cost (USD)',
+        value: '0.000000',
         inline: true,
       },
     ]);

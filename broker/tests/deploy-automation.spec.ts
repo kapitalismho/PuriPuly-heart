@@ -18,8 +18,14 @@ const renderFingerprintBootstrapScript = new URL(
   import.meta.url,
 );
 const checkedInWranglerConfig = new URL('../wrangler.jsonc', import.meta.url);
+const brokerDatabaseId = '22222222-2222-4222-8222-222222222222';
+const agentUsageDatabaseId = '11111111-1111-4111-8111-111111111111';
 const abuseControlsWorkflow = new URL(
   '../../.github/workflows/maintenance-broker-abuse-controls.yml',
+  import.meta.url,
+);
+const cleanupWorkflow = new URL(
+  '../../.github/workflows/maintenance-broker-d1-cleanup.yml',
   import.meta.url,
 );
 
@@ -39,138 +45,129 @@ afterEach(() => {
 });
 
 describe('broker direct deploy automation', () => {
-  it('renders a deploy-time wrangler config with the production database_id while preserving the canonical worker name', () => {
-    const tempDir = createTempDir();
-    const outputPath = join(tempDir, 'wrangler.production.jsonc');
-
-    runNodeScript(renderWranglerConfigScript, [
-      '--source',
-      fileURLToPath(checkedInWranglerConfig),
-      '--out',
-      outputPath,
-      '--database-id',
-      'production-d1-database-id',
-      '--network-identity-hmac-key-version',
-      '1',
-    ]);
+  it('renders distinct database IDs for both bindings while preserving the canonical worker name', () => {
+    const outputPath = join(createTempDir(), 'wrangler.production.jsonc');
+    runNodeScript(renderWranglerConfigScript, productionRendererArgs(outputPath));
 
     const renderedConfig = readFileSync(outputPath, 'utf8');
-    expect(renderedConfig).toContain('"name": "puripuly-heart-broker"');
-    expect(renderedConfig).toContain('"database_id": "production-d1-database-id"');
+    const config = JSON.parse(renderedConfig);
+    expect(config.name).toBe('puripuly-heart-broker');
+    expect(config.d1_databases).toEqual([
+      { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: brokerDatabaseId },
+      { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: agentUsageDatabaseId, migrations_dir: '../agent-relay/migrations' },
+    ]);
     expect(renderedConfig).not.toContain('REQUIRED_AT_DEPLOY_TIME');
+  });
+
+  it('substitutes database IDs by binding even when their order changes', () => {
+    const tempDir = createTempDir();
+    const sourcePath = join(tempDir, 'wrangler.reordered.jsonc');
+    const outputPath = join(tempDir, 'wrangler.production.jsonc');
+    const source = JSON.parse(readFileSync(checkedInWranglerConfig, 'utf8'));
+    source.d1_databases.reverse();
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2));
+    runNodeScript(renderWranglerConfigScript, [
+      ...productionRendererArgs(outputPath),
+      '--source', sourcePath,
+    ]);
+    expect(JSON.parse(readFileSync(outputPath, 'utf8')).d1_databases).toEqual([
+      { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: agentUsageDatabaseId, migrations_dir: '../agent-relay/migrations' },
+      { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: brokerDatabaseId },
+    ]);
   });
 
   it('fails config rendering if the checked-in worker name stops being canonical', () => {
     const tempDir = createTempDir();
     const sourcePath = join(tempDir, 'wrangler.noncanonical.jsonc');
     const outputPath = join(tempDir, 'wrangler.production.jsonc');
+    writeFileSync(sourcePath, readFileSync(checkedInWranglerConfig, 'utf8').replace(
+      '"name": "puripuly-heart-broker"',
+      '"name": "puripuly-heart-broker-preview"',
+    ));
+    expect(() => runNodeScript(renderWranglerConfigScript, [
+      ...productionRendererArgs(outputPath),
+      '--source', sourcePath,
+    ])).toThrow(/canonical worker name/i);
+    expect(existsSync(outputPath)).toBe(false);
+  });
 
-    writeFileSync(
-      sourcePath,
-      readFileSync(checkedInWranglerConfig, 'utf8').replace(
-        '"name": "puripuly-heart-broker"',
-        '"name": "puripuly-heart-broker-preview"',
-      ),
-      'utf8',
-    );
+  it.each(['database-id', 'agent-usage-database-id'])('requires a real non-placeholder UUID for --%s', (argument) => {
+    const tempDir = createTempDir();
+    for (const [index, value] of [undefined, '', ' \t ', 'REQUIRED_AT_DEPLOY_TIME', 'not-a-database-uuid', '00000000-0000-0000-0000-000000000000'].entries()) {
+      const outputPath = join(tempDir, `rejected.${index}.jsonc`);
+      const args = productionRendererArgs(outputPath);
+      args.splice(args.indexOf(`--${argument}`), 2);
+      if (value !== undefined) args.push(`--${argument}`, value);
+      expect(() => runNodeScript(renderWranglerConfigScript, args)).toThrow();
+      expect(existsSync(outputPath)).toBe(false);
+    }
+  });
 
-    expect(() =>
-      runNodeScript(renderWranglerConfigScript, [
-        '--source',
-        sourcePath,
-        '--out',
-        outputPath,
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version',
-        '1',
-      ]),
-    ).toThrow(/canonical worker name/i);
+  it('rejects a Relay database UUID equal to Broker D1 without regard to case', () => {
+    const outputPath = join(createTempDir(), 'wrangler.production.jsonc');
+    expect(() => runNodeScript(renderWranglerConfigScript, [
+      ...productionRendererArgs(outputPath),
+      '--database-id', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '--agent-usage-database-id', 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',
+    ])).toThrow(/must differ/i);
+    expect(existsSync(outputPath)).toBe(false);
+  });
+
+  it.each(['BROKER_DB', 'AGENT_USAGE_DB'])('rejects missing, duplicated, or already substituted %s bindings', (binding) => {
+    const tempDir = createTempDir();
+    const original = JSON.parse(readFileSync(checkedInWranglerConfig, 'utf8')) as {
+      d1_databases: Array<{ binding: string; database_id: string }>;
+    };
+    const entry = original.d1_databases.find((database) => database.binding === binding)!;
+    const invalidBindings = [
+      original.d1_databases.filter((database) => database.binding !== binding),
+      [...original.d1_databases, entry],
+      original.d1_databases.map((database) => database.binding === binding ? { ...database, database_id: brokerDatabaseId } : database),
+    ];
+    for (const [index, databases] of invalidBindings.entries()) {
+      const sourcePath = join(tempDir, `wrangler.invalid.${index}.jsonc`);
+      const outputPath = join(tempDir, `wrangler.rejected.${index}.jsonc`);
+      writeFileSync(sourcePath, JSON.stringify({ ...original, d1_databases: databases }, null, 2));
+      expect(() => runNodeScript(renderWranglerConfigScript, [
+        ...productionRendererArgs(outputPath),
+        '--source', sourcePath,
+      ])).toThrow(new RegExp(binding, 'u'));
+      expect(existsSync(outputPath)).toBe(false);
+    }
   });
 
   it('renders versioned network identity vars for first deploy and rotation while rejecting mismatched pairs', () => {
-    const firstDeployDir = createTempDir();
-    const firstDeployPath = join(firstDeployDir, 'wrangler.production.jsonc');
-    runNodeScript(renderWranglerConfigScript, [
-      '--source',
-      fileURLToPath(checkedInWranglerConfig),
-      '--out',
-      firstDeployPath,
-      '--database-id',
-      'production-d1-database-id',
-      '--network-identity-hmac-key-version',
-      '1',
-    ]);
+    const firstDeployPath = join(createTempDir(), 'wrangler.production.jsonc');
+    runNodeScript(renderWranglerConfigScript, productionRendererArgs(firstDeployPath));
     const firstDeployConfig = readFileSync(firstDeployPath, 'utf8');
     expect(firstDeployConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION"');
     expect(firstDeployConfig).not.toContain('NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS');
 
-    const rotationDir = createTempDir();
-    const rotationPath = join(rotationDir, 'wrangler.production.jsonc');
+    const rotationPath = join(createTempDir(), 'wrangler.production.jsonc');
     runNodeScript(renderWranglerConfigScript, [
-      '--source',
-      fileURLToPath(checkedInWranglerConfig),
-      '--out',
-      rotationPath,
-      '--database-id',
-      'production-d1-database-id',
-      '--network-identity-hmac-key-version',
-      '2',
-      '--network-identity-hmac-key-version-previous',
-      '1',
+      ...productionRendererArgs(rotationPath),
+      '--network-identity-hmac-key-version', '2',
+      '--network-identity-hmac-key-version-previous', '1',
     ]);
     const rotationConfig = readFileSync(rotationPath, 'utf8');
     expect(rotationConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION"');
     expect(rotationConfig).toContain('"NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS"');
 
     const rejectionDir = createTempDir();
-    const rejectionCases: string[][] = [
-      ['--database-id', 'production-d1-database-id'],
-      [
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version',
-        '0',
-      ],
-      [
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version',
-        'v1',
-      ],
-      [
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version-previous',
-        '1',
-      ],
-      [
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version',
-        '2',
-        '--network-identity-hmac-key-version-previous',
-        '2',
-      ],
-      [
-        '--database-id',
-        'production-d1-database-id',
-        '--network-identity-hmac-key-version',
-        '2',
-        '--network-identity-hmac-key-version-previous',
-        '0',
-      ],
+    const rejectionCases = [
+      {},
+      { current: '0' },
+      { current: 'v1' },
+      { previous: '1' },
+      { current: '2', previous: '2' },
+      { current: '2', previous: '0' },
     ];
-    for (const [caseIndex, rejectionArgs] of rejectionCases.entries()) {
-      expect(() =>
-        runNodeScript(renderWranglerConfigScript, [
-          '--source',
-          fileURLToPath(checkedInWranglerConfig),
-          '--out',
-          join(rejectionDir, `wrangler.rejected.${caseIndex}.jsonc`),
-          ...rejectionArgs,
-        ]),
-      ).toThrow();
+    for (const [index, versions] of rejectionCases.entries()) {
+      const args = productionRendererArgs(join(rejectionDir, `wrangler.rejected.${index}.jsonc`));
+      args.splice(args.indexOf('--network-identity-hmac-key-version'), 2);
+      if (versions.current) args.push('--network-identity-hmac-key-version', versions.current);
+      if (versions.previous) args.push('--network-identity-hmac-key-version-previous', versions.previous);
+      expect(() => runNodeScript(renderWranglerConfigScript, args)).toThrow();
     }
   });
 
@@ -257,6 +254,26 @@ describe('broker direct deploy automation', () => {
     }
   });
 
+  it.skipIf(!bashAvailable)('renders the cleanup workflow with both database IDs and configured identity versions', () => {
+    const script = extractWorkflowRunBlock(readFileSync(cleanupWorkflow, 'utf8'), 'Render production Wrangler config');
+    const scenario = createDailyCapScenario({
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '9',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '8',
+    });
+    const result = runBashScript(script, scenario.tempDir, scenario.env);
+    expect(result.status, result.stderr).toBe(0);
+    const config = JSON.parse(readFileSync(join(scenario.tempDir, 'wrangler.production.jsonc'), 'utf8'));
+    expect(config.d1_databases).toEqual([
+      { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: brokerDatabaseId },
+      { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: agentUsageDatabaseId, migrations_dir: '../agent-relay/migrations' },
+    ]);
+    expect(config.vars).toMatchObject({
+      NETWORK_IDENTITY_HMAC_KEY_VERSION: '9',
+      NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '8',
+    });
+    expect(existsSync(scenario.callLogPath)).toBe(false);
+  });
+
   it.skipIf(!bashAvailable)('renders configured daily-cap maintenance and changes only the cap before reading it back', () => {
     const script = dailyCapWorkflowScript();
     for (const [current, previous, cap] of [
@@ -275,7 +292,8 @@ describe('broker direct deploy automation', () => {
       expect(config).toContain('"name": "puripuly-heart-broker"');
       expect(config).toContain('"binding": "BROKER_DB"');
       expect(config).toContain('"database_name": "puripuly-heart-broker"');
-      expect(config).toContain('"database_id": "daily-cap-synthetic-database"');
+      expect(config).toContain(`"database_id": "${brokerDatabaseId}"`);
+      expect(config).toContain(`"database_id": "${agentUsageDatabaseId}"`);
       expect(config).not.toContain('REQUIRED_AT_DEPLOY_TIME');
       expect(config).toContain(`"NETWORK_IDENTITY_HMAC_KEY_VERSION": "${current}"`);
       if (previous?.trim()) {
@@ -327,7 +345,7 @@ describe('broker direct deploy automation', () => {
       ...[undefined, '', '0', '-1', '100001', '18446744073709551617', '9'.repeat(1000), '1.5', 'abc', '01'].map(
         (TARGET_MAX_COUNT) => ({ TARGET_MAX_COUNT }),
       ),
-      ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION'].flatMap(
+      ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION', 'AGENT_USAGE_D1_DATABASE_ID_PRODUCTION'].flatMap(
         (name) => [{ [name]: undefined }, { [name]: ' \t ' }],
       ),
     ];
@@ -463,7 +481,8 @@ assert(args.includes('--remote'));
 assert(args.includes('--json'));
 assert.equal(args[args.indexOf('--config') + 1], 'wrangler.production.jsonc');
 const config = readFileSync('wrangler.production.jsonc', 'utf8');
-assert(config.includes('"database_id": "daily-cap-synthetic-database"'));
+assert(config.includes('"database_id": "${brokerDatabaseId}"'));
+assert(config.includes('"database_id": "${agentUsageDatabaseId}"'));
 const db = new DatabaseSync('synthetic-d1.sqlite');
 let results = [];
 try {
@@ -490,7 +509,8 @@ process.stdout.write(JSON.stringify([{ success: true, results }]));
       TARGET_MAX_COUNT: '450',
       CLOUDFLARE_API_TOKEN: 'daily-cap-synthetic-token',
       CLOUDFLARE_ACCOUNT_ID: 'daily-cap-synthetic-account',
-      BROKER_D1_DATABASE_ID_PRODUCTION: 'daily-cap-synthetic-database',
+      BROKER_D1_DATABASE_ID_PRODUCTION: brokerDatabaseId,
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: agentUsageDatabaseId,
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '7',
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: undefined,
       ...overrides,
@@ -553,6 +573,16 @@ function createTempDir(): string {
   const tempDir = mkdtempSync(join(tmpdir(), 'broker-direct-deploy-'));
   tempDirs.push(tempDir);
   return tempDir;
+}
+
+function productionRendererArgs(outputPath: string): string[] {
+  return [
+    '--source', fileURLToPath(checkedInWranglerConfig),
+    '--out', outputPath,
+    '--database-id', brokerDatabaseId,
+    '--agent-usage-database-id', agentUsageDatabaseId,
+    '--network-identity-hmac-key-version', '1',
+  ];
 }
 
 function runNodeScript(scriptUrl: URL, args: string[]): string {

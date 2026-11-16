@@ -16,7 +16,7 @@ const requiredColumns = {
   terra_daily: ['utc_date', 'tokens'],
   request_slots: ['installation_hash', 'slot', 'owner', 'turn_id', 'classification', 'expires_at'],
   protocol_daily: ['installation_hash', 'utc_date', 'agent_protocol', 'requests'],
-  photo_admissions: ['installation_hash', 'request_id', 'period_start', 'owner', 'expires_at', 'settled',
+  photo_admissions: ['installation_hash', 'request_id', 'period_start', 'requested_at', 'owner', 'expires_at', 'settled',
     'uncached_input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens', 'missing_usage', 'cost_usd'],
 };
 
@@ -93,9 +93,11 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
   config.vars.SUPPORT_REPORTS_ENABLED = env.SUPPORT_REPORTS_ENABLED;
   config.vars.PHOTO_SERVICE_ENABLED = env.PHOTO_SERVICE_ENABLED || 'false';
   if (env.PHOTO_POLICY) config.vars.PHOTO_POLICY = env.PHOTO_POLICY;
-  config.secrets.required = ['PURI_TOKEN_SECRET', ...(
-    env.AGENT_SERVICE_ENABLED === 'true' || env.PHOTO_SERVICE_ENABLED === 'true' ? ['OPENAI_API_KEY'] : []
-  )];
+  config.secrets.required = [
+    'PURI_TOKEN_SECRET',
+    ...(env.AGENT_SERVICE_ENABLED === 'true' ? ['OPENAI_API_KEY'] : []),
+    ...(env.PHOTO_SERVICE_ENABLED === 'true' ? ['PHOTO_OPENAI_API_KEY'] : []),
+  ];
   await mkdir(destination, { recursive: true, mode: 0o700 });
   await writeFile(resolve(destination, 'wrangler.json'), `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 }

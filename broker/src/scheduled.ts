@@ -24,6 +24,7 @@ import { runNetworkIdentityBackfill } from './network-identity-migration';
 import { resolveNetworkIdentitySecrets } from './network-identity';
 import { deleteExpiredChallengePreflightInstallations } from './preflight-retention';
 import { deleteExpiredPuriProofNonces } from './puri-token';
+import { getRelayDailyUsage } from './relay-usage';
 
 import {
   applyAppActiveDayRetention,
@@ -69,6 +70,7 @@ export async function handleScheduled(
   env: Pick<
     BrokerBindings,
     | 'BROKER_DB'
+    | 'AGENT_USAGE_DB'
     | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'
     | 'DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL'
     | 'OPENROUTER_MANAGEMENT_API_KEY'
@@ -584,7 +586,7 @@ function isDailyReportScheduleDue(
 }
 
 export async function runDailyReport(
-  env: Pick<BrokerBindings, 'BROKER_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
+  env: Pick<BrokerBindings, 'BROKER_DB' | 'AGENT_USAGE_DB' | 'DISCORD_DAILY_REPORT_WEBHOOK_URL'>,
   now: Date,
 ): Promise<
   | { ok: true; payload: DailyReportPayload; sent: true }
@@ -602,7 +604,7 @@ export async function runDailyReport(
 
   let payload: DailyReportPayload;
   try {
-    payload = await buildDailySummaryPacketForDate(env.BROKER_DB, reportDateUtc);
+    payload = await buildDailySummaryPacketForDate(env, reportDateUtc);
     await sendDailyReport(env.DISCORD_DAILY_REPORT_WEBHOOK_URL, payload);
   } catch (error) {
     await releaseDailyReportDelivery(env.BROKER_DB, claim, now);
@@ -615,21 +617,21 @@ export async function runDailyReport(
 
 
 async function buildDailySummaryPacketForDate(
-  db: BrokerBindings['BROKER_DB'],
+  env: Pick<BrokerBindings, 'BROKER_DB' | 'AGENT_USAGE_DB'>,
   reportDateUtc: string,
 ): Promise<DailyReportPayload> {
   return buildDailySummaryPacketForWindow(
-    db,
+    env,
     resolveDailyReportWindowForDate(reportDateUtc),
   );
 }
 
 async function buildDailySummaryPacketForWindow(
-  db: BrokerBindings['BROKER_DB'],
+  env: Pick<BrokerBindings, 'BROKER_DB' | 'AGENT_USAGE_DB'>,
   window: DailyReportWindow,
 ): Promise<DailyReportPayload> {
-  const [sourceCountsResult, appUsage] = await Promise.all([
-    db
+  const [sourceCountsResult, appUsage, modelUsage] = await Promise.all([
+    env.BROKER_DB
       .prepare(
         `SELECT issue_source,
                 COUNT(DISTINCT CASE
@@ -643,7 +645,8 @@ async function buildDailySummaryPacketForWindow(
       )
       .bind(window.windowStart, window.windowEnd)
       .all<SourceCountRow>(),
-    getAppUsageDailyMetrics(db, window.reportDateUtc),
+    getAppUsageDailyMetrics(env.BROKER_DB, window.reportDateUtc),
+    getRelayDailyUsage(env.AGENT_USAGE_DB, window.reportDateUtc),
   ]);
   const sourceCounts = Object.fromEntries(
     sourceCountsResult.results.map((row) => [row.issue_source, Number(row.count)]),
@@ -661,6 +664,7 @@ async function buildDailySummaryPacketForWindow(
       keys_delivered_discord: keysDeliveredDiscord,
       keys_delivered_qq: keysDeliveredQq,
       ...appUsage,
+      model_usage: modelUsage,
     },
   };
 }

@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { accountingDatabase } from '../../../agent-relay/tests/fixtures';
 
 import { applyBrokerMigrations } from './migrations';
 import {
@@ -125,6 +126,7 @@ class SqliteD1Database {
 
 export interface TestBrokerEnv extends Record<string, unknown> {
   BROKER_DB: D1Database;
+  AGENT_USAGE_DB: D1Database;
   OPENROUTER_MANAGEMENT_API_KEY: string;
   OPENROUTER_MANAGED_GUARDRAIL_ID: string;
   OPENROUTER_MANAGED_USER_HMAC_SECRET: string;
@@ -141,6 +143,7 @@ export interface TestBrokerEnv extends Record<string, unknown> {
   NETWORK_IDENTITY_HMAC_KEY_VERSION: string;
   NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
   __db: DatabaseSync;
+  __usageDb: DatabaseSync;
 }
 
 export function createTestBrokerEnv(options: SqliteD1Hooks & { throughMigration?: string } = {}): TestBrokerEnv {
@@ -158,8 +161,10 @@ export function createTestBrokerEnv(options: SqliteD1Hooks & { throughMigration?
     'fingerprint_salt',
   );
 
+  const usage = accountingDatabase();
   return {
     BROKER_DB: new SqliteD1Database(db, options) as unknown as D1Database,
+    AGENT_USAGE_DB: usage.db,
     OPENROUTER_MANAGEMENT_API_KEY: 'test-management-api-key',
     OPENROUTER_MANAGED_GUARDRAIL_ID: 'test-managed-guardrail-id',
     OPENROUTER_MANAGED_USER_HMAC_SECRET: 'test-managed-user-hmac-secret',
@@ -176,6 +181,7 @@ export function createTestBrokerEnv(options: SqliteD1Hooks & { throughMigration?
     NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: '',
     NETWORK_IDENTITY_HMAC_KEY_VERSION: '1',
     __db: db,
+    __usageDb: usage.sqlite,
   };
 }
 

@@ -12,7 +12,7 @@
     "enabled": false
   },
   "secrets": {
-    "required": ["OPENAI_API_KEY", "PURI_TOKEN_SECRET"]
+    "required": ["OPENAI_API_KEY", "PHOTO_OPENAI_API_KEY", "PURI_TOKEN_SECRET"]
   },
   "vars": {
     "AGENT_SERVICE_ENABLED": "false",

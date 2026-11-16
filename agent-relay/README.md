@@ -15,11 +15,19 @@ Prompts and [protocol contracts](src/contracts.ts) ship with the Worker. Rebuild
 Run the manual [deployment workflow](../.github/workflows/deploy-agent-relay.yml) from `dev` with the reviewed commit and production confirmation. Configuration lives in the workflow and [preparation script](operations/prepare-deployment.mjs).
 
 - Provision an initialized D1 dedicated to Relay before deployment. Leave `apply_migrations` off for code-only updates; pending migrations block deployment.
-- Set `AGENT_SERVICE_ENABLED` and `SUPPORT_REPORTS_ENABLED` explicitly. Disabling model admission leaves already dispatched work running.
-- Deployment preserves existing Worker secrets and non-owned runtime variables. Keep `OPENAI_API_KEY` server-only and coordinate shared `PURI_TOKEN_SECRET` rotation with Broker.
+- Set `AGENT_SERVICE_ENABLED` and `SUPPORT_REPORTS_ENABLED` explicitly. Set `PHOTO_SERVICE_ENABLED=true` to enable photo translation; deployment defaults it to `false` when unset. Disabling model admission leaves already dispatched work running.
+- Deployment preserves existing Worker secrets and non-owned runtime variables. Enabled chatbot service requires `OPENAI_API_KEY`; enabled photo service requires `PHOTO_OPENAI_API_KEY`. Keep both keys server-only. Photo requests never fall back to the chatbot key. Coordinate shared `PURI_TOKEN_SECRET` rotation with Broker.
 - Committed migrations have no automatic rollback. Authorize database recovery separately.
+- Before deploying Broker's usage-reporting code, apply Relay migration `0008_photo_request_timestamp.sql` and deploy Relay first. It adds nullable `photo_admissions.requested_at` for UTC report attribution; legacy rows keep an approximate date based on `period_start`. Broker's read-only deployment gate rejects the old schema.
+- Share the existing dedicated database ID via `AGENT_USAGE_D1_DATABASE_ID_PRODUCTION` for Broker's `AGENT_USAGE_DB` binding. Keep it distinct from Broker D1. Relay owns these migrations; Broker must never apply its migrations to Relay D1.
 
 The deployment smoke checks authentication and protocol rejection without model calls or report uploads. Live-cost probes require separate authorization.
+
+## Daily Usage Reporting
+
+Broker reuses its existing daily Discord webhook and reads aggregate-only data directly from Relay D1 for the report's UTC calendar date, without a public usage endpoint or new secret. Chatbot counts are recorded response and classification calls, not user questions; photo counts are Relay photo requests. **Cost (USD)** sums recorded `cost_usd`, calculated from recorded usage and configured token rates. Direct personal-key and ChatGPT photo routes outside Relay are excluded.
+
+Nonzero flags show incomplete usage, pending photo requests, or approximate dates for legacy photo records. If usage reads fail, Broker retains the pending daily report for retry instead of sending zero usage. Reporting does not read or expose provider keys.
 
 ## Support Reports
 
@@ -45,7 +53,7 @@ pnpm --filter @puripuly-heart/agent-relay test
 pnpm --filter @puripuly-heart/agent-relay dev --var AGENT_SERVICE_ENABLED:true
 ```
 
-Apply [migrations](migrations/) to isolated local D1. Supply `OPENAI_API_KEY` and the Broker-matching `PURI_TOKEN_SECRET` through the Worker environment, not CLI arguments or the app.
+Apply [migrations](migrations/) to isolated local D1. Supply `OPENAI_API_KEY` for chatbot requests, `PHOTO_OPENAI_API_KEY` for photo requests, and the Broker-matching `PURI_TOKEN_SECRET` through the Worker environment, not CLI arguments or the app. To enable local photo translation, also pass `--var PHOTO_SERVICE_ENABLED:true` to the dev command.
 
 Apps default to the public service. Set an explicit override before starting a source app:
 

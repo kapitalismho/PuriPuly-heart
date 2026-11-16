@@ -2,12 +2,17 @@
   "name": "puripuly-heart-broker",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-08",
-  // Replace this placeholder with the real D1 database_id at deploy time.
   "d1_databases": [
     {
       "binding": "BROKER_DB",
       "database_name": "puripuly-heart-broker",
       "database_id": "REQUIRED_AT_DEPLOY_TIME"
+    },
+    {
+      "binding": "AGENT_USAGE_DB",
+      "database_name": "puripuly-heart-agent-usage",
+      "database_id": "AGENT_USAGE_REQUIRED_AT_DEPLOY_TIME",
+      "migrations_dir": "../agent-relay/migrations"
     }
   ],
   "triggers": {

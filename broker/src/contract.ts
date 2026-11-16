@@ -79,6 +79,7 @@ export const OPTIONAL_BINDINGS = {
 
 export interface BrokerBindings {
   BROKER_DB: D1Database;
+  AGENT_USAGE_DB: D1Database;
   OPENROUTER_MANAGEMENT_API_KEY: string;
   OPENROUTER_MANAGED_GUARDRAIL_ID: string;
   OPENROUTER_MANAGED_USER_HMAC_SECRET: string;

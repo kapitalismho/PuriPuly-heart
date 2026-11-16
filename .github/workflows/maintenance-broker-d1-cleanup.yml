@@ -39,6 +39,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
     steps:
       - name: Guard inputs
         shell: bash
@@ -113,10 +114,19 @@ jobs:
 
       - name: Render production Wrangler config
         working-directory: broker
-        run: >-
-          node scripts/render-production-wrangler-config.mjs
-          --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION"
-          --out wrangler.production.jsonc
+        shell: bash
+        env:
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
+        run: |
+          version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+          fi
+          node scripts/render-production-wrangler-config.mjs \
+            --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
+            "${version_args[@]}" --out wrangler.production.jsonc
 
       - name: Inspect matching broker rows
         id: inspect

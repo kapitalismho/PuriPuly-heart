@@ -7,7 +7,7 @@ import { isRecord } from './type-guards';
 import { checkPhotoAllowance, photoAllowanceUsed, photoPolicy, UsageEnv } from './usage';
 
 export type PhotoEnv = UsageEnv & {
-  OPENAI_API_KEY?: string;
+  PHOTO_OPENAI_API_KEY?: string;
   PHOTO_SERVICE_ENABLED?: string;
   PHOTO_POLICY?: string;
 };
@@ -24,7 +24,7 @@ function error(status: number, code: string, retryAfter?: number): Response {
 }
 
 export async function receivePhotoAllowance(env: PhotoEnv, installation: string): Promise<Response> {
-  if (env.PHOTO_SERVICE_ENABLED !== 'true' || !env.OPENAI_API_KEY) return error(503, 'service_shutdown');
+  if (env.PHOTO_SERVICE_ENABLED !== 'true' || !env.PHOTO_OPENAI_API_KEY) return error(503, 'service_shutdown');
   let policy;
   try { policy = photoPolicy(env.PHOTO_POLICY); } catch { return error(503, 'service_shutdown'); }
   let status;
@@ -39,7 +39,7 @@ export async function receivePhotoAllowance(env: PhotoEnv, installation: string)
 export async function receivePhoto(
   request: Request, env: PhotoEnv, installation: string, context?: Pick<ExecutionContext, 'waitUntil'>,
 ): Promise<Response> {
-  if (env.PHOTO_SERVICE_ENABLED !== 'true' || !env.OPENAI_API_KEY) return error(503, 'service_shutdown');
+  if (env.PHOTO_SERVICE_ENABLED !== 'true' || !env.PHOTO_OPENAI_API_KEY) return error(503, 'service_shutdown');
   let policy;
   try { policy = photoPolicy(env.PHOTO_POLICY); } catch { return error(503, 'service_shutdown'); }
   let body: unknown;
@@ -77,7 +77,7 @@ export async function receivePhoto(
   try {
     const upstream = await beforeAbort(abort.signal, () => fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
-      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${env.PHOTO_OPENAI_API_KEY}`, 'content-type': 'application/json' },
       redirect: 'manual',
       signal: abort.signal,
       body: JSON.stringify({

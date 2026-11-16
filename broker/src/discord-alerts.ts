@@ -1,4 +1,5 @@
 import type { AppUsageDailyMetrics } from './telemetry';
+import type { RelayDailyUsage } from './relay-usage';
 
 const DAILY_HEARTBEAT_COLOR_OK = 0x5865f2;
 const DAILY_HEARTBEAT_COLOR_ACTIVE = 0xfee75c;
@@ -33,6 +34,7 @@ export interface DailyReportPayload {
     keys_delivered_total: number;
     keys_delivered_discord: number;
     keys_delivered_qq: number;
+    model_usage: RelayDailyUsage;
   };
 }
 
@@ -90,11 +92,13 @@ export async function sendDailyReport(
 ): Promise<void> {
   const summary = packet.summary;
 
+  const usage = summary.model_usage;
+  const gaps = accountingGaps(usage);
   await sendDiscordEmbed(
     webhookUrl,
     {
       title: `PuriPuly daily summary — ${packet.report_date_utc} UTC`,
-      color: resolveDailyHeartbeatColor(packet),
+      color: resolveDailyHeartbeatColor(packet, gaps.length > 0),
       description: `${packet.window_start} ≤ observed_at < ${packet.window_end}`,
       content: ['```json', JSON.stringify(packet), '```'].join('\n'),
       fields: [
@@ -116,6 +120,34 @@ export async function sendDailyReport(
           ].join('\n'),
           inline: true,
         },
+        {
+          name: 'Chatbot',
+          value: [
+            `recorded_calls=${usage.chatbot.classification_calls + usage.chatbot.response_calls}`,
+            `responses=${usage.chatbot.response_calls}`,
+            `classifications=${usage.chatbot.classification_calls}`,
+            `cost_usd=${usage.chatbot.cost_usd.toFixed(6)}`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: 'Photo translation',
+          value: [
+            `requests=${usage.photo.requests}`,
+            `cost_usd=${usage.photo.cost_usd.toFixed(6)}`,
+          ].join('\n'),
+          inline: true,
+        },
+        {
+          name: 'Total cost (USD)',
+          value: usage.total_cost_usd.toFixed(6),
+          inline: true,
+        },
+        ...(gaps.length ? [{
+          name: 'Accounting gaps',
+          value: gaps.join('\n'),
+          inline: false,
+        }] : []),
       ],
     },
     fetchImpl,
@@ -195,8 +227,17 @@ function wrapJsonCodeBlock(value: string): string {
   return ['```json', value, '```'].join('\n');
 }
 
-function resolveDailyHeartbeatColor(packet: DailyReportPayload): number {
-  if (packet.summary.keys_delivered_total > 0) {
+function accountingGaps(usage: RelayDailyUsage): string[] {
+  const gaps: string[] = [];
+  if (usage.chatbot.missing_usage_calls) gaps.push(`chatbot_missing_usage=${usage.chatbot.missing_usage_calls}`);
+  if (usage.photo.missing_usage_requests) gaps.push(`photo_missing_usage=${usage.photo.missing_usage_requests}`);
+  if (usage.photo.unsettled_requests) gaps.push(`photo_unsettled=${usage.photo.unsettled_requests}`);
+  if (usage.photo.estimated_date_requests) gaps.push(`photo_estimated_date=${usage.photo.estimated_date_requests}`);
+  return gaps;
+}
+
+function resolveDailyHeartbeatColor(packet: DailyReportPayload, hasAccountingGaps: boolean): number {
+  if (packet.summary.keys_delivered_total > 0 || hasAccountingGaps) {
     return DAILY_HEARTBEAT_COLOR_ACTIVE;
   }
 

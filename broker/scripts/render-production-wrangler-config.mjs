@@ -4,6 +4,12 @@ import { fileURLToPath } from 'node:url';
 
 const CANONICAL_WORKER_NAME = 'puripuly-heart-broker';
 const DATABASE_ID_PLACEHOLDER = 'REQUIRED_AT_DEPLOY_TIME';
+const DATABASE_ID_PLACEHOLDERS = {
+  BROKER_DB: DATABASE_ID_PLACEHOLDER,
+  AGENT_USAGE_DB: `AGENT_USAGE_${DATABASE_ID_PLACEHOLDER}`,
+};
+const DATABASE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const NIL_DATABASE_ID = '00000000-0000-0000-0000-000000000000';
 
 await main();
 
@@ -14,6 +20,12 @@ async function main() {
   );
   const outputPath = resolve(requiredArg(args, 'out'));
   const databaseId = requiredArg(args, 'database-id');
+  const agentUsageDatabaseId = requiredArg(args, 'agent-usage-database-id');
+  assertDatabaseId(databaseId, '--database-id');
+  assertDatabaseId(agentUsageDatabaseId, '--agent-usage-database-id');
+  if (databaseId.toLowerCase() === agentUsageDatabaseId.toLowerCase()) {
+    throw new Error('--agent-usage-database-id must differ from the Broker --database-id.');
+  }
   const keyVersion = requiredArg(args, 'network-identity-hmac-key-version');
   const keyVersionPrevious = args['network-identity-hmac-key-version-previous'];
   assertPositiveInteger(keyVersion, '--network-identity-hmac-key-version must be a positive integer.');
@@ -53,29 +65,13 @@ async function main() {
   ];
   const renderedConfig = injectVersionVars(sourceText, versionEntries);
 
-  const databaseIdPlaceholderPattern = new RegExp(
-    `"database_id"\\s*:\\s*"${DATABASE_ID_PLACEHOLDER}"`,
-    'gu',
-  );
-  const placeholderMatches = sourceText.match(databaseIdPlaceholderPattern) ?? [];
-
-  if (placeholderMatches.length !== 1) {
-    throw new Error(
-      `expected exactly one ${DATABASE_ID_PLACEHOLDER} database_id placeholder`,
-    );
+  const withBrokerDatabaseId = replaceDatabaseId(renderedConfig, 'BROKER_DB', databaseId);
+  const withDatabaseIds = replaceDatabaseId(withBrokerDatabaseId, 'AGENT_USAGE_DB', agentUsageDatabaseId);
+  if (withDatabaseIds.includes(DATABASE_ID_PLACEHOLDER)) {
+    throw new Error('wrangler config has unexpected remaining deploy-time placeholders.');
   }
 
-  const withDatabaseId = renderedConfig.replace(
-    databaseIdPlaceholderPattern,
-    `"database_id": ${JSON.stringify(databaseId)}`,
-  );
-  if (withDatabaseId === renderedConfig) {
-    throw new Error(
-      `expected exactly one ${DATABASE_ID_PLACEHOLDER} database_id placeholder`,
-    );
-  }
-
-  await writeFile(outputPath, withDatabaseId, 'utf8');
+  await writeFile(outputPath, withDatabaseIds, 'utf8');
   process.stdout.write(`${outputPath}\n`);
 }
 
@@ -113,6 +109,29 @@ function injectVersionVars(sourceText, versionEntries) {
   }
   const body = [...kept, ...versionEntries].join(',\n');
   return [...lines.slice(0, openIndex + 1), body, ...lines.slice(closeIndex)].join('\n');
+}
+
+function replaceDatabaseId(sourceText, binding, databaseId) {
+  const bindingPattern = new RegExp(`\\{[^{}]*"binding"\\s*:\\s*"${binding}"[^{}]*\\}`, 'gu');
+  const bindings = [...sourceText.matchAll(bindingPattern)];
+  const placeholder = DATABASE_ID_PLACEHOLDERS[binding];
+  const placeholderPattern = new RegExp(
+    `"database_id"\\s*:\\s*"${placeholder}"`,
+    'gu',
+  );
+  if (bindings.length !== 1 || (bindings[0][0].match(placeholderPattern) ?? []).length !== 1) {
+    throw new Error(`expected exactly one ${binding} binding with a ${placeholder} database_id.`);
+  }
+  return sourceText.replace(bindingPattern, (entry) => entry.replace(
+    placeholderPattern,
+    `"database_id": ${JSON.stringify(databaseId)}`,
+  ));
+}
+
+function assertDatabaseId(value, argument) {
+  if (!DATABASE_ID_PATTERN.test(value) || value.toLowerCase() === NIL_DATABASE_ID) {
+    throw new Error(`${argument} must be a real D1 database UUID.`);
+  }
 }
 
 function assertPositiveInteger(value, message) {
