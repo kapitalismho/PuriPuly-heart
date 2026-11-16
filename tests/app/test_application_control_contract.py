@@ -546,7 +546,7 @@ async def test_cli_photo_settings_apply_and_survive_restart(tmp_path, monkeypatc
         assert result["status"] in {"applied", "degraded"}
         rejected = await control.submit(
             "settings.apply",
-            {"changes": {"photo.route": "openai"}},
+            {"changes": {"photo.route": "openai-api"}},
             request_id="photo-settings-invalid",
         )
         rejected_result = await control.wait(rejected["operation_id"], timeout=10)

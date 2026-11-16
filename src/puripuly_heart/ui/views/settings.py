@@ -230,6 +230,16 @@ _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
 
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
 _SETTINGS_SUBTAB_ORDER = ("api", "photo", "general", "overlay")
+_PHOTO_MODEL_ROUTES = {
+    "luna": tuple(route for route in PHOTO_ROUTES if route != "gemini"),
+    "gemini": ("gemini",),
+}
+
+
+def _photo_model_for_route(route: str) -> str:
+    return "gemini" if route == "gemini" else "luna"
+
+
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
 _OVERLAY_DISTANCE_DIVISIONS = 30
@@ -1184,6 +1194,7 @@ class SettingsView(ft.Column):
         )
         self._gemini_key = self._build_gemini_key_field()
         self._photo_gemini_key = self._build_gemini_key_field()
+        self._photo_openai_key = self._build_openai_key_field()
         self._elevenlabs_scribe_key = ApiKeyField(
             "settings.elevenlabs_scribe_api_key",
             "elevenlabs_scribe_api_key",
@@ -1245,16 +1256,7 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
-        self._openai_key = ApiKeyField(
-            "settings.openai_api_key",
-            "openai_api_key",
-            "openai",
-            on_verify=self._verify_key,
-            on_save=self._on_secret_change,
-            show_snackbar=lambda msg, bg: (
-                self.show_snackbar(msg, bg) if self.show_snackbar else None
-            ),
-        )
+        self._openai_key = self._build_openai_key_field()
         self._openrouter_pkce_button = self._build_action_button(
             t("settings.openrouter_authenticate"),
             self._on_openrouter_pkce_click,
@@ -2471,7 +2473,10 @@ class SettingsView(ft.Column):
         self._openrouter_routing_row = self._translation_connection_row
         self._gpu_device_row = self._api_surface.gpu_device_row
 
-        self._photo_surface = compose_settings_photo_surface(self._build_photo_surface_slots())
+        self._photo_surface = compose_settings_photo_surface(
+            self._build_photo_surface_slots(),
+            placeholder_factory=self._wrap_empty_unit_card,
+        )
 
         self._settings_subtab_shell = self._build_settings_subtab_shell(
             {
@@ -2496,7 +2501,25 @@ class SettingsView(ft.Column):
         )
 
     def _on_gemini_secret_change(self, key: str, value: str) -> object:
-        for field in (self._gemini_key, self._photo_gemini_key):
+        return self._share_secret_change((self._gemini_key, self._photo_gemini_key), key, value)
+
+    def _build_openai_key_field(self) -> ApiKeyField:
+        return ApiKeyField(
+            "settings.openai_api_key",
+            "openai_api_key",
+            "openai",
+            on_verify=self._verify_key,
+            on_save=self._on_openai_secret_change,
+            show_snackbar=lambda msg, bg: (
+                self.show_snackbar(msg, bg) if self.show_snackbar else None
+            ),
+        )
+
+    def _on_openai_secret_change(self, key: str, value: str) -> object:
+        return self._share_secret_change((self._openai_key, self._photo_openai_key), key, value)
+
+    def _share_secret_change(self, fields: tuple[ApiKeyField, ...], key: str, value: str) -> object:
+        for field in fields:
             if field.value != value:
                 field.value = value
                 _update_control_if_mounted(field)
@@ -2509,6 +2532,11 @@ class SettingsView(ft.Column):
         self._photo_enabled_text = self._build_clickable_text(
             t("settings.photo.state.on"),
             self._on_photo_enabled_click,
+        )
+        self._photo_model_title = self._unit_card_title(t("settings.photo.model.title"))
+        self._photo_model_text = self._build_clickable_text(
+            t("settings.photo.model.luna"),
+            self._on_photo_model_click,
         )
         self._photo_route_title = self._unit_card_title(t("settings.photo.route.title"))
         self._photo_route_text = self._build_clickable_text(
@@ -2531,10 +2559,24 @@ class SettingsView(ft.Column):
             height=None,
             expand=False,
         )
+        self._photo_openai_card = self._wrap_card(
+            self._photo_openai_key,
+            height=None,
+            expand=False,
+        )
+        self._photo_remaining_promotion = ft.Text(
+            t("settings.photo.remaining.promotion"),
+            size=20,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_PRIMARY,
+        )
         self._photo_remaining_card = self._wrap_card(
             ft.Column(
                 [
-                    self._photo_remaining_title,
+                    ft.Row(
+                        [self._photo_remaining_title, self._photo_remaining_promotion],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
                     ft.Container(height=4),
                     self._photo_remaining_bar,
                 ],
@@ -2546,11 +2588,13 @@ class SettingsView(ft.Column):
         self._sync_photo_setting_cards()
         return SettingsPhotoSurfaceSlots(
             chatgpt_account=self._photo_chatgpt_view.card,
+            openai_key=self._photo_openai_card,
             gemini_key=self._photo_gemini_card,
             enabled=self._wrap_unit_card(
                 title=self._photo_enabled_title,
                 value=self._photo_enabled_text,
             ),
+            model=self._wrap_unit_card(title=self._photo_model_title, value=self._photo_model_text),
             route=self._wrap_unit_card(title=self._photo_route_title, value=self._photo_route_text),
             remaining=self._photo_remaining_card,
             delete_translated=self._wrap_unit_card(
@@ -2570,25 +2614,33 @@ class SettingsView(ft.Column):
         self._photo_enabled_text.content.value = t(
             "settings.photo.state.on" if enabled else "settings.photo.state.off"
         )
+        self._photo_model_text.content.value = t(f"settings.photo.model.{self._photo_model()}")
         self._photo_route_text.content.value = t(f"settings.photo.route.{self._photo_route()}")
         self._photo_delete_text.content.value = t(
             "settings.photo.state.on" if delete_translated else "settings.photo.state.off"
         )
-        for control in (self._photo_enabled_text, self._photo_route_text, self._photo_delete_text):
+        value_controls = (
+            self._photo_enabled_text,
+            self._photo_model_text,
+            self._photo_route_text,
+            self._photo_delete_text,
+        )
+        for control in value_controls:
             control.disabled = general is None
         route = self._photo_route()
         self._photo_chatgpt_view.card.visible = general is not None and route == "chatgpt"
+        self._photo_openai_card.visible = general is not None and route == "openai"
         self._photo_gemini_card.visible = general is not None and route == "gemini"
         if route == "chatgpt":
             self._sync_chatgpt_account_card()
-        _update_control_if_mounted(self._photo_chatgpt_view.card)
-        _update_control_if_mounted(self._photo_gemini_card)
+        for card in (
+            self._photo_chatgpt_view.card,
+            self._photo_openai_card,
+            self._photo_gemini_card,
+        ):
+            _update_control_if_mounted(card)
         if is_control_mounted(self):
-            for control in (
-                self._photo_enabled_text,
-                self._photo_route_text,
-                self._photo_delete_text,
-            ):
+            for control in value_controls:
                 with contextlib.suppress(Exception):
                     control.update()
         self._sync_photo_status_cards()
@@ -2596,6 +2648,9 @@ class SettingsView(ft.Column):
     def _photo_route(self) -> str:
         general = self._general_snapshot
         return "managed" if general is None else general.photo_route
+
+    def _photo_model(self) -> str:
+        return _photo_model_for_route(self._photo_route())
 
     def _sync_photo_status_cards(self) -> None:
         status = self._photo_status
@@ -2643,6 +2698,27 @@ class SettingsView(ft.Column):
         self._sync_photo_setting_cards()
         self._emit_settings_changed(PhotoEnabledSettingsIntent(enabled))
 
+    def _on_photo_model_click(self, e) -> None:
+        _ = e
+        if not is_control_mounted(self) or self._general_snapshot is None:
+            return
+        modal = SettingsModal(
+            self.page,
+            t("settings.photo.model.title"),
+            [
+                OptionItem(value=model, label=t(f"settings.photo.model.{model}"))
+                for model in _PHOTO_MODEL_ROUTES
+            ],
+            self._on_photo_model_selected,
+        )
+        modal.open(self._photo_model())
+
+    def _on_photo_model_selected(self, value: str) -> None:
+        routes = _PHOTO_MODEL_ROUTES.get(value)
+        if routes is None or value == self._photo_model():
+            return
+        self._on_photo_route_selected(routes[0])
+
     def _on_photo_route_click(self, e) -> None:
         _ = e
         if not is_control_mounted(self) or self._general_snapshot is None:
@@ -2651,10 +2727,19 @@ class SettingsView(ft.Column):
             self.page,
             t("settings.photo.route.title"),
             [
-                OptionItem(value=route, label=t(f"settings.photo.route.{route}"))
-                for route in PHOTO_ROUTES
+                OptionItem(
+                    value=route,
+                    label=t(f"settings.photo.route.{route}"),
+                    description=(
+                        t("settings.photo.route.managed.description")
+                        if route == "managed"
+                        else None
+                    ),
+                )
+                for route in _PHOTO_MODEL_ROUTES[self._photo_model()]
             ],
             self._on_photo_route_selected,
+            show_description=True,
         )
         modal.open(self._photo_route())
 
@@ -4177,7 +4262,9 @@ class SettingsView(ft.Column):
         if snapshot.openrouter_api_key is not None:
             self._openrouter_key.value = snapshot.openrouter_api_key
         if snapshot.openai_api_key is not None:
-            self._openai_key.value = snapshot.openai_api_key
+            for openai_key in (self._openai_key, getattr(self, "_photo_openai_key", None)):
+                if openai_key is not None:
+                    openai_key.value = snapshot.openai_api_key
         if snapshot.deepseek_api_key is not None:
             self._deepseek_key.value = snapshot.deepseek_api_key
         if snapshot.deepgram_api_key is not None:
@@ -4267,6 +4354,7 @@ class SettingsView(ft.Column):
         # Map field -> (has_key, is_verified)
         gemini_key = getattr(self, "_gemini_key", None)
         photo_gemini_key = getattr(self, "_photo_gemini_key", None)
+        photo_openai_key = getattr(self, "_photo_openai_key", None)
         elevenlabs_scribe_key = getattr(self, "_elevenlabs_scribe_key", None)
         field_map = [
             (self._deepgram_key, self._deepgram_key.value, verified.deepgram),
@@ -4288,6 +4376,11 @@ class SettingsView(ft.Column):
             (self._soniox_key, self._soniox_key.value, verified.soniox),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._openai_key, self._openai_key.value, verified.openai),
+            (
+                photo_openai_key,
+                photo_openai_key.value if photo_openai_key else None,
+                verified.openai,
+            ),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
             (self._alibaba_key_beijing, self._alibaba_key_beijing.value, verified.alibaba_beijing),
             (
@@ -6963,8 +7056,10 @@ class SettingsView(ft.Column):
         self._chatbox_source_title.value = t("settings.chatbox_include_source")
         self._clipboard_auto_translate_title.value = t("settings.clipboard_auto_translate")
         self._photo_enabled_title.value = t("settings.photo.enabled.title")
+        self._photo_model_title.value = t("settings.photo.model.title")
         self._photo_route_title.value = t("settings.photo.route.title")
         self._photo_remaining_title.value = t("settings.photo.remaining.title")
+        self._photo_remaining_promotion.value = t("settings.photo.remaining.promotion")
         self._photo_delete_title.value = t("settings.photo.delete_translated.title")
         self._telemetry_enabled_title.value = t("settings.telemetry.title")
         self._activation_notice_title.value = t("settings.activation_notice.title")
@@ -7099,6 +7194,7 @@ class SettingsView(ft.Column):
         self._deepgram_key.apply_locale()
         self._gemini_key.apply_locale()
         self._photo_gemini_key.apply_locale()
+        self._photo_openai_key.apply_locale()
         self._elevenlabs_scribe_key.apply_locale()
         self._soniox_key.apply_locale()
         self._managed_trial_usage_bar.apply_locale()

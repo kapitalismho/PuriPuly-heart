@@ -28,7 +28,7 @@ OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
 OSC_CONNECTION_MODES: Final = ("automatic", "manual", "off")
-PHOTO_ROUTES: Final = ("managed", "chatgpt", "gemini")
+PHOTO_ROUTES: Final = ("managed", "chatgpt", "openai", "gemini")
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
@@ -785,7 +785,7 @@ class PhotoIntent:
         if not isinstance(self.enabled, bool):
             raise ValueError("photo enabled must be a boolean")
         if self.route not in PHOTO_ROUTES:
-            raise ValueError("photo route must be managed, chatgpt or gemini")
+            raise ValueError("photo route must be managed, chatgpt, openai or gemini")
         if not isinstance(self.delete_translated, bool):
             raise ValueError("photo delete_translated must be a boolean")
 

@@ -257,10 +257,12 @@ class SettingsGeneralSurfaceSlots:
 @dataclass(frozen=True, slots=True)
 class SettingsPhotoSurfaceSlots:
     enabled: ft.Control
+    model: ft.Control
     route: ft.Control
     remaining: ft.Control
     delete_translated: ft.Control
     chatgpt_account: ft.Control | None = None
+    openai_key: ft.Control | None = None
     gemini_key: ft.Control | None = None
 
 

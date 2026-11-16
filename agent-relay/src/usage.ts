@@ -217,7 +217,7 @@ export function photoPolicy(raw?: string): PhotoPolicy {
     maxBodyBytes: 4 * 1024 * 1024,
     maxOutputTokens: 8192,
     concurrency: 1,
-    allowance: 25,
+    allowance: 50,
     periodMs: 86_400_000,
     deadlineMs: 240_000,
   };

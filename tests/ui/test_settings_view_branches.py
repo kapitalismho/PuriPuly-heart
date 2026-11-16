@@ -3832,18 +3832,21 @@ def test_on_peer_stt_selected_refreshes_api_visibility_and_redraws_immediately(
 
 
 @pytest.mark.parametrize(
-    ("route", "chatgpt", "gemini", "remaining"),
+    ("route", "model", "chatgpt", "openai", "gemini", "remaining"),
     [
-        ("managed", False, False, True),
-        ("chatgpt", True, False, False),
-        ("gemini", False, True, False),
+        ("managed", "luna", False, False, False, True),
+        ("chatgpt", "luna", True, False, False, False),
+        ("openai", "luna", False, True, False, False),
+        ("gemini", "gemini", False, False, True, False),
     ],
 )
 def test_photo_route_shows_only_its_own_card(
     monkeypatch: pytest.MonkeyPatch,
     settings_events,
     route: str,
+    model: str,
     chatgpt: bool,
+    openai: bool,
     gemini: bool,
     remaining: bool,
 ) -> None:
@@ -3857,13 +3860,88 @@ def test_photo_route_shows_only_its_own_card(
 
     photo_controls = _subtab_controls(view, "photo")
     assert view._photo_chatgpt_view.card in photo_controls
+    assert view._photo_openai_card in photo_controls
     assert view._photo_gemini_card in photo_controls
     assert view._photo_remaining_card in photo_controls
     assert view._photo_chatgpt_view.card is not view._chatgpt_account_card
     assert view._photo_chatgpt_view.card.visible is chatgpt
+    assert view._photo_openai_card.visible is openai
     assert view._photo_gemini_card.visible is gemini
     assert view._photo_remaining_card.visible is remaining
+    assert view._photo_model_text.content.value == t(f"settings.photo.model.{model}")
     assert view._photo_route_text.content.value == t(f"settings.photo.route.{route}")
+    assert _row_card_titles(photo_controls[0]) == [
+        t("settings.photo.enabled.title"),
+        t("settings.photo.model.title"),
+        t("settings.photo.route.title"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("route", "options"),
+    [
+        ("chatgpt", ["managed", "chatgpt", "openai"]),
+        ("gemini", ["gemini"]),
+    ],
+)
+def test_photo_connection_choices_follow_the_selected_model(
+    monkeypatch: pytest.MonkeyPatch, settings_events, route: str, options: list[str]
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(settings.intent, photo=replace(settings.intent.photo, route=route)),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    attach_dummy_page(monkeypatch, view)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+    opened: list[tuple[list[str], str]] = []
+    descriptions: dict[str, str | None] = {}
+
+    class CapturingModal:
+        def __init__(self, page_arg, title, options, on_select, **kwargs):
+            self._values = [option.value for option in options]
+            if kwargs.get("show_description"):
+                descriptions.update({option.value: option.description for option in options})
+
+        def open(self, current: str) -> None:
+            opened.append((self._values, current))
+
+    monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view._on_photo_model_click(None)
+    view._on_photo_route_click(None)
+
+    model = "gemini" if route == "gemini" else "luna"
+    assert opened == [(["luna", "gemini"], model), (options, route)]
+    assert descriptions == {
+        option: (t("settings.photo.route.managed.description") if option == "managed" else None)
+        for option in options
+    }
+
+
+def test_photo_model_choice_switches_to_that_models_default_connection(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(settings.intent, photo=replace(settings.intent.photo, route="openai")),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    view._on_photo_model_selected("luna")
+    assert settings_events.settings.intent.photo.route == "openai"
+
+    view._on_photo_model_selected("gemini")
+    assert settings_events.settings.intent.photo.route == "gemini"
+    assert view._photo_model_text.content.value == t("settings.photo.model.gemini")
+    assert view._photo_gemini_card.visible is True
+
+    view._on_photo_model_selected("luna")
+    assert settings_events.settings.intent.photo.route == "managed"
+    assert view._photo_route_text.content.value == t("settings.photo.route.managed")
+    assert view._photo_remaining_card.visible is True
 
 
 def test_photo_remaining_card_uses_the_managed_usage_bar_with_the_daily_count(
@@ -3877,6 +3955,9 @@ def test_photo_remaining_card_uses_the_managed_usage_bar_with_the_daily_count(
     bar = view._photo_remaining_bar
     assert isinstance(bar, ManagedTrialUsageBar)
     assert _tree_contains_control(view._photo_remaining_card, bar)
+    assert _tree_contains_control(view._photo_remaining_card, view._photo_remaining_promotion)
+    assert view._photo_remaining_title.value == t("settings.photo.remaining.title")
+    assert view._photo_remaining_promotion.value == t("settings.photo.remaining.promotion")
     assert bar._remaining_text.value == t("settings.managed_trial_usage.remaining_placeholder")
 
     view.set_photo_status(PhotoStatusSnapshot(route="managed", remaining=20, allowance=25))
@@ -3912,6 +3993,20 @@ def test_photo_gemini_field_shares_the_gemini_secret(
     assert view._gemini_key.value == "synthetic-gemini"
     assert view._photo_gemini_key.value == "synthetic-gemini"
     assert saved == [("gemini_api_key", "synthetic-gemini")]
+
+
+def test_photo_openai_field_shares_the_openai_secret(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    saved = []
+    monkeypatch.setattr(view, "_on_secret_change", lambda key, value: saved.append((key, value)))
+
+    view._on_openai_secret_change("openai_api_key", "synthetic-openai")
+
+    assert view._openai_key.value == "synthetic-openai"
+    assert view._photo_openai_key.value == "synthetic-openai"
+    assert saved == [("openai_api_key", "synthetic-openai")]
 
 
 def test_speech_hint_cards_precede_api_keys_and_system_prompt_ends_translation_tab(

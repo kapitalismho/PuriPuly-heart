@@ -355,6 +355,7 @@ export const appTools = [
               "enum": [
                 "managed",
                 "chatgpt",
+                "openai",
                 "gemini"
               ]
             },
