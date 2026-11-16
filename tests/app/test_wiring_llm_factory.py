@@ -5,6 +5,7 @@ from dataclasses import asdict, replace
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
 import pytest
 
 from puripuly_heart.app.services.managed.managed_operation import new_managed_operation_id
@@ -28,7 +29,9 @@ from puripuly_heart.config.runtime_resolution import (
     resolve_llm_config,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
+from puripuly_heart.core import network_clients
+from puripuly_heart.core.error_messages import provider_failure_report
+from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider, LLMProviderRaceError
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaMetrics, ManagedGemmaResponse
 from puripuly_heart.core.managed_credential import (
@@ -389,6 +392,98 @@ def test_combined_gemma_composes_pooled_attempts_and_single_model_emergency(
             assert candidate.provider_routing == OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY
     assert first.models == ("google/gemma-4-26b-a4b-it", "google/gemma-4-31b-it")
     assert first.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("connection", "expected_api_key", "expected_source"),
+    [
+        ("managed", "issued-managed-key", "managed"),
+        ("openrouter", "synthetic-personal-key", "secret_store"),
+    ],
+)
+async def test_selected_gemma_credential_reaches_transport_and_failure_report(
+    monkeypatch: pytest.MonkeyPatch,
+    connection: str,
+    expected_api_key: str,
+    expected_source: str,
+) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    secrets = InMemorySecretStore()
+    secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, "issued-managed-key")
+    secrets.set("openrouter_api_key", "synthetic-personal-key")
+    release_service = RecordingReleaseService(RecordingManagedState())
+    requests: list[tuple[str, str, str]] = []
+    clients: list[httpx.AsyncClient] = []
+    allow_translation = False
+    translated_text = "정상적인 후속 번역"
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(
+            (request.method, str(request.url), request.headers.get("authorization", ""))
+        )
+        if not allow_translation:
+            return httpx.Response(401)
+        return httpx.Response(200, json={"choices": [{"message": {"content": translated_text}}]})
+
+    def create_client(**kwargs: object) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            **kwargs, transport=httpx.MockTransport(respond), trust_env=False
+        )
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr(network_clients, "external_async_client", create_client)
+    baseline_tasks = asyncio.all_tasks()
+    config = resolve_llm_config(
+        RuntimeResolutionInput(
+            translation=TranslationRuntimeIntent(model="gemma4_26b_31b", connection=connection)
+        )
+    )
+    provider = create_llm_provider_from_resolved_config(
+        config, secrets=secrets, managed_release_service=release_service
+    )
+    translate_kwargs = {
+        "utterance_id": uuid4(),
+        "text": "A legitimate subsequent translation.",
+        "system_prompt": "Translate {source_language} to {target_language}.",
+        "source_language": "en",
+        "target_language": "ko",
+    }
+    expected_request = (
+        "POST",
+        "https://openrouter.ai/api/v1/chat/completions",
+        f"Bearer {expected_api_key}",
+    )
+    try:
+        with pytest.raises(LLMProviderRaceError) as failure:
+            await asyncio.wait_for(provider.translate(**translate_kwargs), timeout=15)
+        diagnostics = provider_failure_report(
+            failure.value, provider="llm", operation="translate"
+        ).diagnostics
+        assert requests == [expected_request] * 3
+
+        allow_translation = True
+        translate_kwargs["utterance_id"] = uuid4()
+        result = await asyncio.wait_for(provider.translate(**translate_kwargs), timeout=5)
+        assert result.text == translated_text
+        assert result.utterance_id == translate_kwargs["utterance_id"]
+        assert requests == [expected_request] * 4
+
+        assert diagnostics.fields["provider"] == "openrouter"
+        assert diagnostics.status_code == 401
+        child_statuses = [
+            (cause.fields["provider"], cause.status_code) for cause in diagnostics.causes
+        ]
+        assert child_statuses == [("openrouter", 401)] * 3
+        child_sources = [cause.fields.get("credential_source") for cause in diagnostics.causes]
+        aggregate_source = diagnostics.fields.get("credential_source")
+        assert aggregate_source == expected_source, f"{connection=}; {child_sources=}"
+        assert child_sources == [expected_source] * 3
+    finally:
+        await provider.close()
+        assert all(client.is_closed for client in clients)
+        assert not (asyncio.all_tasks() - baseline_tasks)
 
 
 def test_combined_gemma_byok_without_key_does_not_fall_back_to_managed(
