@@ -93,7 +93,7 @@ export async function receivePhoto(
       }),
     }));
     if (upstream.ok && upstream.body && upstream.headers.get('content-type')?.split(';')[0] === 'text/event-stream') {
-      return responseStream(upstream, abort, request.signal, settle, release, context);
+      return responseStream(upstream, abort, request.signal, settle, release, context, { photo: true });
     }
     abort.abort();
     await upstream.body?.cancel();
