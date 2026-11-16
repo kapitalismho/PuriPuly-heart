@@ -7,6 +7,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from pathlib import Path
+from time import monotonic
 
 import pytest
 
@@ -160,32 +161,41 @@ def test_concurrent_process_creation_and_mutation_survive_fresh_process_reload(
         initial = EncryptedFileSecretStore(path, passphrase="synthetic")
         initial.set("unrelated", "keep")
     environment = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
-    children = [
-        subprocess.Popen(
-            [sys.executable, "-c", _PROCESS_WRITER, str(path), prefix],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=environment,
-        )
-        for prefix in ("discord", "qq", "chatgpt")
-    ]
+    children: dict[str, subprocess.Popen[str]] = {}
+    readers = ThreadPoolExecutor(max_workers=1, thread_name_prefix="secret-store-readiness")
+    failure: BaseException | None = None
     try:
-        for child in children:
-            assert child.stdout.readline().strip() == "ready"
-        for child in children:
-            child.stdin.write("open\n")
-            child.stdin.flush()
-        for child in children:
-            assert child.stdout.readline().strip() == "opened"
-        for child in children:
-            child.stdin.write("write\n")
-            child.stdin.flush()
+        for prefix in ("discord", "qq", "chatgpt"):
+            children[prefix] = subprocess.Popen(
+                [sys.executable, "-c", _PROCESS_WRITER, str(path), prefix],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=environment,
+            )
+        for phase, command in (("ready", "open\n"), ("opened", "write\n")):
+            deadline = monotonic() + 30
+            for prefix, child in children.items():
+                reading = readers.submit(child.stdout.readline)
+                try:
+                    line = reading.result(timeout=max(0, deadline - monotonic()))
+                except TimeoutError as error:
+                    raise AssertionError(
+                        f"{prefix} child (pid {child.pid}) timed out waiting for {phase!r} "
+                        "within 30s"
+                    ) from error
+                assert line.strip() == phase, (
+                    f"{prefix} child (pid {child.pid}) expected {phase!r}, "
+                    f"received {line!r}; returncode={child.poll()}"
+                )
+            for child in children.values():
+                child.stdin.write(command)
+                child.stdin.flush()
         salts = []
-        for child in children:
+        for prefix, child in children.items():
             stdout, stderr = child.communicate(timeout=30)
-            assert child.returncode == 0, stderr
+            assert child.returncode == 0, f"{prefix} child (pid {child.pid}): {stderr}"
             salts.append(json.loads(stdout)["salt"])
         assert len(set(salts)) == 1
         expected = {
@@ -219,13 +229,47 @@ print(json.dumps({key: store.get(key) for key in keys}))
             "qq-obsolete": None,
             "chatgpt-obsolete": None,
         }
+    except BaseException as error:
+        failure = error
+        raise
     finally:
-        for child in children:
-            if child.poll() is None:
-                child.kill()
-                child.communicate(timeout=10)
-            for stream in (child.stdin, child.stdout, child.stderr):
-                stream.close()
+        cleanup_errors = []
+        for prefix, child in children.items():
+            try:
+                if child.poll() is None:
+                    child.kill()
+            except Exception as error:
+                cleanup_errors.append(f"{prefix} kill: {error!r}")
+        try:
+            readers.shutdown(wait=True)
+        except Exception as error:
+            cleanup_errors.append(f"readers shutdown: {error!r}")
+        for prefix, child in children.items():
+            try:
+                stdout, stderr = child.communicate(timeout=10)
+                if failure is not None:
+                    failure.add_note(
+                        f"{prefix} child (pid {child.pid}, returncode={child.returncode}): "
+                        f"stdout={stdout!r}; stderr={stderr!r}"
+                    )
+            except Exception as error:
+                cleanup_errors.append(f"{prefix} drain: {error!r}")
+            finally:
+                try:
+                    child.wait(timeout=10)
+                except Exception as error:
+                    cleanup_errors.append(f"{prefix} reap: {error!r}")
+                for stream in (child.stdin, child.stdout, child.stderr):
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except Exception as error:
+                            cleanup_errors.append(f"{prefix} close: {error!r}")
+        if cleanup_errors:
+            message = "Child cleanup failed:\n" + "\n".join(cleanup_errors)
+            if failure is None:
+                raise AssertionError(message)
+            failure.add_note(message)
 
 
 @pytest.mark.parametrize("operation", ["get", "set", "delete", "migrate"])
