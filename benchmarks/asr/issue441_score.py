@@ -96,10 +96,21 @@ def ending_completion(words, reference_text, ending_s):
     matches = lexical_reference_matches(pieces, reference)
     if matches:
         index = next(index for index, endpoint in enumerate(ends) if endpoint == matches[0])
-        commit, word = ordered[index]
+        _, word = ordered[index]
+        start = matches[0] - len(reference)
+        participating = {id(origin): origin for position, (origin, _) in enumerate(ordered[:index + 1])
+                         if ends[position] > start}
+        revised = [origin for origin in participating.values() if not origin["committed_source_text_unchanged"]]
+        if revised:
+            return {"status": "later_text_revision_not_backdated", "delay_s": None,
+                    "revised_segments": [{key: origin.get(key) for key in (
+                        "segment_index", "text", "eventual_source_text", "arrival_s",
+                        "eventual_source_arrival_s", "evidence")} for origin in revised],
+                    "support": "At least one participating segment's eventual source text differs from its original committed receipt. Later restored text is not credited to that earlier commit."}
+        commit = max(participating.values(), key=lambda origin: origin["arrival_s"])
         return {"status": "supported", "delay_s": commit["arrival_s"] - ending_s,
                 "commit_evidence": commit["evidence"], "ending_word_end_s": word["end_s"],
-                "support": "Frozen reference text fully represented by source-ordered timed words at lexical-unit boundaries, correlated to commits only by segment index."}
+                "support": "Full frozen reference ending has timed lexical endpoint support; every participating segment's source text matches its original committed receipt. Credits the latest participating commit receipt, not delayed alignment or restored text."}
     return {"status": "reference_ending_content_not_represented" if reference else "reference_text_unavailable",
             "delay_s": None, "observed_reference_span_text": "".join(word["text"] for _, word in ordered),
             "support": "No completion latency assigned without full frozen reference-text endpoint support; substitutions, missing content, and unlocalizable timing remain unavailable."}
@@ -386,6 +397,9 @@ class Journal:
             commit["start_s"] = min((unit["start_s"] for unit in timed), default=None)
             commit["end_s"] = max((unit["end_s"] for unit in timed), default=None)
             commit["words"] = timed
+            commit["eventual_source_text"] = "".join(group["normalized_source_text"] for group in current_composition_projection(units))
+            commit["committed_source_text_unchanged"] = compact_source_text(commit["text"]) == commit["eventual_source_text"]
+            commit["eventual_source_arrival_s"] = max((unit["arrival_s"] for unit in units), default=None)
             controls = [row for row in self.events if row.get("kind") == "native_commit_control_state"
                         and row.get("raw", {}).get("segment_index") == commit["segment_index"]
                         and str(row.get("session_id", "0")) == commit["session"]]

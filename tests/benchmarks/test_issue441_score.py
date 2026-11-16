@@ -438,3 +438,95 @@ def test_full_reference_tail_preserves_legitimate_signed_timing():
     assert result["counts"]["endings_latency_eligible"] == 1
     assert result["opportunities"][0]["ending_to_commit_s"] == pytest.approx(-0.1)
     assert result["ending_to_commit"]["n"] == 1
+
+
+def exported_indexed_snapshots(data):
+    data["observations"], data["snapshots"] = [], []
+    for row in data["events"]:
+        raw = row["raw"]
+        kind = raw["message_type"]
+        if kind not in {"committed_transcript", "diarized_transcript"}:
+            continue
+        indices = []
+        for word in raw.get("words") or [{"text": raw.get("text", "")}]:
+            indices.append(len(data["observations"]))
+            data["observations"].append({
+                "arrival_s": row["arrival_s"], "segment_index": raw["segment_index"],
+                "text": word["text"], "speaker": word.get("speaker_id"),
+                "start_s": word.get("start"), "end_s": word.get("end"), "settled": True, "raw": word})
+        data["snapshots"].append({
+            "event_seq": row["seq"], "arrival_s": row["arrival_s"], "revision": row["seq"],
+            "session_id": row["session_id"], "segment_index": raw["segment_index"],
+            "snapshot_key": f"scribe:segment:{raw['segment_index']}:{'diarized' if kind == 'diarized_transcript' else kind}",
+            "operation": "replace", "observation_indices": indices})
+    return data
+
+
+def ending_reference():
+    reference = recording()
+    reference["spans"][0].update(end_s=10, text="first no")
+    reference["turn_opportunities"] = [{"id": "end", "kind": "ending", "time_s": 10,
+                                        "start_s": 10, "end_s": 10, "span_ids": ["a"],
+                                        "reference_text": "first no"}]
+    return reference
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+@pytest.mark.parametrize("revision", ["tail", "earlier-fragment"])
+def test_later_restored_text_never_backdates_original_commit_latency(exported, revision):
+    first = {"text": "first", "start": 0, "end": 4, "speaker_id": "A"}
+    tail = {"text": "no", "start": 9.5, "end": 9.8, "speaker_id": "A"}
+    if revision == "tail":
+        events = [event(0, 1, "committed_transcript", segment_index=0, text="first"),
+                  event(1, 12, "diarized_transcript", segment_index=0, words=[first, tail])]
+    else:
+        events = [event(0, 1, "committed_transcript", segment_index=0, text="wrong"),
+                  event(1, 9.9, "committed_transcript", segment_index=1, text="no"),
+                  event(2, 12, "diarized_transcript", segment_index=0, words=[first]),
+                  event(3, 12.2, "diarized_transcript", segment_index=1, words=[tail])]
+    data = run(events)
+    if exported:
+        exported_indexed_snapshots(data)
+    result = turn_score(ending_reference(), Journal(data))
+    case = result["opportunities"][0]
+    assert result["counts"]["opportunities"] == 1
+    assert result["counts"]["endings_latency_unavailable"] == 1
+    assert result["ending_to_commit"]["n"] == 0
+    assert case["ending_to_commit_s"] is None
+    assert case["ending_completion"]["status"] == "later_text_revision_not_backdated"
+    assert case["content"]["reference_contained"] is True
+    assert case["ending_completion"]["revised_segments"][0]["text"] in {"first", "wrong"}
+    assert case["ending_completion"]["revised_segments"][0]["eventual_source_arrival_s"] == 12
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+def test_unchanged_committed_text_keeps_its_receipt_time_with_delayed_alignment(exported):
+    data = run([
+        event(0, 9.9, "committed_transcript", segment_index=0, text="first no"),
+        event(1, 12, "diarized_transcript", segment_index=0, words=[
+            {"text": "first", "start": 0, "end": 4, "speaker_id": "A"},
+            {"text": "no", "start": 9.5, "end": 9.8, "speaker_id": "A"}]),
+    ])
+    if exported:
+        exported_indexed_snapshots(data)
+    result = turn_score(ending_reference(), Journal(data))
+    assert result["counts"]["endings_latency_eligible"] == 1
+    assert result["opportunities"][0]["ending_completion"]["status"] == "supported"
+    assert result["opportunities"][0]["ending_to_commit_s"] == pytest.approx(-0.1)
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+def test_multi_fragment_completion_waits_for_every_original_text_receipt(exported):
+    data = run([
+        event(0, 9.9, "committed_transcript", segment_index=1, text="no"),
+        event(1, 12, "committed_transcript", segment_index=0, text="first"),
+        event(2, 12.2, "diarized_transcript", segment_index=0, words=[
+            {"text": "first", "start": 0, "end": 4, "speaker_id": "A"}]),
+        event(3, 12.3, "diarized_transcript", segment_index=1, words=[
+            {"text": "no", "start": 9.5, "end": 9.8, "speaker_id": "A"}]),
+    ])
+    if exported:
+        exported_indexed_snapshots(data)
+    result = turn_score(ending_reference(), Journal(data))
+    assert result["counts"]["endings_latency_eligible"] == 1
+    assert result["opportunities"][0]["ending_to_commit_s"] == 2
