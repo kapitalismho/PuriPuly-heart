@@ -17,7 +17,7 @@ const PULL_M: f32 = 0.12;
 const APPROACH_SHOW_MARGIN_M: f32 = 0.10;
 const APPROACH_HIDE_MARGIN_M: f32 = 0.15;
 pub(super) const WRIST_FLOAT_M: f32 = 0.03;
-pub const DEFAULT_PHOTO_WIDTH_M: f32 = 0.4125;
+pub const DEFAULT_PHOTO_WIDTH_M: f32 = 0.45;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
