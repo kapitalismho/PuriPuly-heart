@@ -317,7 +317,7 @@ async def test_canonical_custom_realtime_native_transients_reach_fresh_completed
             ]
             assert len(audio) == 2 and len(audio[0]) == len(audio[1]) == 320
             assert audio[0] != audio[1]
-            assert env.delays == [0.8]
+            assert env.delays == ([0.8] if fault == "commit_connection" else [])
             assert not env.failures
             assert env.capture.snapshot.desired_active and env.capture.snapshot.effective_active
     finally:
@@ -610,3 +610,124 @@ async def test_soniox_startup_cleanup_debt_fences_allocation_until_explicit_reac
     finally:
         cleanup_allowed = True
         await backend.close()
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("provider_id", ["custom_realtime", "qwen_audio"])
+async def test_cloud_final_timeouts_drop_only_their_utterances_and_keep_capture(
+    channel, provider_id, monkeypatch
+):
+    from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
+    from tests.providers.test_qwen_audio import ScriptedSocket, SocketFactory, control, native
+
+    timeouts = 4
+    recovered = "Recovered after repeated final timeouts."
+    finishes = []
+
+    class QwenSocket(ScriptedSocket):
+        async def send(self, value):
+            await super().send(value)
+            if isinstance(value, bytes):
+                return
+            header = json.loads(value)["header"]
+            if header["action"] != "finish-task":
+                return
+            finishes.append(header["task_id"])
+            if len(finishes) > timeouts:
+                await self.push(native(header["task_id"], text=recovered))
+                await self.push(control(header["task_id"], "task-finished"))
+
+    class RealtimeSocket(_FakeWebSocket):
+        async def send(self, payload):
+            await super().send(payload)
+            if json.loads(payload)["type"] != "input_audio_buffer.commit":
+                return
+            finishes.append(payload)
+            if len(finishes) <= timeouts:
+                return
+            await self.push(
+                json.dumps({"type": "input_audio_buffer.committed", "item_id": "fresh"})
+            )
+            await self.push(
+                json.dumps(
+                    {
+                        "type": "conversation.item.input_audio_transcription.completed",
+                        "item_id": "fresh",
+                        "event_id": "fresh-final",
+                        "transcript": recovered,
+                    }
+                )
+            )
+
+    if provider_id == "qwen_audio":
+        sockets = SocketFactory()
+
+        class _QwenSockets(SocketFactory):
+            async def __call__(self, *args, **kwargs):
+                socket = QwenSocket()
+                sockets.sockets.append(socket)
+                return socket
+
+        websocket_factory = _QwenSockets()
+
+        async def factory(_settings, epoch):
+            backend = QwenAudioStreamingSTTBackend(
+                api_key="offline",
+                channel=channel,
+                language_hints=("en",),
+                websocket_factory=websocket_factory,
+                task_start_timeout_s=0.2,
+                task_finish_timeout_s=0.05,
+                send_timeout_s=0.2,
+            )
+            return await backend.open_session(projection=STTSessionProjection("scoped", epoch))
+
+        backend = None
+        expected_reason = "qwen_final_timeout"
+    else:
+        monkeypatch.setattr(custom_module, "_STREAM_FINAL_TIMEOUT_S", 0.02)
+
+        async def connect(*_args, **_kwargs):
+            return RealtimeSocket([], hang=True)
+
+        backend = _backend(
+            mode="realtime", compatibility="openai_realtime", websocket_connect=connect
+        )
+
+        async def factory(_settings, epoch):
+            return await backend.open_session(projection=STTSessionProjection("scoped", epoch))
+
+        expected_reason = "final_timeout"
+
+    try:
+        async with recovery_pipeline(channel, provider_id, factory) as env:
+
+            def failed_terminals():
+                return [
+                    event
+                    for event in env.events
+                    if isinstance(event, STTProviderTurnTerminal) and event.outcome == "failed"
+                ]
+
+            for order in range(timeouts):
+                await env.speak(order)
+                await wait_until(lambda order=order: len(failed_terminals()) == order + 1)
+                assert env.capture.snapshot.desired_active
+                assert env.capture.snapshot.effective_active
+            assert [event.failure_reason for event in failed_terminals()] == (
+                [expected_reason] * timeouts
+            )
+            assert all(
+                event.channel_availability is STTChannelAvailability.RECOVERING
+                for event in failed_terminals()
+            )
+            assert not env.translator.calls
+
+            await env.speak(timeouts)
+            await env.output_for(recovered)
+            assert not env.failures
+            assert env.capture.snapshot.desired_active and env.capture.snapshot.effective_active
+            assert [call.text for call in env.translator.calls] == [recovered]
+    finally:
+        if backend is not None:
+            await backend.close()

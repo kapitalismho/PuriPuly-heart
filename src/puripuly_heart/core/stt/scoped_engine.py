@@ -59,6 +59,27 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 logger = logging.getLogger(__name__)
 
+_CLOUD_TURN_PROVIDERS = frozenset(
+    {
+        "soniox",
+        "deepgram",
+        "elevenlabs_scribe",
+        "qwen_audio",
+        "custom",
+        "custom_offline",
+        "custom_realtime",
+        "rolling_free",
+    }
+)
+_FINAL_TIMEOUT_CAUSES = frozenset(
+    {
+        "provider_final_timeout",
+        "final_timeout",
+        "qwen_final_timeout",
+        "deepgram_finalize_ack_missing",
+    }
+)
+
 
 def _log_recognition_terminal(
     identity: STTProviderTurnIdentity,
@@ -2417,6 +2438,18 @@ class ScopedRecognitionEngine:
             )
         ):
             if (
+                self._utterance_final_timeout(turn.settings, terminal)
+                and terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
+                and turn.authority_generation == self._authority_generation
+                and not self._closed
+                and not self._terminal_failure_notified
+            ):
+                terminal = replace(
+                    terminal,
+                    epoch_disposition="retire",
+                    channel_availability=STTChannelAvailability.RECOVERING,
+                )
+            elif (
                 self._generic_turn_recovery(turn.settings)
                 and terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
                 and terminal.outcome in ("failed", "degraded", "expired")
@@ -2592,6 +2625,19 @@ class ScopedRecognitionEngine:
             "local_qwen_gpu",
         }
 
+    @staticmethod
+    def _utterance_final_timeout(
+        settings: AudioSegmentSettingsSnapshot | str,
+        terminal: STTProviderTurnTerminal | STTProviderInputTerminal,
+    ) -> bool:
+        provider_id = settings if isinstance(settings, str) else settings.provider_id
+        return (
+            provider_id in _CLOUD_TURN_PROVIDERS
+            and isinstance(terminal, STTProviderTurnTerminal)
+            and terminal.outcome in ("failed", "degraded")
+            and (terminal.failure_reason or "").partition(":")[0] in _FINAL_TIMEOUT_CAUSES
+        )
+
     def _account_resource_failure(
         self, turn: _ActiveTurn, terminal: STTProviderTurnTerminal
     ) -> None:
@@ -2600,6 +2646,7 @@ class ScopedRecognitionEngine:
             or terminal.channel_availability is not STTChannelAvailability.UNAVAILABLE
             or turn.independent_recognition
             or not self._generic_turn_recovery(turn.settings)
+            or self._utterance_final_timeout(turn.settings, terminal)
             or turn.authority_generation != self._authority_generation
         ):
             return
