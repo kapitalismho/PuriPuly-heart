@@ -672,27 +672,48 @@ def at_anchor(units, anchor, recording, activity=False):
         return {"state": "missing_speaker", "detail": "conflicting_simultaneous_ids"}
     if usable:
         return {"state": "missing_speaker"}
-    span = next(span for span in recording["spans"] if span["id"] == anchor["span_id"])
+    if activity:
+        return {"state": "missing_speaker", "detail": "no_usable_activity_identity_at_anchor"}
+    text_units = [unit for unit in units if source_lexical_unit(unit)]
     untimed = [
         unit
-        for unit in units
-        if lexical(unit.get("text"))
-        and (not number(unit.get("start_s")) or not number(unit.get("end_s")))
+        for unit in text_units
+        if not number(unit.get("start_s"))
+        or not number(unit.get("end_s"))
+        or unit["end_s"] <= unit["start_s"]
     ]
-    if untimed:
+    local_untimed = [
+        unit
+        for unit in untimed
+        if any(
+            number(source.get("start_s"))
+            and number(source.get("end_s"))
+            and source["start_s"] <= t < source["end_s"]
+            for source in unit.get("source_ranges", [])
+        )
+    ]
+    if local_untimed:
         return {
             "state": "missing_timing",
-            "detail": "untimed_text_cannot_be_localized_to_reference_span",
+            "detail": "explicit_source_range_covers_anchor_but_word_alignment_unusable",
+            "evidence": local_untimed[0].get("evidence"),
+        }
+    if not text_units:
+        return {
+            "state": "missing_text",
+            "detail": "no_lexical_text_received_by_cutoff",
+            "reference_span": anchor["span_id"],
         }
     return {
-        "state": "missing_text" if not activity else "missing_speaker",
-        "reference_span": span["id"],
+        "state": "no_timed_text_coverage",
+        "detail": "text_exists_but_anchor_local_cause_unsupported",
+        "session_has_untimed_text": bool(untimed),
     }
 
 
 def counts(rows):
     result = dict(Counter(row["outcome"] for row in rows))
-    for reason in ("missing_text", "missing_timing", "missing_speaker"):
+    for reason in ("missing_text", "missing_timing", "missing_speaker", "no_timed_text_coverage"):
         result.setdefault(reason, 0)
     n = len(rows)
     assigned = result.get("correct", 0) + result.get("wrong", 0)
@@ -1037,12 +1058,34 @@ def span_edge(units, span, edge, activity):
         and (activity or lexical(unit.get("text")))
     ]
     if not candidates:
-        return {"state": "missing_text" if not activity else "missing_speaker"}
-    selected = (
-        min(candidates, key=lambda row: row["start_s"])
-        if edge == "first"
-        else max(candidates, key=lambda row: row["end_s"])
+        return {
+            "state": (
+                "missing_speaker"
+                if activity
+                else (
+                    "no_timed_text_coverage"
+                    if any(source_lexical_unit(unit) for unit in units)
+                    else "missing_text"
+                )
+            )
+        }
+    endpoint_key = "start_s" if edge == "first" else "end_s"
+    endpoint = (min if edge == "first" else max)(unit[endpoint_key] for unit in candidates)
+    tied = [unit for unit in candidates if unit[endpoint_key] == endpoint]
+    priority = max(
+        bool(unit.get("settled")) and unit.get("segment_index") is not None for unit in tied
     )
+    tied = [
+        unit
+        for unit in tied
+        if (bool(unit.get("settled")) and unit.get("segment_index") is not None) == priority
+    ]
+    newest = max(unit["arrival_s"] for unit in tied)
+    tied = [unit for unit in tied if unit["arrival_s"] == newest]
+    identities = {(unit["session"], unit.get("speaker")) for unit in tied}
+    if len(identities) != 1:
+        return {"state": "missing_speaker", "detail": "conflicting_exact_edge_identities"}
+    selected = tied[0]
     if selected.get("speaker") is None:
         return {"state": "missing_speaker", "evidence": selected.get("evidence")}
     return {
@@ -1051,6 +1094,7 @@ def span_edge(units, span, edge, activity):
         "speaker": selected["speaker"],
         "evidence": selected.get("evidence"),
         "source_interval_s": [selected["start_s"], selected["end_s"]],
+        "selection": "indexed_settled_then_latest_receipt_at_exact_endpoint",
     }
 
 
@@ -1575,9 +1619,9 @@ def caption_structure(run, recording, journal, mapping):
                 "source_span_id": change.get("source_span_id"),
                 "target_span_id": change.get("target_span_id"),
                 "available": bool(a and b),
-                "joined": bool(a & b),
-                "harmful_cross_speaker_join": bool(a & b) and different,
-                "native_missed_change": change["missed_change"],
+                "same_flow_at_selected_envelopes": bool(a & b),
+                "cross_speaker_envelope_candidate": bool(a & b) and different,
+                "native_edge_same_id_probe": change["missed_change"],
             }
         )
     fragmentation = []
@@ -1608,17 +1652,17 @@ def caption_structure(run, recording, journal, mapping):
             "caption_preparations": len(exports.get("captions", [])),
             "final_outputs": len(finals),
             "targets_with_final_revisions": sum(value > 1 for value in revisions.values()),
-            "harmful_cross_speaker_joins": sum(
-                row["harmful_cross_speaker_join"] for row in composition
+            "cross_speaker_envelope_candidates": sum(
+                row["cross_speaker_envelope_candidate"] for row in composition
             ),
-            "fragmented_reference_spans": sum(
+            "fragmented_reference_span_probes": sum(
                 row["unnecessary_fragmentation_probe"] for row in fragmentation
             ),
         },
         "composition": composition,
         "fragmentation": fragmentation,
         "groups": [{key: value for key, value in row.items() if key != "units"} for row in groups],
-        "limit": "Structural controlled-MT replay, not actual MT or GUI latency. Native map reused, no caption remapping. Source speaker-run envelopes can include gaps; fragmentation is a probe, not adjudicated unnecessary output. RGB is not speaker truth.",
+        "limit": "Envelope candidate probes, not established harmful joins or provider accuracy. Source-run bounds can spill across reference boundaries or fill gaps between native tokens; corroborate raw group/request/caption IDs before attributing harm. Broad-envelope assigned coverage is not recovered ASR text. Structural controlled-MT replay is not actual MT/GUI latency; RGB is not speaker truth.",
     }
 
 
@@ -1779,8 +1823,10 @@ def representative_cases(arms):
                     candidates.append({**prefix, "kind": "late_regrouping", "case": case})
             caption = result.get("caption_structure") or {}
             for case in caption.get("composition", []):
-                if case["harmful_cross_speaker_join"]:
-                    candidates.append({**prefix, "kind": "caption_join", "case": case})
+                if case["cross_speaker_envelope_candidate"]:
+                    candidates.append(
+                        {**prefix, "kind": "caption_envelope_candidate", "case": case}
+                    )
     selected = []
     for candidate in candidates:
         if candidate["kind"] not in {row["kind"] for row in selected}:
@@ -1820,6 +1866,12 @@ def score(manifest, runs_root):
         "frozen_at": manifest["frozen_at"],
         "mapping_method": MAPPING_METHOD,
         "anchor_policy": "All frozen anchors remain eligible in connected sessions, including missing text/timing/identity. N is activity-only. Unconnected sessions are unrun, not model failures.",
+        "unassigned_reason_policy": {
+            "missing_text": "No lexical text evidence received anywhere in this session view; not an anchor-local lexical-recall estimate.",
+            "missing_timing": "Untimed or unusably timed lexical evidence has an explicit source range containing this anchor.",
+            "missing_speaker": "Timed text covers the anchor but identity is absent/conflicting; N instead has no usable activity identity.",
+            "no_timed_text_coverage": "Text exists, but no usable timed lexical unit covers the fixed anchor and the local cause is unsupported. This does not establish missing recognition or justify interpolation.",
+        },
         "arms": arms,
         "comparisons": comparisons(arms),
         "representative_cases": representative_cases(arms),

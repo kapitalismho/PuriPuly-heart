@@ -118,7 +118,7 @@ def test_identical_text_correlates_only_by_segment_index():
     assert journal.snapshot(4)[0]["speaker"] is None
     assert (
         score_recording(recording(), run(events))["views"]["online"]["anchors"][0]["outcome"]
-        == "missing_timing"
+        == "no_timed_text_coverage"
     )
 
 
@@ -126,7 +126,10 @@ def test_identical_text_correlates_only_by_segment_index():
     "case,expected",
     [
         ([], "missing_text"),
-        ([event(0, 0.8, "committed_transcript", segment_index=0, text="no")], "missing_timing"),
+        (
+            [event(0, 0.8, "committed_transcript", segment_index=0, text="no")],
+            "no_timed_text_coverage",
+        ),
         ([diarized(0, 0.8, 0, 0, None)], "missing_speaker"),
     ],
 )
@@ -471,7 +474,7 @@ def test_caption_composition_reuses_native_map_and_obeys_output_cutoff():
     assert result["views"]["eventual"]["counts"]["correct"] == 2
     assert caption["views"]["online"]["anchors"][0]["outcome"] == "missing_text"
     assert caption["views"]["eventual"]["anchors"][1]["outcome"] == "wrong"
-    assert caption["counts"]["harmful_cross_speaker_joins"] == 1
+    assert caption["counts"]["cross_speaker_envelope_candidates"] == 1
 
 
 def test_cap_context_and_empty_commits_never_count_as_useful_output():
@@ -514,7 +517,7 @@ def test_cap_context_and_empty_commits_never_count_as_useful_output():
     assert result["opportunities"][0]["cap_eof_context_excluded_from_useful"]
 
 
-def test_text_only_partial_snapshot_is_missing_timing_not_missing_text():
+def test_text_only_partial_snapshot_has_unsupported_local_coverage_not_missing_text():
     data = run([event(0, 0.8, "partial_transcript", text="no")])
     data["snapshots"] = [
         {
@@ -530,7 +533,7 @@ def test_text_only_partial_snapshot_is_missing_timing_not_missing_text():
     ]
     result = score_recording(recording(), data)
     assert result["views"]["online"]["counts"]["eligible"] == 3
-    assert result["views"]["online"]["anchors"][0]["outcome"] == "missing_timing"
+    assert result["views"]["online"]["anchors"][0]["outcome"] == "no_timed_text_coverage"
 
 
 def test_frozen_identity_anchor_remains_eligible_without_reference_transcript():
@@ -860,7 +863,11 @@ def exported_indexed_snapshots(data):
     for row in data["events"]:
         raw = row["raw"]
         kind = raw["message_type"]
-        if kind not in {"committed_transcript", "diarized_transcript"}:
+        if kind not in {
+            "committed_transcript",
+            "committed_transcript_with_timestamps",
+            "diarized_transcript",
+        }:
             continue
         indices = []
         for word in raw.get("words") or [{"text": raw.get("text", "")}]:
@@ -868,7 +875,7 @@ def exported_indexed_snapshots(data):
             data["observations"].append(
                 {
                     "arrival_s": row["arrival_s"],
-                    "segment_index": raw["segment_index"],
+                    "segment_index": raw.get("segment_index"),
                     "text": word["text"],
                     "speaker": word.get("speaker_id"),
                     "start_s": word.get("start"),
@@ -883,8 +890,12 @@ def exported_indexed_snapshots(data):
                 "arrival_s": row["arrival_s"],
                 "revision": row["seq"],
                 "session_id": row["session_id"],
-                "segment_index": raw["segment_index"],
-                "snapshot_key": f"scribe:segment:{raw['segment_index']}:{'diarized' if kind == 'diarized_transcript' else kind}",
+                "segment_index": raw.get("segment_index"),
+                "snapshot_key": (
+                    f"scribe:segment:{raw['segment_index']}:{'diarized' if kind == 'diarized_transcript' else kind}"
+                    if raw.get("segment_index") is not None
+                    else f"scribe:unindexed:{row['seq']}"
+                ),
                 "operation": "replace",
                 "observation_indices": indices,
             }
@@ -993,3 +1004,137 @@ def test_multi_fragment_completion_waits_for_every_original_text_receipt(exporte
     result = turn_score(ending_reference(), Journal(data))
     assert result["counts"]["endings_latency_eligible"] == 1
     assert result["opportunities"][0]["ending_to_commit_s"] == 2
+
+
+def test_unrelated_zero_duration_token_cannot_relabel_a_known_word_timing_gap():
+    words = [
+        {
+            "arrival_s": 0.8,
+            "start_s": 0,
+            "end_s": 0.4,
+            "text": "known",
+            "speaker": "A",
+            "settled": True,
+        },
+        {
+            "arrival_s": 0.8,
+            "start_s": 0.6,
+            "end_s": 1,
+            "text": "text",
+            "speaker": "A",
+            "settled": True,
+        },
+    ]
+    before = score_recording(recording(), run(arm="S0", observations=words))
+    words.append(
+        {
+            "arrival_s": 0.9,
+            "start_s": 10,
+            "end_s": 10,
+            "text": "elsewhere",
+            "speaker": "A",
+            "settled": True,
+            "source_ranges": [],
+        }
+    )
+    after = score_recording(recording(), run(arm="S0", observations=words))
+    for view in ("online", "eventual"):
+        left, right = before["views"][view], after["views"][view]
+        assert (
+            left["anchors"][0]["outcome"]
+            == right["anchors"][0]["outcome"]
+            == "no_timed_text_coverage"
+        )
+        assert left["counts"]["eligible"] == right["counts"]["eligible"] == 3
+        assert left["counts"]["assigned"] == right["counts"]["assigned"] == 0
+
+
+def test_missing_timing_requires_explicit_source_localization_not_session_text():
+    observation = {
+        "arrival_s": 0.8,
+        "start_s": None,
+        "end_s": None,
+        "text": "no",
+        "speaker": None,
+        "settled": True,
+    }
+    unsupported = score_recording(recording(), run(observations=[observation]))
+    assert unsupported["views"]["eventual"]["anchors"][0]["outcome"] == "no_timed_text_coverage"
+    localized = {**observation, "source_ranges": [{"start_s": 0, "end_s": 1}]}
+    supported = score_recording(recording(), run(observations=[localized]))
+    assert supported["views"]["eventual"]["anchors"][0]["outcome"] == "missing_timing"
+    assert supported["views"]["eventual"]["anchors"][1]["outcome"] == "no_timed_text_coverage"
+    assert supported["views"]["eventual"]["counts"]["eligible"] == 3
+
+
+@pytest.mark.parametrize("exported", [False, True], ids=["raw", "exported"])
+@pytest.mark.parametrize(
+    "later_identity", [False, True], ids=["stays-unknown", "late-indexed-identity"]
+)
+def test_change_edges_use_receive_ordered_indexed_identity_without_future_repair(
+    exported, later_identity
+):
+    events = [
+        event(0, 0.8, "committed_transcript", segment_index=0, text="no"),
+        event(
+            1,
+            0.9,
+            "committed_transcript_with_timestamps",
+            words=[{"text": "no", "start": 0, "end": 1, "speaker_id": None}],
+        ),
+        diarized(2, 1.1, 0, 0, "left"),
+        event(3, 2.8, "committed_transcript", segment_index=1, text="no"),
+        event(
+            4,
+            2.9,
+            "committed_transcript_with_timestamps",
+            words=[{"text": "no", "start": 2, "end": 3, "speaker_id": None}],
+        ),
+        event(6, 4.8, "committed_transcript", segment_index=2, text="yes"),
+        event(
+            7,
+            4.9,
+            "committed_transcript_with_timestamps",
+            words=[{"text": "yes", "start": 4, "end": 5, "speaker_id": None}],
+        ),
+        diarized(8, 5.5, 2, 4, "left", "yes"),
+    ]
+    if later_identity:
+        events.append(diarized(5, 4.5, 1, 2, "right"))
+    data = run(events)
+    if exported:
+        exported_indexed_snapshots(data)
+    reference = recording()
+    reference["changes"] = [
+        {
+            "id": "change",
+            "time_s": 2,
+            "from_speaker": "A",
+            "to_speaker": "B",
+            "source_span_id": "a",
+            "target_span_id": "b",
+            "kind": "speaker_change",
+        },
+        {
+            "id": "return",
+            "time_s": 4,
+            "from_speaker": "B",
+            "to_speaker": "A",
+            "source_span_id": "b",
+            "target_span_id": "c",
+            "kind": "return",
+        },
+    ]
+    result = score_recording(reference, data)
+    changes = {(row["id"], row["view"]): row for row in result["changes"]}
+    assert len(result["changes"]) == 4
+    assert changes["change", "online"]["status"] == "unavailable"
+    assert changes["change", "online"]["evidence"][1]["state"] == "missing_speaker"
+    if later_identity:
+        assert result["mapping"] == {"session": {"left": "A", "right": "B"}}
+        assert changes["change", "eventual"]["correct_identity_pair"] is True
+        assert changes["return", "online"]["correct_identity_pair"] is True
+        assert changes["return", "eventual"]["correct_identity_pair"] is True
+    else:
+        assert changes["change", "eventual"]["status"] == "unavailable"
+        assert changes["return", "eventual"]["status"] == "unavailable"
