@@ -18,7 +18,7 @@ fn input(
 }
 
 fn kept(id: u64) -> serde_json::Value {
-    json!({"block_id":id,"bbox":[1.25,2.5,100.5,50.25],"source":"Brand 123","translation":"Brand 123"})
+    json!({"block_id":id,"quad":[[1.25,2.5],[100.5,2.5],[100.5,50.25],[1.25,50.25]],"source":"Brand 123","translation":"Brand 123"})
 }
 
 #[test]
@@ -94,8 +94,8 @@ fn bbox_candidate_does_not_invent_source_geometry_and_missing_model_is_explicit_
         model_path: Some("missing-selected-model.onnx".into()),
         ..Default::default()
     });
-    let bbox = json!([{"block_id":0,"bbox":[10,10,100,50],"source":null,"source_line_count":null}]);
-    let snapshot = input(1, 1, json!([]), bbox);
+    let quad = json!([{"block_id":0,"quad":[[10,10],[100,10],[100,50],[10,50]],"source":null,"source_line_count":null}]);
+    let snapshot = input(1, 1, json!([]), quad);
     let mut candidate = false;
     pipeline
         .process(
@@ -123,7 +123,7 @@ fn bbox_candidate_does_not_invent_source_geometry_and_missing_model_is_explicit_
         2,
         1,
         json!([]),
-        json!([{"block_id":0,"bbox":[10,10,100,50],"source":"A\nB","source_line_count":2}]),
+        json!([{"block_id":0,"quad":[[10,10],[100,10],[100,50],[10,50]],"source":"A\nB","source_line_count":2}]),
     );
     let result = pipeline.process(
         &source,
@@ -197,7 +197,7 @@ fn pipeline_with_pending_region() -> (ImagePipeline, Arc<image::RgbImage>) {
 }
 
 fn source_preparation(id: u64) -> serde_json::Value {
-    json!({"block_id":id,"bbox":[10,10,70,40],"source":"SOURCE","source_line_count":1})
+    json!({"block_id":id,"quad":[[10,10],[70,10],[70,40],[10,40]],"source":"SOURCE","source_line_count":1})
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn hidden_erase_refresh_reuses_mask_and_only_current_successful_text_commits() {
     let snapshot = input(
         2,
         1,
-        json!([{"block_id":1,"bbox":[10,10,70,40],"source":"SOURCE","translation":"Translated"}]),
+        json!([{"block_id":1,"quad":[[10,10],[70,10],[70,40],[10,40]],"source":"SOURCE","translation":"Translated"}]),
         json!([]),
     );
     let calls = Cell::new(0);
@@ -659,8 +659,8 @@ fn terminal_translated_blocks_keep_renderable_layouts_after_processing_is_retire
         2,
         1,
         json!([
-            {"block_id":99,"bbox":[10,10,70,40],"source":"SOURCE","translation":"한글"},
-            {"block_id":3,"bbox":[10,10,70,40],"source":"SOURCE","translation":"번역"}
+            {"block_id":99,"quad":[[10,10],[70,10],[70,40],[10,40]],"source":"SOURCE","translation":"한글"},
+            {"block_id":3,"quad":[[10,10],[70,10],[70,40],[10,40]],"source":"SOURCE","translation":"번역"}
         ]),
         json!([source_preparation(100)]),
     );

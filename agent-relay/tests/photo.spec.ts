@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import legacyContract from '../src/photo-contract.json';
+import quadContract from '../src/photo-quad-contract.json';
 import relay from '../src/index';
 import { checkPhotoAllowance, photoPolicy } from '../src/usage';
 import { accountingDatabase, installationHash, relayEvents, responseEvents, signToken, tokenSecret } from './fixtures';
@@ -16,6 +18,16 @@ function request(value: unknown = body, claims = {}) {
 function environment(db: D1Database) {
   return { AGENT_USAGE_DB: db, PURI_TOKEN_SECRET: tokenSecret, OPENAI_API_KEY: 'server-only-key', PHOTO_SERVICE_ENABLED: 'true' };
 }
+function message(id = 'answer', phase: string | null = 'final_answer', text = '') {
+  return { id, type: 'message', role: 'assistant', phase, content: [{ type: 'output_text', text }] };
+}
+function item(value = message(), index = 0, done = false) {
+  return { type: done ? 'response.output_item.done' : 'response.output_item.added', output_index: index, item: value };
+}
+function delta(text: string, id = 'answer', index = 0) {
+  return { type: 'response.output_text.delta', item_id: id, output_index: index, content_index: 0, delta: text };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -77,6 +89,67 @@ The image is ${text} pixels.`);
     expect(upstream.mock.calls.length).toBe(calls);
     sqlite.close();
   });
+  it.each([1, 2, 3])('preserves protocol %s geometry, JPEG upload and one settled request', async (version) => {
+    const { db, sqlite } = accountingDatabase();
+    const geometry = version === 3
+      ? { quad: [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]] }
+      : { bbox: [0, 0, 100, 100] };
+    const block = { ...geometry, source: 'one\nunknown ?', translation: '하나\n?' };
+    const text = JSON.stringify({ blocks: [block] });
+    const upstream = vi.fn().mockResolvedValue(responseEvents(result, [
+      { type: 'response.output_text.delta', delta: text },
+    ]));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const value = { ...body, photo_protocol: version, ...(version === 1 ? {} : { image_size: [720, 1280] }) };
+      const response = await relay.fetch(request(value), environment(db));
+      expect(response.status).toBe(200);
+      const events = await relayEvents(response);
+      expect(events.map((event) => event.type)).toEqual(['text_delta', 'completed']);
+      expect(JSON.parse(events[0].text as string).blocks).toEqual([block]);
+      expect(upstream).toHaveBeenCalledTimes(1);
+      const sent = JSON.parse(upstream.mock.calls[0][1].body);
+      const contract = version === 3 ? quadContract : legacyContract;
+      expect(sent.text.format.schema).toEqual(contract.schema);
+      expect(sent.text.format.schema.properties.blocks.items.required).toEqual([
+        version === 3 ? 'quad' : 'bbox', 'source', 'translation',
+      ]);
+      expect(sent.text.format.schema.properties.blocks.items.properties).toEqual(version === 3 ? {
+        quad: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, minItems: 4, maxItems: 4 },
+        source: { type: 'string' }, translation: { type: 'string' },
+      } : {
+        bbox: { type: 'array', items: { type: 'integer' }, minItems: 4, maxItems: 4 },
+        source: { type: 'string' }, translation: { type: 'string' },
+      });
+      expect(sent.instructions).toBe(contract.instructions.replaceAll('${targetName}', 'Korean'));
+      expect(sent.input[0].content[0]).toEqual({ type: 'input_image', image_url: `data:image/jpeg;base64,${body.image_base64}` });
+      expect(sent.input[0].content[1].text).toContain(version === 1 ? '1280x720' : '720x1280');
+      expect(sqlite.prepare('SELECT settled, output_tokens FROM photo_admissions').get()).toMatchObject({ settled: 1, output_tokens: 2556 });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('rejects invalid v3 canvases, retired versions and non-JPEG input before admission', async () => {
+    const { db, sqlite } = accountingDatabase();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const current = { ...body, photo_protocol: 3, image_size: [1280, 720] };
+      for (const invalid of [
+        { ...current, image_size: [1920, 1080] }, { ...current, image_size: undefined },
+        { ...current, photo_protocol: true }, { ...current, photo_protocol: 4 },
+        { ...current, image_base64: 'iVBORw0KGgo=' }, { ...current, image_base64: '/9j/AAA!' },
+      ]) {
+        expect((await relay.fetch(request(invalid), environment(db))).status).toBe(400);
+      }
+      expect(upstream).not.toHaveBeenCalled();
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions').get()!.n).toBe(0);
+    } finally {
+      sqlite.close();
+    }
+  });
+
 
   it('rejects model, endpoint, nested config and invalid tokens before admission or upstream work', async () => {
     const { db, sqlite } = accountingDatabase();
@@ -226,7 +299,9 @@ The image is ${text} pixels.`);
     let signal: AbortSignal | undefined;
     const upstream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"{"}\n\n'));
+        controller.enqueue(new TextEncoder().encode(
+          [item(), delta('{')].map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''),
+        ));
       },
       cancel() { cancelled = true; },
     });
@@ -265,5 +340,97 @@ The image is ${text} pixels.`);
     expect((await relay.fetch(request(), environment(db))).status).toBe(409);
     expect(upstream).toHaveBeenCalledTimes(1);
     sqlite.close();
+  });
+});
+
+describe('photo structured-answer message selection', () => {
+  it.each([
+    [1, '{"blocks": invalid'], [1, '{"blocks":[]}'],
+    [2, '{"blocks": invalid'], [2, '{"blocks":[]}'],
+    [3, '{"blocks": invalid'], [3, '{"blocks":[]}'],
+  ] as const)('streams only final blocks before terminal completion for protocol %s (%s)', async (version, commentary) => {
+    const { db, sqlite } = accountingDatabase();
+    let controller: ReadableStreamDefaultController<Uint8Array>;
+    const upstream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    const emit = (event: unknown) => controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
+    const fetch = vi.fn().mockResolvedValue(new Response(upstream, { headers: { 'content-type': 'text/event-stream' } }));
+    vi.stubGlobal('fetch', fetch);
+    const block = {
+      ...(version === 3 ? { quad: [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]] } : { bbox: [0, 0, 100, 100] }),
+      source: 'FINAL\n?', translation: '최종\n?',
+    };
+    const first = '{"blocks":[' + JSON.stringify(block);
+    const comment = message('comment', 'commentary', commentary);
+    const final = message('answer', 'final_answer', first + ']}');
+    const response = await relay.fetch(request({
+      ...body, photo_protocol: version, ...(version === 1 ? {} : { image_size: [1280, 720] }),
+    }), environment(db));
+    const reader = response.body!.getReader();
+    const read = async () => JSON.parse(new TextDecoder().decode((await reader.read()).value).slice(6));
+    try {
+      for (const event of [item(comment), delta(commentary, 'comment'), item(comment, 0, true), item(final, 1), delta(first, 'answer', 1)]) emit(event);
+      expect(await read()).toEqual({ type: 'text_delta', text: first });
+      expect(sqlite.prepare('SELECT settled FROM photo_admissions').get()!.settled).toBe(0);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      emit(delta(']}', 'answer', 1));
+      emit(item(final, 1, true));
+      emit({ type: 'response.completed', response: { ...result, output: [comment, final] } });
+      expect(await read()).toEqual({ type: 'text_delta', text: ']}' });
+      expect((await read()).type).toBe('completed');
+      expect((await reader.read()).done).toBe(true);
+      expect(sqlite.prepare('SELECT settled, output_tokens FROM photo_admissions').get()).toMatchObject({ settled: 1, output_tokens: 2556 });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      await reader.cancel();
+      sqlite.close();
+    }
+  });
+
+  it.each([null, 'final_answer'])('accepts a single initially unphased answer finalized as %s', async (terminalPhase) => {
+    const { db, sqlite } = accountingDatabase();
+    const text = '{"blocks":[]}';
+    const unphased = message('answer', null, text);
+    const fetch = vi.fn().mockResolvedValue(responseEvents({ ...result, output: [{ ...unphased, phase: terminalPhase }] }, [
+      item(unphased), delta(text),
+    ]));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const events = await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 3, image_size: [1280, 720] }), environment(db)));
+      expect(events.map((event) => event.type)).toEqual(['text_delta', 'completed']);
+      expect(events[0].text).toBe(text);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(sqlite.prepare('SELECT settled FROM photo_admissions').get()!.settled).toBe(1);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  const comment = message('comment', 'commentary', '{"blocks":[]}');
+  const unphased = message('answer', null, '{"blocks":[]}');
+  const other = message('other', null, '{"blocks":[]}');
+  it.each([
+    { name: 'commentary-only', events: [item(comment), delta('{"blocks":[]}', 'comment')], output: [comment] },
+    { name: 'two unphased answers', events: [item(unphased), delta('{"blocks":[]}'), item(other, 1), delta('{"blocks":[]}', 'other', 1)], output: [unphased, other] },
+    { name: 'wrong item identity', events: [item(comment), delta('{"blocks":[]}', 'wrong')], output: [] },
+    { name: 'missing item identity', events: [item(comment), { type: 'response.output_text.delta', delta: '{"blocks":[]}' }], output: [] },
+    { name: 'two explicit final answers', events: [item(), item(message('other'), 1)], output: [] },
+    { name: 'delta before item metadata', events: [delta('{"blocks":[]}'), item()], output: [] },
+    { name: 'wrong content index', events: [item(unphased), { ...delta('{"blocks":[]}'), content_index: 1 }], output: [] },
+    { name: 'changed phase', events: [item(comment), item({ ...comment, phase: 'final_answer' }, 0, true)], output: [] },
+    { name: 'anonymous ambiguous output', events: [{ type: 'response.output_text.delta', delta: '{"blocks":[]}{"blocks":[]}' }], output: [comment, message()] },
+    { name: 'commentary plus unphased message', events: [item(comment), item(unphased, 1), delta('{"blocks":[]}', 'answer', 1)], output: [comment, unphased] },
+  ])('rejects $name without publishing structured text or replaying', async ({ events, output }) => {
+    const { db, sqlite } = accountingDatabase();
+    const fetch = vi.fn().mockResolvedValue(responseEvents({ ...result, output }, events));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      expect(await relayEvents(await relay.fetch(request({ ...body, photo_protocol: 3, image_size: [1280, 720] }), environment(db)))).toEqual([
+        { type: 'error', error: { code: 'upstream_invalid_response' } },
+      ]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions WHERE settled = 1').get()!.n).toBe(1);
+    } finally {
+      sqlite.close();
+    }
   });
 });

@@ -147,3 +147,22 @@ describe('upstream response streaming', () => {
     expect(database.writes[0][9]).toBe(1);
   });
 });
+
+it('keeps commentary and final-answer chat deltas visible outside the photo endpoint', async () => {
+  const database = usageDatabase();
+  const comment = { id: 'comment', type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text: 'Working. ' }] };
+  const final = { id: 'answer', type: 'message', role: 'assistant', phase: 'final_answer', content: [{ type: 'output_text', text: 'Ready.' }] };
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(responseEvents({ ...terminal(), output: [comment, final] }, [
+    { type: 'response.output_item.added', output_index: 0, item: comment },
+    { type: 'response.output_text.delta', item_id: 'comment', output_index: 0, content_index: 0, delta: 'Working. ' },
+    { type: 'response.output_item.added', output_index: 1, item: final },
+    { type: 'response.output_text.delta', item_id: 'answer', output_index: 1, content_index: 0, delta: 'Ready.' },
+  ]));
+  const events = await relayEvents(await relay.fetch(request(), { ...testEnv(), AGENT_USAGE_DB: database.db }));
+  expect(events.slice(0, 2)).toEqual([
+    { type: 'text_delta', text: 'Working. ' },
+    { type: 'text_delta', text: 'Ready.' },
+  ]);
+  expect(events.at(-1)?.type).toBe('completed');
+  expect(database.writes).toHaveLength(1);
+});

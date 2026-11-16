@@ -1,3 +1,4 @@
+import { PhotoResponseOutput } from './photo-output';
 import { isRecord } from './type-guards';
 
 type Settlement = (result: unknown) => Promise<void>;
@@ -41,8 +42,10 @@ export function responseStream(
   settle: Settlement,
   release: () => void,
   context?: Pick<ExecutionContext, 'waitUntil'>,
+  options: { photo?: boolean } = {},
 ): Response {
   const reader = upstream.body!.getReader();
+  const photoOutput = options.photo ? new PhotoResponseOutput() : undefined;
   const encoder = new TextEncoder();
   let cancelled = false;
   let downstreamCancelled = false;
@@ -70,14 +73,18 @@ export function responseStream(
           for await (const event of upstreamEvents(reader)) {
             if (cancelled) break;
             if (!isRecord(event)) throw new Error('upstream_invalid_response');
+            const selected = photoOutput?.accept(event);
+            if (selected) emit({ type: 'text_delta', text: selected });
             if (event.type === 'response.output_text.delta') {
               if (typeof event.delta !== 'string') throw new Error('upstream_invalid_response');
-              emit({ type: 'text_delta', text: event.delta });
+              if (!photoOutput) emit({ type: 'text_delta', text: event.delta });
             } else if (['response.completed', 'response.incomplete', 'response.failed'].includes(event.type as string)) {
               result = event.response;
               if (!isRecord(result) || result.object !== 'response' || !Array.isArray(result.output)) {
                 throw new Error('upstream_invalid_response');
               }
+              const pending = event.type === 'response.completed' ? photoOutput?.finish(result) : undefined;
+              if (pending) emit({ type: 'text_delta', text: pending });
               abort.abort();
               await reader.cancel().catch(() => {});
               if (event.type === 'response.failed') throw new Error('upstream_unavailable');

@@ -1,18 +1,16 @@
 from puripuly_heart.core.photo.parsing import (
-    BBox,
-    BboxReady,
     BlockComplete,
     PhotoBlock,
     PhotoBlockParser,
     PhotoParseError,
     PhotoParseEvent,
+    Quad,
+    QuadReady,
     SourceReady,
 )
 from puripuly_heart.core.photo.prompt import PhotoPrompt, render_photo_prompt
 
 __all__ = [
-    "BBox",
-    "BboxReady",
     "BlockComplete",
     "PhotoBlock",
     "PhotoBlockParser",
@@ -20,5 +18,7 @@ __all__ = [
     "PhotoParseEvent",
     "PhotoPrompt",
     "SourceReady",
+    "Quad",
+    "QuadReady",
     "render_photo_prompt",
 ]

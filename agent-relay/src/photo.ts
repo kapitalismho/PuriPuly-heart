@@ -1,4 +1,5 @@
-import contract from './photo-contract.json';
+import legacyContract from './photo-contract.json';
+import quadContract from './photo-quad-contract.json';
 import { beforeAbort, requestLifetime } from './lifetime';
 import { readRequestJson } from './requests';
 import { responseStream } from './stream';
@@ -45,7 +46,7 @@ export async function receivePhoto(
   try { body = await readRequestJson(request, policy.maxBodyBytes); } catch (caught) {
     return error(caught instanceof Error && caught.message === 'request_too_large' ? 413 : 400, 'invalid_photo_request');
   }
-  const sized = isRecord(body) && body.photo_protocol === 2;
+  const sized = isRecord(body) && (body.photo_protocol === 2 || body.photo_protocol === 3);
   const size: unknown = isRecord(body) && sized ? body.image_size : [1280, 720];
   if (!isRecord(body) || Object.keys(body).length !== (sized ? 5 : 4)
     || !Object.keys(body).every((key) => ['photo_protocol', 'request_id', 'image_base64', 'target_language', ...(sized ? ['image_size'] : [])].includes(key))
@@ -56,9 +57,10 @@ export async function receivePhoto(
     || typeof body.image_base64 !== 'string' || body.image_base64.length < 8
     || body.image_base64.length % 4 !== 0 || !body.image_base64.startsWith('/9j/')
     || !/^[A-Za-z0-9+/]*={0,2}$/.test(body.image_base64)
-    || typeof body.target_language !== 'string' || !Object.hasOwn(contract.languages, body.target_language)) {
+    || typeof body.target_language !== 'string' || !Object.hasOwn(legacyContract.languages, body.target_language)) {
     return error(400, 'invalid_photo_request');
   }
+  const contract = body.photo_protocol === 3 ? quadContract : legacyContract;
   const language = contract.languages[body.target_language as keyof typeof contract.languages];
   let admission;
   try { admission = await checkPhotoAllowance(env, installation, body.request_id, policy); }
@@ -91,7 +93,7 @@ export async function receivePhoto(
       }),
     }));
     if (upstream.ok && upstream.body && upstream.headers.get('content-type')?.split(';')[0] === 'text/event-stream') {
-      return responseStream(upstream, abort, request.signal, settle, release, context);
+      return responseStream(upstream, abort, request.signal, settle, release, context, { photo: true });
     }
     abort.abort();
     await upstream.body?.cancel();

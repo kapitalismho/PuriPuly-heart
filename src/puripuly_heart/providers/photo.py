@@ -27,6 +27,7 @@ from puripuly_heart.core.photo.protocol import (
     PhotoStreamEvent,
     PhotoTextDelta,
 )
+from puripuly_heart.providers.photo_output import PhotoResponseOutput
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +321,7 @@ class LunaPhotoConnection(_PhotoConnection):
     ) -> AsyncIterator[PhotoStreamEvent]:
         await self.preopen()
         payload = json.dumps({"type": "response.create", **_luna_payload(image, target_language)})
+        answer = PhotoResponseOutput()
         async with asyncio.timeout(self._timeout):
             self._sent()
             await self._socket.send(payload)
@@ -328,13 +330,10 @@ class LunaPhotoConnection(_PhotoConnection):
                 if not isinstance(event, dict):
                     raise PhotoProviderError("photo_stream_invalid", retryable=False)
                 kind = event.get("type")
-                if kind == "response.output_text.delta":
-                    delta = event.get("delta")
-                    if not isinstance(delta, str):
-                        raise PhotoProviderError("photo_stream_invalid", retryable=False)
-                    if delta:
-                        yield PhotoTextDelta(delta)
-                elif kind == "response.completed":
+                text = answer.accept(event)
+                if text:
+                    yield PhotoTextDelta(text)
+                if kind == "response.completed":
                     response = event.get("response") or {}
                     if response.get("status") not in (None, "completed"):
                         raise PhotoProviderError("photo_stream_incomplete")
@@ -342,6 +341,9 @@ class LunaPhotoConnection(_PhotoConnection):
                         for part in output.get("content") or []:
                             if part.get("type") == "refusal":
                                 raise PhotoProviderError("photo_content_rejected", retryable=False)
+                    text = answer.finish(response)
+                    if text:
+                        yield PhotoTextDelta(text)
                     yield PhotoStreamCompleted(
                         usage=response.get("usage") or {}, model=response.get("model") or self.model
                     )
@@ -528,6 +530,7 @@ class OpenAIPhotoConnection(_PhotoConnection):
     google = False
     model = "gpt-6-luna"
     endpoint = "https://api.openai.com/v1/responses"
+    _relayed = False
 
     def __init__(
         self,
@@ -602,6 +605,7 @@ class OpenAIPhotoConnection(_PhotoConnection):
                         raise PhotoProviderError("photo_stream_invalid", retryable=False)
                     data: list[str] = []
                     completed = False
+                    answer = None if self._relayed else PhotoResponseOutput()
                     async for line in response.aiter_lines():
                         if completed:
                             continue
@@ -613,17 +617,26 @@ class OpenAIPhotoConnection(_PhotoConnection):
                             if not isinstance(event, dict):
                                 raise PhotoProviderError("photo_stream_invalid", retryable=False)
                             kind = event.get("type")
-                            if kind in ("response.output_text.delta", "text_delta"):
-                                delta = event.get(
-                                    "delta" if kind == "response.output_text.delta" else "text"
-                                )
-                                if not isinstance(delta, str):
+                            text = answer.accept(event) if answer is not None else ""
+                            if text:
+                                yield PhotoTextDelta(text)
+                            if kind == "text_delta":
+                                if not self._relayed or not isinstance(event.get("text"), str):
                                     raise PhotoProviderError(
                                         "photo_stream_invalid", retryable=False
                                     )
-                                if delta:
-                                    yield PhotoTextDelta(delta)
+                                if event["text"]:
+                                    yield PhotoTextDelta(event["text"])
+                            elif kind == "response.output_text.delta":
+                                if self._relayed:
+                                    raise PhotoProviderError(
+                                        "photo_stream_invalid", retryable=False
+                                    )
                             elif kind in ("response.completed", "completed"):
+                                if self._relayed != (kind == "completed"):
+                                    raise PhotoProviderError(
+                                        "photo_stream_invalid", retryable=False
+                                    )
                                 result = event.get("response")
                                 if (
                                     not isinstance(result, dict)
@@ -636,6 +649,10 @@ class OpenAIPhotoConnection(_PhotoConnection):
                                             raise PhotoProviderError(
                                                 "photo_content_rejected", retryable=False
                                             )
+                                if answer is not None:
+                                    text = answer.finish(result)
+                                    if text:
+                                        yield PhotoTextDelta(text)
                                 yield PhotoStreamCompleted(
                                     usage=result.get("usage") or {},
                                     model=result.get("model") or self.model,
@@ -695,6 +712,8 @@ class OpenRouterPhotoConnection(OpenAIPhotoConnection):
 
 
 class RelayPhotoConnection(OpenAIPhotoConnection):
+    _relayed = True
+
     def __init__(
         self,
         endpoint: str,
@@ -734,7 +753,7 @@ class RelayPhotoConnection(OpenAIPhotoConnection):
 
     def _body(self, image: PreparedPhoto, target_language: str) -> dict:
         return {
-            "photo_protocol": 2,
+            "photo_protocol": 3,
             "request_id": self._request_id,
             "image_base64": image.jpeg_base64,
             "image_size": list(image.send_size),
