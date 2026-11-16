@@ -71,7 +71,18 @@ class Capture:
             "events": [],
             "observations": [],
             "snapshots": [],
-            "sends": [],
+            "sends": [
+                {
+                    "session_id": "session",
+                    "status": "completed",
+                    "start_s": -2,
+                    "completed_s": 0,
+                    "transmitted_start_s": 0,
+                    "transmitted_end_s": 2,
+                    "source_ranges": [{"start_s": 0, "end_s": 2}],
+                    "kind": "audio",
+                }
+            ],
         }
 
     def put(
@@ -376,6 +387,176 @@ def test_source_discontinuity_and_backward_replay_are_not_healed():
     assert capture.observation(entry("no"))["reason"] == "alignment_ambiguous"
 
 
+def sent(start, end, ranges, completed=1, status="completed", session="session", **extra):
+    return {
+        "session_id": session,
+        "status": status,
+        "start_s": completed - 0.01,
+        "completed_s": completed,
+        "transmitted_start_s": start,
+        "transmitted_end_s": end,
+        "source_ranges": [
+            {"start_s": source_start, "end_s": source_end} for source_start, source_end in ranges
+        ],
+        "kind": "audio",
+        **extra,
+    }
+
+
+def bridge_capture(sends, right_source=(0.8, 1), right_provider=(0.8, 1)):
+    capture = Capture("S1")
+    capture.run["sends"] = sends
+    capture.put(0.4, "soniox:final", [word("do ", 0.1, 0.3)], operation="append", settled=True)
+    capture.put(
+        1.2,
+        "soniox:final",
+        [
+            word(
+                "go",
+                *right_source,
+                provider_start_s=right_provider[0],
+                provider_end_s=right_provider[1],
+            )
+        ],
+        operation="append",
+        settled=True,
+    )
+    return capture
+
+
+def test_causal_completed_silence_bridge_preserves_captured_piece_mappings():
+    sends = [
+        sent(0, 0.3, [(0, 0.3)], completed=0.35),
+        sent(0.3, 0.8, [(0.3, 0.8)], completed=0.9),
+        sent(0.8, 1, [(0.8, 1)], completed=1.1),
+    ]
+    capture = bridge_capture(sends)
+    before = copy.deepcopy(capture.run)
+    result = capture.observation(entry("do go"), 1.3)
+    assert result["outcome"] == "correct"
+    assert capture.run == before
+    proof = result["localized"][0]["bridge_proofs"][0]
+    assert proof["cutoff_s"] == 1.2
+    assert proof["supported"]
+    assert [row["send"]["completed_s"] for row in proof["sends"]] == [0.35, 0.9, 1.1]
+    assert [piece["source_ranges"] for piece in result["localized"][0]["pieces"]] == [
+        before["observations"][0]["source_ranges"],
+        before["observations"][1]["source_ranges"],
+    ]
+
+
+@pytest.mark.parametrize(
+    "sends,right_source,right_provider,reason",
+    [
+        (
+            [sent(0, 0.3, [(0, 0.3)], completed=0.35), sent(0.3, 0.5, [(0.8, 1)])],
+            (0.8, 1),
+            (0.3, 0.5),
+            "omitted_or_replayed_source_in_bridge",
+        ),
+        (
+            [
+                sent(0, 0.3, [(0, 0.3)], completed=0.35),
+                sent(0.3, 0.8, [], kind="padding", generated=True),
+                sent(0.8, 1, [(0.3, 0.5)]),
+            ],
+            (0.3, 0.5),
+            (0.8, 1),
+            "inserted_padding_in_bridge",
+        ),
+        (
+            [
+                sent(0, 0.3, [(0, 0.3)], completed=0.35),
+                sent(0.3, 0.8, [], kind="padding", generated=True),
+                sent(0.8, 1, [(0.8, 1)]),
+            ],
+            (0.8, 1),
+            (0.8, 1),
+            "inserted_padding_in_bridge",
+        ),
+        (
+            [sent(0, 0.3, [(0, 0.3)], completed=0.35), sent(0.8, 1, [(0.8, 1)])],
+            (0.8, 1),
+            (0.8, 1),
+            "missing_or_ambiguous_transmitted_bridge",
+        ),
+        (
+            [],
+            (0.8, 1),
+            (0.8, 1),
+            "missing_causal_completed_bridge",
+        ),
+    ],
+)
+def test_mapping_breaks_cannot_manufacture_cross_piece_occurrence(
+    sends, right_source, right_provider, reason
+):
+    result = bridge_capture(sends, right_source, right_provider).observation(entry("do go"))
+    assert result["outcome"] == "unassigned"
+    assert result["occurrence_count"] == 0
+    candidate = result["unlocalized_exact"][0]
+    assert candidate["reason"] == "cross_piece_source_bridge_unsupported"
+    assert candidate["bridge_proofs"][0]["reason"] == reason
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"completed": 2},
+        {"status": "failed"},
+        {"session": "another-session"},
+        {"completed": None},
+    ],
+)
+def test_late_failed_or_unproven_bridge_cannot_repair_captured_occurrence(extra):
+    middle = sent(0.3, 0.8, [(0.3, 0.8)])
+    if "completed" in extra:
+        middle["completed_s"] = extra["completed"]
+    if "status" in extra:
+        middle["status"] = extra["status"]
+    if "session" in extra:
+        middle["session_id"] = extra["session"]
+    sends = [
+        sent(0, 0.3, [(0, 0.3)], completed=0.35),
+        middle,
+        sent(0.8, 1, [(0.8, 1)], completed=1.1),
+    ]
+    capture = bridge_capture(sends)
+    assert capture.observation(entry("do go"), 1.3)["occurrence_count"] == 0
+    assert capture.observation(entry("do go"))["occurrence_count"] == 0
+
+
+def test_future_send_cannot_validate_an_already_captured_mapped_piece():
+    capture = bridge_capture(
+        [
+            sent(0, 0.3, [(0, 0.3)], completed=0.5),
+            sent(0.3, 0.8, [(0.3, 0.8)], completed=0.9),
+            sent(0.8, 1, [(0.8, 1)], completed=1.1),
+        ]
+    )
+    proof = capture.observation(entry("do go"))["unlocalized_exact"][0]["bridge_proofs"][0]
+    assert proof["reason"] == "send_not_completed_at_piece_capture"
+
+
+def test_native_piece_overlap_is_allowed_with_causal_contiguous_source_proof():
+    capture = final_capture([word("do ", 0.1, 0.6), word("go", 0.4, 0.9)])
+    result = capture.observation(entry("do go"))
+    assert result["outcome"] == "correct"
+    assert result["localized"][0]["bridge_proofs"][0]["supported"]
+
+
+def test_backward_provider_progression_remains_unsupported():
+    capture = final_capture(
+        [
+            word("do ", 0.1, 0.3),
+            word("go", 0.8, 1, provider_start_s=0.05, provider_end_s=0.25),
+        ]
+    )
+    result = capture.observation(entry("do go"))
+    assert result["occurrence_count"] == 0
+    assert result["unlocalized_exact"][0]["reason"] == "backward_source_or_provider_progression"
+
+
 def make_ami(path):
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
@@ -502,7 +683,7 @@ def synthetic_frozen(tmp_path):
     annotation = tmp_path / "ami.zip"
     make_ami(annotation)
     manifest = {"recordings": [source_record(annotation)]}
-    capture = final_capture([word("no")])
+    capture = final_capture([word("n", 0.1, 0.4), word("o", 0.6, 0.9)])
     run_path = tmp_path / "run.json"
     run_path.write_text(json.dumps(capture.run), encoding="utf-8")
     score = {
@@ -628,6 +809,7 @@ def test_cli_comparison_on_isolated_synthetic_files_is_exclusive(tmp_path):
     assert completed.returncode == 0, completed.stderr
     assert load(output)["frozen_inputs_sha256"] == digest(frozen_path)
     assert len(load(output)["rows"]) == 2
+    assert all(row["localized"][0]["bridge_proofs"][0]["supported"] for row in load(output)["rows"])
     repeated = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, check=False)
     assert repeated.returncode != 0
     assert "FileExistsError" in repeated.stderr

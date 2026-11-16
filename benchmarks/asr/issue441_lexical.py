@@ -421,7 +421,7 @@ def streams(journal, cutoff):
                 previous = index
         if block:
             blocks.append({"session": session, "units": block})
-    return blocks, [
+    diagnostics = [
         {
             "session": session,
             "family": key,
@@ -429,6 +429,10 @@ def streams(journal, cutoff):
         }
         for (session, key), rows in diagnostic.items()
     ]
+    for block in blocks + diagnostics:
+        block["sends"] = journal.run.get("sends", [])
+        block["send_evidence"] = f"{journal.evidence}#sends"
+    return blocks, diagnostics
 
 
 def intersects(unit, entry):
@@ -490,6 +494,88 @@ def progressing(units):
                 ):
                     return False
     return True
+
+
+def bridge_proof(left, right, block):
+    cutoff = max(left["arrival_s"], right["arrival_s"])
+    proof = {
+        "left_evidence": left["evidence"],
+        "right_evidence": right["evidence"],
+        "cutoff_s": cutoff,
+        "supported": False,
+        "reason": None,
+        "sends": [],
+    }
+    bounds = [unit.get(f"provider_{edge}_s") for unit in (left, right) for edge in ("start", "end")]
+    if not all(number(value) for value in bounds) or left["session"] != right["session"]:
+        proof["reason"] = "missing_provider_or_session_provenance"
+        return proof
+    start, end = left["provider_start_s"], right["provider_end_s"]
+    proof["provider_interval_s"] = [start, end]
+    spans = []
+    for index, sent in enumerate(block.get("sends", [])):
+        a, b = sent.get("transmitted_start_s"), sent.get("transmitted_end_s")
+        if (
+            str(sent.get("session_id", "")) != left["session"]
+            or sent.get("status") != "completed"
+            or not number(sent.get("completed_s"))
+            or sent["completed_s"] > cutoff
+            or not number(a)
+            or not number(b)
+            or max(a, start) >= min(b, end)
+        ):
+            continue
+        proof["sends"].append(
+            {
+                "evidence": f"{block['send_evidence']}/{index}",
+                "send": dict(sent),
+            }
+        )
+        cursor = a
+        for source in sent.get("source_ranges") or []:
+            lo, hi = source.get("start_s"), source.get("end_s")
+            if not number(lo) or not number(hi) or hi <= lo or cursor + hi - lo > b + 1e-5:
+                proof["reason"] = "invalid_send_source_provenance"
+                return proof
+            spans.append((cursor, cursor + hi - lo, lo, sent["completed_s"]))
+            cursor += hi - lo
+        if b - cursor >= 1e-5:
+            spans.append((cursor, b, None, sent["completed_s"]))
+    cursor, source_cursor = start, left["start_s"]
+    for a, b, source, completed in sorted(spans, key=lambda span: (span[0], span[1])):
+        lo, hi = max(a, start), min(b, end)
+        if lo >= hi:
+            continue
+        if abs(lo - cursor) >= 1e-5:
+            proof["reason"] = "missing_or_ambiguous_transmitted_bridge"
+            return proof
+        if source is None:
+            proof["reason"] = "inserted_padding_in_bridge"
+            return proof
+        mapped_start = source + lo - a
+        if abs(mapped_start - source_cursor) >= 1e-5:
+            proof["reason"] = "omitted_or_replayed_source_in_bridge"
+            return proof
+        for unit in (left, right):
+            if (
+                min(hi, unit["provider_end_s"]) - max(lo, unit["provider_start_s"]) >= 1e-5
+                and completed > unit["arrival_s"]
+            ):
+                proof["reason"] = "send_not_completed_at_piece_capture"
+                return proof
+        cursor, source_cursor = hi, mapped_start + hi - lo
+    if abs(cursor - end) >= 1e-5 or not spans:
+        proof["reason"] = "missing_causal_completed_bridge"
+        return proof
+    if any(
+        abs(unit[f"{edge}_s"] - (left["start_s"] + unit[f"provider_{edge}_s"] - start)) >= 1e-5
+        for unit in (left, right)
+        for edge in ("start", "end")
+    ):
+        proof["reason"] = "captured_piece_boundary_disagreement"
+        return proof
+    proof.update(supported=True, reason="causal_contiguous_completed_source_bridge")
+    return proof
 
 
 def evidence(unit):
@@ -556,7 +642,14 @@ def occurrences(blocks, entry):
                     candidate["reason"] = "backward_source_or_provider_progression"
                     unlocalized.append(candidate)
                 else:
-                    localized.append(candidate)
+                    candidate["bridge_proofs"] = [
+                        bridge_proof(left, right, block) for left, right in zip(parts, parts[1:])
+                    ]
+                    if all(proof["supported"] for proof in candidate["bridge_proofs"]):
+                        localized.append(candidate)
+                    else:
+                        candidate["reason"] = "cross_piece_source_bridge_unsupported"
+                        unlocalized.append(candidate)
     return {
         "localized": localized,
         "unlocalized_exact": unlocalized,
