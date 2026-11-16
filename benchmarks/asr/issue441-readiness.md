@@ -1,5 +1,13 @@
 # #441 pilot readiness and execution gaps
 
+## Owner amendment: automatic execution
+
+After this readiness checkpoint, the owner directed: “아 그런거 없이 자동으로 해줘. 필요하면 오디오 소스를 바꾸고” — proceed automatically without the manual prerequisite, changing audio sources if necessary.
+
+This supersedes the requirement for new human/audio listening before the pilot. Use independently authored corpus references plus automatic signal/voice checks; freeze the inputs and scoring opportunities before inspecting candidate outputs. Mark these references as annotation-derived, not listened or acoustically adjudicated. Keep uncertain semantic boundaries and overlap limitations visible. Audio replacement is permitted subject to source conditions. All other matched-input, provider/controller, scoring, timing, production-preservation and reporting requirements remain in force.
+
+The sections below are the historical pre-amendment readiness record, not the resumed execution status. The listening blocker and its proposed human handoff are superseded; unrun conditions and other setup gaps must now be addressed through automatic execution rather than treated as completed.
+
 ## Disposition
 
 **Blocked before the required input/label freeze. No pilot condition has run.** This is a prerequisite investigation, not a completed comparison or a supported rejection of Scribe. Keep [#441](https://github.com/kapitalismho/PuriPuly-heart/issues/441) open. Do not choose a provider or diagnose a Soniox defect from these observations.
