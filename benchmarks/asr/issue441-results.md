@@ -37,6 +37,57 @@ Require complete normalized lexical sequences at whole native-piece boundaries, 
 
 Declare the attribution surface: Soniox finalized native text plus its current live partial; E0 indexed commit/diarized revisions plus its current live partial. The retained E0 timestamp-only committed messages lack `segment_index`; keep their text/timing as a separate diagnostic, without joining them to indexed identities by adjacency, text equality or guessed timing. Before indexed metadata arrives, that surface can lack usable timing even when a separate unindexed message contains it. Preserve this availability distinction. Causal native ordering, snapshot replacement and only already-received identity merges govern the supplement; no later metadata repairs an earlier observation.
 
+#### Supplementary execution and results
+
+Source-only checkpoint `3796f90552ac7ab1f6d3ae3267218c54995e7d46` was independently reviewed before aggregation. Review found that monotonic native-piece bounds alone could bridge omitted source or generated padding. Repair `93e03e754ed2f85a2e235c2818811f8a10b07507` requires actual completed same-session send coverage and continuous source progression at the original piece receipts, without remapping captured observations. The independent bounded repair review accepted this correction; 52 focused tests and scoped Black/Ruff passed, including ordinary-silence/native-overlap positives and omission/padding/equal-cancellation/future-ledger negatives. No actual aggregate was computed before that repair was accepted.
+
+The authorized command below completed once at that repaired pin with shared Python 3.14.10, exit 0, in 8.604 s. This is offline scoring duration, not ASR latency. There were no failed actual comparison attempts, quality retries or further provider calls.
+
+```text
+../../../.venv/Scripts/python.exe benchmarks/asr/issue441_lexical.py compare --frozen benchmarks/asr/issue441-lexical-inputs.json --output .tmp/issue441/lexical/result.json
+```
+
+The [frozen lexical inputs](issue441-lexical-inputs.json) have SHA-256 `926cf06540d7d0e3f59c5835ad54426c663e8897ead7ee84aaf33a244388fa77`; protocol hash `b3c7f8043230979b638c4c35fe131dd8447ee41ed99129163e07ef31f805c6e9`. The result SHA-256 is `ff6ccd1dee404ed7156c706ca0333bf35a0dda3188532b8a19ca776bc77d1b1b`. All 39 instrumented files matched before/after: the 32 original manifest/score/selection/log pins, four annotation files, and the evaluator/tests/new freeze. Source units, original anchors/parents/cutoffs and fixed session mappings also matched. The result retains all 720 arm/view rows, including 144 explicitly source-ineligible rows; the old point results were neither rerun nor overwritten.
+
+C/W/U means correct / wrong / unassigned among the same eligible reference units. Assigned coverage is `(C+W)/n`, conditional accuracy is `C/(C+W)`, and correct coverage is `C/n`; conditional accuracy is not overall ASR accuracy. Online is the unchanged parent-span-end +1 s cutoff; eventual is evaluated independently. A single value below means both views are identical. S1 is native inbound text, not caption-envelope attribution.
+
+| Reference stratum | n | S0 C/W/U online → eventual | S1 C/W/U online → eventual | E0 C/W/U online → eventual |
+| --- | ---: | --- | --- | --- |
+| EN words, no annotated overlap | 37 | 23/3/11 → 25/3/9 | 24/1/12 | 33/0/4 → 35/0/2 |
+| EN words, annotated overlap | 3 | 3/0/0 | 3/0/0 | 2/1/0 → 3/0/0 |
+| KO words, no annotated overlap | 20 | 16/0/4 → 17/0/3 | 17/0/3 | 16/0/4 → 17/0/3 |
+| JA whole phrases, no annotated overlap | 14 | 6/0/8 | 6/0/8 | 8/0/6 → 9/0/5 |
+| JA whole phrases, annotated overlap | 22 | 6/0/16 → 7/0/15 | 6/0/16 | 8/0/14 |
+
+Do not combine these heterogeneous units into a provider ranking. KO covers only one reference speaker, and no annotated overlap does not establish absence of acoustic overlap. Most JA unassigned cases are strict normalized whole-phrase mismatches: 23 for S0/S1 and 18 for E0 in each view. Different spelling/script, partial text or timing localization can prevent support without establishing deletion. E0 also has one eventual mixed-ID JA phrase, retained as unassigned. Missing lexical IDs and ambiguous localized occurrences were absent in this particular pass, not ruled out generally.
+
+Wrong counts also retain the old point-derived mapping limitation: two of S0's three EN wrong units are unmatched IDs, and S1's one EN wrong unit is unmatched. E0's one online EN wrong unit has a mapped ID and becomes correct eventually. These are not interchangeable with acoustically adjudicated speaker-classifier errors. No exact primary candidate in this realized pass was rejected specifically by the repaired cross-piece bridge check; its negative protections were established synthetically, not by an alternate-rule rescore.
+
+The E0 unindexed timestamp-only observations remain a separate text/timing diagnostic, not additional attribution:
+
+| Reference units | n | Separate localized exact text/timing online → eventual | Primary unassigned despite separate support online → eventual |
+| --- | ---: | --- | --- |
+| EN words | 40 | 31 → 39 | 0 → 1 |
+| KO words | 20 | 6 → 18 | 0 → 1 |
+| JA phrases | 36 | 8 → 18 | 1 → 1 |
+
+These observations do not join unindexed words to indexed identities or backfill earlier timing.
+
+Two cases were selected before aggregation:
+
+- **`en-anchor-02`, `charger`:** the original 6.887 s point remains uncovered for S0. The complete source word spans 6.622–7.152 s. S0's finalized ` ch` / `arg` / `er.` pieces all intersect that word and unanimously map to FEE013, so the supplement is correct **eventually**, with two supported causal bridges. Receipt at 12.502 s is later than the 8.28 s cutoff, so online stays unassigned. S1 also recognizes those pieces, but its last piece starts at 7.276 s, outside the fixed reference word; both supplemental views remain unassigned rather than widening timing bounds. E0 is correct eventually, but its 8.609 s receipt also misses the same cutoff. This demonstrates that point coverage is not ASR recall, not that every timing limitation disappears.
+- **`ja-anchor-10`, 30.08 s:** the complete independent phrase spans 29.96–33.16 s. All three arms remain unassigned for strict whole-phrase mismatch in both supplemental views, despite S0's original point success. Repeated backchannels and text/script differences prevent exact equivalence; easier substrings are not substituted. This result neither proves S1 acoustic deletion nor negates the separate completed-input omission and controlled acoustic-state diagnosis below.
+
+Local-only evidence under `.tmp/issue441/lexical/`: `execution-attempt-1.json` records import resolution, command, exit, hashes and timing; `offline-compare-attempt-1.txt` records stdout; `result.json` retains every outcome and provenance; `summary.md`, `derived-summary.json` and `preselected-cases.json` retain all rates, reasons and case evidence. These ignored artifacts are not published URLs. No product configuration, VAD/caption policy or provider adoption changed. Latest upstream `cb47ada43dcd8c9deda22ee447ca6bf9637dd566` was inspected but not merged: its timeout/recovery/logging changes do not alter the diagnosed acoustic reset path, but the historical comparison is not a new execution of that latest runtime.
+
+#### JA input-omission diagnosis and owner handoff
+
+The owner explicitly selected **analysis/comparison only, production unchanged**, and requested an English handoff. [The Soniox input-selection handoff](issue441-soniox-handoff.md) records public input/model provenance, the reproducible offline procedure, failures, decisive observations, limits and the separately unapproved repair direction.
+
+The omission occurs before Soniox receives source PCM. At the 29.984 s `delivery_pause`, the age ≥5 s / 192 ms opportunity branch calls `VadGating.seal_active`, which performs a full `SileroVadOnnx.reset`. The resulting acoustic cold start delays the next onset to 31.232 s; the 500 ms pre-roll then starts at 30.732 s and cannot recover the 30.08 s anchor. This is not the ordinary 512/800 ms SmartTurn branch, hard cap, or supported evidence of the native queue dropping already-admitted PCM.
+
+A bounded offline comparison reproduced all 910 original source-payload signatures through 32 s. Suppressing only the target **whole acoustic reset**, while retaining logical/ring resets and threshold settings, recovered the omitted interval through the unchanged three-frame onset gate. All 1,858 admitted payloads across the completed paired tracks matched mapped-source production PCM conversion at the replaced local wire. These observations are not original wire hashes or server acceptance, and original per-frame probabilities were not logged. Earlier seals, pacing/timers and recognition completion were controlled; one target intervention does not establish safety at every pause, acceptable false-onset behavior, or improved server recognition. No product fix or further cloud/MT/GUI run was made.
+
 ## Authority, frozen input and reference limits
 
 The owner's subsequent instruction authorized automatic execution without new human listening and permitted replacement audio. The [readiness record](issue441-readiness.md#owner-amendment-automatic-execution) preserves that amendment. References are independently authored corpus annotations plus automatic voice/energy checks, **not newly listened or acoustically adjudicated truth**. Candidate output did not select or retime the anchors.
