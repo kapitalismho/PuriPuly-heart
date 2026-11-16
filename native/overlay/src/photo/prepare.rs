@@ -33,14 +33,14 @@ pub fn send_size(width: u32, height: u32) -> [u32; 2] {
     if height > width { [720, 1280] } else { [1280, 720] }
 }
 
-pub(super) struct SendCanvas<'a> {
+struct SendCanvas<'a> {
     pub pixels: Cow<'a, RgbImage>,
     pub scale: f64,
     pub offset_x: u32,
     pub offset_y: u32,
 }
 
-pub(super) fn send_canvas(original: &RgbImage) -> SendCanvas<'_> {
+fn send_canvas(original: &RgbImage) -> SendCanvas<'_> {
     let [send_width, send_height] = send_size(original.width(), original.height());
     let scale = (f64::from(send_width) / f64::from(original.width()))
         .min(f64::from(send_height) / f64::from(original.height()));

@@ -13,9 +13,6 @@ path = "src/lib.rs"
 name = "PuriPulyHeartOverlay"
 path = "src/main.rs"
 
-[features]
-photo-experiment = []
-
 [dependencies]
 futures-util = "0.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

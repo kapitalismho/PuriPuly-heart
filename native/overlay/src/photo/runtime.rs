@@ -1355,16 +1355,6 @@ pub async fn run_cli(args: &[String]) -> i32 {
         );
         return 0;
     }
-    #[cfg(feature = "photo-experiment")]
-    if args.len() == 5 && args[1] == "--role" && args[2] == "photo" && args[3] == "--prepare-experiment" {
-        return match super::experiment::prepare(Path::new(&args[4])) {
-            Ok(()) => 0,
-            Err(error) => {
-                eprintln!("{}", json!({"type":"photo_experiment_error","detail":error.to_string()}));
-                1
-            }
-        };
-    }
     #[cfg(windows)]
     if args.len() == 5 && args[1] == "--role" && args[2] == "photo" && args[3] == "--offline" {
         return match super::offline::run(Path::new(&args[4])).await {

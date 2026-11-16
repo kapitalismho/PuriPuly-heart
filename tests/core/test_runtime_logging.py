@@ -2114,6 +2114,11 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
     identity = f"photo_id={uuid4()} attempt_id=1"
     accepted = [
         f"[Photo] decode {identity} duration_ms=10.250",
+        f"[Photo] quad_ready {identity} block_id=0 duration_ms=1300.125",
+        f"[Photo] block_corrected {identity} block_id=0",
+        f"[Photo] block_excluded {identity} block_id=1 failure_code=photo_quad_invalid",
+        f"[Photo] block_excluded {identity} block_id=2 failure_code=photo_quad_outside_image",
+        f"[Photo] block_excluded {identity} block_id=3 failure_code=photo_quad_clipping_excessive",
         f"[Photo] source_ready {identity} block_id=0 duration_ms=1400.125",
         f"[Photo] total {identity} duration_ms=2000.000 model=gemini-3.1-flash-lite",
         f"[Photo] failed {identity} failure_code=photo_authentication_failed",
@@ -2136,6 +2141,7 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] total {identity} duration_ms=-1",
         f"[Photo] total {identity} model=private-model-name",
         f"[Photo] source_ready {identity} source=private-source-text",
+        f"[Photo] quad_ready {identity} quad=private-geometry",
         f"[Photo] preparation {identity} path=C:/private/photo.png",
         f"[Photo] private-stage {identity}",
         f"[Photo] image_unrecognized {identity} duration_ms=1",

@@ -277,16 +277,16 @@ class PhotoLifecycle:
     ) -> None:
         if parsed.index in photo.excluded:
             return
-        if parsed.kind == "bbox_ready":
+        if parsed.kind == "quad_ready":
             assert photo.image is not None
             try:
-                mapped = photo.image.map_box(parsed.bbox, google=google)
+                mapped = photo.image.map_quad(parsed.quad, google=google)
             except PhotoImageError as error:
                 self._exclude(photo, parsed.index, error.code)
                 return
             photo.preparations[parsed.index] = {
                 "block_id": parsed.index,
-                "bbox": list(mapped.bbox),
+                "quad": [list(point) for point in mapped.quad],
                 "source": None,
                 "source_line_count": None,
             }
@@ -308,7 +308,7 @@ class PhotoLifecycle:
                 photo.blocks.append(
                     {
                         "block_id": parsed.index,
-                        "bbox": preparation["bbox"],
+                        "quad": preparation["quad"],
                         "source": parsed.source,
                         "translation": parsed.translation,
                     }
@@ -367,7 +367,7 @@ class PhotoLifecycle:
             target_language = self._target_language()
             for execution in range(2):
                 assert connection is not None
-                parser = PhotoBlockParser(google=connection.google)
+                parser = PhotoBlockParser()
                 sent: float | None = None
                 completed = False
                 first_text = True

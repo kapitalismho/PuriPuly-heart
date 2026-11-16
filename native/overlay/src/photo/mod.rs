@@ -13,8 +13,6 @@ pub mod manifest;
 mod offline;
 pub mod prepare;
 pub mod processing;
-#[cfg(feature = "photo-experiment")]
-mod experiment;
 pub mod runtime;
 pub mod state;
 mod telea;

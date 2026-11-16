@@ -67,11 +67,11 @@ class ControlledConnection:
         self.records["prepared"] = image
         yield PhotoRequestSent(time.monotonic())
         yield PhotoTextDelta(
-            '{"blocks":[{"bbox":[0,0,100,100],"source":"one","translation":"translated one"},'
+            '{"blocks":[{"quad":[[20.5,10.25],[110.5,30.25],[90.5,100.25],[0.5,80.25]],"source":"one","translation":"translated one"},'
         )
         await asyncio.sleep(0.03)
         yield PhotoTextDelta(
-            '{"bbox":[100,100,200,200],"source":"two","translation":"translated two"}]}'
+            '{"quad":[[100,100],[200,100],[200,200],[100,200]],"source":"two","translation":"translated two"}]}'
         )
         yield PhotoStreamCompleted({}, self.model)
 
@@ -138,6 +138,11 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
         assert records["starts"] == 1
         assert records["prepared"].source_width == 1280
         assert [b["source"] for b in owner.lifecycle.snapshot["photo"]["blocks"]] == ["one", "two"]
+        original_quads = [block["quad"] for block in owner.lifecycle.snapshot["photo"]["blocks"]]
+        assert original_quads[0] == [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]]
+        assert [
+            item["quad"] for item in owner.lifecycle.snapshot["photo"]["preparations"]
+        ] == original_quads
         assert not owner.lifecycle.snapshot["photo"]["first_block_drawn"]
         native_timings = {
             stage: fields["duration_ms"]
@@ -174,6 +179,9 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
         assert owner.lifecycle.snapshot["photo"]["path"] == str(source)
         assert owner.lifecycle.snapshot["photo"]["expected_file_id"] == expected_file_id
         assert not owner.lifecycle.snapshot["photo"]["first_block_drawn"]
+        assert [
+            block["quad"] for block in owner.lifecycle.snapshot["photo"]["blocks"]
+        ] == original_quads
         print(
             {
                 "executable": executable.name,
@@ -182,6 +190,7 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
                 "generations": [old_generation, owner.supervisor.generation],
                 "provider_starts": records["starts"],
                 "native_receipt_blocks": 2,
+                "mapped_original_quads": original_quads,
                 "draw_observed": False,
                 "backend": "probe",
                 "executable_sha256": executable_sha256,
@@ -308,8 +317,11 @@ async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(t
         assert prepared.send_size == (720, 1280)
         assert jpeg_size(base64.b64decode(prepared.jpeg_base64)) == (720, 1280)
         assert (prepared.offset_x, prepared.offset_y) == (0, 0)
-        boxes = [b["bbox"] for b in owner.lifecycle.snapshot["photo"]["blocks"]]
-        assert boxes == [[0.0, 0.0, 75.0, 75.0], [75.0, 75.0, 150.0, 150.0]]
+        quads = [b["quad"] for b in owner.lifecycle.snapshot["photo"]["blocks"]]
+        assert quads == [
+            [[15.375, 7.6875], [82.875, 22.6875], [67.875, 75.1875], [0.375, 60.1875]],
+            [[75.0, 75.0], [150.0, 75.0], [150.0, 150.0], [75.0, 150.0]],
+        ]
         assert owner._interaction()["wrist_calibration"]["reference"]["model"] == "synthetic"
     finally:
         await owner.close()

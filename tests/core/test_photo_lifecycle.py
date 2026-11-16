@@ -57,9 +57,8 @@ class Connection:
 
 
 def block(source="source", translation="translated", *, google=False):
-    key = "box_2d" if google else "bbox"
     return PhotoTextDelta(
-        f'{{"blocks":[{{"{key}":[0,0,100,100],"source":"{source}","translation":"{translation}"}}]}}'
+        f'{{"blocks":[{{"quad":[[0,0],[100,0],[100,100],[0,100]],"source":"{source}","translation":"{translation}"}}]}}'
     )
 
 
@@ -138,7 +137,12 @@ async def test_offer_preopens_without_preparation_or_send_then_reopen_reuses_res
         assert h.owner.request_starts == 1
         assert len(h.prepares) == 1
         assert h.prepares[0] == (photo_id, 1, Path(h.photo["path"]), (1, 2))
-        assert h.photo["blocks"][0]["bbox"] == [0.0, 0.0, 150.0, 150.0]
+        assert h.photo["blocks"][0]["quad"] == [
+            [0.0, 0.0],
+            [150.0, 0.0],
+            [150.0, 150.0],
+            [0.0, 150.0],
+        ]
         assert h.photo["preparations"][0]["source_line_count"] == 1
         h.owner.hidden(photo_id)
         assert not h.photo["visible"]
@@ -585,20 +589,20 @@ async def test_route_revocation_suppresses_offer_and_cancels_active_request(tmp_
 
 
 async def test_every_block_accumulates_and_stage_timing_starts_at_send_not_pull(tmp_path):
-    bbox = asyncio.Event()
+    quad = asyncio.Event()
     source = asyncio.Event()
     complete = asyncio.Event()
     h = Harness(
         tmp_path,
         [
             [
-                bbox,
-                PhotoTextDelta('{"blocks":[{"bbox":[0,0,100,100],'),
+                quad,
+                PhotoTextDelta('{"blocks":[{"quad":[[0,0],[100,0],[100,100],[0,100]],'),
                 source,
                 PhotoTextDelta('"source":"one\\ntwo",'),
                 complete,
                 PhotoTextDelta(
-                    '"translation":"translated"},{"bbox":[100,100,200,200],"source":"second","translation":"second translated"}]}'
+                    '"translation":"translated"},{"quad":[[100,100],[200,100],[200,200],[100,200]],"source":"second","translation":"second translated"}]}'
                 ),
                 PhotoStreamCompleted({}, "gpt-6-luna"),
             ]
@@ -610,7 +614,7 @@ async def test_every_block_accumulates_and_stage_timing_starts_at_send_not_pull(
         h.owner.pull(photo_id, "pull")
         await eventually(lambda: h.owner.request_starts == 1)
         h.time = 11
-        bbox.set()
+        quad.set()
         await eventually(lambda: len(h.photo["preparations"]) == 1)
         assert h.photo["preparations"][0]["source_line_count"] is None
         assert h.photo["blocks"] == []
@@ -701,13 +705,13 @@ async def test_geometry_quarantine_preserves_later_blocks_and_removes_empty_prep
         [
             [
                 PhotoTextDelta(
-                    '{"blocks":[{"bbox":[51,722,271,730],"source":"outside","translation":"외부"},'
-                    '{"bbox":[-1,100,100,200],"source":"edge","translation":"가장자리"},'
-                    '{"bbox":[100,100,200,200],"source":"empty",'
+                    '{"blocks":[{"quad":[[51,722],[271,722],[271,730],[51,730]],"source":"outside","translation":"외부"},'
+                    '{"quad":[[-1,100],[100,100],[100,200],[-1,200]],"source":"edge","translation":"가장자리"},'
+                    '{"quad":[[100,100],[200,100],[200,200],[100,200]],"source":"empty",'
                 ),
                 translation,
                 PhotoTextDelta(
-                    '"translation":"  "},{"bbox":[200,100,300,200],"source":"last","translation":"마지막"}]}'
+                    '"translation":"  "},{"quad":[[200,100],[300,100],[300,200],[200,200]],"source":"last","translation":"마지막"}]}'
                 ),
                 PhotoStreamCompleted({}, "gpt-6-luna"),
             ]
@@ -723,7 +727,7 @@ async def test_geometry_quarantine_preserves_later_blocks_and_removes_empty_prep
         )
         assert h.photo["excluded_blocks"] == [0]
         assert [b["block_id"] for b in h.photo["blocks"]] == [1]
-        assert h.photo["blocks"][0]["bbox"] == [0, 150, 150, 300]
+        assert h.photo["blocks"][0]["quad"] == [[0, 150], [150, 150], [150, 300], [0, 300]]
         assert all(
             p["block_id"] != 0
             for snapshot in h.snapshots
@@ -768,7 +772,11 @@ async def test_photo_result_distinguishes_correction_empty_and_rejected_output(
 ):
     document = {
         "blocks": [
-            {"box_2d" if google else "bbox": box, "source": source, "translation": translation}
+            {
+                "quad": [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]], [box[0], box[3]]],
+                "source": source,
+                "translation": translation,
+            }
             for box in boxes
         ]
     }
@@ -796,10 +804,9 @@ async def test_photo_result_distinguishes_correction_empty_and_rejected_output(
 async def test_truncated_structure_keeps_accepted_blocks_without_retry_or_pending_erase(
     tmp_path, google
 ):
-    field = "box_2d" if google else "bbox"
     text = (
-        '{"blocks":[{"' + field + '":[0,0,100,100],"source":"one","translation":"하나"},'
-        '{"' + field + '":[100,100,200,200],"source":"unfinished"'
+        '{"blocks":[{"quad":[[0,0],[100,0],[100,100],[0,100]],"source":"one","translation":"하나"},'
+        '{"quad":[[100,100],[200,100],[200,200],[100,200]],"source":"unfinished"'
     )
     h = Harness(
         tmp_path, [[PhotoTextDelta(text), PhotoStreamCompleted({}, "model")]], google=google
@@ -815,4 +822,75 @@ async def test_truncated_structure_keeps_accepted_blocks_without_retry_or_pendin
         assert h.owner.request_starts == 1
         assert len(h.connections) == 1
     finally:
+        await h.owner.close()
+
+
+@pytest.mark.parametrize("google", [False, True])
+async def test_rotated_geometry_is_early_immutable_and_bad_geometry_does_not_hide_neighbor(
+    tmp_path, google
+):
+    geometry = asyncio.Event()
+    source = asyncio.Event()
+    complete = asyncio.Event()
+    invalid = [[0, 0], [100, 100], [100, 0], [0, 100]]
+    rotated = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
+    if google:
+        rotated = [[x / 1280 * 1000, y / 720 * 1000] for x, y in rotated]
+    prefix = (
+        '{"blocks":['
+        + json.dumps({"quad": invalid, "source": "bad", "translation": "bad"})
+        + ',{"quad":'
+    )
+    h = Harness(
+        tmp_path,
+        [
+            [
+                PhotoTextDelta(prefix),
+                geometry,
+                PhotoTextDelta(json.dumps(rotated)),
+                source,
+                PhotoTextDelta(',"source":"unknown ?\\nknown"'),
+                complete,
+                PhotoTextDelta(',"translation":"모름 ?\\n알려짐"}]}'),
+                PhotoStreamCompleted({}, "model"),
+            ]
+        ],
+        google=google,
+    )
+    expected = [[450.375, 150.75], [751.125, 225.375], [675.75, 451.125], [375.75, 375.375]]
+    try:
+        photo_id = await h.offer()
+        h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["excluded_blocks"] == [0])
+        assert h.photo["preparations"] == h.photo["blocks"] == []
+        geometry.set()
+        await eventually(lambda: len(h.photo["preparations"]) == 1)
+        preparation = h.photo["preparations"][0]
+        for actual, point in zip(preparation["quad"], expected, strict=True):
+            assert actual == pytest.approx(point)
+        assert preparation["source"] is preparation["source_line_count"] is None
+        assert h.photo["blocks"] == []
+        source.set()
+        await eventually(lambda: h.photo["preparations"][0]["source_line_count"] == 2)
+        assert h.photo["blocks"] == []
+        complete.set()
+        await eventually(lambda: h.photo["phase"] == "partial")
+        assert h.photo["excluded_blocks"] == [0]
+        assert h.photo["blocks"] == [
+            {
+                "block_id": 1,
+                "quad": preparation["quad"],
+                "source": "unknown ?\nknown",
+                "translation": "모름 ?\n알려짐",
+            }
+        ]
+        assert h.photo["preparations"][0]["quad"] == preparation["quad"]
+        assert h.owner.request_starts == h.connections[0].starts == 1
+        h.owner.hidden(photo_id)
+        assert h.owner.pull(photo_id, "reopen")
+        assert h.owner.request_starts == 1
+    finally:
+        geometry.set()
+        source.set()
+        complete.set()
         await h.owner.close()

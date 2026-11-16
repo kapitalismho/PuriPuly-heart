@@ -178,7 +178,9 @@ async def test_luna_dedicated_preopen_send_timing_partial_blocks_and_completion(
     connections = []
     release = asyncio.Event()
     disconnected = asyncio.Event()
-    block = '{"bbox":[200,100,600,300],"source":"Hello","translation":"안녕"}'
+    block = (
+        '{"quad":[[200,100],[600,100],[600,300],[200,300]],"source":"Hello","translation":"안녕"}'
+    )
 
     async def handle(socket):
         connections.append(socket.request.headers.get("Authorization"))
@@ -230,6 +232,11 @@ async def test_luna_dedicated_preopen_send_timing_partial_blocks_and_completion(
         assert request["store"] is False
         assert "temperature" not in request
         assert request["text"]["format"]["strict"] is True
+        assert request["text"]["format"]["schema"]["properties"]["blocks"]["items"]["required"] == [
+            "quad",
+            "source",
+            "translation",
+        ]
         assert (
             request["input"][0]["content"][0]["image_url"]
             == f"data:image/jpeg;base64,{photo.jpeg_base64}"
@@ -243,11 +250,15 @@ async def test_luna_dedicated_preopen_send_timing_partial_blocks_and_completion(
         await asyncio.wait_for(disconnected.wait(), 1)
 
 
+@pytest.mark.parametrize("model", ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"])
 async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_partial_stream(
     tmp_path: Path,
+    model: str,
 ):
     photo = await synthetic_photo(tmp_path)
-    block = '{"box_2d":[100,200,400,600],"source":"Hello","translation":"안녕"}'
+    block = (
+        '{"quad":[[200,100],[600,100],[600,400],[200,400]],"source":"Hello","translation":"안녕"}'
+    )
     chunks = [
         _google_chunk("private thought", thought=True),
         _google_chunk('{"blocks":[' + block),
@@ -256,9 +267,7 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
     ]
     async with ControlledGoogle(chunks) as server:
         server.pause_after = 2
-        connection = GooglePhotoConnection(
-            "synthetic-key", model="gemini-3.1-flash-lite", base_url=server.base_url
-        )
+        connection = GooglePhotoConnection("synthetic-key", model=model, base_url=server.base_url)
         await connection.preopen()
         assert [(method, body) for method, _, body, _, _ in server.requests] == [("GET", None)]
         assert connection.connect_ms > 0
@@ -268,13 +277,13 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
         assert isinstance(sent, PhotoRequestSent)
         delta = await anext(stream)
         assert delta == PhotoTextDelta('{"blocks":[' + block)
-        events = PhotoBlockParser(google=True).feed(delta.text)
+        events = PhotoBlockParser().feed(delta.text)
         assert any(event.kind == "block_complete" for event in events)
         assert server.connections == 1
         assert [request[0] for request in server.requests] == ["GET", "POST"]
         method, target, body, headers, received = server.requests[-1]
         assert pull_time <= sent.monotonic_time <= received
-        assert target.endswith("/gemini-3.1-flash-lite:streamGenerateContent?alt=sse")
+        assert target.endswith(f"/{model}:streamGenerateContent?alt=sse")
         assert headers["x-goog-api-key"] == "synthetic-key"
         assert body["contents"][0]["parts"][0] == {
             "inline_data": {"mime_type": "image/jpeg", "data": photo.jpeg_base64}
@@ -285,8 +294,13 @@ async def test_google_metadata_only_preopen_and_selected_body_thought_filtering_
         assert config["mediaResolution"] == "MEDIA_RESOLUTION_HIGH"
         assert not {"temperature", "topP", "topK"}.intersection(config)
         schema = config["responseJsonSchema"]["properties"]["blocks"]["items"]
-        assert schema["required"] == ["box_2d", "source", "translation"]
-        assert schema["properties"]["box_2d"]["items"] == {"type": "integer"}
+        assert schema["required"] == ["quad", "source", "translation"]
+        assert schema["properties"]["quad"]["items"] == {
+            "type": "array",
+            "items": {"type": "number"},
+            "minItems": 2,
+            "maxItems": 2,
+        }
         assert "normalized to 0-1000" in body["systemInstruction"]["parts"][0]["text"]
         assert not server.gate.is_set()
         server.gate.set()
@@ -575,7 +589,7 @@ async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_pai
     events = [
         {
             "type": "response.output_text.delta",
-            "delta": '{"blocks":[{"bbox":[0,0,100,100],"source":"one","translation":"하나"}',
+            "delta": '{"blocks":[{"quad":[[0,0],[100,0],[100,100],[0,100]],"source":"one","translation":"하나"}',
         },
         {"type": "response.output_text.delta", "delta": "]}"},
         {
@@ -605,6 +619,9 @@ async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_pai
         assert remaining[-1] == PhotoStreamCompleted({"output_tokens": 30}, "gpt-6-luna")
         assert len(server.requests) == 1
         assert server.requests[0][2]["model"] == "gpt-6-luna"
+        assert server.requests[0][2]["text"]["format"]["schema"]["properties"]["blocks"]["items"][
+            "required"
+        ] == ["quad", "source", "translation"]
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-api-key"
 
 
@@ -640,8 +657,14 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         tokens.append(True)
         return "synthetic-puri-token"
 
+    quad = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
+    document = json.dumps(
+        {"blocks": [{"quad": quad, "source": "known\n?", "translation": "알려짐\n?"}]}
+    )
+
     events = [
-        {"type": "text_delta", "text": '{"blocks":[]}'},
+        {"type": "text_delta", "text": document[: len(document) // 2]},
+        {"type": "text_delta", "text": document[len(document) // 2 :]},
         {
             "type": "completed",
             "response": {"status": "completed", "model": "gpt-6-luna", "usage": {}},
@@ -654,6 +677,24 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         assert server.requests == []
         result = [event async for event in connection.stream(photo, "ko")]
         assert isinstance(result[-1], PhotoStreamCompleted)
+        parser = PhotoBlockParser()
+        parsed = [
+            stage
+            for event in result
+            if isinstance(event, PhotoTextDelta)
+            for stage in parser.feed(event.text)
+        ]
+        blocks = parser.finish()
+        assert [event.kind for event in parsed] == ["quad_ready", "source_ready", "block_complete"]
+        assert blocks[0].quad == tuple(tuple(point) for point in quad)
+        assert blocks[0].source == "known\n?"
+        assert blocks[0].translation == "알려짐\n?"
+        mapped = photo.map_quad(blocks[0].quad, google=False)
+        for actual, (x, y) in zip(mapped.quad, quad, strict=True):
+            assert actual == pytest.approx(
+                ((x - photo.offset_x) / photo.scale, (y - photo.offset_y) / photo.scale)
+            )
+        assert not mapped.corrected
         assert len(server.requests) == 1
         sent = server.requests[0][2]
         assert set(sent) == {
@@ -663,7 +704,7 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
             "image_size",
             "target_language",
         }
-        assert sent["photo_protocol"] == 2
+        assert sent["photo_protocol"] == 3
         assert sent["image_size"] == [1280, 720]
         assert sent["image_base64"] == photo.jpeg_base64
         assert sent["target_language"] == "ko"
@@ -773,7 +814,7 @@ async def test_api_consumer_failure_releases_single_connection_pool_for_next_pho
         assert len(server.requests) == 2
 
 
-async def test_portrait_preparation_maps_boxes_and_prompts_in_its_upright_canvas(tmp_path):
+async def test_portrait_preparation_maps_quads_and_prompts_in_its_upright_canvas(tmp_path):
     from puripuly_heart.providers.photo import _luna_payload
 
     source = tmp_path / "source.png"
@@ -795,7 +836,77 @@ async def test_portrait_preparation_maps_boxes_and_prompts_in_its_upright_canvas
         directory=tmp_path,
     )
     assert photo.send_size == (720, 1280)
-    assert photo.map_box((0, 640, 720, 1280), google=False).bbox == (0.0, 1920.0, 2160.0, 3840.0)
-    assert photo.map_box((500, 0, 1000, 1000), google=True).bbox == (0.0, 1920.0, 2160.0, 3840.0)
+    assert photo.map_quad(((0, 640), (720, 640), (720, 1280), (0, 1280)), google=False).quad == (
+        (0.0, 1920.0),
+        (2160.0, 1920.0),
+        (2160.0, 3840.0),
+        (0.0, 3840.0),
+    )
+    assert photo.map_quad(((0, 500), (1000, 500), (1000, 1000), (0, 1000)), google=True).quad == (
+        (0.0, 1920.0),
+        (2160.0, 1920.0),
+        (2160.0, 3840.0),
+        (0.0, 3840.0),
+    )
     text = _luna_payload(photo, "ko")["input"][0]["content"][1]["text"]
     assert text.endswith("The image is 720x1280 pixels.")
+
+
+async def test_openrouter_one_quad_translation_request_reaches_consumer_without_geometry_followup(
+    tmp_path,
+):
+    from puripuly_heart.providers.photo import OpenRouterPhotoConnection
+
+    photo = await synthetic_photo(tmp_path)
+    quad = [[300.25, 100.5], [500.75, 150.25], [450.5, 300.75], [250.5, 250.25]]
+    document = json.dumps(
+        {"blocks": [{"quad": quad, "source": "known\n?", "translation": "알려짐\n?"}]}
+    )
+    events = [
+        {"type": "response.output_text.delta", "delta": document},
+        {
+            "type": "response.completed",
+            "response": {"status": "completed", "model": "openai/gpt-6-luna"},
+        },
+    ]
+    credentials = []
+
+    async def credential():
+        credentials.append(True)
+        return "synthetic-openrouter-key"
+
+    async with ControlledGoogle(events) as server:
+        connection = OpenRouterPhotoConnection(credential)
+        connection.endpoint = server.base_url.removesuffix("/v1beta/models") + "/v1/responses"
+        parser = PhotoBlockParser()
+        received = []
+        async for event in connection.stream(photo, "ko"):
+            if isinstance(event, PhotoTextDelta):
+                received.extend(parser.feed(event.text))
+        blocks = parser.finish()
+        assert len(blocks) == 1
+        assert blocks[0].quad == tuple(tuple(point) for point in quad)
+        assert blocks[0].translation == "알려짐\n?"
+        assert [event.kind for event in received] == [
+            "quad_ready",
+            "source_ready",
+            "block_complete",
+        ]
+        mapped = photo.map_quad(blocks[0].quad, google=False)
+        assert not mapped.corrected
+        assert len(server.requests) == len(credentials) == 1
+        sent = server.requests[0][2]
+        assert sent["provider"] == {
+            "only": ["openai"],
+            "allow_fallbacks": False,
+            "require_parameters": True,
+        }
+        assert sent["text"]["format"]["schema"]["properties"]["blocks"]["items"]["required"] == [
+            "quad",
+            "source",
+            "translation",
+        ]
+        assert (
+            sent["input"][0]["content"][0]["image_url"]
+            == f"data:image/jpeg;base64,{photo.jpeg_base64}"
+        )

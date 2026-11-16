@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::manifest::PhotoError;
+use super::processing::Quad;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -31,7 +32,7 @@ pub struct PhotoImage {
 #[serde(deny_unknown_fields)]
 pub struct PhotoPreparation {
     pub block_id: u64,
-    pub bbox: [f64; 4],
+    pub quad: [[f64; 2]; 4],
     pub source: Option<String>,
     pub source_line_count: Option<u32>,
 }
@@ -40,7 +41,7 @@ pub struct PhotoPreparation {
 #[serde(deny_unknown_fields)]
 pub struct PhotoBlock {
     pub block_id: u64,
-    pub bbox: [f64; 4],
+    pub quad: [[f64; 2]; 4],
     pub source: String,
     pub translation: String,
 }
@@ -115,7 +116,7 @@ impl Photo {
             }
         }
         for preparation in &self.preparations {
-            validate_bbox(&preparation.bbox, self.image.as_ref())?;
+            validate_quad(preparation.quad, self.image.as_ref())?;
             if !ids.insert(preparation.block_id)
                 || match (&preparation.source, preparation.source_line_count) {
                     (None, None) => false,
@@ -129,7 +130,7 @@ impl Photo {
         ids.clear();
         ids.extend(self.excluded_blocks.iter().copied());
         for block in &self.blocks {
-            validate_bbox(&block.bbox, self.image.as_ref())?;
+            validate_quad(block.quad, self.image.as_ref())?;
             if !ids.insert(block.block_id) {
                 return Err(PhotoError::Protocol);
             }
@@ -138,7 +139,7 @@ impl Photo {
                 .iter()
                 .find(|preparation| preparation.block_id == block.block_id)
             {
-                if preparation.bbox != block.bbox
+                if preparation.quad != block.quad
                     || preparation
                         .source
                         .as_ref()
@@ -152,21 +153,13 @@ impl Photo {
     }
 }
 
-fn validate_bbox(bbox: &[f64; 4], image: Option<&PhotoImage>) -> Result<(), PhotoError> {
+fn validate_quad(quad: [[f64; 2]; 4], image: Option<&PhotoImage>) -> Result<(), PhotoError> {
     let Some(image) = image else {
         return Err(PhotoError::Protocol);
     };
-    if bbox.iter().any(|value| !value.is_finite())
-        || bbox[0] < 0.0
-        || bbox[1] < 0.0
-        || bbox[2] <= bbox[0]
-        || bbox[3] <= bbox[1]
-        || bbox[2] > f64::from(image.width)
-        || bbox[3] > f64::from(image.height)
-    {
-        return Err(PhotoError::Protocol);
-    }
-    Ok(())
+    Quad::new(quad, [image.width, image.height])
+        .map(|_| ())
+        .map_err(|_| PhotoError::Protocol)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -264,7 +257,7 @@ fn validate_cumulative(current: &Photo, next: &Photo) -> Result<(), PhotoError> 
             }
             return Err(PhotoError::Protocol);
         };
-        if old.bbox != new.bbox
+        if old.quad != new.quad
             || (old.source.is_some()
                 && (old.source != new.source || old.source_line_count != new.source_line_count))
         {

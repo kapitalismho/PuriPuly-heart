@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import legacyContract from '../src/photo-contract.json';
+import quadContract from '../src/photo-quad-contract.json';
 import relay from '../src/index';
 import { checkPhotoAllowance, photoPolicy } from '../src/usage';
 import { accountingDatabase, installationHash, relayEvents, responseEvents, signToken, tokenSecret } from './fixtures';
@@ -77,6 +79,67 @@ The image is ${text} pixels.`);
     expect(upstream.mock.calls.length).toBe(calls);
     sqlite.close();
   });
+  it.each([1, 2, 3])('preserves protocol %s geometry, JPEG upload and one settled request', async (version) => {
+    const { db, sqlite } = accountingDatabase();
+    const geometry = version === 3
+      ? { quad: [[20.5, 10.25], [110.5, 30.25], [90.5, 100.25], [0.5, 80.25]] }
+      : { bbox: [0, 0, 100, 100] };
+    const block = { ...geometry, source: 'one\nunknown ?', translation: '하나\n?' };
+    const text = JSON.stringify({ blocks: [block] });
+    const upstream = vi.fn().mockResolvedValue(responseEvents(result, [
+      { type: 'response.output_text.delta', delta: text },
+    ]));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const value = { ...body, photo_protocol: version, ...(version === 1 ? {} : { image_size: [720, 1280] }) };
+      const response = await relay.fetch(request(value), environment(db));
+      expect(response.status).toBe(200);
+      const events = await relayEvents(response);
+      expect(events.map((event) => event.type)).toEqual(['text_delta', 'completed']);
+      expect(JSON.parse(events[0].text as string).blocks).toEqual([block]);
+      expect(upstream).toHaveBeenCalledTimes(1);
+      const sent = JSON.parse(upstream.mock.calls[0][1].body);
+      const contract = version === 3 ? quadContract : legacyContract;
+      expect(sent.text.format.schema).toEqual(contract.schema);
+      expect(sent.text.format.schema.properties.blocks.items.required).toEqual([
+        version === 3 ? 'quad' : 'bbox', 'source', 'translation',
+      ]);
+      expect(sent.text.format.schema.properties.blocks.items.properties).toEqual(version === 3 ? {
+        quad: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 }, minItems: 4, maxItems: 4 },
+        source: { type: 'string' }, translation: { type: 'string' },
+      } : {
+        bbox: { type: 'array', items: { type: 'integer' }, minItems: 4, maxItems: 4 },
+        source: { type: 'string' }, translation: { type: 'string' },
+      });
+      expect(sent.instructions).toBe(contract.instructions.replaceAll('${targetName}', 'Korean'));
+      expect(sent.input[0].content[0]).toEqual({ type: 'input_image', image_url: `data:image/jpeg;base64,${body.image_base64}` });
+      expect(sent.input[0].content[1].text).toContain(version === 1 ? '1280x720' : '720x1280');
+      expect(sqlite.prepare('SELECT settled, output_tokens FROM photo_admissions').get()).toMatchObject({ settled: 1, output_tokens: 2556 });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it('rejects invalid v3 canvases, retired versions and non-JPEG input before admission', async () => {
+    const { db, sqlite } = accountingDatabase();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const current = { ...body, photo_protocol: 3, image_size: [1280, 720] };
+      for (const invalid of [
+        { ...current, image_size: [1920, 1080] }, { ...current, image_size: undefined },
+        { ...current, photo_protocol: true }, { ...current, photo_protocol: 4 },
+        { ...current, image_base64: 'iVBORw0KGgo=' }, { ...current, image_base64: '/9j/AAA!' },
+      ]) {
+        expect((await relay.fetch(request(invalid), environment(db))).status).toBe(400);
+      }
+      expect(upstream).not.toHaveBeenCalled();
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM photo_admissions').get()!.n).toBe(0);
+    } finally {
+      sqlite.close();
+    }
+  });
+
 
   it('rejects model, endpoint, nested config and invalid tokens before admission or upstream work', async () => {
     const { db, sqlite } = accountingDatabase();

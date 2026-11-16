@@ -65,7 +65,7 @@ fn requested() -> Photo {
 fn block(id: u64) -> PhotoBlock {
     PhotoBlock {
         block_id: id,
-        bbox: [1.25, 2.5, 300.0, 100.0],
+        quad: [[1.25, 2.5], [300.0, 2.5], [300.0, 100.0], [1.25, 100.0]],
         source: "A\nB".into(),
         translation: "가\n나".into(),
     }
@@ -174,7 +174,7 @@ fn early_geometry_never_invents_source_lines_or_changes_completed_content() {
     let mut current = requested();
     current.preparations.push(PhotoPreparation {
         block_id: 0,
-        bbox: block(0).bbox,
+        quad: block(0).quad,
         source: None,
         source_line_count: None,
     });
@@ -198,6 +198,73 @@ fn early_geometry_never_invents_source_lines_or_changes_completed_content() {
     assert_eq!(state.apply(4, Some(current)), Err(PhotoError::Protocol));
 }
 
+#[test]
+fn quad_geometry_is_required_convex_clockwise_in_image_even_when_kept() {
+    let valid = [[100.0,20.0],[160.0,80.0],[100.0,140.0],[40.0,80.0]];
+    for start in 0..4 {
+        let mut current = requested();
+        let mut complete = block(0);
+        complete.quad = std::array::from_fn(|i| valid[(i + start) % 4]);
+        complete.translation = complete.source.clone();
+        current.blocks.push(complete);
+        PhotoState::default().apply(1, Some(current)).unwrap();
+    }
+    let invalid = [
+        [[10.0,10.0],[80.0,80.0],[80.0,10.0],[10.0,80.0]],
+        [[10.0,10.0],[10.0,80.0],[80.0,80.0],[80.0,10.0]],
+        [[10.0,10.0],[80.0,10.0],[40.0,20.0],[10.0,80.0]],
+        [[10.0,10.0],[80.0,10.0],[80.0,10.0],[10.0,80.0]],
+        [[10.0,10.0],[40.0,10.0],[80.0,10.0],[10.0,80.0]],
+        [[-0.1,10.0],[80.0,10.0],[80.0,80.0],[10.0,80.0]],
+        [[10.0,10.0],[1920.1,10.0],[80.0,80.0],[10.0,80.0]],
+        [[10.0,10.0],[80.0,10.0],[80.0,1080.1],[10.0,80.0]],
+        [[f64::NAN,10.0],[80.0,10.0],[80.0,80.0],[10.0,80.0]],
+        [[10.0,10.0],[f64::INFINITY,10.0],[80.0,80.0],[10.0,80.0]],
+    ];
+    for quad in invalid {
+        for kept in [false, true] {
+            let mut current = requested();
+            let mut complete = block(0);
+            complete.quad = quad;
+            if kept { complete.translation = complete.source.clone(); }
+            current.blocks.push(complete);
+            assert_eq!(PhotoState::default().apply(1, Some(current)), Err(PhotoError::Protocol));
+        }
+        let mut current = requested();
+        current.preparations.push(PhotoPreparation {
+            block_id: 0, quad, source: None, source_line_count: None,
+        });
+        assert_eq!(PhotoState::default().apply(1, Some(current)), Err(PhotoError::Protocol));
+    }
+    for field in ["quad", "bbox"] {
+        let mut document = serde_json::to_value(block(0)).unwrap();
+        document.as_object_mut().unwrap().remove("quad");
+        if field == "bbox" { document["bbox"] = json!([1,2,300,100]); }
+        assert!(serde_json::from_value::<PhotoBlock>(document).is_err());
+    }
+}
+
+#[test]
+fn preparation_and_completed_quads_cannot_mutate_even_with_identical_aabbs() {
+    let mut current = requested();
+    current.preparations.push(PhotoPreparation {
+        block_id: 0, quad: block(0).quad, source: None, source_line_count: None,
+    });
+    let mut state = PhotoState::default();
+    state.apply(1, Some(current.clone())).unwrap();
+    let mut changed = current.clone();
+    changed.preparations[0].quad[1][1] += 1.0;
+    assert_eq!(state.apply(2, Some(changed)), Err(PhotoError::Protocol));
+    let mut mismatched = block(0);
+    mismatched.quad[1][1] += 1.0;
+    current.blocks.push(mismatched);
+    assert_eq!(state.apply(2, Some(current.clone())), Err(PhotoError::Protocol));
+    current.blocks[0] = block(0);
+    state.apply(2, Some(current.clone())).unwrap();
+    current.preparations[0].quad[1][1] += 1.0;
+    current.blocks[0].quad = current.preparations[0].quad;
+    assert_eq!(state.apply(3, Some(current)), Err(PhotoError::Protocol));
+}
 #[tokio::test]
 async fn asynchronous_image_boundary_coalesces_full_inputs_and_rejects_stale_results() {
     let (mut boundary, mut worker) = PhotoImageBoundary::channel();
@@ -205,7 +272,7 @@ async fn asynchronous_image_boundary_coalesces_full_inputs_and_rejects_stale_res
     let mut current = requested();
     current.preparations.push(PhotoPreparation {
         block_id: 0,
-        bbox: block(0).bbox,
+        quad: block(0).quad,
         source: None,
         source_line_count: None,
     });
@@ -735,19 +802,24 @@ async fn actual_native_pipeline() {
     config.image.max_size = [320, 180];
     config.image.debug_controls = true;
     let name = "actual-image-pipeline";
-    let root = std::env::temp_dir().join(format!("puri339-native-{}-{name}", std::process::id()));
+    let root = std::env::var_os("PURIPULY_PHOTO_EVIDENCE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join(format!("puri339-native-{}-{name}", std::process::id())));
     let exports = root.join("exports");
     config.image.export_dir = Some(exports.clone());
     let (mut child, mut socket, directory) = start_child(&config, name).await;
     let (stages, mut stage_receiver) = tokio::sync::mpsc::unbounded_channel();
     let stdout = child.0.stdout.take().unwrap();
     let reader = std::thread::spawn(move || {
+        let mut log = Vec::new();
         for line in std::io::BufReader::new(stdout).lines() {
             let value: Value = serde_json::from_str(&line.unwrap()).unwrap();
+            log.push(value.clone());
             if stages.send(value).is_err() {
                 break;
             }
         }
+        log
     });
     assert_eq!(receive(&mut socket).await["type"], "photo_auth");
     let mut current = photo();
@@ -757,11 +829,34 @@ async fn actual_native_pipeline() {
         .as_millis() as u64;
     let source = directory.join("capture.png");
     let mut pixels = image::RgbImage::from_pixel(320, 180, image::Rgb([230, 230, 220]));
-    for y in 45..65 {
-        for x in 30..180 {
-            pixels.put_pixel(x, y, image::Rgb([15, 15, 20]));
+    let glyphs = [
+        [15u8,16,16,14,1,1,30],
+        [14,17,17,17,17,17,14],
+        [17,17,17,17,17,17,14],
+        [30,17,17,30,20,18,17],
+        [14,17,16,16,16,17,14],
+        [31,16,16,30,16,16,31],
+    ];
+    for (left, top, scale) in [(30,45,3), (220,70,2), (220,110,2)] {
+        for (index, rows) in glyphs.iter().enumerate() {
+            for (row, bits) in rows.iter().enumerate() {
+                for column in 0..5 {
+                    if bits & (1 << (4 - column)) == 0 { continue; }
+                    for dy in 0..scale {
+                        for dx in 0..scale {
+                            pixels.put_pixel(
+                                left + (index as u32 * 6 + column) * scale + dx,
+                                top + row as u32 * scale + dy,
+                                image::Rgb([15,15,20]),
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
+    std::fs::create_dir_all(&root).unwrap();
+    pixels.save(root.join("synthetic-source.png")).unwrap();
     pixels.save(&source).unwrap();
     current.path = source.to_string_lossy().into_owned();
     current.expected_file_id = puripuly_heart_overlay::photo::prepare::file_identity(
@@ -810,7 +905,7 @@ async fn actual_native_pipeline() {
     current.phase = PhotoPhase::Requesting;
     current.preparations.push(PhotoPreparation {
         block_id: 0,
-        bbox: [25.0, 35.0, 200.0, 80.0],
+        quad: [[25.0, 35.0], [200.0, 40.0], [200.0, 80.0], [25.0, 75.0]],
         source: None,
         source_line_count: None,
     });
@@ -849,7 +944,7 @@ async fn actual_native_pipeline() {
     assert_eq!(hidden_metadata["blocks"].as_array().unwrap().len(), 0);
     current.blocks.push(PhotoBlock {
         block_id: 0,
-        bbox: current.preparations[0].bbox,
+        quad: current.preparations[0].quad,
         source: "SOURCE".into(),
         translation: "Translated".into(),
     });
@@ -862,14 +957,14 @@ async fn actual_native_pipeline() {
     for id in 1..3 {
         current.blocks.push(PhotoBlock {
             block_id: id,
-            bbox: [
-                210.0,
-                25.0 + id as f64 * 40.0,
-                310.0,
-                55.0 + id as f64 * 40.0,
+            quad: [
+                [210.0, 25.0 + id as f64 * 40.0],
+                [310.0, 25.0 + id as f64 * 40.0],
+                [310.0, 55.0 + id as f64 * 40.0],
+                [210.0, 55.0 + id as f64 * 40.0],
             ],
-            source: format!("SOURCE {id}"),
-            translation: format!("Result {id}"),
+            source: "SOURCE".into(),
+            translation: if id == 2 { "SOURCE".into() } else { "Result".into() },
         });
         send(
             &mut socket,
@@ -899,6 +994,11 @@ async fn actual_native_pipeline() {
     );
     assert_eq!(metadata["original_uploads"], 1);
     assert!(metadata["composition_gpu_ms"].is_number());
+    assert_eq!(metadata["blocks"][2]["kept"], true);
+    assert_eq!(
+        image::imageops::crop_imm(&complete, 210, 105, 100, 30).to_image(),
+        image::imageops::crop_imm(&original, 210, 105, 100, 30).to_image(),
+    );
     assert!(metadata["font"]["family"]
         .as_str()
         .unwrap()
@@ -999,7 +1099,8 @@ async fn actual_native_pipeline() {
     .await
     .unwrap();
     assert!(child.0.wait().unwrap().success());
-    reader.join().unwrap();
+    let log = reader.join().unwrap();
+    std::fs::write(root.join("native-log.json"), serde_json::to_vec_pretty(&log).unwrap()).unwrap();
     std::fs::remove_dir_all(directory).unwrap();
 }
 
@@ -1074,7 +1175,7 @@ async fn actual_photo_process_rejects_unauthorized_or_invalid_quiesce() {
 #[test]
 fn photo_protocol_requires_current_schema_and_immutable_capture_identity() {
     let mut old_manifest = manifest();
-    old_manifest.protocol_version = 2;
+    old_manifest.protocol_version = 3;
     assert_eq!(old_manifest.validate(), Err(PhotoError::Manifest));
     let mut document = serde_json::to_value(photo()).unwrap();
     document.as_object_mut().unwrap().remove("expected_file_id");
@@ -1318,7 +1419,7 @@ async fn excluded_preparations_cannot_resurrect_or_publish_late_results() {
     for id in [0, 1] {
         current.preparations.push(PhotoPreparation {
             block_id: id,
-            bbox: block(id).bbox,
+            quad: block(id).quad,
             source: Some("A\nB".into()),
             source_line_count: Some(2),
         });

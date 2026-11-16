@@ -168,7 +168,7 @@ class PhotoBridge:
         self.shutdown_complete.clear()
         self._commands.clear()
         return {
-            "protocol_version": 3,
+            "protocol_version": 4,
             "role": "photo",
             "bridge_url": self._url,
             "session_token": self._token,
@@ -274,7 +274,7 @@ class PhotoBridge:
         token = value.get("session_token")
         return (
             value.get("type") == "photo_auth"
-            and value.get("protocol_version") == 3
+            and value.get("protocol_version") == 4
             and type(value.get("protocol_version")) is int
             and value.get("role") == "photo"
             and isinstance(token, str)
