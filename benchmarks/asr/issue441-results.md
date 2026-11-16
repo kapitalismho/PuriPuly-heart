@@ -2,14 +2,28 @@
 
 ## Decision
 
-**Defer a production/default switch to Scribe and keep the current controller.** Native Scribe metadata warrants a bounded integration-design experiment, but this pilot does not establish superior diarization accuracy, a useful `turn_prediction` advantage over matched VAD, or safe late caption regrouping.
+**Defer a production/default switch to Scribe; do not adopt `turn_prediction`. Keep the current controller.** Native Scribe metadata warrants a bounded integration-design experiment, but this pilot does not establish superior diarization accuracy, a useful prediction advantage over matched VAD, or safe late caption regrouping.
 
 - Fix the proposed integration boundary first: join delayed metadata by `segment_index`, preserve coherent source text and context, and distinguish identity-only updates from source-unit changes that require new MT. Actual Japanese source-fragment translations changed meaning. This is not a demonstrated defect in the existing Soniox product path.
 - Do not implement a Soniox composition repair from envelope-only probes: corroboration found no confirmed harmful join among the six flagged cases, with two still unresolved.
 - Nemotron's historical 1.04 s profile worked on the existing AMD GPU. This establishes standalone activity/identity feasibility, not text alignment or an integrated alternative; it does not reopen the cancelled [#218](https://github.com/kapitalismho/PuriPuly-heart/issues/218) work.
 - The next narrow question is whether an indexed Scribe adapter can preserve complete source units when metadata arrives, avoiding word-fragment MT while exposing useful attribution. Waiting for metadata versus translating immediately and regrouping must account for actual latency and additional requests, not assume free recoloring.
 
+### Owner decision: do not adopt turn prediction
+
+After reviewing the results, the owner instructed: “턴 프레딕션은 아예 비채용으로 결정” — do not adopt turn prediction. This supersedes any prior deferral or open adoption question for that feature. Do not plan its integration, parameter tuning or further prediction experiments under #441. Keep the executed T0/T1/T2 evidence and its limitations as historical results; this product decision is not a claim that the prediction algorithm is universally ineffective. Evaluation of Scribe ASR/native diarization remains a separate, deferred question. No production setting or runtime behavior changed.
+
 Issue: [#441](https://github.com/kapitalismho/PuriPuly-heart/issues/441). Product baseline: `9f7474b94b885a7a9a4777b43a3a05026e3e248e`. Production sources, default routing, settings and protected documentation were not changed. No PR, remote publication, issue closure or Project-state update is claimed.
+
+### Clarification: production policy and the Japanese fragmentation case
+
+S1 used the production audio/VAD/controller/Soniox recognition path at the declared product baseline, followed by replay through the production source-group, caption, continuity and context owners. It was not a simplified “split on every speaker” replacement. S0 deliberately omitted production input selection and intermediate finalization. S1's full structural replay substituted immediate deterministic MT and collected output events; only the seven selected intervals subsequently used actual MT and Desktop presentation. This does not reproduce a private installed instance, personal settings or a live end-to-end GUI session.
+
+For Soniox, the first correction is interpretation, not parameter tuning: the recorded timestamp-gap and envelope qualifiers already correct misleading missing-ASR/harm claims. Do not retrospectively move anchors or widen token intervals to improve the score. A separately declared lexical-unit-aligned comparison could address representation differences, while preserving the original fixed-point results. The observed JA 30.08 s source-input omission is a distinct, narrow diagnostic candidate; its cause, audible contribution loss and a justified VAD/finalize correction are not established. Existing evidence does not justify broadly changing the current grouping or silence thresholds.
+
+The mt-07 failure does **not** show that correctly separating speakers intrinsically worsens translation. Original Scribe diarized event 539, segment 10, assigns `楽しみ` to native `speaker_0` and the following `方…` to `speaker_1`; similarly `なん` is `speaker_0` and `か…` is `speaker_1`. The projection therefore splits the expressions `楽しみ方` and `なんか` inside their linguistic units. Independent reference span `ja-diagnostic-a206` assigns the complete phrase to one reference speaker at 52.63–56.84 s, with another speaker's `うん` backchannels overlapping at 52.65–53.50 and 54.24–55.21 s. Native/reference ID namespaces differ. These annotations suggest an overlap-associated attribution problem rather than genuine floor changes inside those expressions, but no new listening establishes its acoustic cause.
+
+Both whole and fragmented E0 translations used empty prior-turn context and the same bound normal prompt/language pair/model settings; source granularity and the immediate phrase context available to each request changed. They are individual stochastic calls, not a repeated quality estimate. The observed `楽しみ` → `기대돼` and `なん` → `뭐` demonstrate the risk of using those raw-ID runs as independent translation units, not a general argument against speaker-aware captions. E0's projection was not full production Scribe caption integration; S1 retained its captured context and cannot serve as a matched-context quality control. This clarification used existing artifacts only, without new provider calls or rescoring.
 
 ## Authority, frozen input and reference limits
 
