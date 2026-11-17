@@ -332,7 +332,7 @@ pub enum Hand {
     Right,
 }
 
-pub const PHOTO_LINGER: Duration = Duration::from_millis(2500);
+pub const PHOTO_LINGER: Duration = Duration::from_secs(4);
 pub const TOUCH_EDGE_M: f32 = 0.05;
 pub const TOUCH_DEPTH_M: f32 = 0.08;
 
