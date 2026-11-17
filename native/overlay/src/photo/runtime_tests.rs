@@ -899,7 +899,7 @@ impl PhotoRuntime {
 
 #[tokio::test]
 async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
-    use super::super::interaction::IDENTITY;
+    use super::super::interaction::{IDENTITY, PHOTO_LINGER};
     use futures_util::{SinkExt, StreamExt};
     use tokio::net::TcpListener;
     use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -944,6 +944,7 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
                 reference_epoch:1, left_index:1, right_index:2, grip, right_grip:false,
             }), clock + Duration::from_millis(ms))
         };
+        let settled_ms = 600 + PHOTO_LINGER.as_millis() as u64 + 1000;
         for ms in [0, 50, 150, 350] { step(&mut runtime, ms, false, 0.0); }
         assert!(step(&mut runtime, 360, true, 0.0).grab);
         if phase >= 1 { assert!(step(&mut runtime, 380, true, 0.12).pull); }
@@ -960,13 +961,18 @@ async fn quiescent_bridge_ack_waits_for_interaction_and_release_or_loss() {
             step(&mut runtime, 600, false, 0.12);
             runtime.ack_quiescent(&mut bridge).await.unwrap();
             assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
-            step(&mut runtime, 3300, false, 0.0);
+            step(&mut runtime, settled_ms, false, 0.0);
         }
+        assert!(runtime.interaction.quiescent(), "phase={phase}, loss={loss}");
         runtime.ack_quiescent(&mut bridge).await.unwrap();
-        let ack = socket.next().await.unwrap().unwrap();
+        let ack = tokio::time::timeout(Duration::from_secs(5), socket.next())
+            .await
+            .unwrap_or_else(|_| panic!("quiescent acknowledgement timed out: phase={phase}, loss={loss}"))
+            .unwrap()
+            .unwrap();
         assert_eq!(serde_json::from_str::<serde_json::Value>(ack.to_text().unwrap()).unwrap(),
             json!({"type":"photo_debug_quiescent","request_id":"bounded-request"}));
-        assert!(!step(&mut runtime, 3340, true, 0.0).grab);
+        assert!(!step(&mut runtime, settled_ms + 40, true, 0.0).grab);
         runtime.ack_quiescent(&mut bridge).await.unwrap();
         assert!(tokio::time::timeout(Duration::from_millis(20), socket.next()).await.is_err());
     }

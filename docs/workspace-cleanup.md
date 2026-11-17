@@ -133,3 +133,11 @@ Even `--check-only` writes `benchmarks/asr/data-preparation.json`. Both attempts
 - No completed acoustic/provider experiment was rerun. No model download, live provider request, production setting change, UI claim, or #441 scientific conclusion is part of this cleanup.
 
 No affected protected-manual drift is intentionally left: the parent explicitly authorizes the directly affected benchmark/contributor navigation updates. Architecture, CLI, privacy, and release contracts are unchanged.
+
+## Combined PR integration
+
+[PR #452](https://github.com/kapitalismho/PuriPuly-heart/pull/452) publishes the accumulated #447/#448/#449 outcomes and the additional approved cleanup. The final prepublication checks passed Ruff, Black on 1,278 files, the 603-file offline test-selection gate, and 112 focused cleanup/resource-consumer cases. Original child implementation and actual source/installed-application evidence remain applicable.
+
+The [first PR CI run](https://github.com/kapitalismho/PuriPuly-heart/actions/runs/44055266033) passed eight jobs but stalled in the native deterministic test `quiescent_bridge_ack_waits_for_interaction_and_release_or_loss`. The existing `dev` visibility change had increased the photo-card linger from 2.5 to 4 seconds; that test still advanced only 2.7 seconds after release, then waited indefinitely for a correctly withheld acknowledgement. The run was cancelled for diagnosis. Graphics and Python overlay integration checks had not started; the later missing integration-results file was a cancellation consequence, not an executed test failure.
+
+The bounded repair changes only the test: derive settled synthetic time from the current linger policy with a fade/return margin, assert quiescence before acknowledgement, and give acknowledgement delivery a five-second deadline. All five interaction/release/loss cases, early-ack rejection, exact request identity, re-grab prevention, and duplicate-ack rejection remain. Product visibility and runtime behavior are unchanged. The repaired bridge case and both surrounding quiescence contracts passed on Windows Rust 1.99.1: three tests, zero failures, 0.51 seconds, using the existing release-profile build cache. Current-head CI remains a separate publication gate.
