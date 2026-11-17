@@ -19,6 +19,12 @@ Maintained repository tools are tracked under [`scripts/ci/`](../scripts/ci/) an
 
 Cloud services are sibling projects at [`services/broker/`](../services/broker/README.md) and [`services/agent-relay/`](../services/agent-relay/README.md), outside the Python package. The development-only [`benchmarks/chatbot/`](../benchmarks/chatbot/README.md) owns chatbot measurements. Follow the service guides when preserving ignored Wrangler state and regenerating workspace dependency links after a checkout layout change.
 
+Application-owned translation templates, target-language rules, and language-pair examples live in [`src/puripuly_heart/data/prompts/`](../src/puripuly_heart/data/prompts/). Keep prompt contents and provider/language selection intact during resource-only changes. [`#70`](https://github.com/kapitalismho/PuriPuly-heart/issues/70) and [`#71`](https://github.com/kapitalismho/PuriPuly-heart/issues/71) remain open for rule and example contributions. `PURIPULY_HEART_PROMPTS_DIR` still selects an external prompt directory; saved user overrides remain user data, not bundled assets.
+
+Native upgrade cleanup removes old `app/prompts/` defaults only when their size and hash match the packaged resources. Modified or unrecognized old files and root user `prompts/` are preserved; retained files are not implicit runtime fallbacks.
+
+The [HTTP extension guide](../docs/http-extensions/index.md), [schema](../docs/http-extensions/http-extension.schema.json), and [example](../docs/http-extensions/examples/mymemory.json) are grouped under `docs/http-extensions/`. The native build copies that example to the unchanged installed `examples/http_extensions/` location. User extension discovery stays in the user's `http_extensions` directory.
+
 ## Native ASR worker builds
 
 Use CMake 3.19 or newer, the Windows Vulkan SDK, and the supported build entry point:

@@ -83,7 +83,7 @@ Contracts: [audio ownership](../src/puripuly_heart/core/audio/ownership.py), [de
 - Output preserves turn identity across revisions. Python owns caption lifetime; native code renders it.
 - The scene owner observes VRChat independently of audio and OSC. Only sanitized population context reaches translation.
 
-Interfaces: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions.md).
+Interfaces: [native overlays](../native/overlay/README.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](http-extensions/index.md).
 
 ### Isolated photo requests
 

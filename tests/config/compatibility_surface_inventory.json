@@ -114,7 +114,7 @@
       "classification": "public_compatibility_preserve",
       "source_of_truth_refs": [
         "src/puripuly_heart/config/prompts.py",
-        "prompts/translation_prompt.md",
+        "src/puripuly_heart/data/prompts/translation_prompt.md",
         "tests/config/public_compatibility_surfaces_snapshot.json::prompts"
       ],
       "fixture_or_guard_refs": [

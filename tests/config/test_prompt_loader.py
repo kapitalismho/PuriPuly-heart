@@ -269,3 +269,18 @@ def test_get_prompts_dir_is_independent_of_cwd(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("PURIPULY_HEART_PROMPTS_DIR", raising=False)
 
     assert get_prompts_dir() == expected
+
+
+def test_native_prompt_resources_never_fall_back_to_retired_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retired = tmp_path / "prompts"
+    retired.mkdir()
+    (retired / "translation_prompt.md").write_text("RETIRED ROOT", encoding="utf-8")
+    monkeypatch.delenv("PURIPULY_HEART_PROMPTS_DIR", raising=False)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(tmp_path))
+
+    assert get_prompts_dir() == tmp_path / "puripuly_heart" / "data" / "prompts"
+    with pytest.raises(FileNotFoundError, match="Required translation prompt not found"):
+        get_translation_prompt_template()

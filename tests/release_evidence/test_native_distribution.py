@@ -338,7 +338,7 @@ def test_bundle_cli_and_manifest_preserve_required_payload(
     assert "sdk_probe.pyc" in {entry["path"] for entry in bundled["stdlib_archive"]["members"]}
     assert not any("/__pycache__/" in path and "/flet/" in path for path in inventory)
     assert "app/puripuly_heart/data/payload.txt" in inventory
-    assert "app/prompts/system.txt" in inventory
+    assert "app/puripuly_heart/data/prompts/system.txt" in inventory
 
 
 def test_bundling_identical_inputs_produces_identical_archives(

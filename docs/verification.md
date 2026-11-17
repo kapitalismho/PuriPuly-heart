@@ -72,6 +72,7 @@ Examples of selection, not additional required scenarios:
 - **Caption wrapping:** captions/output with prepared input that reaches the changed renderer.
 - **Speech results missing from captions:** speech/translation plus captions/output, following the same channel and result across the handoff.
 - **Puri changing caption settings:** chatbot approval/tool effect plus effective settings plus the visible caption result.
+- **Prompt/resource packaging:** compose settings and translation using the same synthetic manual text in source and rebuilt installed layouts. Observe the assembled system prompt at a controlled provider and the completed translation result, not only an import or asset inventory. Cover provider-specific templates, language rules/examples, `PURIPULY_HEART_PROMPTS_DIR`, and saved user overrides with the existing prompt/resource contracts. The [HTTP example](http-extensions/examples/mymemory.json) can exercise extension loading and request/response handling against a controlled local endpoint; keep its installed `examples/http_extensions/` location and the user's discovery directory distinct.
 
 Update the affected guidance when behavior, interfaces, commands, prerequisites, or observation methods change. Keep shared setup and syntax with their existing owners rather than adding a second manual. Distinguish guidance drift, missing tools, product regressions, and unavailable environments; never weaken the expected outcome to hide a regression.
 

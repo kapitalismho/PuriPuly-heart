@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/kapitalismho/PuriPuly/main/docs/http-extension.schema.json",
   "title": "PuriPuly HTTP extension",
-  "description": "Declarative custom HTTP translation API extension for PuriPuly. See docs/http-extensions.md in the repository for the full field reference. A declared secret must be referenced through a {{secret:<id>}} placeholder, and the URL must not contain placeholders or credentials.",
+  "description": "Declarative custom HTTP translation API extension for PuriPuly. See docs/http-extensions/index.md in the repository for the full field reference. A declared secret must be referenced through a {{secret:<id>}} placeholder, and the URL must not contain placeholders or credentials.",
   "type": "object",
   "required": [
     "schema_version",

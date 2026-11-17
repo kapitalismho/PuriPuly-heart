@@ -3,10 +3,12 @@
 PuriPuly can translate through any HTTP translation API using a declarative JSON extension. Extensions are loaded from the user's `http_extensions` directory, so you can add a new API without a code change.
 
 - Windows: `%LOCALAPPDATA%\puripuly-heart\http_extensions`
-- A JSON Schema for editor validation lives next to this file: `http-extension.schema.json`
-- A working reference example ships in the repository under `examples/http_extensions/mymemory.json`
+- A JSON Schema for editor validation lives next to this file: [`http-extension.schema.json`](http-extension.schema.json).
+- The repository's working reference example is [`examples/mymemory.json`](examples/mymemory.json). Release distributions keep it at `examples/http_extensions/mymemory.json`; copy it into the user's discovery directory to enable it.
 
 Drop a `.json` file into the directory, open the settings UI's HTTP extension card, and press **Reload**. Each file must contain exactly one extension; the file name does not matter, but the `id` must be unique among loaded extensions.
+
+The schema's public `$id` remains `https://raw.githubusercontent.com/kapitalismho/PuriPuly/main/docs/http-extension.schema.json`. It is an existing identity, not the new repository location. Use the adjacent schema file for local editor validation; this relocation does not establish that the historical URL serves the current schema.
 
 ## Fields
 

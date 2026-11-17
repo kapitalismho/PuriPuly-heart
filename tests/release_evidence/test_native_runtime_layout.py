@@ -8,7 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from puripuly_heart.config.prompts import get_prompts_dir
+from puripuly_heart.config.prompts import (
+    get_prompts_dir,
+    get_translation_prompt_template,
+    render_translation_prompt_template,
+)
 from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_RUNTIME_DIRNAME,
     default_llama_runtime_root,
@@ -32,7 +36,7 @@ def test_source_layout_is_independent_of_working_directory(
 
     assert layout.host_kind == "source"
     assert (layout.app_resource_root / "pyproject.toml").is_file()
-    assert get_prompts_dir() == layout.resource("prompts")
+    assert get_prompts_dir() == layout.package_resource("data", "prompts")
     assert get_prompts_dir().is_dir()
     assert layout.package_resource("data", "THIRD_PARTY_NOTICES.txt") == (
         SOURCE_ROOT / "data" / "THIRD_PARTY_NOTICES.txt"
@@ -151,6 +155,7 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         shutil.copy2(SOURCE_ROOT / relative, destination)
     shutil.copytree(SOURCE_ROOT / "data/i18n", package / "data/i18n")
     bytecode.write_text(json.dumps(compile_runtime(tmp_path, layout_path)), encoding="utf-8")
+    shutil.copytree(SOURCE_ROOT / "data/prompts", package / "data/prompts", dirs_exist_ok=True)
     bundle_runtime(tmp_path, layout_path, bytecode)
     app_root = tmp_path / "relocated app 한글"
     (tmp_path / "app").rename(app_root)
@@ -177,6 +182,7 @@ def test_native_child_consumes_production_bundle_resources_without_installed_wri
         "zipimport._compile_source = reject_compilation\n"
         """
 from puripuly_heart import runtime_layout
+from puripuly_heart.config import prompts
 from puripuly_heart.core.vad import bundled
 from puripuly_heart.core.local_asr import local_stt_assets
 from puripuly_heart.ui import fonts, i18n
@@ -194,6 +200,9 @@ resources = [
 manifest = local_stt_assets.load_local_stt_asset_manifest()
 with wave.open(str(resources[-1]), "rb") as speech:
     speech_format = [speech.getnchannels(), speech.getsampwidth(), speech.getframerate(), speech.getnframes()]
+prompt = prompts.render_translation_prompt_template(
+    prompts.get_translation_prompt_template(), source_name="Korean", target_name="English"
+)
 print(json.dumps({
     "host_kind": layout.host_kind,
     "origins": [runtime_layout.__file__, bundled.__file__, fonts.__file__, i18n.__file__,
@@ -202,6 +211,7 @@ print(json.dumps({
         {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
         for path in resources
     ],
+    "prompt": prompt,
     "font_url": fonts.font_asset_path(fonts.FONT_FAMILY_NOTO_SANS_CJK_JP),
     "manifest_id": manifest.model_id,
     "locales": i18n.available_locales(),
@@ -238,6 +248,11 @@ print(json.dumps({
         }
         for relative in (*resource_paths[:4], resource_paths[-1])
     ]
+    assert result["prompt"] == render_translation_prompt_template(
+        get_translation_prompt_template(), source_name="Korean", target_name="English"
+    )
+    assert "Use contractions" in result["prompt"]
+    assert "아까 그분 목소리" in result["prompt"]
     assert result["speech_format"] == [1, 2, 22050, 26336]
     assert result["font_url"] == "/fonts/NotoSansCJK-Medium.ttc"
     assert (
