@@ -533,8 +533,24 @@ fn tracking_loss_during_hide_dwell_resets_visibility_and_show_input_timers() {
 }
 
 
+const REFERENCED_RIGHT: Transform = [
+    [1.0, 0.0, 0.0, 0.3],
+    [0.0, 0.0, -1.0, -0.2],
+    [0.0, 1.0, 0.0, -0.4],
+];
+const REFERENCED_RIGHT_HANDGRIP: Transform = [
+    [0.0, -1.0, 0.0, 0.11],
+    [1.0, 0.0, 0.0, -0.04],
+    [0.0, 0.0, 1.0, 0.09],
+];
+
+fn referenced_center() -> [f32; 3] {
+    let wrist = TemporaryInteractionConfig::default().effective_wrist_transform(REFERENCED_RIGHT_HANDGRIP);
+    column(compose(REFERENCED_RIGHT, wrist), 3)
+}
+
 fn referenced_input(grip: bool, separation: f32) -> LegacyVrInput {
-    let center = [0.30846656, -0.32473191, -0.375];
+    let center = referenced_center();
     LegacyVrInput {
         head: [
             [0.9800666, -0.19866933, 0.0, center[0]],
@@ -546,21 +562,13 @@ fn referenced_input(grip: bool, separation: f32) -> LegacyVrInput {
             [0.0, 1.0, 0.0, center[1] + 0.07],
             [-1.0, 0.0, 0.0, center[2] + 0.14],
         ],
-        right: [
-            [1.0, 0.0, 0.0, 0.3],
-            [0.0, 0.0, -1.0, -0.2],
-            [0.0, 1.0, 0.0, -0.4],
-        ],
+        right: REFERENCED_RIGHT,
         left_handgrip: [
             [1.0, 0.0, 0.0, 0.14],
             [0.0, 0.0, -1.0, -0.07],
             [0.0, 1.0, 0.0, 0.03],
         ],
-        right_handgrip: [
-            [0.0, -1.0, 0.0, 0.11],
-            [1.0, 0.0, 0.0, -0.04],
-            [0.0, 0.0, 1.0, 0.09],
-        ],
+        right_handgrip: REFERENCED_RIGHT_HANDGRIP,
         left_index: 3,
         right_index: 8,
         reference_epoch: 7,
@@ -602,10 +610,11 @@ fn referenced_fixture(attempt: u64) -> Fixture {
 fn rotated_handgrips_share_the_visible_near_and_relative_pull_anchor() {
     let mut f = referenced_fixture(0);
     let sample = referenced_input(false, 0.04);
+    let center = referenced_center();
     let world_icon = [
-        [0.9800666, -0.19866933, 0.0, 0.30846656],
-        [0.19866933, 0.9800666, 0.0, -0.32473191],
-        [0.0, 0.0, 1.0, -0.375],
+        [0.9800666, -0.19866933, 0.0, center[0]],
+        [0.19866933, 0.9800666, 0.0, center[1]],
+        [0.0, 0.0, 1.0, center[2]],
     ];
     let icon = f.interaction.frame.icon.unwrap();
     assert_eq!(icon.device, sample.right_index);
@@ -648,9 +657,10 @@ fn referenced_grab_follows_raw_attachment_and_returns_to_the_moving_right_anchor
     let half = f.step(512, Some(moved)).icon.unwrap();
     let end = f.step(625, Some(moved)).icon.unwrap();
     let endpoint = compose(moved.right, end.transform);
-    assert!((endpoint[0][3] - 0.50846656).abs() < 0.00001);
-    assert!((endpoint[1][3] + 0.32473191).abs() < 0.00001);
-    assert!((endpoint[2][3] + 0.375).abs() < 0.00001);
+    let center = referenced_center();
+    assert!((endpoint[0][3] - center[0] - 0.2).abs() < 0.00001);
+    assert!((endpoint[1][3] - center[1]).abs() < 0.00001);
+    assert!((endpoint[2][3] - center[2]).abs() < 0.00001);
     assert!(
         distance(half.transform, end.transform)
             < distance(returned.icon.unwrap().transform, end.transform)
@@ -693,9 +703,15 @@ fn default_wrist_moves_with_component_position_but_explicit_matrix_remains_raw()
             json!({})
         })
         .unwrap();
-        let mut floating_wrist = raw_wrist;
-        floating_wrist[1][3] += 0.03;
         let mut sample = referenced_input(false, 0.04);
+        let mut floating_wrist = if explicit {
+            raw_wrist
+        } else {
+            compose(sample.right_handgrip, DEFAULT_WRIST)
+        };
+        for row in &mut floating_wrist {
+            row[3] += row[2] * WRIST_FLOAT_M;
+        }
         for ms in [0, 50, 150, 350] {
             f.step(ms, Some(sample));
         }
@@ -751,7 +767,7 @@ fn watch_gate_and_optional_point_override_share_the_sphere() {
     let label = "Watch candidate\nRadius fixed: 10 cm";
     let mut evidence = Vec::new();
     for point_override in [None, Some([0.025, 0.12, 0.04])] {
-        let point = point_override.unwrap_or([0.035, 0.10153344, 0.03473191]);
+        let point = point_override.unwrap_or(column(DEFAULT_WRIST, 3));
         for direction in [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.57735026; 3]] {
             for (offset, admitted) in [(-0.00001, true), (0.00001, false)] {
                 let mut f = Fixture::new(0);
@@ -762,13 +778,15 @@ fn watch_gate_and_optional_point_override_share_the_sphere() {
                 f.interaction.config.debug_case_label = Some(label.into());
                 let mut sample = referenced_input(false, 0.0);
                 let local = f.interaction.config.effective_wrist_transform(sample.right_handgrip);
-                let component_point = compose(sample.right_handgrip, [
-                    [1.0, 0.0, 0.0, point[0] + 0.03], [0.0, 1.0, 0.0, point[1]], [0.0, 0.0, 1.0, point[2]],
-                ]);
+                let mut base = DEFAULT_WRIST;
+                for (row, value) in base.iter_mut().zip(point) {
+                    row[3] = value + row[2] * WRIST_FLOAT_M;
+                }
+                let component_point = compose(sample.right_handgrip, base);
                 for i in 0..3 {
                     assert!((local[i][3] - component_point[i][3]).abs() < 0.000001);
+                    assert!((local[i][2] - component_point[i][2]).abs() < 0.000001);
                 }
-                assert_eq!(column(local, 2), column(sample.right_handgrip, 0));
                 let center = compose(sample.right, local);
                 let left_point = compose(sample.left, sample.left_handgrip);
                 for i in 0..3 {
