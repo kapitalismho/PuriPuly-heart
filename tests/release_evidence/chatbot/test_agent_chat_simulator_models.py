@@ -10,16 +10,16 @@ from websockets.datastructures import Headers
 from websockets.exceptions import InvalidStatus
 from websockets.http11 import Response
 
-from puripuly_heart.core import network_clients
-from puripuly_heart.core.external_network import ProxyPolicy
-from puripuly_heart.core.storage.secrets import InMemorySecretStore
-from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
-from puripuly_heart.release_evidence.agent_chat_simulator import models
-from puripuly_heart.release_evidence.agent_chat_simulator.models import (
+from benchmarks.chatbot import __main__ as cli
+from benchmarks.chatbot import models
+from benchmarks.chatbot.models import (
     SimulatorModelError,
     SimulatorModels,
     SubscriptionConnectGate,
 )
+from puripuly_heart.core import network_clients
+from puripuly_heart.core.external_network import ProxyPolicy
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
 
 _SCHEMA = {
     "type": "object",

@@ -6,17 +6,17 @@ from copy import deepcopy
 
 import pytest
 
-from puripuly_heart.release_evidence.agent_chat_simulator import execution
-from puripuly_heart.release_evidence.agent_chat_simulator.execution import (
+from benchmarks.chatbot import execution
+from benchmarks.chatbot.execution import (
     AttemptJob,
     AttemptScheduler,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.runner import (
+from benchmarks.chatbot.runner import (
     ControlledModels,
     controlled_transport,
     run_attempt,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.scenarios import select_scenarios
+from benchmarks.chatbot.scenarios import select_scenarios
 
 
 async def reached(event):

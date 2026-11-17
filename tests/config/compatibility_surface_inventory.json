@@ -128,7 +128,7 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
         "src/puripuly_heart/core/managed_identity.py::DISCORD_OPENROUTER_ISSUE_PATH",
-        "broker/src"
+        "services/broker/src"
       ],
       "fixture_or_guard_refs": [
         "tests/core/test_managed_openrouter_broker_client.py::test_nested_broker_error_envelope_becomes_release_error",

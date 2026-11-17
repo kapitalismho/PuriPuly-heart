@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configureSupportStorage } from './support-storage.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const checkout = fileURLToPath(new URL('../../../', import.meta.url));
 export const workerName = 'puripuly-heart-agent-relay';
 export const confirmation = `deploy ${workerName} from dev`;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -74,7 +75,7 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
     throw new Error('Checked-in relay configuration must keep the canonical Worker and dedicated storage bindings.');
   }
   const destination = resolve(directory);
-  const within = relative(resolve(root, '..'), destination);
+  const within = relative(checkout, destination);
   if (within !== '..' && !within.startsWith(`..${sep}`) && !isAbsolute(within)) throw new Error('Deployment output must be outside the checkout.');
   if (env.SUPPORT_REPORTS_ENABLED === 'true') {
     await configureSupportStorage({ mode: 'verify', bucket: config.r2_buckets[0].bucket_name,

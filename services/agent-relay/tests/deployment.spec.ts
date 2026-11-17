@@ -179,8 +179,17 @@ describe('manual relay deployment preparation', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('refuses repository output and never overwrites an existing config', async () => {
-    await expect(prepareDeployment({ env: base, directory: fileURLToPath(new URL('../..', import.meta.url)) })).rejects.toThrow();
+  it.each(['../../..', '../../../src', '../..', '..', '../../broker'])('refuses checkout output at %s before writing or remote access', async (relativePath) => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(prepareDeployment({
+      env: { ...base, SUPPORT_REPORTS_ENABLED: 'true' },
+      directory: fileURLToPath(new URL(relativePath, import.meta.url)),
+      fetcher,
+    })).rejects.toThrow('Deployment output must be outside the checkout.');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('never overwrites an existing config', async () => {
     const path = await directory();
     const existing = '{"preserve":"existing configuration"}\n';
     await writeFile(join(path, 'wrangler.json'), existing);

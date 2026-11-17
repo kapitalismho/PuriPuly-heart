@@ -433,7 +433,7 @@ uv run ruff check src tests
 uv run python -m pytest
 ```
 
-[Разработка брокера (Linux)](../../broker/README.md) · [Разработка VR-оверлея (Windows)](../../native/overlay/README.md)
+[Разработка брокера (Linux)](../../services/broker/README.md) · [Разработка VR-оверлея (Windows)](../../native/overlay/README.md)
 
 ---
 

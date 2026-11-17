@@ -22,6 +22,11 @@ from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretValuesSnapshot,
 )
 from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
+from puripuly_heart.app.services.agent_chat.execution import (
+    APP_TOOLS,
+    app_tool_descriptions,
+    app_tool_schemas,
+)
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.agent_chat.provider_setup import (
     NAVIGATION_PROVIDERS,
@@ -1864,12 +1869,83 @@ async def test_generator_omits_enumerated_local_audio_values(catalog, tmp_path, 
     input_path = tmp_path / "choices.json"
     output_path = tmp_path / "app-tools.ts"
     input_path.write_text(json.dumps(catalog), encoding="utf-8")
-    generator = Path(__file__).resolve().parents[2] / "agent-relay/generate-tools.py"
+    generator = Path(__file__).resolve().parents[2] / "services/agent-relay/generate-tools.py"
     monkeypatch.setattr(
         sys, "argv", [str(generator), str(input_path), "--output", str(output_path)]
     )
     runpy.run_path(str(generator), run_name="__main__")
     assert "PRIVATE-" not in output_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("working_directory", [".", "services/agent-relay"])
+@pytest.mark.parametrize(
+    ("generator_name", "artifact_name"),
+    [
+        ("generate-tools.py", "app-tools.ts"),
+        ("generate-context.py", "context-modules.ts"),
+        ("generate-photo.py", "photo-contract.json"),
+    ],
+)
+async def test_relay_generators_resolve_outputs_from_root_and_service(
+    catalog, tmp_path, monkeypatch, working_directory, generator_name, artifact_name
+):
+    root = Path(__file__).resolve().parents[2]
+    service = root / "services/agent-relay"
+    generator = service / generator_name
+    choices = tmp_path / "choices.json"
+    choices.write_text(json.dumps(catalog), encoding="utf-8")
+    arguments = [str(choices)] if generator_name == "generate-tools.py" else []
+    output = tmp_path / artifact_name
+    unrelated = tmp_path / "unrelated.txt"
+    unrelated.write_text("preserve unrelated output", encoding="utf-8")
+    monkeypatch.chdir(root / working_directory)
+    monkeypatch.setattr(sys, "argv", [str(generator), *arguments, "--output", str(output)])
+    runpy.run_path(str(generator), run_name="__main__")
+    generated = output.read_text(encoding="utf-8")
+    if generator_name == "generate-tools.py":
+        tools = json.loads(
+            generated.removeprefix("export const appTools = ").strip().removesuffix(";")
+        )
+        schemas = app_tool_schemas(catalog)
+        descriptions = app_tool_descriptions()
+
+        def expanded(value, definitions):
+            if isinstance(value, dict):
+                if "$ref" in value:
+                    return expanded(
+                        definitions[value["$ref"].removeprefix("#/$defs/")], definitions
+                    )
+                return {
+                    key: expanded(item, definitions)
+                    for key, item in value.items()
+                    if key not in {"$defs", "uniqueItems"}
+                }
+            if isinstance(value, list):
+                return [expanded(item, definitions) for item in value]
+            return value
+
+        assert [tool["name"] for tool in tools] == list(APP_TOOLS)
+        for tool in tools:
+            assert tool["description"] == descriptions[tool["name"]]
+            assert tool["strict"] is False
+            parameters = tool["parameters"]
+            assert expanded(parameters, parameters.get("$defs", {})) == expanded(
+                schemas[tool["name"]], {}
+            )
+    else:
+        assert generated == (service / "src" / artifact_name).read_text(encoding="utf-8")
+    writes = []
+
+    def capture_output(path, content, **kwargs):
+        writes.append((path, content))
+        return len(content)
+
+    monkeypatch.setattr(Path, "write_text", capture_output)
+    monkeypatch.setattr(sys, "argv", [str(generator), *arguments])
+    runpy.run_path(str(generator), run_name="__main__")
+    assert writes == [(service / "src" / artifact_name, generated)]
+    assert unrelated.read_text(encoding="utf-8") == "preserve unrelated output"
 
 
 @pytest.mark.asyncio

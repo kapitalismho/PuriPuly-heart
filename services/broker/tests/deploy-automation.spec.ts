@@ -21,11 +21,11 @@ const checkedInWranglerConfig = new URL('../wrangler.jsonc', import.meta.url);
 const brokerDatabaseId = '22222222-2222-4222-8222-222222222222';
 const agentUsageDatabaseId = '11111111-1111-4111-8111-111111111111';
 const abuseControlsWorkflow = new URL(
-  '../../.github/workflows/maintenance-broker-abuse-controls.yml',
+  '../../../.github/workflows/maintenance-broker-abuse-controls.yml',
   import.meta.url,
 );
 const cleanupWorkflow = new URL(
-  '../../.github/workflows/maintenance-broker-d1-cleanup.yml',
+  '../../../.github/workflows/maintenance-broker-d1-cleanup.yml',
   import.meta.url,
 );
 

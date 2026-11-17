@@ -67,7 +67,7 @@ jobs:
           cache: pnpm
 
       - name: Guard manual dev deployment and exact reviewed source
-        run: node agent-relay/operations/prepare-deployment.mjs guard
+        run: node services/agent-relay/operations/prepare-deployment.mjs guard
 
       - name: Select isolated temporary deployment directory
         run: |
@@ -81,11 +81,11 @@ jobs:
         timeout-minutes: 3
         env:
           PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
-        run: node agent-relay/operations/prepare-deployment.mjs prepare "$DEPLOY_DIR"
+        run: node services/agent-relay/operations/prepare-deployment.mjs prepare "$DEPLOY_DIR"
 
       - name: Require initialized relay database
         timeout-minutes: 3
-        working-directory: agent-relay
+        working-directory: services/agent-relay
         run: |
           pnpm exec wrangler d1 execute AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json" \
             --command "$RELAY_SCHEMA_QUERY" --json > "$DEPLOY_DIR/schema.json"
@@ -94,12 +94,12 @@ jobs:
       - name: Apply explicitly selected relay migrations
         if: inputs.apply_migrations
         timeout-minutes: 5
-        working-directory: agent-relay
+        working-directory: services/agent-relay
         run: pnpm exec wrangler d1 migrations apply AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json"
 
       - name: Require deploy-ready relay schema
         timeout-minutes: 3
-        working-directory: agent-relay
+        working-directory: services/agent-relay
         run: |
           pnpm exec wrangler d1 execute AGENT_USAGE_DB --remote --config "$DEPLOY_DIR/wrangler.json" \
             --command "$RELAY_SCHEMA_QUERY" --json > "$DEPLOY_DIR/schema.json"
@@ -107,7 +107,7 @@ jobs:
 
       - name: Deploy canonical workers.dev relay
         timeout-minutes: 5
-        working-directory: agent-relay
+        working-directory: services/agent-relay
         run: >-
           pnpm exec wrangler deploy --keep-vars --config "$DEPLOY_DIR/wrangler.json"
           --experimental-provision=false --experimental-auto-create=false --no-autoconfig
@@ -117,7 +117,7 @@ jobs:
         timeout-minutes: 3
         env:
           PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
-        run: node agent-relay/operations/smoke-deployment.mjs
+        run: node services/agent-relay/operations/smoke-deployment.mjs
 
       - name: Remove ephemeral deployment files
         if: always()

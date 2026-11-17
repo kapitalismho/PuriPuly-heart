@@ -1,3 +1,3 @@
 packages:
-  - broker
-  - agent-relay
+  - services/broker
+  - services/agent-relay

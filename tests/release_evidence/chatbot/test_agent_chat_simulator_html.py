@@ -8,7 +8,7 @@ from html.parser import HTMLParser
 
 import pytest
 
-from puripuly_heart.release_evidence.agent_chat_simulator.html_report import render_html
+from benchmarks.chatbot.html_report import render_html
 
 
 @dataclass
@@ -556,8 +556,8 @@ def test_input_report_cannot_be_overwritten_and_incomplete_json_is_not_exported(
 async def test_cli_render_does_not_initialize_models_accounts_login_or_relay(monkeypatch, tmp_path):
     import httpx
 
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
-    from puripuly_heart.release_evidence.agent_chat_simulator import models
+    from benchmarks.chatbot import __main__ as cli
+    from benchmarks.chatbot import models
 
     def forbidden(*args, **kwargs):
         pytest.fail("offline HTML rendering initialized model/account/network access")

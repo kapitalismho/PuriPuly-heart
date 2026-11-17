@@ -2,7 +2,7 @@
 
 Managed identity, entitlement, and credential release for PuriPuly Heart. Broker runs on Cloudflare Workers with D1 and Worker secrets. The app calls OpenRouter directly; Broker is not a translation proxy.
 
-See [application ownership](../docs/architecture.md) and [client authentication and recovery](../docs/cli.md#authentication-and-recovery).
+See [application ownership](../../docs/architecture.md) and [client authentication and recovery](../../docs/cli.md#authentication-and-recovery).
 
 ## Service Boundaries
 
@@ -32,7 +32,7 @@ Reporting uses stored usage records and does not require access to chatbot or ph
 
 ## Deployment and Maintenance
 
-Run the [direct-deploy workflow](../.github/workflows/deploy-broker-direct.yml) from `dev` with confirmation `deploy puripuly-heart-broker from dev`. Use an initialized, supported database. Configuration lives in the workflow and [renderer](scripts/render-production-wrangler-config.mjs).
+Run the [direct-deploy workflow](../../.github/workflows/deploy-broker-direct.yml) from `dev` with confirmation `deploy puripuly-heart-broker from dev`. Use an initialized, supported database. Configuration lives in the workflow and [renderer](scripts/render-production-wrangler-config.mjs).
 
 Leave `apply_migrations` off for code-only updates. Pending ordinary migrations block deployment; never force journal entries. Ordinary migrations exclude destructive `0025` and `0027`.
 
@@ -50,21 +50,23 @@ Deployment checks public health and foundation routes. The [live issuance/routin
 
 - Run `0025` (telemetry deletion) only after data/consumer review and deletion approval.
 - Run `0027` (referral deletion) only after privacy prerequisites and old-request drainage. Stage it separately from `0025` and verify surviving credential relationships.
-- These [migrations](migrations/) have no workflow-managed recovery copy. Use the [maintenance workflow](../.github/workflows/maintenance-broker-abuse-controls.yml) for authorization-cap changes.
+- These [migrations](migrations/) have no workflow-managed recovery copy. Use the [maintenance workflow](../../.github/workflows/maintenance-broker-abuse-controls.yml) for authorization-cap changes.
 
 ## Local Development
 
 Use a Linux-native checkout and dependencies, including WSL-internal storage. Use isolated local D1 and credentials, synthetic identities, and controlled provider responses. From the repository root:
 
+When updating a populated checkout, first follow the shared [local-state and dependency migration procedure](../README.md#local-checkout-migration). Preserve ignored databases/secrets/configs; do not move old workspace dependency links.
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm --filter @puripuly-heart/broker run verify:config
-pnpm exec vitest run broker/tests --exclude "broker/tests/deploy-smoke/**"
+pnpm exec vitest run services/broker/tests --exclude "services/broker/tests/deploy-smoke/**"
 pnpm --filter @puripuly-heart/broker dev --local --ip 127.0.0.1
 ```
 
-Initialize local state with [migrations](migrations/) and the fingerprint helper. Keep production credentials out of local bindings. [PR CI](../.github/workflows/pr-ci.yml) defines automated checks.
+Initialize local state with [migrations](migrations/) and the fingerprint helper. Keep production credentials out of local bindings. [PR CI](../../.github/workflows/pr-ci.yml) defines automated checks.
 
 The local config also binds `AGENT_USAGE_DB` to isolated Relay D1, with a distinct local placeholder ID and Relay's own `migrations_dir`. Apply Relay's [migrations](../agent-relay/migrations/) to that local database before exercising the daily report; never apply Broker migrations to it or connect local development to production D1. For end-to-end local reporting, use local-only configs with matching Relay database IDs and the same explicit `--persist-to` directory for both Workers.
 

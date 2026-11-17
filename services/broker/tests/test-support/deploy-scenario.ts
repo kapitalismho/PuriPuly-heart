@@ -15,7 +15,7 @@ import { applyBrokerMigrations, BROKER_MIGRATION_FILENAMES } from './migrations'
 
 const brokerRoot = fileURLToPath(new URL('../../', import.meta.url));
 const relayRoot = fileURLToPath(new URL('../../../agent-relay/', import.meta.url));
-const workflow = readFileSync(new URL('../../../.github/workflows/deploy-broker-direct.yml', import.meta.url), 'utf8');
+const workflow = readFileSync(new URL('../../../../.github/workflows/deploy-broker-direct.yml', import.meta.url), 'utf8');
 const shellPath = (path: string) => path.replaceAll('\\', '/');
 const bash = process.platform === 'win32'
   ? join(dirname(dirname(execFileSync('where.exe', ['git'], { encoding: 'utf8' }).trim().split(/\r?\n/u)[0]!)), 'bin', 'bash.exe')
@@ -36,7 +36,7 @@ export function createDeployScenario(options: {
   mode?: string;
 } = {}): DeployScenario {
   const root = mkdtempSync(join(tmpdir(), 'broker-minimal-deploy-'));
-  const broker = join(root, 'broker');
+  const broker = join(root, 'services', 'broker');
   for (const dir of [broker, join(broker, 'scripts'), join(broker, 'migrations')]) mkdirSync(dir, { recursive: true });
   mkdirSync(join(broker, 'src'));
   copyFileSync(join(brokerRoot, 'src/trial-policy.ts'), join(broker, 'src/trial-policy.ts'));
@@ -183,7 +183,7 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
       writeFileSync(scriptPath, script);
       executed.push(name);
       const child = spawn(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', shellPath(scriptPath)], {
-        cwd: block.includes('working-directory: broker') ? scenario.broker : scenario.root,
+        cwd: block.includes('working-directory: services/broker') ? scenario.broker : scenario.root,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
       });

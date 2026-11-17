@@ -5,16 +5,16 @@ from copy import deepcopy
 
 import pytest
 
-from puripuly_heart.app.services.agent_chat.modules import MODULES
-from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
-from puripuly_heart.release_evidence.agent_chat_simulator import runner
-from puripuly_heart.release_evidence.agent_chat_simulator.app import ScenarioApp
-from puripuly_heart.release_evidence.agent_chat_simulator.relay_context import (
+from benchmarks.chatbot import __main__ as cli
+from benchmarks.chatbot import runner
+from benchmarks.chatbot.app import ScenarioApp
+from benchmarks.chatbot.relay_context import (
     load_relay_context,
     upstream_context_id,
     validate_relay_context,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.scenarios import select_scenarios
+from benchmarks.chatbot.scenarios import select_scenarios
+from puripuly_heart.app.services.agent_chat.modules import MODULES
 from tests.app.test_agent_chat import context_of
 
 

@@ -12,14 +12,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _guide_screens() -> str:
-    guide = (ROOT / "agent-relay/prompts/agent/guide.md").read_text(encoding="utf-8")
+    guide = (ROOT / "services/agent-relay/prompts/agent/guide.md").read_text(encoding="utf-8")
     start = guide.index("\n## Screens\n")
     end = guide.index("\n## ", start + 1)
     return guide[start:end]
 
 
 def _relay_tool(name: str) -> dict:
-    source = (ROOT / "agent-relay/src/app-tools.ts").read_text(encoding="utf-8")
+    source = (ROOT / "services/agent-relay/src/app-tools.ts").read_text(encoding="utf-8")
     tools = json.loads(source.removeprefix("export const appTools = ").strip().removesuffix(";"))
     return next(tool for tool in tools if tool["name"] == name)
 

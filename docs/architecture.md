@@ -101,7 +101,7 @@ Contracts: [photo bridge](../src/puripuly_heart/core/photo/bridge.py), [provider
 - Settings changes require approval. Cancellation discards unapproved work, not committed changes.
 - Credentials use secure app controls, not chat. Support uploads require a user click.
 
-Service contract and development: [Agent relay](../agent-relay/README.md).
+Service contract and development: [Agent relay](../services/agent-relay/README.md). Relay and [Broker](../services/broker/README.md) are independently deployed sibling Workers outside the Python package. The development-only [chatbot benchmark](../benchmarks/chatbot/README.md) consumes application contracts without becoming an application dependency.
 
 ## Settings and Credentials
 

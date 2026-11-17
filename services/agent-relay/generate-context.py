@@ -9,7 +9,9 @@ from puripuly_heart.app.services.agent_chat.modules import MODULE_DESCRIPTIONS
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=Path("agent-relay/src/context-modules.ts"))
+    parser.add_argument(
+        "--output", type=Path, default=Path(__file__).resolve().parent / "src/context-modules.ts"
+    )
     args = parser.parse_args()
     modules = [
         {"name": module, "description": description}

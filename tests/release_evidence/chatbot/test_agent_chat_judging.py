@@ -6,8 +6,8 @@ from dataclasses import replace
 
 import pytest
 
-from puripuly_heart.release_evidence.agent_chat_simulator.app import ScenarioApp
-from puripuly_heart.release_evidence.agent_chat_simulator.judging import (
+from benchmarks.chatbot.app import ScenarioApp
+from benchmarks.chatbot.judging import (
     CRITERIA,
     calibration_export,
     code_judgment,
@@ -17,7 +17,7 @@ from puripuly_heart.release_evidence.agent_chat_simulator.judging import (
     run_status,
     validate_judgment,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.scenarios import select_scenarios
+from benchmarks.chatbot.scenarios import select_scenarios
 
 
 def evaluation(*, routing_case=False):

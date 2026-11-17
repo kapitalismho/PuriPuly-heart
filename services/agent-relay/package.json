@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local --ip 127.0.0.1 --port 8788 --inspector-port 9230 --config wrangler.jsonc",
-    "typecheck": "tsc --noEmit --project ../tsconfig.json",
-    "test": "vitest run --root .. agent-relay/tests",
+    "typecheck": "tsc --noEmit --project ../../tsconfig.json",
+    "test": "vitest run --root ../.. services/agent-relay/tests",
     "support:storage": "node operations/support-storage.mjs",
     "context:export": "node operations/export-context.mjs"
   },

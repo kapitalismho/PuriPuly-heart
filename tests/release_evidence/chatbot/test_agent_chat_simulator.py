@@ -9,23 +9,13 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentSetupAction
-from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
-from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
-from puripuly_heart.app.services.agent_chat.provider_setup import PROVIDER_SETUPS
-from puripuly_heart.app.services.agent_chat.tools import AgentTools
-from puripuly_heart.config.provider_values import STTProviderName
-from puripuly_heart.config.translation_values import (
-    TranslationModel,
-    supported_translation_connections,
-)
-from puripuly_heart.release_evidence.agent_chat_simulator.app import (
+from benchmarks.chatbot.app import (
     INJECTION_DEVICE_LABEL,
     KEY_FIELDS,
     BrowserStepResult,
     ScenarioApp,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.judging import (
+from benchmarks.chatbot.judging import (
     CRITERIA,
     JUDGE_REVISION,
     calibration_export,
@@ -35,8 +25,8 @@ from puripuly_heart.release_evidence.agent_chat_simulator.judging import (
     run_status,
     secret_value_requests,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.models import SimulatorModelError
-from puripuly_heart.release_evidence.agent_chat_simulator.runner import (
+from benchmarks.chatbot.models import SimulatorModelError
+from benchmarks.chatbot.runner import (
     ControlledModels,
     RecordingTransport,
     controlled_response,
@@ -45,9 +35,19 @@ from puripuly_heart.release_evidence.agent_chat_simulator.runner import (
     run_attempt,
     run_case,
 )
-from puripuly_heart.release_evidence.agent_chat_simulator.scenarios import (
+from benchmarks.chatbot.scenarios import (
     SCENARIOS,
     select_scenarios,
+)
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentSetupAction
+from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
+from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
+from puripuly_heart.app.services.agent_chat.provider_setup import PROVIDER_SETUPS
+from puripuly_heart.app.services.agent_chat.tools import AgentTools
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.translation_values import (
+    TranslationModel,
+    supported_translation_connections,
 )
 from tests.app.test_agent_chat import answer, tool
 
@@ -533,7 +533,7 @@ async def test_requested_english_and_refusal_extras_use_real_owner_and_free_outc
 
 @pytest.mark.asyncio
 async def test_probe_cli_preserves_partial_role_failure(monkeypatch, tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     class PartialProbe:
         attempts = []
@@ -567,7 +567,7 @@ async def test_probe_cli_preserves_partial_role_failure(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_calibration_cli_exports_compares_without_invented_owner_scores(tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     evidence = {"id": "fixture", "judgment": {"status": "valid", **verdicts()}}
     report = {
@@ -675,7 +675,7 @@ async def test_quality_fixture_exposes_the_unresolved_symptom_until_new_model_ou
 
 
 def test_second_revised_same20_comparison_downgrades_without_overriding_code():
-    from puripuly_heart.release_evidence.agent_chat_simulator.judging import apply_calibration
+    from benchmarks.chatbot.judging import apply_calibration
 
     evidence = {"id": "initial", "judgment": {"status": "valid", **verdicts()}}
     source = {
@@ -725,8 +725,8 @@ def test_second_revised_same20_comparison_downgrades_without_overriding_code():
 async def test_live_attempts_use_fresh_synthetic_identity_with_actual_refresh_owner(
     monkeypatch, tmp_path, relay_context_manifest
 ):
+    from benchmarks.chatbot import __main__ as cli
     from puripuly_heart.app.adapters.agent_relay_auth import AgentRelayTokenOwner
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
 
     class ReadyModels:
         attempts = []
@@ -1783,7 +1783,7 @@ async def test_recording_stream_closes_inner_iterator_without_fabricating_comple
 
 @pytest.mark.asyncio
 async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     selected = [case.id for case in SCENARIOS]
     output = tmp_path / "new-boundaries.json"
@@ -1833,7 +1833,7 @@ async def test_invalid_raw_classification_is_retained_beside_effective_fallback(
 
 @pytest.mark.asyncio
 async def test_rejudge_never_overwrites_frozen_samples_or_prior_rejudgment(monkeypatch, tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     class UnpreparedModels:
         async def close(self):
@@ -1857,7 +1857,7 @@ async def test_rejudge_never_overwrites_frozen_samples_or_prior_rejudgment(monke
 
 @pytest.fixture
 def frozen_rejudge(tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     opening = {"role": "user", "content": "reasoning 설정을 확인해 줘."}
     current = {"role": "user", "content": "이번에는 현재 요청만 봐 줘."}
@@ -1961,7 +1961,7 @@ def frozen_rejudge(tmp_path):
 async def test_rejudge_checkpoints_failures_and_refreshes_old_owner_template(
     monkeypatch, frozen_rejudge
 ):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     frozen = frozen_rejudge
     for sample in frozen.samples["conversations"]:
@@ -2081,7 +2081,7 @@ async def test_rejudge_checkpoints_failures_and_refreshes_old_owner_template(
 async def test_rejudge_complete_same20_preserves_explicit_current_owner_rows(
     monkeypatch, frozen_rejudge
 ):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     frozen = frozen_rejudge
     cli.write_json(frozen.source, frozen.samples)
@@ -2152,7 +2152,7 @@ async def test_rejudge_complete_same20_preserves_explicit_current_owner_rows(
 async def test_rejudge_preparation_failure_leaves_blocked_pending_output(
     monkeypatch, frozen_rejudge, cancelled
 ):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     frozen = frozen_rejudge
     cli.write_json(frozen.source, frozen.samples)
@@ -2203,7 +2203,7 @@ async def test_rejudge_preparation_failure_leaves_blocked_pending_output(
 async def test_rejudge_cancellation_checkpoints_returned_calls_and_stops(
     monkeypatch, frozen_rejudge
 ):
-    from puripuly_heart.release_evidence.agent_chat_simulator import __main__ as cli
+    from benchmarks.chatbot import __main__ as cli
 
     frozen = frozen_rejudge
     cli.write_json(frozen.source, frozen.samples)
@@ -3658,7 +3658,7 @@ async def test_new_owner_paths_keep_hidden_state_outside_actor_and_record_actual
 
 
 def test_planned_saved_report_counts_distinguish_placeholders_and_partial_results(tmp_path):
-    from puripuly_heart.release_evidence.agent_chat_simulator.runner import (
+    from benchmarks.chatbot.runner import (
         report_header,
         write_json,
     )

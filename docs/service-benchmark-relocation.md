@@ -1,0 +1,62 @@
+# Cloud-service and chatbot benchmark relocation
+
+Implementation record for [#448](https://github.com/kapitalismho/PuriPuly-heart/issues/448), under [#446](https://github.com/kapitalismho/PuriPuly-heart/issues/446). Work continues on the same local branch as [#447's cleanup](workspace-cleanup.md), starting at `d9b524d325edfd0c7a1a917e55080d5586fe738e`. The initial tracked tree was clean. Remote `dev` remained `508a13809474a6a14948227c18558cfd090cc35c`, already included in that baseline.
+
+The owner chose one combined PR later. This record does not claim a push, PR, merge, deployment, issue closure, or Project transition. #448 was observed in the PuriPuly Project's Backlog. Keep the later publication/navigation work below separate from local implementation acceptance.
+
+## Result and preserved contracts
+
+- [Broker](../services/broker/README.md) and [Relay](../services/agent-relay/README.md) are sibling projects under `services/`, outside Python `src/`. Worker identities, bindings, databases, authentication, prompts, SQL migrations, cross-service imports, data ownership, and migration ordering are unchanged.
+- pnpm workspace/lock importers, TypeScript/Vitest roots, CI/deployment/maintenance workflows, synthetic deployment layouts, generated-contract callers, and compatibility inventory use the new paths.
+- Relay's deployment preparer still rejects output anywhere in the **entire checkout**, not merely `services/`. Five additional boundary cases cover checkout root, application source, services root, Relay, and sibling Broker before writes or remote access.
+- The three Relay generators continue consuming Python-owned tool/context/photo definitions. Default outputs resolve beside the scripts from repository root or Relay cwd. All three accept explicit temporary `--output` destinations; photo gained that option. Existing generated artifacts were not overwritten.
+- All ten simulator modules moved unchanged to [benchmarks/chatbot](../benchmarks/chatbot/README.md), without a compatibility entrypoint. Only the simulator left `release_evidence`; unrelated tools remain. Simulator tests and trusted-context fixtures now live in `tests/release_evidence/chatbot/`, so unrelated release-evidence collection does not import benchmark fixtures.
+- Benchmark-scoped guards preserve scheduler ownership and check production-import/package-discovery separation. A successful controlled three-dialogue run explicitly remains `blocked_calibration` with `live_pass=false` until actual calibration requirements are met.
+
+No application-visible behavior is intentionally changed. Developer-visible changes are the service paths, root command `uv run --no-sync python -m benchmarks.chatbot`, relocated simulator tests, and cwd-independent generator outputs. The [service workspace guide](../services/README.md), service READMEs, benchmark README, contributor navigation, architecture map, Russian README service link, and [#444 measurement map](verification.md#chatbot) own the updated instructions. No other protected-manual drift was identified.
+
+## Local state and dependencies
+
+The current worktree had no inherited Wrangler state, service secrets, generated configs/types, or service dependency trees to migrate. It received a fresh frozen-lockfile pnpm installation; no primary-checkout dependencies or state were copied. Dependency links now belong to the new workspace paths.
+
+A bounded metadata-only inspection of the primary checkout found an empty Relay Wrangler temporary directory, no default-path local Wrangler databases, one Broker generated type file, root/service dependency trees and account/cache metadata, and root environment-file categories. Contents of secrets/account caches were not read. Those files, links, and unrelated saved state remain untouched. Absence at default paths is not a machine-wide claim about custom `--persist-to` locations.
+
+The [migration procedure](../services/README.md#local-checkout-migration) covers stopped-process backups, complete SQLite sidecar preservation, destination conflicts, private config path review, explicit persistence paths, and fresh dependency links. Shared ignore patterns protect Wrangler/local-secret/generated categories at the new depth and retain old generated-type exclusion while populated checkouts await integration. No blanket cleanup or deletion of unclassified local state occurred.
+
+## Executed verification
+
+Node checks used Ubuntu WSL, Node 24.10.0 and pnpm 10.34.9 against this Windows-backed worktree with newly installed Linux dependencies. Python checks used CPython 3.14.10 from the prepared development environment with explicit current-worktree `src` and repository import paths; no environment sync occurred. Identity observations confirmed current-checkout application and benchmark imports.
+
+| Check | Observed result and boundary |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | All three workspace projects resolved; 82 packages installed. Existing primary state was untouched. Ignored esbuild/workerd install-script warnings did not prevent the actual checks below. |
+| `pnpm typecheck`; `pnpm --filter @puripuly-heart/agent-relay typecheck` | Both passed at the new roots. |
+| Complete Relay test selection plus focused Broker contracts | 422 distinct passing tests: all 232 Relay cases and 190 Broker cases covering hosting, deployment automation, synthetic minimal deployment, Puri deployment, foundation, photo access, daily usage, Relay usage, and migration behavior. The final focused rerun had 224 passes across 10 files. |
+| Python Relay request/tool contracts and guide-screen checks | 110 passed, including six generator cases across repository-root and Relay working directories. Generated tool schemas are compared to the Python owner for the supplied catalog; context/photo outputs match current artifacts. |
+| Compatibility inventory gate | One affected required-surface test passed. |
+| Both `wrangler deploy --dry-run` commands | Broker and Relay emitted nonempty bundles in private temporary directories. Credentials were unset; HOME/config/log paths were isolated, metrics and dotenv loading disabled. No deployment or production migration occurred. |
+| Actual offline export from the emitted Relay bundle | `controlled_no_network`, zero external model calls, four context IDs, nine captures, eight current migration hashes, seven bundle modules. Protocol, compatibility flag, entry identity, and migration hashes were checked. Exported entry SHA-256: `284f5cf8d31d1b907d49d361c0f62670af2b081fc73cd541fa40c927a8ff19cd`. |
+| Simulator contracts and scoped lifecycle/package guards | 528 distinct passing tests across retained and corrected runs: all 520 existing simulator contracts, four benchmark guards/contracts, and four production lifecycle checks. Context/build rejection, result/HTML rendering, calibration export/import/rejudging, blocked states, and failure/cancellation semantics remain covered. |
+| Actual new benchmark `--help` and controlled `smoke` | Both exited 0. Smoke saved 26/26 completed cases/runs with `controlled_smoke_completed`, `live_pass=false`, calibration `blocked`, and preserved synthetic trusted contexts. It did not measure an emitted Worker: top-level build identity remained `unknown`, separate from the supplied synthetic manifest identity. |
+| Package/import boundaries and retained tool | Actual setuptools discovery found 64 source packages, zero benchmark packages, and no retired simulator module spec. Production-import guard passed. `puripuly_heart.release_evidence.local_cpu_real_decode --help` exited 0 without inference/download. |
+| Changed documentation navigation | 213 local targets/anchors resolved. |
+| Ignore behavior | 13 private/generated paths excluded; four maintained source/doc paths discoverable. |
+
+Service checks used `pnpm --filter @puripuly-heart/agent-relay test` and the focused Broker files under `services/broker/tests/`; the live `deploy-smoke` suite was not run. Python used `tests/app/test_agent_chat_relay_contract.py`, `tests/app/test_agent_chat_tools.py`, `tests/architecture/test_puri_guide_screens.py`, the affected compatibility-inventory test, and `tests/release_evidence/chatbot` plus `tests/architecture/test_lifecycle_task_guard.py`. No broad repository suite was required for this relocation.
+
+Benchmark actual-command probes used isolated user directories, private outputs, removed inherited provider credentials/overrides, and guards against external network, keyring access, live-app startup/discovery, subprocess/browser launches, and writes outside the private directory. Final probes observed none of those effects. The guard allowed only inspected urllib3 IPv6 capability probing and Windows asyncio loopback self-pipes. Isolated uv launcher cache writes were observed and classified separately from application state. Temporary reports, manifests, bundles, probe scripts, guards, Git adapter, and owned test outputs were cleaned; recreated workspace dependencies remain.
+
+### Failures and corrections
+
+- The first Relay run had 198 passes and 34 synthetic-deployment failures because Linux Git could not resolve a Windows-linked worktree's `.git` path. A temporary restricted read-only adapter supplied the actual worktree metadata for `rev-parse HEAD`; the affected checks then passed. Neither repository metadata nor deployment assertions were changed to bypass this environment boundary.
+- Two new generator tests initially compared a synthetic choice catalog's tools against a different production catalog. The corrected oracle compares exact Python-owner names, descriptions, strictness, and expanded schemas for the supplied catalog. Context/photo comparisons remain byte-level artifact checks. No weaker generated-tool contract was substituted.
+- The first simulator/guard run had 526 passes and one failure because an empty retired source directory remained after moving files. Removing that empty namespace-package surface fixed discovery; the affected boundary tests and new blocked-calibration orchestration test then passed (four cases).
+- Task-local smoke instrumentation initially rejected an import-time closed IPv6 capability probe and later mishandled a shallow Python frame. Narrowly classifying the inspected runtime plumbing repaired the observer, not product behavior. Saved-output inspection corrected two observer assumptions: no-Worker smoke has unknown top-level build identity, and uv writes isolated launcher cache metadata. Successful operations were not rerun merely to confirm those observations.
+- The integration Ruff check passed. Black identified seven formatting-only changes in generators and affected tests. Both owners applied only the requested wrapping/blank-line corrections with targeted edits; the affected Black checks then passed (four service files and three benchmark/fixture files). Behavioral evidence remains applicable.
+
+## Limits and publication handoff
+
+- No live-model evaluation, actual GUI/hardware effect, real Worker deployment, production database read/migration, or production authentication claim follows from these checks. Controlled smoke and emitted-context export have distinct evidence boundaries; neither supplies owner calibration judgments.
+- Full Broker and repository-wide suites were not run. Local Node was 24.10.0, not CI's pinned 22.23.4. The Windows-backed WSL worktree needed the read-only Git adapter for synthetic deployment identity; this is not a claim of native Linux checkout setup or remote CI execution.
+- Protected documentation edits are limited to the parent's approved path/command/navigation and directly affected verification guidance. Historical pinned evidence remains unchanged.
+- At the later combined PR, publish this record and the updated repository paths, reconcile #448's Project status, and update #444's current mutable simulator link from the retired Relay location to `benchmarks/chatbot/README.md`. Preserve pinned historical links. Current remote links/status were not changed during this local-only task.

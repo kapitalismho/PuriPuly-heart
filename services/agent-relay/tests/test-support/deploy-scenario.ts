@@ -11,7 +11,7 @@ import { parse } from 'yaml';
 
 import relay from '../../src/index';
 
-const repository = fileURLToPath(new URL('../../../', import.meta.url));
+const repository = fileURLToPath(new URL('../../../../', import.meta.url));
 const relayRoot = fileURLToPath(new URL('../../', import.meta.url));
 const support = fileURLToPath(new URL('./', import.meta.url));
 const canonicalOrigin = 'https://puripuly-heart-agent-relay.synthetic-account.workers.dev';
@@ -114,7 +114,7 @@ export function readEvents(scenario: DeployScenario): Array<{ event: string; pen
 }
 
 export async function runDeployWorkflow(scenario: DeployScenario) {
-  const workflow = readFileSync(new URL('../../../.github/workflows/deploy-agent-relay.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  const workflow = readFileSync(new URL('../../../../.github/workflows/deploy-agent-relay.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
   const query = workflow.match(/^      RELAY_SCHEMA_QUERY: (.+)$/mu);
   if (!query) throw new Error('Missing workflow schema query.');
   let queryValue = query[1].replace(/^(['"])(.*)\1$/u, '$2');
@@ -199,7 +199,7 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
       writeFileSync(scriptPath, script);
       executed.push(name);
       const child = spawn(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', shellPath(scriptPath)], {
-        cwd: block.includes('working-directory: agent-relay') ? relayRoot : repository, env, stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: block.includes('working-directory: services/agent-relay') ? relayRoot : repository, env, stdio: ['ignore', 'pipe', 'pipe'],
       });
       child.stdout.on('data', (data) => { stdout += String(data); });
       child.stderr.on('data', (data) => { stderr += String(data); });

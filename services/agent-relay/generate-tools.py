@@ -98,7 +98,9 @@ def app_tools(catalog: dict) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("choices", type=Path)
-    parser.add_argument("--output", type=Path, default=Path("agent-relay/src/app-tools.ts"))
+    parser.add_argument(
+        "--output", type=Path, default=Path(__file__).resolve().parent / "src/app-tools.ts"
+    )
     args = parser.parse_args()
     catalog = json.loads(args.choices.read_text(encoding="utf-8"))
     args.output.write_text(

@@ -2,7 +2,7 @@
 
 Puri's model-request service is a TypeScript Cloudflare Worker with D1 usage storage and optional R2 support storage. Relay owns model requests, prompts, and protocol contracts. Python owns conversations, app context, and tool execution. [Broker](../broker/README.md#puri-installation-tokens) supplies installation authentication.
 
-See [application ownership](../docs/architecture.md#agent-conversation) and the [Privacy Policy](../PRIVACY.md#6-puri-assistant-and-voluntary-support-reports).
+See [application ownership](../../docs/architecture.md#agent-conversation) and the [Privacy Policy](../../PRIVACY.md#6-puri-assistant-and-voluntary-support-reports).
 
 ## Protocol and Authentication
 
@@ -12,7 +12,7 @@ Prompts and [protocol contracts](src/contracts.ts) ship with the Worker. Rebuild
 
 ## Deployment
 
-Run the manual [deployment workflow](../.github/workflows/deploy-agent-relay.yml) from `dev` with the reviewed commit and production confirmation. Configuration lives in the workflow and [preparation script](operations/prepare-deployment.mjs).
+Run the manual [deployment workflow](../../.github/workflows/deploy-agent-relay.yml) from `dev` with the reviewed commit and production confirmation. Configuration lives in the workflow and [preparation script](operations/prepare-deployment.mjs).
 
 - Provision an initialized D1 dedicated to Relay before deployment. Leave `apply_migrations` off for code-only updates; pending migrations block deployment.
 - Set `AGENT_SERVICE_ENABLED` and `SUPPORT_REPORTS_ENABLED` explicitly. Set `PHOTO_SERVICE_ENABLED=true` to enable photo translation; deployment defaults it to `false` when unset. Disabling model admission leaves already dispatched work running.
@@ -33,7 +33,7 @@ Nonzero flags show incomplete usage, pending photo requests, or approximate date
 
 Reports upload only after an explicit user click and may contain sensitive conversation and log content. Normal Relay storage and logs exclude message bodies.
 
-Use a developer-only R2 bucket with the [30-day lifecycle](support-lifecycle.json). From `agent-relay`, with operations-only Cloudflare credentials:
+Use a developer-only R2 bucket with the [30-day lifecycle](support-lifecycle.json). From `services/agent-relay`, with operations-only Cloudflare credentials:
 
 ```sh
 node operations/support-storage.mjs verify puripuly-heart-support-reports
@@ -45,6 +45,8 @@ node operations/support-storage.mjs configure puripuly-heart-support-reports --e
 ## Local Development
 
 Use a Linux-native checkout and dependencies, including WSL-internal storage. From the repository root:
+
+When updating a populated checkout, first follow the shared [local-state and dependency migration procedure](../README.md#local-checkout-migration). Preserve ignored databases/secrets/configs; do not move old workspace dependency links.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -64,15 +66,21 @@ uv run python -m puripuly_heart.main
 
 Point `PURIPULY_AGENT_BROKER_URL` at an isolated Broker with the same token secret. Isolate app data, secrets, and runtime resources. Loopback HTTP is source-only; remove overrides to use the public service.
 
-## Scenario Simulator
+## Generated Application Contracts
 
-The [simulator](../src/puripuly_heart/release_evidence/agent_chat_simulator/) uses synthetic app state, not a live GUI. Keep output private and outside the repository.
+Python application owners remain authoritative for tool, context-module, and photo contracts. Use the prepared project environment and current-checkout imports. From the repository root, write private temporary comparison outputs first:
 
 ```sh
-uv run --no-sync python -m puripuly_heart.release_evidence.agent_chat_simulator --help
+PYTHONPATH=src uv run --no-sync python services/agent-relay/generate-tools.py "$PRIVATE_RESULTS/settings-choices.json" --output "$PRIVATE_RESULTS/app-tools.ts"
+PYTHONPATH=src uv run --no-sync python services/agent-relay/generate-context.py --output "$PRIVATE_RESULTS/context-modules.ts"
+PYTHONPATH=src uv run --no-sync python services/agent-relay/generate-photo.py --output "$PRIVATE_RESULTS/photo-contract.json"
 ```
 
-Pass `--subscription-only` to every live `probe`, `run`, and `calibration-rejudge`. Use ChatGPT sign-in and stop if unavailable; do not fall back to API-key billing.
+`PRIVATE_RESULTS` must be an existing private directory outside the checkout. The tools generator consumes the application-owned [`settings choices`](../../docs/cli.md) catalog JSON, not benchmark definitions. From `services/agent-relay/`, use `PYTHONPATH=../../src` and the same script basenames. Without `--output`, each generator targets its own script-adjacent `src/` artifact from either working directory; inspect and preserve any unrelated edits before intentionally updating those tracked outputs. Generation does not deploy a Worker.
+
+## Scenario Simulator
+
+The development-only [chatbot benchmark](../../benchmarks/chatbot/README.md) owns simulator commands, trusted-context manifests, calibration, private output handling, and evidence limits. It uses synthetic app state, not a live GUI, and is not shipped in the Python application.
 
 ## Source Map
 
