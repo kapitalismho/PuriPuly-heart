@@ -1007,7 +1007,7 @@ async fn next_source(runtime: &mut PhotoRuntime, bridge: &mut PhotoBridge) -> So
 #[cfg(windows)]
 #[tokio::test]
 async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() {
-    use super::super::interaction::compose;
+    use super::super::interaction::{compose, PHOTO_LINGER};
     use super::super::prepare::file_identity;
     use super::super::state::{Photo, PhotoPhase};
     use futures_util::{SinkExt, StreamExt};
@@ -1097,15 +1097,16 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     runtime.interaction_input(Some(sample(false,0.06)),clock+Duration::from_millis(400),&mut bridge).await.unwrap();
     runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(550),&mut bridge).await.unwrap();
     assert!(runtime.interaction.frame.photo.is_some());
-    runtime.interaction_input(Some(sample(false,0.0)),clock+Duration::from_millis(3100),&mut bridge).await.unwrap();
+    let settled = clock + Duration::from_millis(400) + PHOTO_LINGER + Duration::from_secs(1);
+    runtime.interaction_input(Some(sample(false,0.0)),settled,&mut bridge).await.unwrap();
     assert!(runtime.interaction.frame.photo.is_none());
     runtime.preview_source(late_release,&mut bridge).await.unwrap();
     assert!(runtime.texture.is_some());
     assert!(runtime.interaction.frame.photo.is_none());
     assert_eq!(runtime.pull_sequence,0);
     assert!(!runtime.preparation_started);
-    for (ms,grip,separation) in [(3175,false,0.0),(3200,false,0.0),(3210,true,0.0),(3230,true,0.06)] {
-        runtime.interaction_input(Some(sample(grip,separation)),clock+Duration::from_millis(ms),&mut bridge).await.unwrap();
+    for (ms,grip,separation) in [(75,false,0.0),(100,false,0.0),(110,true,0.0),(130,true,0.06)] {
+        runtime.interaction_input(Some(sample(grip,separation)),settled+Duration::from_millis(ms),&mut bridge).await.unwrap();
     }
     let partial = runtime.interaction.frame;
     assert_eq!(partial.photo.unwrap().alpha,1.0);
@@ -1131,7 +1132,7 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
             "input_boundary":"Synthetic nonidentity native poses through the production interaction_input function; not OpenVR/HMD input",
         })).unwrap()).unwrap();
     }
-    runtime.interaction_input(Some(sample(true,0.121)),clock+Duration::from_millis(3250),&mut bridge).await.unwrap();
+    runtime.interaction_input(Some(sample(true,0.121)),settled+Duration::from_millis(150),&mut bridge).await.unwrap();
     assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_pull");
     assert_eq!(runtime.interaction.frame.photo.unwrap().alpha,1.0);
     assert!(next_photo_message(&mut socket,20).await.is_none());
@@ -1141,11 +1142,11 @@ async fn first_grab_local_pixels_and_late_source_results_preserve_hold_fences() 
     photo.visible=true;
     runtime.receive(PhotoIncoming::Snapshot { revision:2,photo:Some(photo.clone()) },&mut bridge).await.unwrap();
     assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_state_received");
-    runtime.interaction_input(Some(sample(true,0.0)),clock+Duration::from_millis(3270),&mut bridge).await.unwrap();
+    runtime.interaction_input(Some(sample(true,0.0)),settled+Duration::from_millis(170),&mut bridge).await.unwrap();
     assert!((runtime.interaction.frame.photo.unwrap().width-W*180.0/320.0).abs()<0.00001);
     assert_eq!(runtime.pull_sequence,1);
     assert_eq!(runtime.compositor.as_ref().unwrap().original_uploads,1);
-    runtime.interaction_input(None,clock+Duration::from_millis(3290),&mut bridge).await.unwrap();
+    runtime.interaction_input(None,settled+Duration::from_millis(190),&mut bridge).await.unwrap();
     assert_eq!(next_photo_message(&mut socket,2000).await.unwrap()["type"],"photo_hidden");
     assert!(runtime.interaction.frame.photo.is_none());
     runtime.preparation.start_source(runtime.source_request.clone().unwrap()).unwrap();
