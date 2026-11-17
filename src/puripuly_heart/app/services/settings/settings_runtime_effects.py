@@ -127,6 +127,7 @@ class SettingsRuntimeEffectsAdapter:
         clear_local_pending: Callable[[], None],
         replace_self_stt: Callable[[bool], Awaitable[None]],
         rebuild_managed_gemma: Callable[[], Awaitable[bool]],
+        sync_photo: Callable[[], Awaitable[None]],
     ) -> None:
         self._state = state
         self._settings = settings
@@ -151,6 +152,7 @@ class SettingsRuntimeEffectsAdapter:
         self._clear_local_pending = clear_local_pending
         self._replace_self_stt = replace_self_stt
         self._rebuild_managed_gemma = rebuild_managed_gemma
+        self._sync_photo = sync_photo
 
     async def preserve_before_replace(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         preserved = await self._github_prompt().preserve_before_settings_replace(settings)
@@ -491,6 +493,11 @@ class SettingsRuntimeEffectsAdapter:
         rebuild_managed_gemma: bool = True,
     ) -> None:
         settings = transition.settings
+        if (
+            transition.previous_settings is None
+            or transition.previous_settings.intent.photo != settings.intent.photo
+        ):
+            await self._sync_photo()
         self.apply_activation_notice(settings)
         await self._desktop_overlay.apply_controls(transition.desktop_runtime_controls)
         previous_strict_runtime_errors = self._clipboard.strict_runtime_errors

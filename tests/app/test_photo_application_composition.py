@@ -94,7 +94,6 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
             runner=PhotoProcessRunner(Path(os.environ["PHOTO_NATIVE_EXECUTABLE"])),
             backend="probe",
             temporary_root=owned,
-            poll_interval=0.01,
         )
         photo_owners.append(owner)
         return owner
@@ -166,6 +165,34 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
         )
         assert not app._settings.settings.overlay_enabled()
         assert records["starts"] == 1
+        control = app.control()
+        control.bind_instance("photo-capture-settings")
+        disabled = await control.submit(
+            "settings.apply",
+            {"changes": {"photo.enabled": False}},
+            request_id="photo-capture-disable",
+        )
+        disabled_result = await control.wait(disabled["operation_id"], timeout=10)
+        assert disabled_result["status"] in {"applied", "degraded"}
+        await until(lambda: owner.lifecycle.snapshot["photo"] is None)
+        (photos / "while-disabled.png").write_bytes(png(64, 64))
+        enabled = await control.submit(
+            "settings.apply",
+            {"changes": {"photo.enabled": True}},
+            request_id="photo-capture-enable",
+        )
+        enabled_result = await control.wait(enabled["operation_id"], timeout=10)
+        assert enabled_result["status"] in {"applied", "degraded"}
+        assert owner.lifecycle.snapshot["photo"] is None
+        month = photos / "2026-12"
+        month.mkdir()
+        next_photo = month / "VRChat_2026-12-01_00-00-00.001_64x64.png"
+        next_photo.write_bytes(png(64, 64))
+        await until(
+            lambda: owner.lifecycle.snapshot["photo"] is not None
+            and owner.lifecycle.snapshot["photo"]["path"] == str(next_photo.resolve())
+        )
+        assert records["starts"] == 1
         print(
             {
                 "composed_startup": True,
@@ -174,6 +201,7 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
                 "photo_pid_after_replacement": photo_pid,
                 "photo_generation_after_crash": owner.supervisor.generation,
                 "starts": records["starts"],
+                "settings_reactivation_new_month_capture": True,
                 "controlled": "provider+credentials; no live services",
             }
         )
