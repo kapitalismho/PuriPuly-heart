@@ -2,6 +2,8 @@
 
 Development-only synthetic Agent Chat measurements. Run from the repository root in the locked project's prepared Python environment; the benchmark is not an installed application command or a production dependency. Application owners still define context and tool execution; [Agent Relay](../../services/agent-relay/README.md) owns emitted prompts and model requests.
 
+Updating a populated checkout may leave ignored `__pycache__` files in the retired simulator directory. Inert cache/namespace residue is not the old command or a compatibility shim; the maintained entrypoint is `benchmarks.chatbot`. Do not retain runnable source there or delete unrelated state to satisfy a directory-existence check. Preserve private reports separately from disposable bytecode.
+
 ## Controlled offline smoke
 
 Set `PRIVATE_RESULTS` to an existing private directory outside every checkout, using an absolute path. Always pass explicit output paths: CLI defaults are relative to the working directory. Keep reports, conversation archives, calibration samples, owner judgments, and rendered HTML out of tracked/public artifacts.
