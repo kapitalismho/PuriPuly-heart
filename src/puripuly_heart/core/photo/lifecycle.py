@@ -37,6 +37,7 @@ class PhotoRoute:
 class _Photo:
     capture: PhotoCapture
     route: PhotoRoute
+    is_current: Callable[[], bool] = field(default=lambda: True, repr=False)
     photo_id: str = field(default_factory=lambda: str(uuid4()))
     attempt_id: int = 0
     starts: int = 0
@@ -53,6 +54,7 @@ class _Photo:
     pull: asyncio.Event = field(default_factory=asyncio.Event)
     events: deque[str] = field(default_factory=lambda: deque(maxlen=64))
     task: asyncio.Task | None = None
+    release_task: asyncio.Task | None = None
     directory: tempfile.TemporaryDirectory | None = None
 
 
@@ -78,9 +80,13 @@ class PhotoLifecycle:
         self._clock = clock
         self._temporary_root = temporary_root
         self._scope = LifecycleScope("PhotoLifecycle")
+        self._release_scope = LifecycleScope("PhotoLifecycleRelease")
         self._current: _Photo | None = None
         self._retired: list[_Photo] = []
         self._revision = 0
+        self._capture_generation = 0
+        self._changed_event = asyncio.Event()
+        self._cleanup_lock = asyncio.Lock()
         self._frozen = False
         self._renderer_generation = 0
         self._draw_eligible: set[tuple[str, int]] = set()
@@ -125,6 +131,18 @@ class PhotoLifecycle:
             }
         return {"type": "photo_snapshot", "revision": self._revision, "photo": value}
 
+    @property
+    def refresh_delay(self) -> float | None:
+        photo = self._current
+        if photo is None:
+            return None
+        lifetime = 10 if photo.phase in ("offer", "limited") else 600
+        return max(0, lifetime - self._age(photo))
+
+    async def wait_changed(self) -> None:
+        await self._changed_event.wait()
+        self._changed_event.clear()
+
     def renderer_changed(self, generation: int) -> None:
         self._renderer_generation = generation
         self._draw_eligible.clear()
@@ -139,29 +157,44 @@ class PhotoLifecycle:
         return self._clock() - photo.capture.observed_monotonic
 
     def _active(self, photo: _Photo) -> bool:
-        return not self._frozen and self._current is photo and self._age(photo) < 600
+        return (
+            not self._frozen
+            and self._current is photo
+            and self._age(photo) < 600
+            and photo.is_current()
+        )
 
     def _changed(self) -> None:
         self._revision += 1
+        self._changed_event.set()
         self._publish(self.snapshot)
 
-    async def captured(self, capture: PhotoCapture) -> bool:
-        if self._frozen:
+    async def captured(
+        self, capture: PhotoCapture, *, is_current: Callable[[], bool] = lambda: True
+    ) -> bool:
+        if self._frozen or not is_current() or self._clock() - capture.observed_monotonic >= 10:
             return False
+        self._capture_generation += 1
+        generation = self._capture_generation
         route = await self._resolve_route()
-        if self._frozen:
+        if (
+            self._frozen
+            or generation != self._capture_generation
+            or not is_current()
+        ):
             return False
         self._retire_current()
         if route is None or self._clock() - capture.observed_monotonic >= 10:
             self._changed()
             return False
-        photo = _Photo(capture=capture, route=route)
+        photo = _Photo(capture=capture, route=route, is_current=is_current)
         self._current = photo
         if self.debug_limited or self._clock() < self._limited_until.get(route.identity, 0):
             photo.phase = "limited"
         else:
             self._limited_until.pop(route.identity, None)
             photo.task = self._scope.create_task(self._run(photo), name=photo.photo_id)
+            photo.task.add_done_callback(lambda task: self._changed_event.set())
         self._changed()
         return True
 
@@ -185,14 +218,25 @@ class PhotoLifecycle:
                 if photo.task is not None:
                     photo.task.cancel()
                 self._changed()
-        for retired in tuple(self._retired):
-            if retired.task is None or retired.task.done():
-                await self._release(retired)
+        await self._cleanup_retired()
+
+    async def _cleanup_retired(self) -> None:
+        async with self._cleanup_lock:
+            for retired in tuple(self._retired):
+                if retired.task is not None and not retired.task.done():
+                    continue
+                if retired.release_task is None:
+                    retired.release_task = self._release_scope.create_task(
+                        self._release(retired), name=retired.photo_id
+                    )
+                error = await asyncio.shield(retired.release_task)
+                if error is not None:
+                    raise error
                 self._retired.remove(retired)
 
     def pull(self, photo_id: str, event_id: str) -> bool:
         photo = self._current
-        if self._frozen or photo is None or photo.photo_id != photo_id or self._age(photo) >= 600:
+        if photo is None or not self._active(photo) or photo.photo_id != photo_id:
             return False
         if not event_id or len(event_id) > 128 or event_id in photo.events:
             return False
@@ -214,7 +258,7 @@ class PhotoLifecycle:
 
     def hidden(self, photo_id: str) -> None:
         photo = self._current
-        if not self._frozen and photo is not None and photo.photo_id == photo_id:
+        if photo is not None and self._active(photo) and photo.photo_id == photo_id:
             photo.visible = False
             self._changed()
 
@@ -518,21 +562,28 @@ class PhotoLifecycle:
                         photo, "cleanup_failed", failure_code="photo_connection_close_failed"
                     )
 
-    async def _release(self, photo: _Photo) -> None:
+    async def _release(self, photo: _Photo) -> Exception | None:
         if photo.directory is not None:
-            await run_owned_thread_call(photo.directory.cleanup)
+            try:
+                await run_owned_thread_call(photo.directory.cleanup)
+            except Exception as exc:
+                return exc
             photo.directory = None
         if self._discard_translated is not None and photo.phase in _TRANSLATED_PHASES:
             try:
                 await self._discard_translated(photo.capture)
             except Exception:
                 self._measure(photo, "cleanup_failed", failure_code="photo_discard_failed")
+        return None
 
     async def close(self) -> None:
         self.stop_ingress()
         self._retire_current()
         self._changed()
-        await self._scope.close()
-        for photo in tuple(self._retired):
-            await self._release(photo)
-            self._retired.remove(photo)
+        try:
+            await self._scope.close()
+        finally:
+            try:
+                await self._cleanup_retired()
+            finally:
+                await self._release_scope.close()

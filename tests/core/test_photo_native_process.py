@@ -102,7 +102,6 @@ async def test_actual_native_pull_preparation_cumulative_reopen_restart_and_shut
         runner=PhotoProcessRunner(executable),
         backend="probe",
         temporary_root=temporary,
-        poll_interval=0.01,
     )
     try:
         await owner.start()
@@ -215,7 +214,6 @@ async def test_actual_native_death_during_prepare_fails_without_resuming_job(tmp
         runner=PhotoProcessRunner(Path(os.environ["PHOTO_NATIVE_EXECUTABLE"])),
         backend="probe",
         temporary_root=owned,
-        poll_interval=0.01,
     )
     try:
         await owner.start()
@@ -290,7 +288,6 @@ async def test_actual_native_portrait_photo_is_sent_upright_in_portrait_canvas(t
         runner=PhotoProcessRunner(executable),
         backend="probe",
         temporary_root=temporary,
-        poll_interval=0.01,
     )
     try:
         await owner.start()

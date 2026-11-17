@@ -134,6 +134,7 @@ class ChatGptSession:
     )
     clock: Callable[[], float] = time.time
     refresh_margin_s: float = _REFRESH_MARGIN_S
+    status_changed: Callable[[], None] | None = None
     _tokens: ChatGptTokenSet | None = field(init=False, default=None, repr=False)
     _lock: asyncio.Lock | None = field(init=False, default=None, repr=False)
     _http: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
@@ -169,6 +170,21 @@ class ChatGptSession:
             emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
             return ChatGptSessionStatus(None, None, diagnostics)
 
+    def _notify_status_changed(self) -> None:
+        if self.status_changed is None:
+            return
+        try:
+            self.status_changed()
+        except Exception as exc:
+            emit_failure(
+                logger,
+                _session_diagnostics(
+                    "chatgpt_status_notification_failed", "status_notification", exc
+                ),
+                severity="warning",
+                disposition="degraded",
+            )
+
     def client_id(self) -> str | None:
         return self.secret_store().get(CHATGPT_CLIENT_ID_SECRET) or None
 
@@ -191,9 +207,12 @@ class ChatGptSession:
         tokens: ChatGptTokenSet,
         identity: ChatGptIdentity,
     ) -> None:
-        with self._credential_lock:
-            self._store_sign_in(client_id=client_id, tokens=tokens, identity=identity)
-            self._credential_epoch += 1
+        try:
+            with self._credential_lock:
+                self._store_sign_in(client_id=client_id, tokens=tokens, identity=identity)
+                self._credential_epoch += 1
+        finally:
+            self._notify_status_changed()
 
     def _store_sign_in(
         self,
@@ -317,11 +336,14 @@ class ChatGptSession:
                 )
 
         def remove() -> bool:
-            with self._credential_lock:
-                if epoch != self._credential_epoch:
-                    return False
-                store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
-                return True
+            try:
+                with self._credential_lock:
+                    if epoch != self._credential_epoch:
+                        return False
+                    store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
+                    return True
+            finally:
+                self._notify_status_changed()
 
         try:
             removed = await self._owned_credential_call(
@@ -427,15 +449,18 @@ class ChatGptSession:
             )
 
             def reject() -> bool:
-                with self._credential_lock:
-                    if epoch != self._credential_epoch:
-                        return False
-                    self._credential_epoch += 1
-                    self._retired = True
-                    self._tokens = None
-                    self._generation += 1
-                    store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
-                    return True
+                try:
+                    with self._credential_lock:
+                        if epoch != self._credential_epoch:
+                            return False
+                        self._credential_epoch += 1
+                        self._retired = True
+                        self._tokens = None
+                        self._generation += 1
+                        store.delete(CHATGPT_REFRESH_TOKEN_SECRET)
+                        return True
+                finally:
+                    self._notify_status_changed()
 
             try:
                 removed = await self._owned_credential_call(

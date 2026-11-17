@@ -816,3 +816,202 @@ async def test_truncated_structure_keeps_accepted_blocks_without_retry_or_pendin
         assert len(h.connections) == 1
     finally:
         await h.owner.close()
+
+
+async def test_deadlines_are_capture_relative_and_only_offers_use_ten_seconds(tmp_path):
+    h = Harness(tmp_path, [[], []])
+    try:
+        h.time = 8
+        assert await h.owner.captured(capture(Path("earlier.png"), 0))
+        assert h.owner.refresh_delay == 2
+        h.time = 10
+        await h.owner.refresh(h.route)
+        assert h.photo["phase"] == "expired"
+        assert h.owner.refresh_delay == 590
+        h.time = 20
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "accepted")
+        assert h.owner.refresh_delay == 600
+        h.time = 25
+        assert h.owner.refresh_delay == 595
+        await h.owner.refresh(None)
+        assert h.owner.refresh_delay is None
+    finally:
+        await h.owner.close()
+
+
+async def test_stale_capture_and_revoked_generation_do_not_resolve_or_replace(tmp_path):
+    h = Harness(tmp_path, [[]])
+    try:
+        photo_id = await h.offer()
+        calls = 0
+
+        async def resolve():
+            nonlocal calls
+            calls += 1
+            return h.route
+
+        h.owner._resolve_route = resolve
+        h.time = 10
+        assert not await h.owner.captured(capture(Path("stale.png"), 0))
+        assert not await h.owner.captured(
+            capture(Path("revoked.png"), 10), is_current=lambda: False
+        )
+        assert calls == 0
+        assert h.photo["photo_id"] == photo_id
+    finally:
+        await h.owner.close()
+
+
+async def test_reordered_capture_resolution_cannot_replace_newer_offer(tmp_path):
+    h = Harness(tmp_path, [[]])
+    first_entered = asyncio.Event()
+    first_finish = asyncio.Event()
+    calls = 0
+
+    async def resolve():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            first_entered.set()
+            await first_finish.wait()
+        return h.route
+
+    h.owner._resolve_route = resolve
+    first = asyncio.create_task(h.owner.captured(capture(Path("first.png"))))
+    try:
+        await first_entered.wait()
+        assert await h.owner.captured(capture(Path("second.png")))
+        first_finish.set()
+        assert not await first
+        assert h.photo["path"] == "second.png"
+    finally:
+        first_finish.set()
+        await first
+        await h.owner.close()
+
+
+async def test_revoked_capture_generation_blocks_pull_and_provider_work(tmp_path):
+    h = Harness(tmp_path, [[]])
+    current = True
+    try:
+        assert await h.owner.captured(
+            capture(Path("capture.png")), is_current=lambda: current
+        )
+        photo_id = h.photo["photo_id"]
+        current = False
+        assert not h.owner.pull(photo_id, "revoked")
+        await eventually(lambda: h.owner._current.task.done())
+        assert h.prepares == []
+        assert h.owner.request_starts == 0
+    finally:
+        await h.owner.close()
+
+
+async def test_retired_task_settlement_notifies_cleanup_without_repeated_refresh(tmp_path):
+    entered = asyncio.Event()
+    finish = asyncio.Event()
+
+    async def prepare(photo_id, attempt_id, source, directory, **kwargs):
+        entered.set()
+        try:
+            await finish.wait()
+        except asyncio.CancelledError:
+            await finish.wait()
+        snapshot = directory / "source.png"
+        snapshot.write_bytes(b"retired")
+        return PreparedPhoto("jpeg", snapshot, 100, 100, 1, 0, 0, 1)
+
+    h = Harness(tmp_path, [[]], prepare=prepare)
+    try:
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "pull")
+        await entered.wait()
+        await h.owner.refresh(None)
+        assert h.photo is None
+        await h.owner.wait_changed()
+        settled = asyncio.create_task(h.owner.wait_changed())
+        finish.set()
+        await settled
+        await eventually(lambda: h.owner._retired[0].task.done())
+        await h.owner.refresh(None)
+        assert h.owner._retired == []
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        finish.set()
+        await h.owner.close()
+
+
+async def test_cancelled_cleanup_waiter_does_not_duplicate_release_or_leak_tasks(tmp_path):
+    entered = asyncio.Event()
+    finish = asyncio.Event()
+    discarded = []
+
+    async def discard(photo_capture):
+        discarded.append(photo_capture)
+        entered.set()
+        await finish.wait()
+
+    h = Harness(tmp_path, [[block(), PhotoStreamCompleted({}, "gpt-6-luna")]], discard=discard)
+    try:
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        h.time = 600
+        releasing = asyncio.create_task(h.owner.refresh(h.route))
+        await entered.wait()
+        releasing.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await releasing
+        resumed = asyncio.create_task(h.owner.refresh(h.route))
+        closing = asyncio.create_task(h.owner.close())
+        finish.set()
+        await asyncio.gather(resumed, closing)
+        assert len(discarded) == 1
+        assert h.owner._retired == []
+        assert h.owner._scope.active_task_names == ()
+        assert h.owner._release_scope.active_task_names == ()
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        finish.set()
+        await h.owner.close()
+
+
+async def test_failed_directory_cleanup_retains_resource_and_surfaces_on_close(tmp_path, monkeypatch):
+    h = Harness(tmp_path, [[block(), PhotoStreamCompleted({}, "gpt-6-luna")]])
+    photo = None
+    original_cleanup = None
+    attempts = []
+
+    def failing_cleanup():
+        attempts.append(1)
+        raise OSError("temporary directory still in use")
+
+    try:
+        photo_id = await h.offer()
+        assert h.owner.pull(photo_id, "pull")
+        await eventually(lambda: h.photo["phase"] == "completed")
+        photo = h.owner._current
+        directory = photo.directory
+        original_cleanup = directory.cleanup
+        monkeypatch.setattr(directory, "cleanup", failing_cleanup)
+        h.time = 600
+        with pytest.raises(OSError, match="temporary directory still in use"):
+            await h.owner.refresh(h.route)
+        assert h.owner._retired == [photo]
+        assert photo.directory is directory
+        with pytest.raises(OSError, match="temporary directory still in use"):
+            await h.owner.refresh(h.route)
+        assert attempts == [1]
+        with pytest.raises(OSError, match="temporary directory still in use"):
+            await h.owner.close()
+        assert h.owner._retired == [photo]
+        assert photo.directory is directory
+        assert h.owner._scope.active_task_names == ()
+        assert h.owner._release_scope.active_task_names == ()
+        assert attempts == [1]
+    finally:
+        if original_cleanup is not None:
+            await asyncio.to_thread(original_cleanup)
+        if photo is None:
+            await h.owner.close()

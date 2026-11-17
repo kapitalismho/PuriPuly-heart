@@ -1429,6 +1429,7 @@ def compose_application_runtime(
                         smooth_local=smooth
                     ),
                     rebuild_managed_gemma=lambda: provider_runtime.llm_rebuild.rebuild(),
+                    sync_photo=lambda: sync_photo_policy(),
                 ),
                 sync_ui=sync_ui_from_settings,
                 mutation_service_provider=lambda: None,
@@ -1923,6 +1924,9 @@ def compose_application_runtime(
 
     photo_owner = PhotoApplicationOwner(
         resolve_route=resolve_photo_route,
+        enabled=lambda: (
+            settings.canonical is not None and settings.canonical.intent.photo.enabled
+        ),
         discard_translated=discard_translated_photo,
         target_language=lambda: (
             settings.canonical.intent.languages.source_language
@@ -1932,6 +1936,11 @@ def compose_application_runtime(
         diagnostic=photo_diagnostic,
         wrist_calibration_path=Path(config_path).parent / "photo-wrist-calibration.json",
     )
+    chatgpt_session.status_changed = photo_owner.notify_policy_changed
+
+    async def sync_photo_policy() -> None:
+        photo_owner.notify_policy_changed()
+        await photo_owner.wait_policy_applied()
 
     def translation_runtime_enabled() -> bool:
         owner = pipeline.translation_runtime_configuration
@@ -2537,7 +2546,12 @@ def compose_application_runtime(
         support_log_snapshot=runtime_logging.support_log_snapshot,
     )
     application.attach_agent_chat(agent_chat)
-    settings.observe_commits(control._publish_committed)
+
+    def on_settings_committed(snapshot: AppSettingsVNext) -> None:
+        photo_owner.notify_policy_changed()
+        control._publish_committed(snapshot)
+
+    settings.observe_commits(on_settings_committed)
     application.register_application_shutdown_callbacks(
         (
             application_shutdown_callback(
