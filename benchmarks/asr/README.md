@@ -15,7 +15,7 @@ Reuse existing audio or run [prepare.py](prepare.py) from the repository root. P
 uv run --no-sync --with pyarrow==23.0.1 python benchmarks/asr/prepare.py --language all
 ```
 
-`--offline` requires cached pinned sources. `--check-only` validates existing inputs without downloading or rendering.
+`--offline` requires cached pinned sources. `--check-only` validates existing inputs without downloading or rendering, but still writes `benchmarks/asr/data-preparation.json`; preserve any previous preparation evidence before invoking it.
 
 ## Run
 
@@ -41,3 +41,11 @@ Substitute a model/language supported by the catalog, such as `sherpa-ja`/`ja`. 
 - IBM lists AMI among training sources; exact overlap is unknown. IngCrowd is unsplit.
 
 Add models through [models.json](models.json) or a thin [adapter](adapters.py). Other languages need frozen manifests and audio via `--inputs` and `--data-root`. Reuse the common scoring contract.
+
+## Retired native-Soniox experiment
+
+The #373 capture/replay runner, speaker-policy scorer, and MT-inspection commands are retired from the maintained tree. They are separate from the CPU preparation, resident inference, paced replay, and scoring commands above; no replacement generic harness was introduced.
+
+- [Frozen #373 report](https://github.com/kapitalismho/PuriPuly-heart/blob/d27e1bc555c4925a2f3d3cbe4a00ec1b7a101055/benchmarks/asr/issue373-results.md), [labels](https://github.com/kapitalismho/PuriPuly-heart/blob/d27e1bc555c4925a2f3d3cbe4a00ec1b7a101055/benchmarks/asr/issue373-references.json), and [historical source tree](https://github.com/kapitalismho/PuriPuly-heart/tree/d27e1bc555c4925a2f3d3cbe4a00ec1b7a101055/benchmarks/asr) retain the original results and commands. Those commands describe the pinned historical checkout, not the current layout.
+- [#441](https://github.com/kapitalismho/PuriPuly-heart/issues/441) owns the remaining result processing/write-up. Its local historical source, audio, and saved outputs are retained; retirement does not rerun or close that experiment.
+- The [cleanup and preservation record](../../docs/workspace-cleanup.md) identifies source pins, local-only evidence limits, retained workspace categories, and verification.

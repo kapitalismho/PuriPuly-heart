@@ -15,6 +15,8 @@ The [PR workflow](workflows/pr-ci.yml) owns check commands, tool versions, and t
 
 Test observable behavior with isolated state. External integrations require their own setup. Synthetic checks do not establish real device, model, or installed-product behavior; report what actually ran and any verification gaps.
 
+Maintained repository tools are tracked under [`scripts/ci/`](../scripts/ci/) and [`scripts/release/`](../scripts/release/); reusable ASR benchmarks live under [`benchmarks/asr/`](../benchmarks/asr/README.md). These tool directories do not need ignore-rule allowlists. Put new disposable or personal scripts in ignored `scripts/local/` or `.tmp/`, never credentials in maintained tools. Existing root-level personal scripts remain individually ignored until their ownership is resolved. See the [workspace cleanup record](../docs/workspace-cleanup.md) for preservation boundaries and retired experiment commands.
+
 ## Native ASR worker builds
 
 Use CMake 3.19 or newer, the Windows Vulkan SDK, and the supported build entry point:
