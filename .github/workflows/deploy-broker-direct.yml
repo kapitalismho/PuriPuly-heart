@@ -87,7 +87,7 @@ jobs:
 
       - name: Render production Wrangler config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
           if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
@@ -99,12 +99,12 @@ jobs:
             "${version_args[@]}" --out wrangler.production.jsonc
 
       - name: Validate production Wrangler config
-        working-directory: broker
+        working-directory: services/broker
         run: pnpm exec wrangler types --config wrangler.production.jsonc
 
       - name: Require report-ready Relay usage database
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           if ! relay_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-agent-usage --remote --config wrangler.production.jsonc \
@@ -152,7 +152,7 @@ jobs:
 
       - name: Require initialized supported Broker database
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           journal_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \
@@ -195,7 +195,7 @@ jobs:
       - name: Stage and apply explicitly selected ordinary migrations
         if: inputs.apply_migrations
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           stage='.deploy-direct/migrations'
           mkdir -p "$stage"
@@ -223,7 +223,7 @@ jobs:
 
       - name: Require deploy-ready ordinary schema
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           schema_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \
@@ -252,7 +252,7 @@ jobs:
 
 
       - name: Deploy canonical broker worker
-        working-directory: broker
+        working-directory: services/broker
         run: pnpm exec wrangler deploy --keep-vars --config wrangler.production.jsonc
 
       - name: Verify deployed health and public foundation
@@ -295,7 +295,7 @@ jobs:
               assert trial['provider'] == 'OpenRouter'
               expected_models = ast.literal_eval(re.search(
                   r'export const MANAGED_TRIAL_ALLOWED_MODELS = (\[.*?\]) as const;',
-                  Path('broker/src/trial-policy.ts').read_text(encoding='utf-8'),
+                  Path('services/broker/src/trial-policy.ts').read_text(encoding='utf-8'),
                   re.S,
               ).group(1))
               assert isinstance(trial['models'], list) and set(trial['models']) == set(expected_models)

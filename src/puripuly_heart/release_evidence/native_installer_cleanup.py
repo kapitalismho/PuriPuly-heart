@@ -184,6 +184,18 @@ def cleanup_plan(
                 alternatives[key] = row
             elif key not in old:
                 old[key] = row
+    prompt_prefix = "app/puripuly_heart/data/prompts/"
+    for key, row in new.items():
+        if not key.startswith(prompt_prefix):
+            continue
+        prior = OwnedFile("app/prompts/" + row.path[len(prompt_prefix) :], row.bytes, row.sha256)
+        if prior.key in old and (old[prior.key].bytes, old[prior.key].sha256) != (
+            prior.bytes,
+            prior.sha256,
+        ):
+            alternatives[prior.key] = prior
+        elif prior.key not in old:
+            old[prior.key] = prior
     merged = {"schema": LEGACY_SCHEMA, "inventory": [row.as_dict() for row in old.values()]}
     owned = obsolete_owned_files(merged, native)
     preserved = [

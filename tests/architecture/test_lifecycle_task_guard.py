@@ -621,12 +621,6 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
         family=RUN_TASK,
     ),
-    *_reviews(
-        "release_evidence/agent_chat_simulator/execution.py",
-        {"AttemptScheduler.run": 1},
-        "AttemptScheduler retains bounded per-attempt tasks, stops admission on failure/cancellation, "
-        "and shield-drains each attempt's model close and checkpoint before returning",
-    ),
 )
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)
 

@@ -329,7 +329,7 @@ def test_registry_identity_and_fingerprint_survive_filename_changes(tmp_path: Pa
 
 
 def test_example_is_valid() -> None:
-    path = Path("examples/http_extensions/mymemory.json")
+    path = Path("docs/http-extensions/examples/mymemory.json")
 
     extension = parse_http_extension(json.loads(path.read_text(encoding="utf-8")))
 
@@ -338,18 +338,23 @@ def test_example_is_valid() -> None:
 
 
 def test_docs_schema_file_is_valid_json() -> None:
-    schema_path = Path("docs/http-extension.schema.json")
+    schema_path = Path("docs/http-extensions/http-extension.schema.json")
 
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["$id"] == (
+        "https://raw.githubusercontent.com/kapitalismho/PuriPuly/main/docs/http-extension.schema.json"
+    )
     assert schema["additionalProperties"] is False
     assert schema["properties"]["schema_version"]["const"] == 1
     assert schema["properties"]["request"]["required"] == ["body"]
 
 
 def test_docs_schema_rejects_parser_forbidden_urls_and_header_names() -> None:
-    schema = json.loads(Path("docs/http-extension.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads(
+        Path("docs/http-extensions/http-extension.schema.json").read_text(encoding="utf-8")
+    )
     url_pattern = schema["properties"]["url"]["pattern"]
     header_patterns = tuple(schema["properties"]["headers"]["patternProperties"])
 

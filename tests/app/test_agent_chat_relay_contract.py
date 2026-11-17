@@ -13,7 +13,7 @@ from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from tests.app.test_agent_chat import Records, Tokens, answer, tool
 from tests.app.test_agent_chat_routing import selected_decision
 
-FIXTURES = Path(__file__).resolve().parents[2] / "agent-relay/tests/app-requests"
+FIXTURES = Path(__file__).resolve().parents[2] / "services/agent-relay/tests/app-requests"
 _VALUES = frozenset(
     {"agent_protocol", "route", "effort", "allow_tools", "type", "role", "name", "status"}
 )

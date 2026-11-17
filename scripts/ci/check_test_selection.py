@@ -127,7 +127,9 @@ def _discover(root: Path) -> dict[str, ast.Module]:
     for directory, children, filenames in os.walk(protected, onerror=fail):
         for child in children:
             if (Path(directory) / child).is_symlink():
-                raise SelectionError(f"Symlinked test directory is unsupported: {directory}/{child}")
+                raise SelectionError(
+                    f"Symlinked test directory is unsupported: {directory}/{child}"
+                )
         for name in filenames:
             if not (name.startswith("test_") or name.endswith("_test.py")) or not name.endswith(
                 ".py"
@@ -196,7 +198,9 @@ def check_selection(root: Path = REPO_ROOT) -> SelectionReport:
                 raise SelectionError(f"Missing exclusion rationale: {directory}")
             excluded.update(_target_files(root, directory, sources))
         if overlap := selected & excluded:
-            raise SelectionError(f"Intentional integration exclusion was selected: {sorted(overlap)}")
+            raise SelectionError(
+                f"Intentional integration exclusion was selected: {sorted(overlap)}"
+            )
         if omitted := sources.keys() - selected - excluded:
             raise SelectionError(f"Offline test files absent from PR selections: {sorted(omitted)}")
         return SelectionReport(frozenset(selected), frozenset(excluded))

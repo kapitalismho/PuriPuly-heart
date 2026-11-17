@@ -13,5 +13,5 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["broker/src/**/*.ts", "broker/tests/**/*.ts", "agent-relay/src/**/*.ts", "agent-relay/tests/**/*.ts", "vitest.config.ts"]
+  "include": ["services/broker/src/**/*.ts", "services/broker/tests/**/*.ts", "services/agent-relay/src/**/*.ts", "services/agent-relay/tests/**/*.ts", "vitest.config.ts"]
 }

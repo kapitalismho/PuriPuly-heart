@@ -494,7 +494,9 @@ async def test_committed_mymemory_example_uses_local_fake_http_server() -> None:
     thread.start()
     backend = None
     try:
-        sample_path = Path(__file__).parents[2] / "examples" / "http_extensions" / "mymemory.json"
+        sample_path = (
+            Path(__file__).parents[2] / "docs" / "http-extensions" / "examples" / "mymemory.json"
+        )
         definition = replace(
             parse_http_extension(json.loads(sample_path.read_text(encoding="utf-8"))),
             url=f"http://127.0.0.1:{server.server_port}/get",

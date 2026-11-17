@@ -1,0 +1,18 @@
+# Cloud services
+
+[Broker](broker/README.md) and [Agent Relay](agent-relay/README.md) are independently deployed sibling Cloudflare Workers, not Python application packages. Broker owns identity and credential release; Relay owns model requests and its usage database. Their service guides own authentication, binding, migration-ordering, and deployment requirements. Directory maintenance does not authorize deployment, secret rotation, or production database operations.
+
+## Local checkout migration
+
+The old root-level service directories moved here. Git moves tracked sources, not ignored local state. Before integrating the layout into an existing development checkout:
+
+1. Stop that checkout's local Wrangler/dev/test processes. Inventory each service's `.wrangler/`, `.dev.vars*`, `.env*`, generated configs/types, and any explicit `--persist-to` directory. A clean Git status does not establish that these are absent or disposable.
+2. Preserve any database/state, secret/config files, and unclassified metadata in a private backup outside the checkout. Copy the entire Wrangler state, including SQLite sidecars, only while its owners are stopped. Preserve unrelated root settings and environment files in place.
+3. After integrating tracked sources, copy each service's preserved local state/config/secrets to its own `services/<name>/` directory. Do not overwrite an existing destination or merge competing databases. Keep an external `--persist-to` location unchanged, or explicitly migrate it and update every local caller. Broker and Relay still require matching local Relay database IDs and the same explicit persistence directory for shared local usage reporting; their databases and migration owners remain distinct.
+4. Review retained generated configs privately against the relocated templates. Preserve identities/bindings and local values while correcting repository-relative paths. Do not replace real local values with placeholders, apply migrations, deploy, or invoke `support-storage.mjs configure` merely to move files: that command operates on Cloudflare storage. Even its `verify` command accesses the remote API.
+5. Recreate disposable workspace dependencies in the intended Linux-native checkout, including WSL-internal storage, with `pnpm install --frozen-lockfile` from the repository root. Do not move/copy old service `node_modules`, reuse links into another checkout, or reuse Windows-native packages in Linux. Before removing an obsolete dependency directory, retain unclassified `.cache/wrangler` account metadata or `.mf` metadata; dependencies can be reproduced, local account state must not be silently discarded.
+6. Regenerate disposable Worker types with `pnpm --filter @puripuly-heart/broker run verify:config`. Keep manually changed or unclassified generated files until their ownership is settled. Retain the private backup until the intended local Worker/config/database is confirmed usable; remove only confirmed obsolete task-owned artifacts. Never use a blanket `git clean -fdx`.
+
+A fresh worktree with no inherited service state needs a fresh dependency installation, not a copy of another checkout's databases, secrets, or links. Ignore rules cover dependency roots, Wrangler state/local secrets, generated Worker types, and production configs at the new depth; ignoring a file is not authorization to delete it.
+
+Run typechecks, synthetic service/deployment tests, and `wrangler deploy --dry-run` before considering a deployment. Relay's deployment preparer rejects output anywhere inside the **entire checkout**, including directories outside `services/`; choose a private temporary output directory outside the checkout.

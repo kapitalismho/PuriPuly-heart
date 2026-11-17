@@ -88,7 +88,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Render production Wrangler config
-        working-directory: broker
+        working-directory: services/broker
         shell: bash
         env:
           NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
@@ -106,7 +106,7 @@ jobs:
             --out wrangler.production.jsonc
 
       - name: Inspect current daily auth cap
-        working-directory: broker
+        working-directory: services/broker
         run: >-
           pnpm exec wrangler d1 execute
           puripuly-heart-broker --remote --config wrangler.production.jsonc
@@ -115,7 +115,7 @@ jobs:
 
       - name: Update daily auth cap runtime config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           cat > .abuse-controls-daily-cap-update.sql <<SQL
           UPDATE broker_config
@@ -132,7 +132,7 @@ jobs:
 
       - name: Verify daily auth cap runtime config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           verify_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \

@@ -668,7 +668,6 @@ def _archive_members(
                     raise ValueError(f"Python archive cannot contain native binaries: {name}")
             if not stdlib and (
                 name.startswith("product_bootstrap.")
-                or name.startswith("prompts/")
                 or (name.startswith("puripuly_heart/data/") and path.suffix not in {".py", ".pyc"})
             ):
                 raise ValueError(f"Python archive contains filesystem-only content: {name}")
@@ -847,8 +846,9 @@ def bundle_runtime(target_root: Path, layout_path: Path, bytecode_path: Path) ->
             suffix = path.suffix.lower()
             stdlib = root == stdlib_root
             flet = root == dependency_root and relative.parts[0] == "flet"
-            filesystem_resource = root == application_root and (
-                relative.parts[0] == "prompts" or relative.parts[:2] == ("puripuly_heart", "data")
+            filesystem_resource = root == application_root and relative.parts[:2] == (
+                "puripuly_heart",
+                "data",
             )
             if suffix in {".pyd", ".dll", ".so", ".dylib", ".exe"} and (
                 stdlib

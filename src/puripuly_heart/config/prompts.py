@@ -1,6 +1,6 @@
 """Prompt file loader utility.
 
-Loads system prompts from files in the prompts/ directory.
+Loads system prompts from the package data/prompts/ directory.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def get_prompts_dir() -> Path:
     env_dir = os.getenv("PURIPULY_HEART_PROMPTS_DIR")
     if env_dir:
         return Path(env_dir).resolve()
-    return current_runtime_layout().resource("prompts")
+    return current_runtime_layout().package_resource("data", "prompts")
 
 
 def list_prompts() -> list[str]:

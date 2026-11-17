@@ -450,7 +450,7 @@ def test_bundled_runtime_imports_code_and_flet_resources_without_recompilation(
         "spec.loader.exec_module(bootstrap)\n"
         "print(json.dumps([consumer.RESULT, bootstrap.RESULT, "
         "layout.package_resource('data', 'payload.txt').read_text(), "
-        "layout.resource('prompts', 'system.txt').read_text()]))\n"
+        "layout.package_resource('data', 'prompts', 'system.txt').read_text()]))\n"
     )
     result = subprocess.run(
         [sys.executable, "-I", "-B", "-c", script], check=True, capture_output=True, text=True
