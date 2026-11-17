@@ -1094,6 +1094,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "pyyaml" },
     { name = "ruff" },
+    { name = "setuptools" },
 ]
 
 [package.metadata]
@@ -1134,6 +1135,7 @@ requires-dist = [
     { name = "scikit-build-core", marker = "extra == 'build'", specifier = ">=0.10" },
     { name = "scipy", marker = "sys_platform == 'win32'", specifier = "==1.18.0" },
     { name = "setuptools", marker = "extra == 'build'", specifier = "==84.2.1" },
+    { name = "setuptools", marker = "extra == 'dev'", specifier = "==84.2.1" },
     { name = "setuptools-scm", extras = ["toml"], marker = "extra == 'build'", specifier = ">=6.2" },
     { name = "sherpa-onnx", specifier = "==1.13.8" },
     { name = "sherpa-onnx-core", specifier = "==1.13.8" },

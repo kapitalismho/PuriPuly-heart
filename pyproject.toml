@@ -58,6 +58,7 @@ dev = [
   "PyYAML>=6.0.3,<7",
   "ruff>=0.6.0",
   "black>=26.10.1",
+  "setuptools==84.2.1",
 ]
 build = [
   "cmake>=3.31",
