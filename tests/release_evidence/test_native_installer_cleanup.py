@@ -72,9 +72,7 @@ def test_known_packaged_user_data_is_preserved_even_if_absent_from_native_invent
     legacy = _manifest(
         LEGACY_SCHEMA, *(_row(path) for path in protected), _row("runtime/obsolete.dll")
     )
-    native = _manifest(
-        NATIVE_SCHEMA, _row("app/puripuly_heart/data/prompts/translation_prompt.md")
-    )
+    native = _manifest(NATIVE_SCHEMA, _row("app/puripuly_heart/data/prompts/translation_prompt.md"))
 
     assert [row.path for row in obsolete_owned_files(legacy, native)] == ["runtime/obsolete.dll"]
     plan = cleanup_plan(json.dumps(legacy).encode(), json.dumps(native).encode())

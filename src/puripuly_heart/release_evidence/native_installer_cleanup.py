@@ -188,9 +188,7 @@ def cleanup_plan(
     for key, row in new.items():
         if not key.startswith(prompt_prefix):
             continue
-        prior = OwnedFile(
-            "app/prompts/" + row.path[len(prompt_prefix) :], row.bytes, row.sha256
-        )
+        prior = OwnedFile("app/prompts/" + row.path[len(prompt_prefix) :], row.bytes, row.sha256)
         if prior.key in old and (old[prior.key].bytes, old[prior.key].sha256) != (
             prior.bytes,
             prior.sha256,

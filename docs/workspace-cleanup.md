@@ -73,7 +73,7 @@ All paths in this section are relative to the primary workspace. Inventory consi
 
 The b10423 archives remain under `build/download-cache/llama.cpp/` as `llama-b10423-bin-win-cpu-x64.zip` and `llama-b10423-bin-win-vulkan-x64.zip`; the sibling b10423 `manifest.json` remains. Removal commands completed successfully. No blanket clean, recursive worktree deletion, or running-process termination was performed.
 
-### Retained or pending
+### Initial retention decisions
 
 | Category | Disposition and reason |
 | --- | --- |
@@ -87,6 +87,28 @@ The b10423 archives remain under `build/download-cache/llama.cpp/` as `llama-b10
 | Registered worktrees | All retained. Two contain unrelated dirty work; signing and #441 contain unintegrated commits. A clean tracked tree does not establish permission to remove its ignored state. |
 
 Registered ownership checked: primary `dev`, current `issue-447`, `issue-441`, signing integration, `special-thanks`, and the existing dated agent worktree. The latter and `special-thanks` had unrelated tracked changes. No worktree was removed or pruned. Some large environment metadata walks were bounded and skipped links; this record is not a complete disk-size audit.
+
+### Owner-authorized additional cleanup for #446
+
+On 2026-11-17, the owner requested more aggressive cleanup before the combined PR and explicitly released three previously uncertain categories: historical runnable bundle dependencies/intermediates, historical installer binaries, and the old WSL environment. This supersedes the corresponding initial retention decisions above. Losing complete historical runnable bundles, exact installer bytes, and any customized WSL package state was disclosed before approval; these removals are not presented as byte-for-byte reproducible cleanup.
+
+| Additional removed material | Logical bytes |
+| --- | ---: |
+| Primary `target/`, `build/asr-worker-cargo/`, and the historical size-audit Cargo target | 7,790,365,190 |
+| Historical GUI/Flet/size-audit bundle dependency payloads | 1,673,812,612 |
+| Historical bundle build intermediates | 234,924,102 |
+| 26 historical installer executables | 2,968,458,326 |
+| `.venv-wsl/` | 456,526,657 |
+| 89 generated Python bytecode directories | 143,061,685 |
+| **Additional total** | **13,267,148,572** |
+
+The additional total is about **12.36 GiB of logical file content**, not measured reclaimed disk space. The explicit removal inventory contained 551 ignored, untracked paths and 43,133 regular files. No selected path remains. All 354 inventoried retained files kept their original size and SHA-256.
+
+Retained material includes distinct historical application/worker executables, application resources, specifications, TOC/warning/xref records, evidence ZIPs, checksums, logs, source bundles, current staged ASR/overlay runtimes, current model runtimes/downloads, the shared Python environment, personal scripts, private state, and every registered worktree. The primary ASR inputs and the entire #441 checkout/evidence remain untouched. Deleted Cargo intermediates are not substitutes for source provenance; the staged runtime manifests remain.
+
+A private record outside the checkout preserves the exact removal inventory, hashes of the 26 discarded installers, the 93-entry WSL package inventory, and retained-file identities. It contains no credential values and is not a public artifact. Windows removal initially stopped at the WSL `lib64` symlink; Ubuntu removed that link without following it, after which the remaining classified removals completed. No process was terminated.
+
+The old populated-checkout service dependencies and local metadata require the separate [service migration procedure](../services/README.md#local-checkout-migration) when `dev` receives the combined layout. Historical evidence remains evidence, not a supported executable surface.
 
 ## Verification boundaries
 

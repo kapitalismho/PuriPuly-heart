@@ -31,9 +31,7 @@ def _build_compiled_archive_runtime(tmp_path: Path, *, compact_flet: bool) -> tu
         "from dependency import VALUE\nRESULT = VALUE + 1\n", encoding="utf-8"
     )
     (package / "data" / "payload.txt").write_text("filesystem package data", encoding="utf-8")
-    (package / "data" / "prompts" / "system.txt").write_text(
-        "filesystem prompt", encoding="utf-8"
-    )
+    (package / "data" / "prompts" / "system.txt").write_text("filesystem prompt", encoding="utf-8")
     (app / "product_bootstrap.py").write_text("RESULT = 9\n", encoding="utf-8")
     for filename in ("_puripuly_native_runtime.py", "sitecustomize.py"):
         shutil.copy2(root / "native/windows_host" / filename, app / filename)
