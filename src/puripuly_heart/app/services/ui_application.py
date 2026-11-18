@@ -43,10 +43,7 @@ from puripuly_heart.app.ports.settings_view import (
     SettingsApplyOutcome,
     TelemetrySettingsIntent,
 )
-from puripuly_heart.app.ports.ui_application import (
-    TranslationEnablePreparation,
-    UiApplicationState,
-)
+from puripuly_heart.app.ports.ui_application import UiApplicationState
 from puripuly_heart.app.ports.ui_application_intents import (
     UiAudioTestRuntimePort,
     UiDiagnosticsRuntimePort,
@@ -75,7 +72,6 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
-from puripuly_heart.app.services.index_selection import IndexSelectionOwner
 from puripuly_heart.app.services.settings.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
@@ -242,14 +238,6 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                 return await method(self, *args, **kwargs)
 
             if method.__name__ == "set_translation_enabled":
-                preparation = kwargs.get("preparation")
-                if preparation is not None:
-                    if (
-                        preparation.intent_revision != self._translation_selection_intent
-                        or not preparation.ready
-                        or self.translation_preparation_needs_refresh(preparation)
-                    ):
-                        return False
                 self._translation_selection_intent += 1
                 intent = self._translation_selection_intent
                 if activity is not None:
@@ -260,30 +248,6 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                             or control.runtime_toggle_is_current(toggle_intent)
                         )
                     )
-                enabled = args[0] if args else kwargs.get("enabled")
-                if (
-                    enabled
-                    and preparation is None
-                    and self.translation_preparation_needs_refresh(None)
-                ):
-                    if control is not None and control.lock_owned_by_current_task():
-                        return False
-                    while True:
-                        preparation = await self.prepare_translation_enable(intent)
-                        if (
-                            preparation is None
-                            or not preparation.ready
-                            or intent != self._translation_selection_intent
-                        ):
-                            return False
-                        self._admit_application_intent(method.__name__)
-                        if control is None:
-                            return await apply()
-                        async with control.runtime_toggle_lock(toggle_intent):
-                            if intent != self._translation_selection_intent:
-                                return False
-                            if not self.translation_preparation_needs_refresh(preparation):
-                                return await control.run_runtime_toggle(toggle_intent, apply)
             if toggle_intent is not None:
                 return await control.run_runtime_toggle(toggle_intent, apply)
             if (
@@ -346,7 +310,6 @@ class UiApplicationBoundary:
         photo_status_provider: Callable[[], Awaitable[PhotoStatusSnapshot]] | None = None,
         http_extension_registry: object | None = None,
         scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
-        index_selection: IndexSelectionOwner | None = None,
         runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
         runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
         settings_results: SettingsTransactionResultOwner | None = None,
@@ -375,7 +338,6 @@ class UiApplicationBoundary:
         self._scene_observation_provider = scene_observation_provider
         self._runtime_control_authority = runtime_control_authority
         self._runtime_control_activity = runtime_control_activity
-        self._index_selection = index_selection
         self._translation_selection_intent = 0
         self._audio_test_start_revision = 0
         self._osc_runtime_activity: dict[asyncio.Task | None, _RuntimeControlActivity] = {}
@@ -684,54 +646,11 @@ class UiApplicationBoundary:
     def set_manual_input_activity(self, has_text: bool) -> None:
         self._input_runtime.set_manual_input_activity(has_text)
 
-    def _translation_preparation_required(self) -> bool:
-        selection = self._index_selection
-        if selection is None:
-            return False
-        current = self.compatibility_settings()
-        return bool(
-            (current is not None and current.intent.translation.model == "index_translate_35b")
-            or not selection.ready_for_enable
-        )
-
-    async def prepare_translation_enable(
-        self, intent_revision: int | None = None
-    ) -> TranslationEnablePreparation | None:
-        required = self._translation_preparation_required()
-        if intent_revision is None:
-            if not required:
-                return None
-            intent_revision = self._translation_selection_intent
-        selection = self._index_selection
-        ready = intent_revision == self._translation_selection_intent
-        if ready and required and selection is not None:
-            ready = await selection.prepare_enable()
-        return TranslationEnablePreparation(
-            intent_revision=intent_revision,
-            selection_generation=selection.generation if selection is not None else None,
-            ready=ready,
-        )
-
-    def translation_preparation_needs_refresh(
-        self, preparation: TranslationEnablePreparation | None
-    ) -> bool:
-        if preparation is None:
-            return self._translation_preparation_required()
-        if preparation.intent_revision != self._translation_selection_intent:
-            return False
-        selection = self._index_selection
-        generation = selection.generation if selection is not None else None
-        return bool(
-            preparation.selection_generation != generation
-            or (preparation.ready and selection is not None and not selection.ready_for_enable)
-        )
-
     async def set_translation_enabled(
         self,
         enabled: bool,
         *,
         allow_authorization: bool = True,
-        preparation: TranslationEnablePreparation | None = None,
     ) -> object:
         result = await self._input_runtime.set_translation_enabled(
             enabled,

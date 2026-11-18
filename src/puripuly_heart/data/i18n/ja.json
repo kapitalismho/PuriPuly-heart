@@ -31,8 +31,6 @@
   "settings.translation_model.index_translate_35b.description": "無料です（とても重要） 速くて十分使えます",
   "settings.translation_connection.public_api": "公式API",
   "provider.index_translate": "Index-Translate 35B A3B",
-  "messages.index_api_fallback_managed": "Index の無料 API は終了した可能性があります。Gemma 4 · Managed に切り替えました。",
-  "messages.index_api_fallback_openrouter": "Index の無料 API は終了した可能性があります。Gemma 4 · OpenRouter に切り替えました。",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
   "app.already_running": "PuriPulyはすでに起動しています。ウィンドウがすぐに表示されない場合は、しばらくしてからもう一度起動してください。",

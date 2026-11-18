@@ -31,8 +31,6 @@
   "settings.translation_model.index_translate_35b.description": "Бесплатно (очень важно), быстро и вполне годится",
   "settings.translation_connection.public_api": "Официальный API",
   "provider.index_translate": "Index-Translate 35B A3B",
-  "messages.index_api_fallback_managed": "Бесплатный API Index, возможно, завершил работу. Выбран Gemma 4 · Managed.",
-  "messages.index_api_fallback_openrouter": "Бесплатный API Index, возможно, завершил работу. Выбран Gemma 4 · OpenRouter.",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Оверлей",
   "app.already_running": "PuriPuly уже запущен. Если окно не появится в ближайшее время, подождите немного и запустите снова.",

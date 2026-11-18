@@ -489,7 +489,6 @@ _COMPONENTS = frozenset(
         "control.transport",
         "lifecycle.scope",
         "lifecycle.shutdown",
-        "index_selection",
         "ui_audio_settings",
         "ui_i18n",
         "ui_model_assets",

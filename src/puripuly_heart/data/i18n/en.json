@@ -31,8 +31,6 @@
   "settings.translation_model.index_translate_35b.description": "Free (very important), fast, and good enough",
   "settings.translation_connection.public_api": "Official API",
   "provider.index_translate": "Index-Translate 35B A3B",
-  "messages.index_api_fallback_managed": "Index's free API may have ended. Switched to Gemma 4 · Managed.",
-  "messages.index_api_fallback_openrouter": "Index's free API may have ended. Switched to Gemma 4 · OpenRouter.",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
   "app.already_running": "PuriPuly is already running. If the window doesn't appear soon, wait a moment and try again.",
