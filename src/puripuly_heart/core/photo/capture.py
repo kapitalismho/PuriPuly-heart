@@ -157,9 +157,10 @@ class PhotoCaptureWatcher:
         initial = self._baseline_logs.get(path)
         if baseline:
             self._log_offset = status.st_size
-        elif initial is not None and initial[0] == self._log_id:
+        elif initial is not None and initial[0] == self._log_id and initial[1] <= status.st_size:
             self._log_offset = initial[1]
         else:
+            self._baseline_logs.pop(path, None)
             self._log_offset = 0
         self._pending_line = ""
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")

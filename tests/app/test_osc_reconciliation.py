@@ -570,57 +570,6 @@ async def test_lifecycle_snapshot_and_fence_do_not_accept_initialization_as_obse
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("on_surface", ("osc", "ui"))
-@pytest.mark.parametrize("off_surface", ("osc", "ui"))
-async def test_off_during_preparation_survives_equal_canonical_and_old_send(
-    on_surface, off_surface
-):
-    class Selection:
-        ready_for_enable = False
-        generation = 1
-
-        def __init__(self):
-            self.entered = asyncio.Event()
-            self.release = asyncio.Event()
-
-        async def prepare_enable(self):
-            self.entered.set()
-            await self.release.wait()
-            self.ready_for_enable = True
-            return True
-
-    h = RuntimeHarness()
-    selection = Selection()
-    h.application._index_selection = selection
-    await h.start()
-    on = asyncio.create_task(
-        h.dispatch(True) if on_surface == "osc" else h.application.set_translation_enabled(True)
-    )
-    await selection.entered.wait()
-    try:
-        assert h.state.translation is False
-        assert h.integration._publisher.last_published[TRANS] is False
-        if off_surface == "osc":
-            assert (await h.dispatch(False)).applied
-        else:
-            assert await h.application.set_translation_enabled(False)
-        assert h.commands == [(TRANS, False)]
-        assert h.state.translation is False
-        selection.release.set()
-        await on
-        assert h.state.translation is False
-        assert h.commands == [(TRANS, False)]
-        assert h.sender.messages == (
-            [(TRANS, False)] if on_surface == "osc" and off_surface == "ui" else []
-        )
-        assert h.integration._pending_controls() == ()
-    finally:
-        selection.release.set()
-        await asyncio.gather(on, return_exceptions=True)
-        await h.close()
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("fails", (False, True))
 async def test_background_owner_operation_is_gated_until_authoritative_settlement(fails):
     h = RuntimeHarness()

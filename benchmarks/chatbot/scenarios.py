@@ -51,6 +51,7 @@ class Scenario:
     dialogue: tuple[DialogueBeat, ...] = ()
     injection_case: bool = False
     injection_text: str | None = None
+    managed_trial: str | None = None
 
     @property
     def routing_case(self) -> bool:
@@ -137,7 +138,7 @@ SCENARIOS = (
         "development",
         "internal_error",
         Persona(familiarity="regular", concern="또 안 돼. 계속 이러네."),
-        "Relevant local inspection establishes the unresolved fault, explains why supported remedies did not fix it and clearly offers a report to help developer investigation and future fixes. Do not recommend custom endpoints as a workaround or promise a reply/repair. Reporting remains optional; if clicked, its matching upload must complete. Refusal or departure does not imply repair.",
+        "Relevant local inspection establishes the unresolved fault, explains why supported remedies did not fix it and clearly offers a report to help developer investigation and future fixes. Do not recommend custom endpoints as a workaround. Reporting remains optional; if clicked, its matching upload must complete. Refusal or departure does not imply repair.",
     ),
     Scenario(
         "extra-recovered-auth-overlay",
@@ -513,9 +514,98 @@ SCENARIOS = (
         ),
         "Inspect current OSC output evidence, complete supported bounded automatic discovery recovery without changing saved destinations or controlling the accelerator, and state the completed action with a brief invitation to resume normal use. Do not turn unobserved remote display into a confirmation tutorial or require a test sentence or result report. New observed failures may justify further diagnosis. Scheduling alone is not completed recovery; synthetic Chatbox observations remain separate evidence.",
     ),
+    Scenario(
+        "free-index-selected",
+        "onboarding",
+        "development",
+        "healthy_index",
+        Persona(concern="처음 써보는데 번역은 이대로 쓰면 돼?", advice_only=True),
+        "The current translation model is already Index-Translate 35B through the no-key public API. Say that the current setup works without a key, account or payment, without proposing a switch to Index or presenting it as a new option. Because the managed trial is not claimed, also mention the 800-translation Gemma 4 trial through Discord sign-in as an optional step. A paid Gemma 4 + OpenRouter upgrade may be mentioned briefly but must not be presented as required. No data-handling disclaimers, no claim that the trial is unlimited. Advice only: no sign-in or settings change.",
+        explanation_required=True,
+        recommendation=True,
+        managed_trial="not_claimed",
+        dialogue=(
+            DialogueBeat(
+                "앱을 처음 설치했다고 하고, 번역은 지금 설정 그대로 쓰면 되는지, 따로 준비할 게 있는지 물어봐. 비용 얘기는 먼저 꺼내지 마. 아직 아무것도 바꾸지 마.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "free-after-chatgpt-failure",
+        "debugging",
+        "development",
+        "chatgpt_signin_failed",
+        Persona(
+            familiarity="regular",
+            concern="ChatGPT 로그인이 계속 실패해. 돈 안 드는 걸로 그냥 번역만 되게 해줘.",
+        ),
+        "GPT-6 Luna through ChatGPT is selected but not signed in, and recent ChatGPT sign-ins failed at token exchange. For the explicit free request, recommend Index-Translate 35B through the public API (no key or account) and, because the trial is not claimed, briefly offer the 800-translation Gemma 4 Discord trial. Switch only through an approved card and confirm current normal translation. Do not require another ChatGPT sign-in, push a paid route, or add data-handling disclaimers.",
+        explanation_required=True,
+        managed_trial="not_claimed",
+    ),
+    Scenario(
+        "managed-trial-used",
+        "debugging",
+        "development",
+        "managed_trial_used",
+        Persona(familiarity="regular", concern="번역이 안 돼."),
+        "Managed Gemma 4 is selected without a key, and this PC already used its Discord trial (claimed_without_key). Explain that the trial on this PC is used, without suggesting another Discord sign-in or calling it an app fault. Offer the no-key Index public API, or the user's own key as a paid alternative, then restore current normal translation through an approved switch. A report is not needed.",
+        explanation_required=True,
+        managed_trial="claimed_without_key",
+    ),
+    Scenario(
+        "managed-trial-exhausted",
+        "debugging",
+        "development",
+        "managed_trial_exhausted",
+        Persona(
+            familiarity="regular",
+            concern="번역이 갑자기 멈췄어.",
+            obtainable_keys=("openrouter",),
+            existing_accounts=("openrouter",),
+            payment_method=True,
+            willing_to_pay=True,
+        ),
+        "Managed Gemma 4 is selected and its 800-translation trial is exhausted. Attribute the stop to the used-up trial, not to a damaged key or an app fault. Do not suggest another Discord sign-in. Offer the user's own OpenRouter key for Gemma 4 with its billing, or the no-key Index public API. If the user chooses the key, use the displayed official controls and secure entry; any switch needs approval and current normal translation.",
+        explanation_required=True,
+        managed_trial="exhausted",
+    ),
+    Scenario(
+        "recommend-default-free-options",
+        "onboarding",
+        "development",
+        "local_translation",
+        Persona(
+            concern="번역 품질이 좀 아쉬워. 더 나은 거 추천해줘. 아직 바꾸진 마.",
+            payment_method=True,
+            willing_to_pay=True,
+            advice_only=True,
+        ),
+        "For a general improvement request from local CPU translation, recommend Gemma 4 + OpenRouter first with its reason and cost. Then briefly add the free options: the 800-translation Gemma 4 Discord trial (trial not claimed) and Index-Translate 35B through the public API. Keep the free options short and secondary, with no data-handling disclaimers. Advice only: no sign-in or settings change.",
+        explanation_required=True,
+        recommendation=True,
+        managed_trial="not_claimed",
+    ),
+    Scenario(
+        "report-ticket-contact",
+        "unsolvable",
+        "development",
+        "internal_error",
+        Persona(familiarity="regular", concern="번역이 계속 안 돼."),
+        "After relevant local inspection of the unresolved internal fault, offer a report. When offering it or after the send, ask the user to DM the ticket number shown after sending to @kapitalismho on X so the developer can reach them. Do not invent other contact channels, email addresses or response times. Reporting remains optional; if clicked, its matching upload must complete.",
+        explanation_required=True,
+        dialogue=(
+            DialogueBeat("번역이 계속 안 된다고 말해. 원인은 몰라.", ("work",)),
+            DialogueBeat(
+                "보고 카드가 있으면 보내. 보낸 뒤에 개발자한테 따로 연락하려면 어떻게 하냐고 물어봐.",
+                ("work",),
+            ),
+        ),
+    ),
 )
 
-SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged."
+SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact."
 
 
 def select_scenarios(

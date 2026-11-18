@@ -63,7 +63,6 @@ def _parse_translation(data: object) -> str:
 class IndexTranslateProvider(LLMProvider):
     model: str = INDEX_TRANSLATE_MODEL
     timeout: float = 20.0
-    availability_timeout: float = 10.0
     runtime_logging: ProviderObservationPort | None = None
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
@@ -160,14 +159,6 @@ class IndexTranslateProvider(LLMProvider):
             timeout=self.timeout,
         )
         return Translation(utterance_id=utterance_id, text=translated)
-
-    async def check_availability(self) -> None:
-        await self._complete(
-            system_prompt="Translate from English to Spanish. Return only the translation.",
-            user_message=build_translation_user_message(text="Hello.", context=""),
-            max_output_tokens=64,
-            timeout=self.availability_timeout,
-        )
 
     async def close(self) -> None:
         if self._close_task is None:

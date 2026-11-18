@@ -170,6 +170,29 @@ async def test_translation_probe_reports_configured_self_targets_without_publish
     assert app.normal_recognition == app.normal_translation == 0
 
 
+def test_local_quality_advice_starts_with_working_cpu_translation():
+    app = ScenarioApp(scenario("recommend-default-free-options"))
+    app.advance()
+
+    translation = app.current_observations("self")["translation"]
+    assert translation is not None
+    assert translation["configuration"]["model"] == "managed_gemma"
+    assert translation["configuration"]["connection"] == "cpu"
+
+
+@pytest.mark.asyncio
+async def test_exhausted_trial_stays_unusable_after_refresh():
+    app = ScenarioApp(scenario("managed-trial-exhausted"))
+    before = (await app.query("accounts.status", {}))["managed"]
+    accepted = await app.submit("accounts.managed.refresh", {}, request_id="refresh-trial")
+    result = await app.wait(accepted["operation_id"])
+
+    assert before["trial"] == "exhausted"
+    assert result["status"] == "failed"
+    assert result["managed_access"] == "unusable"
+    assert result["managed_remaining_percent"] == before["budget"]["remaining_percent"] == 0
+
+
 @pytest.mark.asyncio
 async def test_simulator_peer_probe_preserves_requested_direction_and_isolation():
     app = ScenarioApp(scenario("fixture-first-run"))

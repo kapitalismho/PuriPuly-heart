@@ -258,7 +258,8 @@ async def test_log_chunks_are_drained_without_another_notification(tmp_path):
         assert (await capture(watcher)).path == new.resolve()
 
 
-async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp_path):
+@pytest.mark.parametrize("startup_log", ["current", "older"])
+async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp_path, startup_log):
     photos = tmp_path / "photos"
     logs = tmp_path / "logs"
     photos.mkdir()
@@ -269,18 +270,44 @@ async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp
     current = logs / "output_log_current.txt"
     older.write_text(f"[VRC Camera] Took screenshot to: {old}\n", encoding="utf-8")
     current.write_text("startup" * 200, encoding="utf-8")
+    clock = current.stat().st_mtime_ns
+
+    def touch(path, offset_seconds):
+        stamp = clock + offset_seconds * 1_000_000_000
+        os.utime(path, ns=(stamp, stamp))
+
+    touch(older, 1 if startup_log == "older" else -1)
     async with watching(photos, logs) as (watcher, source):
         new = tmp_path / "new.png"
         new.write_bytes(b"new")
         current.write_text(f"[VRC Camera] Took screenshot to: {new}\n", encoding="utf-8")
+        touch(current, 2)
         source.emit(current)
         assert (await capture(watcher)).path == new.resolve()
+        rotated = tmp_path / "rotated.png"
+        rotated.write_bytes(b"rotated")
+        with older.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {rotated}\n")
+        touch(older, 3)
+        source.emit(older)
+        assert (await capture(watcher)).path == rotated.resolve()
+
+        resumed = tmp_path / "resumed.png"
+        resumed.write_bytes(b"resumed")
+        with current.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {resumed}\n")
+            log.write("unrelated\n" * 400)
+        touch(current, 4)
+        source.emit(current)
+        assert (await capture(watcher)).path == resumed.resolve()
+
         current.unlink()
         source.emit(current)
         await quiet(watcher)
         replacement = tmp_path / "replacement.png"
         replacement.write_bytes(b"replacement")
         current.write_text(f"[VRC Camera] Took screenshot to: {replacement}\n", encoding="utf-8")
+        touch(current, 5)
         source.emit(current, created=(current,))
         assert (await capture(watcher)).path == replacement.resolve()
 

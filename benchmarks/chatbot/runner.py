@@ -1194,9 +1194,10 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             if not any(item.get("context", {}).get("view") == "diagnostics" for item in outputs):
                 result = tool("read_app", {"topic": "diagnostics"})
             elif any(item.get("status") in {"pending", "offered"} for item in outputs):
-                result = answer(
-                    "로컬 기록에서 반복되는 내부 오류를 확인했어. 설정으로 해결할 수 있는 원인은 찾지 못했어. 원하면 확인한 기록을 개발자에게 보낼 수 있어."
-                )
+                text = "로컬 기록에서 반복되는 내부 오류를 확인했어. 설정으로 해결할 수 있는 원인은 찾지 못했어. 원하면 확인한 기록을 개발자에게 보낼 수 있어."
+                if app.scenario.id == "report-ticket-contact":
+                    text += " 보낸 뒤 표시되는 티켓 번호를 X의 @kapitalismho에게 DM으로 보내줘."
+                result = answer(text)
             else:
                 result = tool(
                     "manage_proposal", {"action": "report", "summary": "Synthetic internal failure"}
@@ -1371,6 +1372,22 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 result = answer(
                     "관리형 키가 거부되고 있어. 키 없이 쓰는 공식 API로 바꾸는 카드를 확인해 줘."
                 )
+        elif cause in {"chatgpt_signin_failed", "managed_trial_used", "managed_trial_exhausted"}:
+            if app.intent["translation"]["model"] == "index_translate_35b":
+                result = answer("키 없이 쓰는 Index 공개 API로 번역이 다시 들어왔어.")
+            elif body["allow_tools"]:
+                result = tool(
+                    "manage_proposal",
+                    {
+                        "action": "settings",
+                        "changes": {
+                            "translation.model": "index_translate_35b",
+                            "translation.connection": "public_api",
+                        },
+                    },
+                )
+            else:
+                result = answer("키 없이 쓰는 Index 공개 API로 바꾸는 카드를 확인해 줘.")
         elif cause in {"slow_luna", "slow_gemma"}:
             replacement = "deepseek_v4_flash_41"
             result = (
