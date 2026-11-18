@@ -152,3 +152,7 @@ Local retained evidence under `.tmp/issue441/scribe-integration/`:
 - `display/natural-2/prepared.json`, `mt-result.json`, and `mt-07-gate-paced.json`: validated effective bodies, actual MT responses/usage, and repaired-candidate request matching. The earlier compressed-clock gate attempts remain distinct.
 
 `docs/verification.md` now gives a bounded delayed-speaker scenario. Protected documentation was not edited: `docs/architecture.md` does not yet describe the new bounded post-commit speaker-evidence path; `native/overlay/README.md` omits the new still-live lineage rule in its abbreviated Python-ownership summary. Neither implies a native protocol change. User-visible changes are the Scribe v3 route/label and live Peer attribution/group corrections; the default provider and user's saved settings were not switched.
+
+### Completion receipt
+
+Independent terminal evidence audit accepted candidate `7acc9268d9c7eb9d9bb13c5678497e28bdb9d14f` under the owner's reduced scope. No additional product changes followed. The task-owned temporary Desktop/replay/extraction helpers were removed after verification; raw inputs, captures, scores, selected bodies, service responses, PNGs and receipts remain. Maintained benchmark entrypoints remain in the repository. No owned renderer process remains from the completed runs, and no remote publication or installed-setting change was performed.
