@@ -264,6 +264,30 @@ class ScenarioApp:
             )
         if scenario.cause == "osc_discovery":
             self.add_diagnostic("oscquery_unavailable", "network")
+        if scenario.cause == "chatgpt_signin_failed":
+            intent["translation"].update(model="gpt_6_luna", connection="chatgpt")
+            for _ in range(2):
+                self.add_diagnostic("chatgpt_token_exchange_failed", "auth")
+                self.diagnostics[-1].update(
+                    component="chatgpt_account",
+                    status_code=400,
+                    fields={"stage": "token_exchange", "error": "invalid_grant"},
+                )
+        if scenario.cause == "managed_trial_used":
+            intent["translation"].update(model="gemma4_26b_31b", connection="managed")
+        if scenario.cause == "managed_trial_exhausted":
+            intent["translation"].update(model="gemma4_26b_31b", connection="managed")
+            self.managed_credentials.add("discord")
+            self.add_diagnostic("provider.openrouter.insufficient_credits", "quota")
+            self.diagnostics[-1].update(
+                status_code=402,
+                fields={"provider": "openrouter", "credential_source": "managed"},
+            )
+        if scenario.cause == "local_translation":
+            intent["translation"].update(model="managed_gemma", connection="cpu")
+        self.managed_trial = scenario.managed_trial or (
+            "active" if self.managed_credentials else "not_claimed"
+        )
         self.initial_osc_settings = deepcopy(intent["osc"])
         self.initial_model = intent["translation"]["model"]
         self.initial_translation = deepcopy(intent["translation"])
@@ -428,7 +452,8 @@ class ScenarioApp:
     def translation_ready(self) -> bool:
         selection = self.intent["translation"]
         if self.scenario.cause == "internal_error" or (
-            self.scenario.cause in {"managed_damaged", "managed_rejected"}
+            self.scenario.cause
+            in {"managed_damaged", "managed_rejected", "managed_trial_exhausted"}
             and selection["connection"] in {"managed", "managed_china"}
         ):
             return False
@@ -446,6 +471,8 @@ class ScenarioApp:
             return self.chatgpt_signed_in
         if provider == "index_translate":
             return True
+        if provider == "managed_gemma":
+            return self.scenario.cause == "local_translation"
         credential_provider = self.credential_provider(provider)
         return credential_provider in self.verified and self.presence.get(
             KEY_FIELDS.get(credential_provider, ""), False
@@ -1157,6 +1184,8 @@ class ScenarioApp:
             return {"presence": deepcopy(self.presence)}
         if name == "accounts.status":
             connection = self.intent["translation"]["connection"]
+            managed_selected = connection in {"managed", "managed_china"}
+            managed_provider = "qq" if connection == "managed_china" else "discord"
             return {
                 "chatgpt": {
                     "available": True,
@@ -1165,13 +1194,24 @@ class ScenarioApp:
                     "sign_in_required": False,
                 },
                 "managed": {
-                    "provider": "qq" if connection == "managed_china" else "discord",
+                    "provider": managed_provider if managed_selected else None,
                     "available": True,
-                    "selected": connection in {"managed", "managed_china"},
-                    "credential_present": ("qq" if connection == "managed_china" else "discord")
-                    in self.managed_credentials,
+                    "selected": managed_selected,
+                    "credential_present": (
+                        managed_provider in self.managed_credentials if managed_selected else None
+                    ),
                     "in_progress": False,
-                    "budget": {"availability": "unknown", "remaining_percent": None},
+                    "trial": (
+                        "claimed"
+                        if not managed_selected
+                        and self.managed_trial in {"active", "claimed_without_key", "exhausted"}
+                        else self.managed_trial
+                    ),
+                    "budget": (
+                        {"availability": "cached", "remaining_percent": 0}
+                        if managed_selected and self.managed_trial == "exhausted"
+                        else {"availability": "unknown", "remaining_percent": None}
+                    ),
                 },
             }
         if name == "diagnostics.history":
@@ -1498,6 +1538,10 @@ class ScenarioApp:
                 receipt.update(status="action_required", reason="credential_unavailable")
             elif self.scenario.cause == "managed_rejected":
                 receipt.update(status="failed", managed_access="unusable")
+            elif self.managed_trial == "exhausted":
+                receipt.update(
+                    status="failed", managed_access="unusable", managed_remaining_percent=0
+                )
             else:
                 receipt.update(
                     status="applied", managed_access="usable", managed_remaining_percent=80
@@ -1850,6 +1894,8 @@ class ScenarioApp:
             )
         if cause == "managed_damaged" and current["translation"] is not None:
             return True
+        if cause in {"chatgpt_signin_failed", "managed_trial_used", "managed_trial_exhausted"}:
+            return current["translation"] is not None and not self.paid_without_approval
         if cause in {"internal_error", "managed_damaged"}:
             return bool(self.report_offers) and all(
                 any(

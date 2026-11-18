@@ -122,7 +122,7 @@ async def test_request_preserves_rendered_prompt_and_shared_input_preparation(
     assert clients[0].is_closed
 
 
-async def test_default_budget_probe_and_translation_share_one_owned_client(transport_factory):
+async def test_default_budget_translations_share_one_owned_client(transport_factory):
     bodies = []
 
     def handler(request):
@@ -132,19 +132,19 @@ async def test_default_budget_probe_and_translation_share_one_owned_client(trans
     clients, *_ = transport_factory(handler)
     provider = index_translate.IndexTranslateProvider()
     try:
-        assert await provider.check_availability() is None
+        await provider.translate(**_kwargs())
         await provider.translate(**_kwargs())
         assert len(bodies) == 2
-        assert bodies[0]["max_tokens"] == 64
-        assert "Prior synthetic exchange" not in str(bodies[0])
-        assert bodies[1]["max_tokens"] == index_translate.INDEX_DEFAULT_OUTPUT_TOKENS
+        assert all(
+            body["max_tokens"] == index_translate.INDEX_DEFAULT_OUTPUT_TOKENS for body in bodies
+        )
         assert bodies[1]["messages"][0]["content"] == _kwargs()["system_prompt"]
         assert len(clients) == 1
     finally:
         await provider.close()
         await provider.close()
     with pytest.raises(asyncio.CancelledError):
-        await provider.check_availability()
+        await provider.translate(**_kwargs())
     assert len(clients) == 1
 
 
@@ -223,7 +223,7 @@ async def test_http_service_failure_is_typed_without_retry_or_response_text(
     provider = index_translate.IndexTranslateProvider()
     try:
         with pytest.raises(IndexServiceUnavailableError) as failure:
-            await provider.check_availability()
+            await provider.translate(**_kwargs())
         assert failure.value.reason == "http_status"
         assert failure.value.status_code == status
         assert "private server body" not in str(failure.value)
@@ -290,8 +290,8 @@ async def test_pending_http_keeps_loop_responsive_and_preserves_cancellation(
             raise
 
     clients, *_ = transport_factory(handler)
-    provider = index_translate.IndexTranslateProvider(availability_timeout=0.05)
-    task = asyncio.create_task(provider.check_availability())
+    provider = index_translate.IndexTranslateProvider(timeout=0.05)
+    task = asyncio.create_task(provider.translate(**_kwargs()))
     await asyncio.wait_for(started.wait(), 1)
     progressed = asyncio.Event()
     asyncio.get_running_loop().call_soon(progressed.set)
@@ -327,7 +327,7 @@ async def test_tls_policy_preparation_is_off_loop_and_settled_before_close(
 
     monkeypatch.setattr(index_translate, "select_tls", prepare)
     provider = index_translate.IndexTranslateProvider()
-    task = asyncio.create_task(provider.check_availability())
+    task = asyncio.create_task(provider.translate(**_kwargs()))
     try:
         async with asyncio.timeout(1):
             while not entered.is_set():

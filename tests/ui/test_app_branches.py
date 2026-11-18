@@ -1941,7 +1941,7 @@ class _LetterChatGptApplication:
     def cancel_chatgpt_sign_in(self) -> None:
         self.calls.append("cancel")
 
-    async def connect_chatgpt(self):
+    async def connect_chatgpt(self, *, authorization_url_sink=None):
         self.calls.append("connect")
         return ChatGptConnectResult(succeeded=True, first_sign_in=True)
 

@@ -895,9 +895,7 @@ async def test_revoked_capture_generation_blocks_pull_and_provider_work(tmp_path
     h = Harness(tmp_path, [[]])
     current = True
     try:
-        assert await h.owner.captured(
-            capture(Path("capture.png")), is_current=lambda: current
-        )
+        assert await h.owner.captured(capture(Path("capture.png")), is_current=lambda: current)
         photo_id = h.photo["photo_id"]
         current = False
         assert not h.owner.pull(photo_id, "revoked")
@@ -977,7 +975,9 @@ async def test_cancelled_cleanup_waiter_does_not_duplicate_release_or_leak_tasks
         await h.owner.close()
 
 
-async def test_failed_directory_cleanup_retains_resource_and_surfaces_on_close(tmp_path, monkeypatch):
+async def test_failed_directory_cleanup_retains_resource_and_surfaces_on_close(
+    tmp_path, monkeypatch
+):
     h = Harness(tmp_path, [[block(), PhotoStreamCompleted({}, "gpt-6-luna")]])
     photo = None
     original_cleanup = None

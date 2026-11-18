@@ -44,7 +44,9 @@ from puripuly_heart.app.services.managed.managed_auth import (
 )
 from puripuly_heart.app.services.managed.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
     ManagedAuthClaimGuard,
+    local_managed_auth_blocking_source,
 )
 from puripuly_heart.app.services.managed.managed_connection_auth import (
     ManagedConnectionAuthRequest,
@@ -70,7 +72,7 @@ from puripuly_heart.config.provider_values import (
     OpenRouterSelectionAlias,
     parse_openrouter_llm_model,
 )
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, ManagedConnectionState
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -949,18 +951,29 @@ class ManagedAuthRuntimeAdapter:
                 ingress_frozen=self.ingress_provider(),
             )
         managed_selected = managed_openrouter_selected_from_vnext(canonical)
+        managed_china = (
+            current.intent.translation.connection == TranslationConnection.MANAGED_CHINA.value
+        )
+        managed = canonical.state.managed_connection
+        key_available = False
+        if not (managed.pending_managed_operation_id or managed.pending_delivery_ack_source) and (
+            managed_selected or not managed.local_managed_claim_sources
+        ):
+            key_available = self._observe_local_managed_key(canonical, selected=managed_selected)
         return ManagedAuthState(
             settings_available=True,
             managed_selected=managed_selected,
-            managed_china=(
-                current.intent.translation.connection == TranslationConnection.MANAGED_CHINA.value
-            ),
-            local_key_available=(
-                self._local_key_available(canonical) if managed_selected else False
-            ),
+            managed_china=managed_china,
+            local_key_available=managed_selected and key_available is True,
             release_service_available=self.release_service_provider() is not None,
             runtime_available=runtime_available if runtime_owner_available else False,
             ingress_frozen=self.ingress_provider(),
+            trial=_managed_trial(
+                managed,
+                managed_china=managed_china,
+                managed_selected=managed_selected,
+                key_available=key_available,
+            ),
         )
 
     async def execute_qq(
@@ -1239,23 +1252,53 @@ class ManagedAuthRuntimeAdapter:
             secret_store=secret_store_port,
         )
 
-    def _local_key_available(self, settings: AppSettingsVNext) -> bool:
-        managed = settings.state.managed_connection
-        if managed.pending_managed_operation_id or managed.pending_delivery_ack_source:
-            return False
+    def _observe_local_managed_key(
+        self, settings: AppSettingsVNext, *, selected: bool
+    ) -> bool | None:
         try:
             secrets = self.secret_store_factory(
                 settings.intent.secrets,
                 config_path=self.config_path,
             )
+            if not selected:
+                return any(
+                    isinstance(value := secrets.get(key), str) and bool(value.strip())
+                    for key in (
+                        OPENROUTER_MANAGED_API_KEY_SECRET,
+                        OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                    )
+                )
             resolution = resolve_openrouter_credentials(
                 build_openrouter_credential_runtime_config_from_vnext(settings),
                 secrets=secrets,
                 request_intent="TRANS",
             )
         except Exception:
-            return False
+            return None
         return resolution.api_key is not None
+
+
+def _managed_trial(
+    managed: ManagedConnectionState,
+    *,
+    managed_china: bool,
+    managed_selected: bool,
+    key_available: bool | None,
+) -> str:
+    if managed.pending_managed_operation_id or managed.pending_delivery_ack_source:
+        return "sign_in_pending"
+    if not managed_selected:
+        if managed.local_managed_claim_sources or key_available is True:
+            return "claimed"
+        return "unknown" if key_available is None else "not_claimed"
+    source = MANAGED_AUTH_CLAIM_SOURCE_QQ if managed_china else MANAGED_AUTH_CLAIM_SOURCE_DISCORD
+    if local_managed_auth_blocking_source(managed.local_managed_claim_sources, source):
+        return "blocked_by_other_sign_in"
+    if key_available is None:
+        return "unknown"
+    if key_available:
+        return "active"
+    return "claimed_without_key" if source in managed.local_managed_claim_sources else "not_claimed"
 
 
 def _supports_transaction_auth(release_service: object) -> bool:

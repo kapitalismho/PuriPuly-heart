@@ -157,9 +157,10 @@ class PhotoCaptureWatcher:
         initial = self._baseline_logs.get(path)
         if baseline:
             self._log_offset = status.st_size
-        elif initial is not None and initial[0] == self._log_id:
+        elif initial is not None and initial[0] == self._log_id and initial[1] <= status.st_size:
             self._log_offset = initial[1]
         else:
+            self._baseline_logs.pop(path, None)
             self._log_offset = 0
         self._pending_line = ""
         self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
@@ -174,9 +175,7 @@ class PhotoCaptureWatcher:
         if self._logs:
             path = max(self._logs, key=lambda item: (self._logs[item].st_mtime_ns, str(item)))
             status = self._logs[path]
-            self._attach_log(
-                path, status, baseline=self._birth_ns(status) < self._start_unix_ns
-            )
+            self._attach_log(path, status, baseline=self._birth_ns(status) < self._start_unix_ns)
         assert self.photo_directory is not None
         self._seen = {
             path: (status.st_dev, status.st_ino)
@@ -266,9 +265,7 @@ class PhotoCaptureWatcher:
                 continue
             identity = (status.st_dev, status.st_ino)
             baseline_id = self._baseline_seen.get(path)
-            created = any(
-                path == item or item in path.parents for item in changes.created
-            )
+            created = any(path == item or item in path.parents for item in changes.created)
             if baseline_id is not None and (
                 created or (changes.rescan and self._birth_ns(status) >= self._start_unix_ns)
             ):
@@ -283,13 +280,9 @@ class PhotoCaptureWatcher:
             return None
         path, status = max(
             new,
-            key=lambda item: (
-                self._birth_ns(item[1]), item[1].st_mtime_ns, str(item[0])
-            ),
+            key=lambda item: (self._birth_ns(item[1]), item[1].st_mtime_ns, str(item[0])),
         )
-        shutter = min(
-            wall, getattr(status, "st_birthtime", min(status.st_ctime, status.st_mtime))
-        )
+        shutter = min(wall, getattr(status, "st_birthtime", min(status.st_ctime, status.st_mtime)))
         observed = now - max(0, wall - shutter)
         return PhotoCapture(
             path, status.st_size, (status.st_dev, status.st_ino), int(shutter * 1000), observed

@@ -520,6 +520,7 @@ async def test_existing_account_flow_respects_no_browser_and_preserves_notificat
         raise TypeError(FORBIDDEN)
 
     owner = ChatGptAccountOwner(session=SimpleNamespace(), browser_opener=fail_browser)
+    owner._sign_in_active = True
     owner._listener = SimpleNamespace()
     owner._authorization_url = "https://example.invalid/synthetic"
     result = await owner.connect(open_browser=False)

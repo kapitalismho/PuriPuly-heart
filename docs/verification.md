@@ -18,6 +18,8 @@ Choose the smallest path through the actual application that establishes the cha
 
 For startup-timeout or cancellation changes, observe cleanup of any already spawned child before replacement. A failed or cancelled start does not itself prove that the child exited; graceful acknowledgement and forced escalation retain their separate meanings.
 
+**Example — recover ChatGPT sign-in:** In an isolated candidate, use a controlled OAuth endpoint that rejects the first code exchange with `invalid_grant` and accepts the next. Start sign-in once. Observe the GUI's retry message and second browser request, or the replacement authorization challenge on the same CLI operation. Check that the new request retains the issued client ID and uses a fresh code and PKCE transaction. Confirm terminal success and the signed-in state. If the endpoint rejects both exchanges, check that the operation stops, preserves any existing connection, and records only safe attempt metadata. Cancel during the retry to check that it cannot activate a connection.
+
 **Environment:** A runnable candidate and isolated writable roots; no account or model is needed for a setting unrelated to those resources. GUI editing claims require using the actual settings UI. For a visible caption-setting effect, also use [captions and output](#captions-and-output).
 
 ## Speech recognition and translation
@@ -53,6 +55,8 @@ For long Self speech, let an early sentence and its translation become visible, 
 Release the result card after translation settles and confirm it stays visible for 4 seconds before its existing 150 ms fade-out. Re-grabbing and placing it restarts the 4-second wait. A card released during preparation or translation must stay visible while that work is pending.
 
 **Example — idle capture and reactivation:** With isolated photo/log directories, compare a quiet interval and new-file detection with the same number of pre-existing photos. Windows capture uses directory notifications, including newly created monthly subdirectories; a quiet watcher should not repeatedly enumerate photos or reread logs. Include a camera-log path outside the default photo directory, partial writes, duplicate notifications, and a missing directory created after startup. Disable image translation and wait for the settings operation to settle, create a photo while disabled, then enable it and immediately create a fresh photo in a new monthly directory. Only the fresh photo should be offered. Startup/recovery scans and known missing-file retries are distinct from idle polling. Exercise notification loss recovery and shutdown separately; watcher failures must be visible rather than silently returning to continuous scanning.
+
+For camera-log rotation, read a new entry from a truncated startup log, switch to a different log, then grow the truncated log past its old size with another camera entry before the old offset. On return to that log, the new screenshot outside the watched photo directory should be detected once; startup screenshots should not be offered.
 
 **Environment:** Windows, VRChat camera/log input, the photo model/runtime assets, native photo runtime, SteamVR/headset for interaction and presentation, and authorization for the selected provider. Use controlled image content; do not upload personal photos for routine probes. Missing VR/provider access limits the connected claim.
 

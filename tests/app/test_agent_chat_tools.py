@@ -237,6 +237,65 @@ async def test_photo_settings_change_through_the_normal_approval_card(catalog):
 
 
 @pytest.mark.asyncio
+async def test_settings_proposal_ignores_a_report_summary(catalog):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        proposed = await tools.execute(
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {"photo.route": "gemini"},
+                "summary": "Synthetic model-written summary",
+            },
+        )
+        assert proposed["status"] == "needs_confirmation"
+        assert "Synthetic model-written summary" not in json.dumps(proposed)
+        assert "Synthetic model-written summary" not in json.dumps(tools.confirmation_display)
+        await tools.confirm(proposed["confirmation"]["id"], True)
+        assert control.submissions[0]["changes"] == {"photo.route": "gemini"}
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("arguments", "explanation"),
+    [
+        (
+            {"action": "settings", "changes": {"languages.source": "en"}},
+            "nest it as changes.languages: {source: ...}",
+        ),
+        (
+            {"action": "settings", "changes": {"photo.route": "gemini"}, "provider": "discord"},
+            "remove provider",
+        ),
+        (
+            {"action": "settings", "changes": {"languages": {"source": None}}},
+            "omit changes.languages.source instead of sending null",
+        ),
+        (
+            {"action": "settings", "changes": {"photo.route": "openai-api"}},
+            "changes.photo.route has an unsupported value",
+        ),
+        ({"action": "report"}, "add summary"),
+    ],
+)
+async def test_rejected_proposal_names_what_to_fix(catalog, arguments, explanation):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        rejected = await tools.execute("manage_proposal", arguments)
+        assert rejected["status"] == "rejected"
+        assert rejected["error"]["code"] == "invalid_arguments"
+        assert explanation in rejected["error"]["explanation"]
+        assert tools.confirmation is None
+        assert not control.submissions
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
 async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
     control = Control(catalog)
     tools, actions, events = adapter(control)

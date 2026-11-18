@@ -267,6 +267,14 @@ class UiManagedRuntimeAdapter:
         metadata = usage.usage_metadata
         remaining = usage.remaining_percent if scope_matches else None
         observation = usage.current_result(usage_state)
+        trial = state.trial if state.settings_available else "unknown"
+        if (
+            trial == "active"
+            and scope_matches
+            and metadata is not None
+            and is_effectively_exhausted(metadata)
+        ):
+            trial = "exhausted"
         return {
             "provider": (
                 ("qq" if state.managed_china else "discord")
@@ -285,6 +293,7 @@ class UiManagedRuntimeAdapter:
                 else None
             ),
             "in_progress": auth.dashboard_action() == "in_progress",
+            "trial": trial,
             "budget": {
                 "unit": "percent",
                 "remaining_percent": remaining,
