@@ -151,25 +151,45 @@ class _DirectoryWatch:
     def _bind(self) -> None:
         kernel = self._kernel
         kernel.CreateFileW.argtypes = [
-            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
-            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
         ]
         kernel.CreateFileW.restype = wintypes.HANDLE
-        kernel.CreateEventW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+        kernel.CreateEventW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
         kernel.CreateEventW.restype = wintypes.HANDLE
         kernel.ReadDirectoryChangesW.argtypes = [
-            wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, wintypes.BOOL,
-            wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
-            ctypes.POINTER(_Overlapped), ctypes.c_void_p,
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(_Overlapped),
+            ctypes.c_void_p,
         ]
         kernel.ReadDirectoryChangesW.restype = wintypes.BOOL
         kernel.WaitForMultipleObjects.argtypes = [
-            wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE), wintypes.BOOL, wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.BOOL,
+            wintypes.DWORD,
         ]
         kernel.WaitForMultipleObjects.restype = wintypes.DWORD
         kernel.GetOverlappedResult.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(_Overlapped),
-            ctypes.POINTER(wintypes.DWORD), wintypes.BOOL,
+            wintypes.HANDLE,
+            ctypes.POINTER(_Overlapped),
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.BOOL,
         ]
         kernel.GetOverlappedResult.restype = wintypes.BOOL
         kernel.CancelIoEx.argtypes = [wintypes.HANDLE, ctypes.POINTER(_Overlapped)]
@@ -213,7 +233,7 @@ class _DirectoryWatch:
                 status = anchor.stat()
                 if stat.S_ISDIR(status.st_mode):
                     break
-            except (FileNotFoundError, NotADirectoryError):
+            except FileNotFoundError, NotADirectoryError:
                 pass
             parent = anchor.parent
             if parent == anchor:
@@ -235,7 +255,7 @@ class _DirectoryWatch:
             end = offset + 12 + length
             if end > len(data) or length % 2:
                 raise RuntimeError("Invalid directory notification name")
-            path = anchor / data[offset + 12:end].decode("utf-16-le")
+            path = anchor / data[offset + 12 : end].decode("utf-16-le")
             if path == self.root or self.root in path.parents or path in self.root.parents:
                 paths.add(path)
                 if action in (1, 5):
@@ -267,8 +287,14 @@ class _DirectoryWatch:
             while not self._stopping.is_set():
                 kernel.ResetEvent(event)
                 if not kernel.ReadDirectoryChangesW(
-                    handle, buffer, len(buffer), True, 0x0000015B, None,
-                    ctypes.byref(overlapped), None,
+                    handle,
+                    buffer,
+                    len(buffer),
+                    True,
+                    0x0000015B,
+                    None,
+                    ctypes.byref(overlapped),
+                    None,
                 ):
                     error = ctypes.get_last_error()
                     if error != 997:
@@ -292,21 +318,23 @@ class _DirectoryWatch:
                     try:
                         status = anchor.stat()
                         replaced = identity != (status.st_dev, status.st_ino)
-                    except (FileNotFoundError, NotADirectoryError):
+                    except FileNotFoundError, NotADirectoryError:
                         replaced = True
                     if not replaced or error not in (2, 3, 5):
                         raise ctypes.WinError(error)
                 if not success or transferred.value == 0:
                     recoveries += 1
                     if recoveries > 2:
-                        raise RuntimeError("Directory notifications repeatedly failed to resynchronize")
+                        raise RuntimeError(
+                            "Directory notifications repeatedly failed to resynchronize"
+                        )
                     kernel.CloseHandle(handle)
                     handle = None
                     anchor, identity, handle = self._open()
                     rescan_pending = True
                     continue
                 recoveries = 0
-                changes = self._changes(anchor, buffer.raw[:transferred.value])
+                changes = self._changes(anchor, buffer.raw[: transferred.value])
                 if changes.paths:
                     self._publish(changes, None)
         except BaseException as error:

@@ -245,14 +245,17 @@ async def test_disabled_owner_never_observes_captures_and_resume_skips_disabled_
         assert owner.lifecycle.snapshot["photo"]["path"].endswith("enabled.png")
         state["enabled"] = False
         owner.notify_policy_changed()
-        assert owner._control(
-            {
-                "type": "photo_pull",
-                "photo_id": owner.lifecycle.snapshot["photo"]["photo_id"],
-                "event_id": "disabled-pull",
-            },
-            0,
-        ) is None
+        assert (
+            owner._control(
+                {
+                    "type": "photo_pull",
+                    "photo_id": owner.lifecycle.snapshot["photo"]["photo_id"],
+                    "event_id": "disabled-pull",
+                },
+                0,
+            )
+            is None
+        )
         assert not owner.lifecycle.snapshot["photo"]["visible"]
         await owner.wait_policy_applied()
         assert not watcher.active
@@ -318,9 +321,7 @@ async def test_idle_and_lifecycle_output_do_not_repeat_policy_or_request_work(tm
         await eventually(lambda: owner.supervisor.start.await_count == 1)
         photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
         assert owner.lifecycle.pull(photo_id, "pull")
-        await eventually(
-            lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed"
-        )
+        await eventually(lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed")
         resolutions = resolve.await_count
         starts = owner.lifecycle.request_starts
         native_starts = owner.supervisor.start.await_count
@@ -385,9 +386,7 @@ async def test_offer_expires_and_retention_cleans_up_without_policy_notification
         )
         photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
         assert owner.lifecycle.pull(photo_id, "translate")
-        await eventually(
-            lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed"
-        )
+        await eventually(lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed")
         retained = owner.lifecycle._current
         owner.lifecycle._clock = lambda: retained.capture.observed_monotonic + 599.9
         owner.lifecycle.hidden(photo_id)

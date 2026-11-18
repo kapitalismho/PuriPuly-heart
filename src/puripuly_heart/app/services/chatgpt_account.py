@@ -188,9 +188,7 @@ class ChatGptAccountOwner:
                 category=(
                     "auth"
                     if isinstance(exc, ChatGptAuthError)
-                    else "lifecycle"
-                    if isinstance(exc, (OSError, httpx.HTTPError))
-                    else "unknown"
+                    else "lifecycle" if isinstance(exc, (OSError, httpx.HTTPError)) else "unknown"
                 ),
                 fields={"phase": self._phase, **fields},
             )
