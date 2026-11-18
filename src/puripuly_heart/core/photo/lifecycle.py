@@ -177,11 +177,7 @@ class PhotoLifecycle:
         self._capture_generation += 1
         generation = self._capture_generation
         route = await self._resolve_route()
-        if (
-            self._frozen
-            or generation != self._capture_generation
-            or not is_current()
-        ):
+        if self._frozen or generation != self._capture_generation or not is_current():
             return False
         self._retire_current()
         if route is None or self._clock() - capture.observed_monotonic >= 10:

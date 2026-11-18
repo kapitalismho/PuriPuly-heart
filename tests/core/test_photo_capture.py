@@ -210,6 +210,7 @@ async def test_file_notifications_do_not_scan_photo_or_log_trees(tmp_path, monke
     photos = tmp_path / "photos"
     photos.mkdir()
     async with watching(photos, tmp_path / "logs") as (watcher, source):
+
         def unexpected(*args):
             raise AssertionError("Whole-tree scan for a file notification")
 
@@ -327,7 +328,9 @@ async def test_waiter_cancellation_does_not_stop_watching_and_restart_rebaseline
 
 async def test_notification_failure_reaches_waiter_and_close_settles_worker(tmp_path):
     source = Notifications()
-    watcher = PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs", notification_source=source)
+    watcher = PhotoCaptureWatcher(
+        tmp_path / "photos", tmp_path / "logs", notification_source=source
+    )
     await watcher.start()
     failure = OSError("native notification failed")
     source.fail(failure)
