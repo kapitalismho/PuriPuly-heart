@@ -18,6 +18,8 @@ Choose the smallest path through the actual application that establishes the cha
 
 For startup-timeout or cancellation changes, observe cleanup of any already spawned child before replacement. A failed or cancelled start does not itself prove that the child exited; graceful acknowledgement and forced escalation retain their separate meanings.
 
+**Example — recover ChatGPT sign-in:** In an isolated candidate, use a controlled OAuth endpoint that rejects the first code exchange with `invalid_grant` and accepts the next. Start sign-in once. Observe the GUI's retry message and second browser request, or the replacement authorization challenge on the same CLI operation. Check that the new request retains the issued client ID and uses a fresh code and PKCE transaction. Confirm terminal success and the signed-in state. If the endpoint rejects both exchanges, check that the operation stops, preserves any existing connection, and records only safe attempt metadata. Cancel during the retry to check that it cannot activate a connection.
+
 **Environment:** A runnable candidate and isolated writable roots; no account or model is needed for a setting unrelated to those resources. GUI editing claims require using the actual settings UI. For a visible caption-setting effect, also use [captions and output](#captions-and-output).
 
 ## Speech recognition and translation

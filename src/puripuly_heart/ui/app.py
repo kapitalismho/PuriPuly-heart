@@ -1816,8 +1816,22 @@ class TranslatorApp:
     ) -> None:
         async def _task() -> None:
             self._refresh_chatgpt_account_card()
+            dialog = getattr(self, "_chatgpt_auth_dialog", None)
+            authorization_started = False
+
+            def authorization_url(_url: str) -> None:
+                nonlocal authorization_started
+                if authorization_started:
+                    if dialog is not None and dialog.is_open:
+                        dialog.set_waiting(retrying=True)
+                    else:
+                        self._show_snackbar(t("chatgpt_auth.retrying"), COLOR_PRIMARY)
+                authorization_started = True
+
             try:
-                result = await self.application.connect_chatgpt()
+                result = await self.application.connect_chatgpt(
+                    authorization_url_sink=authorization_url
+                )
             except Exception as exc:
                 emit_failure(
                     logger,
@@ -1834,8 +1848,7 @@ class TranslatorApp:
                     ),
                 )
                 result = ChatGptConnectResult(succeeded=False, failure_code="failed")
-            dialog = getattr(self, "_chatgpt_auth_dialog", None)
-            if dialog is not None:
+            if dialog is not None and result.failure_code != "in_progress":
                 dialog.close()
             self._refresh_chatgpt_account_card()
             if not result.succeeded:
@@ -2808,4 +2821,6 @@ def _chatgpt_failure_message_key(failure_code: str | None) -> str:
         return "chatgpt_auth.error.timeout"
     if failure_code == "loopback_unavailable":
         return "chatgpt_auth.error.loopback_unavailable"
+    if failure_code == "invalid_grant":
+        return "chatgpt_auth.error.invalid_grant"
     return "chatgpt_auth.error.retry"

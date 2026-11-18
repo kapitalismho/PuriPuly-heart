@@ -70,13 +70,15 @@ class ChatGptAuthDialog:
         )
         self._is_open = True
 
-    def set_waiting(self) -> None:
+    def set_waiting(self, *, retrying: bool = False) -> None:
         self._is_waiting = True
         result = self._dialog_result
         if result is None or result.body_text is None:
             return
         result.body_text.value = join_body_paragraphs(
-            split_body_paragraphs(t("chatgpt_auth.waiting_body"))
+            split_body_paragraphs(
+                t("chatgpt_auth.retrying" if retrying else "chatgpt_auth.waiting_body")
+            )
         )
         result.set_actions(
             [

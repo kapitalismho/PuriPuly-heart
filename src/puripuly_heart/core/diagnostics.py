@@ -90,6 +90,8 @@ _NUMERIC_FIELDS = (
             "winerror",
             "exit_code",
             "attempts",
+            "authorization_attempt",
+            "loopback_port",
             "count",
             "frame_count",
             "vad_sample_count",
@@ -161,6 +163,7 @@ _BOOLEAN_FIELDS = frozenset(
         "rollback_succeeded",
         "managed_secret_present",
         "token_present",
+        "client_id_reused",
         "opened",
         "frames_received",
         "silence_observed",
@@ -191,6 +194,7 @@ _ENUM_FIELDS = {
     **OPENAI_FAILURE_ENUM_FIELDS,
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
+    "retry_outcome": frozenset({"succeeded", "failed", "cancelled"}),
     "service_code": frozenset(
         {
             "service_authentication_failed",
