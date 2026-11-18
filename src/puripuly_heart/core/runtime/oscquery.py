@@ -14,7 +14,7 @@ from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryServiceInfo,
     OscQueryServicePort,
 )
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import emit_basic_log
 
 OscConnectionMode = Literal["automatic", "manual", "off"]
 OscReceiverStarter = Callable[[], Awaitable[object]]

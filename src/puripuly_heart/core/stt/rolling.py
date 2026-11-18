@@ -32,7 +32,7 @@ from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.diagnostics import emit_failure, sanitize_diagnostics
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import emit_basic_log
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,

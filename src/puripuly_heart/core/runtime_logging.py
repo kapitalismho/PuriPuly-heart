@@ -2044,20 +2044,6 @@ def _redact_legacy_text_for_sink(message: str, sink: DiagnosticSink) -> str:
     return DIAGNOSTIC_REDACTION_MARKER
 
 
-def emit_basic_log(
-    logger: logging.Logger,
-    message: str,
-    *args: object,
-    level: int = logging.INFO,
-) -> None:
-    logger.log(
-        level,
-        message,
-        *args,
-        extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
-    )
-
-
 def _sink_for_live_visibility(visibility: DiagnosticVisibility) -> DiagnosticSink:
     if visibility == DIAGNOSTIC_VISIBILITY_BASIC:
         return DIAGNOSTIC_SINK_BASIC_LOGS

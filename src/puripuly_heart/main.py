@@ -241,7 +241,7 @@ def _run_gui(
     try:
         lease = acquire(config_path)
     except InstanceAlreadyRunning:
-        from puripuly_heart.core.runtime_logging import emit_basic_log
+        from puripuly_heart.core.runtime.logging import emit_basic_log
         from puripuly_heart.ui.running_instance import notify_running_instance
 
         outcome = notify_running_instance()
