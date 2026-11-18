@@ -3,6 +3,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['broker/tests/**/*.spec.ts', 'agent-relay/tests/**/*.spec.ts'],
+    include: ['services/broker/tests/**/*.spec.ts', 'services/agent-relay/tests/**/*.spec.ts'],
   },
 });

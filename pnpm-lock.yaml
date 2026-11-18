@@ -24,13 +24,13 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1
 
-  agent-relay:
+  services/agent-relay:
     devDependencies:
       wrangler:
         specifier: ^4.153.0
         version: 4.153.0(@cloudflare/workers-types@5.20261027.1)(@types/node@22.20.5)
 
-  broker:
+  services/broker:
     dependencies:
       hono:
         specifier: ^4.13.14

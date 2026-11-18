@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "puripuly-heart"
-version = "2.11.0"
+version = "2.11.2"
 description = "LLM-based real-time translator for VRChat"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -58,6 +58,7 @@ dev = [
   "PyYAML>=6.0.3,<7",
   "ruff>=0.6.0",
   "black>=26.10.1",
+  "setuptools==84.2.1",
 ]
 build = [
   "cmake>=3.31",

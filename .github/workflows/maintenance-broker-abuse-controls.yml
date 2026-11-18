@@ -26,6 +26,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
       TARGET_MAX_COUNT: ${{ github.event.inputs.max_count }}
       CONFIRM_UPDATE: ${{ github.event.inputs.confirm_update }}
     steps:
@@ -62,6 +63,11 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "${AGENT_USAGE_D1_DATABASE_ID_PRODUCTION//[[:space:]]/}" ]]; then
+            echo 'AGENT_USAGE_D1_DATABASE_ID_PRODUCTION is required and must not be blank.' >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -82,7 +88,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Render production Wrangler config
-        working-directory: broker
+        working-directory: services/broker
         shell: bash
         env:
           NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
@@ -95,11 +101,12 @@ jobs:
 
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
             "${network_identity_version_args[@]}" \
             --out wrangler.production.jsonc
 
       - name: Inspect current daily auth cap
-        working-directory: broker
+        working-directory: services/broker
         run: >-
           pnpm exec wrangler d1 execute
           puripuly-heart-broker --remote --config wrangler.production.jsonc
@@ -108,7 +115,7 @@ jobs:
 
       - name: Update daily auth cap runtime config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           cat > .abuse-controls-daily-cap-update.sql <<SQL
           UPDATE broker_config
@@ -125,7 +132,7 @@ jobs:
 
       - name: Verify daily auth cap runtime config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           verify_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \

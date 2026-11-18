@@ -3765,15 +3765,7 @@ async def test_timeout_diagnostics_keep_original_epoch_and_frozen_watchdog_after
         await ending
         await wait_until(lambda: ("close",) in first.calls)
 
-        second_start_task = asyncio.create_task(engine.handle_owned_vad_event(second_start))
-        await wait_until(
-            lambda: any(
-                deadline <= clock.value + 0.002 and not future.done()
-                for deadline, future in clock.sleepers
-            )
-        )
-        await clock.advance_to(clock.value + 0.001)
-        await second_start_task
+        await engine.handle_owned_vad_event(second_start)
         second_identity = second.requests[0].identity
         assert second_identity.provider_epoch_id != first_identity.provider_epoch_id
         second.emit(
@@ -5295,3 +5287,141 @@ async def test_readiness_exhaustion_keeps_each_attempt_without_changing_budget()
         assert "PRIVATE" not in repr(terminal.failure_diagnostics)
     finally:
         await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider_id", "outcome", "reason", "survives"),
+    [
+        ("deepgram", "degraded", "deepgram_finalize_ack_missing", True),
+        ("elevenlabs_scribe", "failed", "provider_final_timeout", True),
+        ("soniox", "failed", "soniox_receive_failed", False),
+    ],
+)
+async def test_cloud_final_timeouts_do_not_consume_channel_recovery_budget(
+    provider_id: str, outcome: str, reason: str, survives: bool
+) -> None:
+    class FailingSession(ControlledScopedSession):
+        async def seal_turn(self, identity, **kwargs) -> None:
+            await super().seal_turn(identity, **kwargs)
+            self.buffer.put(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome=outcome,
+                    text="partial" if outcome == "degraded" else "",
+                    text_authority="degraded" if outcome == "degraded" else "none",
+                    failure_reason=reason,
+                    epoch_disposition="retire",
+                    failure_retryable=True,
+                )
+            )
+
+    sessions: list[FailingSession] = []
+    notified: list[object] = []
+    emitted: list[object] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        sessions.append(FailingSession())
+        return sessions[-1]
+
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    async def failed(failure: object) -> None:
+        notified.append(failure)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        terminal_failure_sink=failed,
+        sleep=no_sleep,
+        watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=1.0),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings(provider_id))
+
+    def terminals() -> list[STTProviderTurnTerminal]:
+        return [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+
+    try:
+        for order in range(4):
+            start, _chunk, end = segment_events(ledger, start_sample=order * 100, now=order)
+            try:
+                await engine.handle_owned_vad_event(start)
+                await engine.handle_owned_vad_event(end)
+            except Exception:
+                assert not survives
+                break
+            await wait_until(lambda order=order: len(terminals()) == order + 1)
+    finally:
+        await engine.close()
+
+    if survives:
+        assert len(sessions) == 4
+        assert [event.outcome for event in terminals()] == [outcome] * 4
+        assert all(
+            event.channel_availability is STTChannelAvailability.RECOVERING for event in terminals()
+        )
+        assert not notified
+    else:
+        assert terminals()[-1].channel_availability is STTChannelAvailability.UNAVAILABLE
+        assert notified
+
+
+@pytest.mark.asyncio
+async def test_final_timeout_keeps_visible_provisional_text_and_admits_waiting_turn() -> None:
+    class SilentFinalSession(ControlledScopedSession):
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            await super().begin_turn(request)
+            self.buffer.put(
+                STTProviderTurnUpdate(
+                    identity=request.identity,
+                    sequence=1,
+                    stability="provisional",
+                    assembly="replace",
+                    text=f"visible {len(self.requests)}",
+                )
+            )
+
+    sessions: list[SilentFinalSession] = []
+    emitted: list[object] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        sessions.append(SilentFinalSession())
+        return sessions[-1]
+
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=factory,
+        event_sink=emitted.append,
+        sleep=no_sleep,
+        watchdog_resolver=lambda _settings: watchdogs(final_timeout_s=0.05),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
+    a_start, _a_chunk, a_end = segment_events(ledger, start_sample=100, now=1.0)
+    b_start, _b_chunk, b_end = segment_events(ledger, start_sample=200, now=2.0)
+
+    def terminals() -> list[STTProviderTurnTerminal]:
+        return [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+
+    try:
+        await engine.handle_owned_vad_event(a_start)
+        await engine.handle_owned_vad_event(a_end)
+        await engine.handle_owned_vad_event(b_start)
+        await engine.handle_owned_vad_event(b_end)
+        await wait_until(lambda: len(terminals()) == 2)
+    finally:
+        await engine.close()
+
+    assert [
+        (event.identity.segment, event.outcome, event.text, event.failure_reason)
+        for event in terminals()
+    ] == [
+        (a_start.segment.identity, "degraded", "visible 1", "provider_final_timeout"),
+        (b_start.segment.identity, "degraded", "visible 1", "provider_final_timeout"),
+    ]
+    assert all(
+        event.channel_availability is STTChannelAvailability.RECOVERING for event in terminals()
+    )

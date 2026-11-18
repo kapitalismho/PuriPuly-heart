@@ -16,6 +16,7 @@
 - Verify the intended build and instance; check presentation and interaction separately in the actual GUI.
 - Use isolated synthetic state and controlled local resources for probes; keep private data and live services outside routine verification.
 - Confirm checks execute, report failures and verification gaps, and use the evidence to guide corrections or further checks.
+- Use `docs/verification.md` to select and compose product-area examples for the changed behavior, not as a mandatory checklist. Follow the same input/result across affected connections and update affected guidance when behavior, entrypoints, prerequisites, or observations change.
 
 ## Shared work context
 

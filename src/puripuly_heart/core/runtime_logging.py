@@ -340,6 +340,127 @@ def _is_photo_metadata_text(message: str) -> bool:
     return True
 
 
+_RECOGNITION_METADATA_EVENTS = {
+    "Recognition": frozenset(
+        {
+            "terminal",
+            "payload_received",
+            "stream_resumed",
+            "session_retired",
+            "receive_failed",
+            "source_cancelled",
+        }
+    ),
+    "VAD": frozenset({"window", "committed"}),
+    "QwenAudio": frozenset({"task_failed"}),
+}
+_RECOGNITION_METADATA_REASONS = {
+    "VAD": frozenset({"settings_change", "interval", "discontinuity", "eof", "cancel", "exit"}),
+    "QwenAudio": frozenset(
+        {
+            "qwen_final_timeout",
+            "qwen_readiness_failed",
+            "qwen_socket_failed",
+            "qwen_write_failed",
+            "qwen_write_cancelled",
+        }
+    ),
+}
+_RECOGNITION_METADATA_INTEGER_KEYS = frozenset(
+    {
+        "generation",
+        "activation_generation",
+        "successful_payloads",
+        "successful_samples",
+        "successful_bytes",
+        "content_bytes",
+        "context_bytes",
+        "final_wait_ms",
+        "final_timeout_ms",
+        "sealed_wait_ms",
+        "ttl_ms",
+        "failure_retryable",
+        "recovery_pending",
+        "context_only",
+        "observed_audio_ms",
+        "threshold_hits",
+        "candidate_discarded",
+        "candidate_pending_chunks",
+        "committed",
+        "rollovers",
+        "start_debounce_chunks",
+        "start_commit_chunks",
+    }
+)
+_RECOGNITION_METADATA_DECIMAL_KEYS = frozenset(
+    {
+        "input_rms",
+        "max_probability",
+        "threshold_min",
+        "threshold_max",
+        "candidate_max_run_ms",
+        "onset_threshold",
+        "continuation_threshold",
+        "applied_threshold",
+    }
+)
+
+
+def _is_recognition_metadata_text(tag: str, message: str) -> bool:
+    from puripuly_heart.core.stt.diagnostics import recognition_cause
+
+    tokens = message.split()
+    if not 2 <= len(tokens) <= 24 or tokens[0] not in _RECOGNITION_METADATA_EVENTS[tag]:
+        return False
+    seen: set[str] = set()
+    for token in tokens[1:]:
+        if _METADATA_FIELD_RE.fullmatch(token) is None:
+            return False
+        key, value = token.split("=", 1)
+        if key in seen:
+            return False
+        seen.add(key)
+        if key == "channel":
+            valid = value in {"self", "peer"}
+        elif key in {"utterance_id", "epoch", "turn"}:
+            valid = value == "none" or re.fullmatch(r"[0-9a-fA-F-]{32,36}", value)
+        elif key == "provider":
+            valid = re.fullmatch(r"[a-z][a-z0-9_]{0,47}", value)
+        elif key in _RECOGNITION_METADATA_INTEGER_KEYS:
+            valid = value in {"none", "unknown"} or re.fullmatch(r"[0-9]{1,20}", value)
+        elif key in _RECOGNITION_METADATA_DECIMAL_KEYS:
+            valid = value in {"none", "unknown"} or re.fullmatch(
+                r"[0-9]{1,12}(?:\.[0-9]{1,12})?", value
+            )
+        elif key == "outcome":
+            valid = value in {
+                "final",
+                "empty",
+                "failed",
+                "cancelled",
+                "expired",
+                "submitted",
+                "degraded",
+            }
+        elif key == "cause":
+            valid = value in {"none", "unclassified"} or recognition_cause(value) == value
+        elif key == "text_authority":
+            valid = value in {"authoritative", "degraded", "none"}
+        elif key == "recovery":
+            valid = value in {"speech", "next_frame", "none"}
+        elif key == "kind":
+            valid = value in {"onset", "rollover"}
+        elif key == "reason":
+            valid = value in _RECOGNITION_METADATA_REASONS.get(tag, frozenset())
+        elif key == "cause_class":
+            valid = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,79}", value)
+        else:
+            return False
+        if not valid:
+            return False
+    return True
+
+
 def _is_metadata_only_text(message: str) -> bool:
     if len(message) > 4096 or "\n" in message or "\r" in message:
         return False
@@ -351,6 +472,8 @@ def _is_metadata_only_text(message: str) -> bool:
     tags = re.findall(r"\[([A-Za-z][A-Za-z0-9_-]*)\]", message[: prefix.end()])
     if tags == ["Photo"]:
         return _is_photo_metadata_text(message[prefix.end() :])
+    if len(tags) == 1 and tags[0] in _RECOGNITION_METADATA_EVENTS:
+        return _is_recognition_metadata_text(tags[0], message[prefix.end() :])
     if any(
         tag
         not in {

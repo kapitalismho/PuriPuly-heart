@@ -8,12 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL
-from puripuly_heart.app.services.agent_chat.execution import (
-    app_tool_descriptions,
-    app_tool_schemas,
-)
-from puripuly_heart.release_evidence.agent_chat_simulator.app import choice_catalog
 from puripuly_heart.release_evidence.native_distribution import (
     bundle_runtime,
     compile_runtime,
@@ -30,14 +24,14 @@ def _build_compiled_archive_runtime(tmp_path: Path, *, compact_flet: bool) -> tu
     (package / "ui").mkdir(parents=True)
     (package / "config").mkdir()
     (package / "data").mkdir()
-    (app / "prompts").mkdir()
+    (package / "data" / "prompts").mkdir()
     for relative in ("__init__.py", "runtime_layout.py", "config/paths.py"):
         shutil.copy2(root / "src/puripuly_heart" / relative, package / relative)
     (package / "ui" / "consumer.py").write_text(
         "from dependency import VALUE\nRESULT = VALUE + 1\n", encoding="utf-8"
     )
     (package / "data" / "payload.txt").write_text("filesystem package data", encoding="utf-8")
-    (app / "prompts" / "system.txt").write_text("filesystem prompt", encoding="utf-8")
+    (package / "data" / "prompts" / "system.txt").write_text("filesystem prompt", encoding="utf-8")
     (app / "product_bootstrap.py").write_text("RESULT = 9\n", encoding="utf-8")
     for filename in ("_puripuly_native_runtime.py", "sitecustomize.py"):
         shutil.copy2(root / "native/windows_host" / filename, app / filename)
@@ -172,85 +166,3 @@ def staged_compact_bundled_runtime(
     shutil.copytree(source, tmp_path, dirs_exist_ok=True)
     bytecode = tmp_path / "bytecode.json"
     return layout, bytecode, json.loads(bytecode.read_text(encoding="utf-8"))
-
-
-@pytest.fixture
-async def relay_context_manifest() -> dict:
-    marker = "TRUSTED_CONTEXT_ONLY_NOT_FOR_TERRA"
-    schemas = app_tool_schemas(await choice_catalog())
-    descriptions = app_tool_descriptions()
-    return {
-        "format": "puri-agent-relay-context-1",
-        "agent_protocol": AGENT_CHAT_PROTOCOL,
-        "relay_build": "a" * 64,
-        "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
-        "contexts": {
-            "classify": {
-                "model": "synthetic-model",
-                "input_prefix": [
-                    {
-                        "role": "developer",
-                        "content": [
-                            {
-                                "type": "input_text",
-                                "text": marker,
-                                "prompt_cache_breakpoint": {"mode": "explicit"},
-                            }
-                        ],
-                    }
-                ],
-                "questions": [
-                    {
-                        "type": "choice",
-                        "name": "route",
-                        "instructions": "Classify current_message by the Route section.",
-                        "choices": [{"value": "work"}, {"value": "unclear"}],
-                    }
-                ],
-                "prompt_cache_options": {"mode": "explicit", "ttl": "30m"},
-            },
-            "work": {
-                "model": "synthetic-model",
-                "input_prefix": [
-                    {
-                        "role": "developer",
-                        "content": [
-                            {
-                                "type": "input_text",
-                                "text": marker,
-                                "prompt_cache_breakpoint": {"mode": "explicit"},
-                            }
-                        ],
-                    }
-                ],
-                "tools": [
-                    {
-                        "type": "function",
-                        "name": name,
-                        "description": descriptions[name],
-                        "strict": False,
-                        "parameters": schema,
-                    }
-                    for name, schema in schemas.items()
-                ],
-                "reasoning": {"effort": "high"},
-                "prompt_cache_options": {"mode": "implicit", "ttl": "30m"},
-                "store": False,
-                "stream": True,
-                "parallel_tool_calls": False,
-                "max_output_tokens": 25000,
-                "include": ["reasoning.encrypted_content"],
-            },
-            **{
-                route: {
-                    "model": "synthetic-model",
-                    "input_prefix": [],
-                    "instructions": f"{marker} {route}",
-                    "tools": [],
-                    "reasoning": {"effort": "low"},
-                }
-                for route in ("social", "out_of_scope")
-            },
-        },
-        "export_provenance": {"mode": "controlled_test_fixture", "external_model_calls": 0},
-    }

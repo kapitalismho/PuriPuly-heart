@@ -34,7 +34,7 @@ def photo_route_kind(route: PhotoRoute | None) -> str | None:
         return "chatgpt"
     if route.identity.startswith("google-"):
         return "gemini"
-    if route.identity.startswith("benchmark-openai-"):
+    if route.identity.startswith("openai-"):
         return "openai"
     return "managed"
 
@@ -76,14 +76,8 @@ class PhotoProviderAdapter:
                     allow_loopback_http=self.allow_loopback_http,
                 )
             return PhotoRoute("benchmark-managed-openrouter-luna", self._managed_openrouter)
-        if route == "openai-api":
-            key = await run_owned_thread_call(lambda: self.secret_store().get("openai_api_key"))
-            if not key:
-                return None
-            return PhotoRoute(
-                "benchmark-openai-" + hashlib.sha256(key.encode()).hexdigest(),
-                lambda model: OpenAIPhotoConnection(key, client=self._client()),
-            )
+        if route in ("openai", "openai-api"):
+            return await run_owned_thread_call(self._openai_route)
         if route != "personal":
             raise ValueError("unsupported photo access")
         return await run_owned_thread_call(self._observe_route)
@@ -197,6 +191,21 @@ class PhotoProviderAdapter:
                 route="luna", chatgpt_session=self.session, model=model
             ),
         )
+
+    def _openai_route(self) -> PhotoRoute | None:
+        try:
+            key = self.secret_store().get("openai_api_key")
+        except Exception:
+            return None
+        if not key:
+            return None
+
+        def connect(model: str | None):
+            if model not in (None, "gpt-6-luna"):
+                raise PhotoProviderError("photo_request_rejected", retryable=False)
+            return OpenAIPhotoConnection(key, client=self._client())
+
+        return PhotoRoute("openai-" + hashlib.sha256(key.encode()).hexdigest(), connect)
 
     def _gemini_route(self) -> PhotoRoute | None:
         try:

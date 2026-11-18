@@ -905,7 +905,7 @@ class _QwenAudioSession(STTBackendSession):
             return
         self._closing = True
         logger.warning(
-            "[QwenAudio] task failed channel=%s reason=%s cause_class=%s",
+            "[QwenAudio] task_failed channel=%s reason=%s cause_class=%s",
             self.backend.channel,
             reason,
             type(exc).__name__,

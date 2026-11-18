@@ -92,19 +92,6 @@ def build_parser() -> argparse.ArgumentParser:
         "run-desktop-overlay-preview",
         help="Run the desktop Flet overlay preview",
     )
-    desktop_repro = sub.add_parser(
-        "run-desktop-overlay-repro",
-        help="Run Desktop overlay diagnostic repro",
-    )
-    desktop_repro.add_argument("--cycles", type=int, default=100)
-    desktop_repro.add_argument("--dwell-ms", type=int, default=150)
-    desktop_repro.add_argument("--output-dir", type=Path, required=True)
-    verify_desktop_repro = sub.add_parser(
-        "verify-desktop-overlay-repro",
-        help="Verify Desktop overlay repro artifacts",
-    )
-    verify_desktop_repro.add_argument("--output-dir", type=Path, required=True)
-
     sub.add_parser(
         "local-sherpa-runtime-check",
         help="Verify the Local sherpa Windows runtime DLL directory",
@@ -366,18 +353,6 @@ def _run_desktop_overlay_preview() -> int:
     return desktop_overlay_main(["--preview"])
 
 
-def _run_desktop_overlay_repro(*, cycles: int, dwell_ms: int, output_dir: Path) -> int:
-    from puripuly_heart.ui.desktop_overlay_repro import run_desktop_overlay_repro
-
-    return run_desktop_overlay_repro(cycles=cycles, dwell_ms=dwell_ms, output_dir=output_dir)
-
-
-def _verify_desktop_overlay_repro(*, output_dir: Path) -> int:
-    from puripuly_heart.core.desktop_overlay_repro_artifacts import verify_desktop_overlay_repro
-
-    return verify_desktop_overlay_repro(output_dir=output_dir)
-
-
 def _load_settings_or_default(
     path: Path,
 ) -> AppSettingsVNext:
@@ -465,14 +440,6 @@ def main(argv: list[str] | None = None) -> int:
             request_path=args.request_file,
             event_path=args.event_file,
         )
-    if args.command == "run-desktop-overlay-repro":
-        return _run_desktop_overlay_repro(
-            cycles=args.cycles,
-            dwell_ms=args.dwell_ms,
-            output_dir=args.output_dir,
-        )
-    if args.command == "verify-desktop-overlay-repro":
-        return _verify_desktop_overlay_repro(output_dir=args.output_dir)
     if args.command == "installer-telemetry-preference":
         settings_config_path, _ = _settings_config_path(args)
         return _run_installer_telemetry_preference(settings_config_path, args.action)

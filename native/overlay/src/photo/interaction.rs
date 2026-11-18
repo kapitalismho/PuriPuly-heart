@@ -17,7 +17,12 @@ const PULL_M: f32 = 0.12;
 const APPROACH_SHOW_MARGIN_M: f32 = 0.10;
 const APPROACH_HIDE_MARGIN_M: f32 = 0.15;
 pub(super) const WRIST_FLOAT_M: f32 = 0.03;
-pub const DEFAULT_PHOTO_WIDTH_M: f32 = 0.4125;
+pub(super) const DEFAULT_WRIST: Transform = [
+    [0.199799218, -0.126062389, 0.971693648, 0.05],
+    [-0.306633175, -0.949922880, -0.060188187, 0.034477412],
+    [0.930621496, -0.285927956, -0.228448759, 0.065876018],
+];
+pub const DEFAULT_PHOTO_WIDTH_M: f32 = 0.45;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -94,14 +99,13 @@ impl TemporaryInteractionConfig {
             compose(handgrip, calibration.transform)
         } else {
             self.wrist_transform.unwrap_or_else(|| {
-                let point = self
-                    .wrist_handgrip_point_m
-                    .unwrap_or([0.035, 0.10153344, 0.03473191]);
-                compose(handgrip, [
-                    [0.0, 0.0, 1.0, point[0]],
-                    [-0.268297781, -0.963336027, 0.0, point[1]],
-                    [0.963336027, -0.268297781, 0.0, point[2]],
-                ])
+                let mut base = DEFAULT_WRIST;
+                if let Some(point) = self.wrist_handgrip_point_m {
+                    for (row, value) in base.iter_mut().zip(point) {
+                        row[3] = value;
+                    }
+                }
+                compose(handgrip, base)
             })
         };
         for row in &mut wrist {
@@ -332,7 +336,7 @@ pub enum Hand {
     Right,
 }
 
-pub const PHOTO_LINGER: Duration = Duration::from_millis(2500);
+pub const PHOTO_LINGER: Duration = Duration::from_secs(4);
 pub const TOUCH_EDGE_M: f32 = 0.05;
 pub const TOUCH_DEPTH_M: f32 = 0.08;
 

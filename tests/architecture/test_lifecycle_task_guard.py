@@ -382,7 +382,7 @@ TASK_CREATION_REVIEWS = (
         {
             "_GenerationGuardedVadSink.handle_stream_input": 1,
             "_GenerationGuardedVadSink.handle_vad_event": 1,
-            "_GenerationGuardedVadSink._admit_unsent_segment": 1,
+            "_GenerationGuardedVadSink._arm_unsent_expiry": 1,
             "SelfCaptureSessionOwner.note_recognition_failure": 1,
             "SelfCaptureSessionOwner._apply_intent": 1,
             "SelfCaptureSessionOwner._start_generation": 1,
@@ -522,11 +522,6 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
-        "release_evidence/cli_control_speech.py",
-        {"_recognize": 1},
-        "Speech evidence coroutine owns channel subscriber tasks and cancels plus gathers the set in finally; subscribers terminate their subprocesses",
-    ),
-    *_reviews(
         "release_evidence/local_asr_production_composition.py",
         {"_execute": 1},
         "Production composition evidence locally awaits provider handoff and cancels plus gathers it on failure before leaving the evidence boundary",
@@ -578,11 +573,6 @@ TASK_CREATION_REVIEWS = (
         family=BARE_RUN_TASK,
     ),
     *_reviews(
-        "ui/desktop_overlay_repro.py",
-        {"StaticCheckerboardBackdrop.start": 1, "DesktopOverlayReproOwner.run": 2},
-        "DesktopOverlayReproOwner owns and gathers its renderer, diagnostic consumer, and static-backdrop tasks",
-    ),
-    *_reviews(
         "ui/flet_desktop_runtime.py",
         {
             "FletDesktopViewProcessOwner.close": 1,
@@ -630,12 +620,6 @@ TASK_CREATION_REVIEWS = (
         "SettingsView uses page.run_task at the UI boundary for bounded asynchronous UI callbacks, including credential saving, while keeping the modal responsive",
         classification="legacy_exception",
         family=RUN_TASK,
-    ),
-    *_reviews(
-        "release_evidence/agent_chat_simulator/execution.py",
-        {"AttemptScheduler.run": 1},
-        "AttemptScheduler retains bounded per-attempt tasks, stops admission on failure/cancellation, "
-        "and shield-drains each attempt's model close and checkpoint before returning",
     ),
 )
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)

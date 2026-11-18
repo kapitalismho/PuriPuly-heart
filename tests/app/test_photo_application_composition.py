@@ -94,7 +94,6 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
             runner=PhotoProcessRunner(Path(os.environ["PHOTO_NATIVE_EXECUTABLE"])),
             backend="probe",
             temporary_root=owned,
-            poll_interval=0.01,
         )
         photo_owners.append(owner)
         return owner
@@ -166,6 +165,34 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
         )
         assert not app._settings.settings.overlay_enabled()
         assert records["starts"] == 1
+        control = app.control()
+        control.bind_instance("photo-capture-settings")
+        disabled = await control.submit(
+            "settings.apply",
+            {"changes": {"photo.enabled": False}},
+            request_id="photo-capture-disable",
+        )
+        disabled_result = await control.wait(disabled["operation_id"], timeout=10)
+        assert disabled_result["status"] in {"applied", "degraded"}
+        await until(lambda: owner.lifecycle.snapshot["photo"] is None)
+        (photos / "while-disabled.png").write_bytes(png(64, 64))
+        enabled = await control.submit(
+            "settings.apply",
+            {"changes": {"photo.enabled": True}},
+            request_id="photo-capture-enable",
+        )
+        enabled_result = await control.wait(enabled["operation_id"], timeout=10)
+        assert enabled_result["status"] in {"applied", "degraded"}
+        assert owner.lifecycle.snapshot["photo"] is None
+        month = photos / "2026-12"
+        month.mkdir()
+        next_photo = month / "VRChat_2026-12-01_00-00-00.001_64x64.png"
+        next_photo.write_bytes(png(64, 64))
+        await until(
+            lambda: owner.lifecycle.snapshot["photo"] is not None
+            and owner.lifecycle.snapshot["photo"]["path"] == str(next_photo.resolve())
+        )
+        assert records["starts"] == 1
         print(
             {
                 "composed_startup": True,
@@ -174,6 +201,7 @@ async def test_composed_startup_starts_photo_with_captions_off_survives_pipeline
                 "photo_pid_after_replacement": photo_pid,
                 "photo_generation_after_crash": owner.supervisor.generation,
                 "starts": records["starts"],
+                "settings_reactivation_new_month_capture": True,
                 "controlled": "provider+credentials; no live services",
             }
         )
@@ -244,6 +272,54 @@ async def test_composed_route_priority_requires_chatgpt_session_not_openai_key(
             else:
                 assert calls[0]["gemini_api_key"] == google_key
                 assert "chatgpt_session" not in calls[0]
+    finally:
+        await app.stop()
+
+
+@pytest.mark.parametrize("openai_key", ["synthetic-openai", None])
+async def test_composed_openai_route_uses_only_the_official_openai_key(
+    tmp_path, monkeypatch, openai_key
+):
+    monkeypatch.delenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", raising=False)
+    monkeypatch.setattr(
+        application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
+    )
+    monkeypatch.setattr(ChatGptSession, "status", lambda self: SimpleNamespace(signed_in=True))
+    store = {"openai_api_key": openai_key, "gemini_api_key": "synthetic-google"}
+    monkeypatch.setattr(application_runtime, "create_secret_store", lambda *args, **kwargs: store)
+    owners = []
+
+    def make_owner(**kwargs):
+        owner = PhotoApplicationOwner(
+            **kwargs,
+            watcher=PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs"),
+            temporary_root=tmp_path,
+        )
+        owners.append(owner)
+        return owner
+
+    monkeypatch.setattr(application_runtime, "PhotoApplicationOwner", make_owner)
+    app = application_runtime.compose_application_runtime(
+        presentation=HeadlessApplicationPresentation(), config_path=tmp_path / "settings.json"
+    )
+    canonical = AppSettingsVNext()
+    app._settings.settings.canonical = replace(
+        canonical, intent=replace(canonical.intent, photo=PhotoIntent(route="openai"))
+    )
+    try:
+        route = await owners[0]._resolve_route()
+        if openai_key is None:
+            assert route is None
+            return
+        assert photo_provider.photo_route_kind(route) == "openai"
+        connection = route.connect(None)
+        assert isinstance(connection, photo_provider.OpenAIPhotoConnection)
+        assert connection.endpoint == "https://api.openai.com/v1/responses"
+        assert connection._api_key == openai_key
+        with pytest.raises(photo_provider.PhotoProviderError):
+            route.connect("gemini-3.5-flash-lite")
+        store["openai_api_key"] = "rotated-openai"
+        assert (await owners[0]._resolve_route()).identity != route.identity
     finally:
         await app.stop()
 
@@ -369,6 +445,8 @@ async def test_composed_photo_settings_gate_offers_report_status_and_discard_onl
         assert await owner._resolve_route() is None
         assert (await app.photo_status()).route is None
         apply_photo(route="gemini")
+        assert await owner._resolve_route() is None
+        apply_photo(route="openai")
         assert await owner._resolve_route() is None
 
         apply_photo(enabled=False, delete_translated=True)

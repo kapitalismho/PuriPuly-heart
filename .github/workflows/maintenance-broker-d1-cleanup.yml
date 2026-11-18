@@ -39,6 +39,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
     steps:
       - name: Guard inputs
         shell: bash
@@ -112,16 +113,25 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Render production Wrangler config
-        working-directory: broker
-        run: >-
-          node scripts/render-production-wrangler-config.mjs
-          --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION"
-          --out wrangler.production.jsonc
+        working-directory: services/broker
+        shell: bash
+        env:
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
+        run: |
+          version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+          fi
+          node scripts/render-production-wrangler-config.mjs \
+            --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
+            "${version_args[@]}" --out wrangler.production.jsonc
 
       - name: Inspect matching broker rows
         id: inspect
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         env:
           TARGET_INSTALLATION_ID: ${{ github.event.inputs.installation_id }}
           TARGET_HARDWARE_HASH: ${{ github.event.inputs.hardware_hash }}
@@ -200,7 +210,7 @@ jobs:
       - name: Delete matching broker rows
         if: ${{ github.event.inputs.mode == 'delete' }}
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           python3 - <<'PY'
           import json
@@ -298,7 +308,7 @@ jobs:
       - name: Re-inspect after delete
         if: ${{ github.event.inputs.mode == 'delete' }}
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           inspect_sql="$(tr '\n' ' ' < .maintenance-inspect.sql)"
           pnpm exec wrangler d1 execute puripuly-heart-broker --remote --config wrangler.production.jsonc --command "$inspect_sql" --json > .maintenance-post-delete.json

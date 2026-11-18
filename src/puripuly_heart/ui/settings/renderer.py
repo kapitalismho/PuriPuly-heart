@@ -144,14 +144,21 @@ def compose_settings_general_surface(
 
 def compose_settings_photo_surface(
     slots: SettingsPhotoSurfaceSlots,
+    *,
+    placeholder_factory: Callable[[], ft.Control],
 ) -> SettingsPhotoSurfaceRegions:
     return SettingsPhotoSurfaceRegions(
         rows=(
-            compose_settings_triple_row(slots.enabled, slots.route, slots.delete_translated),
+            compose_settings_triple_row(slots.enabled, slots.model, slots.route),
+            compose_settings_triple_row(
+                slots.delete_translated,
+                placeholder_factory(),
+                placeholder_factory(),
+            ),
             slots.remaining,
             *(
                 control
-                for control in (slots.chatgpt_account, slots.gemini_key)
+                for control in (slots.chatgpt_account, slots.openai_key, slots.gemini_key)
                 if control is not None
             ),
         )

@@ -31,6 +31,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+      AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: ${{ secrets.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION }}
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
       APPLY_MIGRATIONS: ${{ inputs.apply_migrations }}
@@ -52,7 +53,7 @@ jobs:
             ''|'false'|'true') ;;
             *) echo 'apply_migrations must be false or true.' >&2; exit 1 ;;
           esac
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID BROKER_D1_DATABASE_ID_PRODUCTION; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID BROKER_D1_DATABASE_ID_PRODUCTION AGENT_USAGE_D1_DATABASE_ID_PRODUCTION; do
             value="${!name}"
             if [[ -z "${value//[[:space:]]/}" ]]; then
               echo "$name is required and must not be blank." >&2
@@ -86,7 +87,7 @@ jobs:
 
       - name: Render production Wrangler config
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
           if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
@@ -94,15 +95,64 @@ jobs:
           fi
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
             "${version_args[@]}" --out wrangler.production.jsonc
 
       - name: Validate production Wrangler config
-        working-directory: broker
+        working-directory: services/broker
         run: pnpm exec wrangler types --config wrangler.production.jsonc
+
+      - name: Require report-ready Relay usage database
+        shell: bash
+        working-directory: services/broker
+        run: |
+          if ! relay_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-agent-usage --remote --config wrangler.production.jsonc \
+            --command "SELECT 'migration' AS kind, name, '' AS table_name, '' AS column_type, 0 AS is_required FROM d1_migrations UNION ALL SELECT 'column', p.name, s.name, p.type, p.[notnull] FROM sqlite_schema AS s JOIN pragma_table_info(s.name) AS p WHERE s.type = 'table' AND s.name IN ('usage_daily', 'photo_admissions');" --json)"; then
+            echo 'Relay usage readiness query failed; deploy Relay and apply 0008_photo_request_timestamp.sql before Broker.' >&2
+            exit 1
+          fi
+          python3 - "$relay_json" <<'PY'
+          import json
+          import sys
+
+          failure = 'Relay usage database is not report-ready; deploy Relay and apply 0008_photo_request_timestamp.sql before Broker.'
+          try:
+              payload = json.loads(sys.argv[1])
+          except (ValueError, TypeError):
+              raise SystemExit(failure)
+          if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict) or payload[0].get('success') is not True:
+              raise SystemExit(failure)
+          rows = payload[0].get('results')
+          if not isinstance(rows, list) or any(
+              not isinstance(row, dict)
+              or row.get('kind') not in {'migration', 'column'}
+              or not isinstance(row.get('name'), str)
+              or not isinstance(row.get('table_name'), str)
+              or not isinstance(row.get('column_type'), str)
+              or type(row.get('is_required')) is not int
+              for row in rows
+          ):
+              raise SystemExit(failure)
+          applied = {row.get('name') for row in rows if row.get('kind') == 'migration'}
+          if not {'0001_usage_daily.sql', '0006_photo_admission.sql', '0008_photo_request_timestamp.sql'} <= applied:
+              raise SystemExit(failure)
+          required = {
+              'usage_daily': {'utc_date', 'responses_calls', 'decisions_calls', 'missing_usage_count', 'cost_usd'},
+              'photo_admissions': {'requested_at', 'period_start', 'settled', 'missing_usage', 'cost_usd'},
+          }
+          for table, expected in required.items():
+              columns = {row.get('name') for row in rows if row.get('kind') == 'column' and row.get('table_name') == table}
+              if not expected <= columns:
+                  raise SystemExit(failure)
+          timestamp = [row for row in rows if row.get('kind') == 'column' and row.get('table_name') == 'photo_admissions' and row.get('name') == 'requested_at']
+          if len(timestamp) != 1 or timestamp[0].get('column_type', '').upper() != 'INTEGER' or timestamp[0].get('is_required') != 0:
+              raise SystemExit(failure + ' photo_admissions.requested_at must be nullable INTEGER.')
+          PY
 
       - name: Require initialized supported Broker database
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           journal_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \
@@ -145,7 +195,7 @@ jobs:
       - name: Stage and apply explicitly selected ordinary migrations
         if: inputs.apply_migrations
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           stage='.deploy-direct/migrations'
           mkdir -p "$stage"
@@ -156,26 +206,24 @@ jobs:
             cp "$migration" "$stage/"
           done
           python3 - <<'PY'
+          import json
           import re
           from pathlib import Path
 
-          config = Path('wrangler.production.jsonc').read_text(encoding='utf-8')
-          config, count = re.subn(
-              r'("database_id"\s*:\s*"[^"]+")',
-              r'\1, "migrations_dir": "migrations"',
-              config,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit('Production database_id was not found.')
-          Path('.deploy-direct/wrangler.migrations.jsonc').write_text(config, encoding='utf-8')
+          config = json.loads(re.sub(r'^\s*//.*$', '', Path('wrangler.production.jsonc').read_text(encoding='utf-8'), flags=re.M))
+          broker = [database for database in config['d1_databases'] if database.get('binding') == 'BROKER_DB']
+          if len(broker) != 1:
+              raise SystemExit('Exactly one Broker migration binding is required.')
+          broker[0]['migrations_dir'] = 'migrations'
+          config['d1_databases'] = broker
+          Path('.deploy-direct/wrangler.migrations.jsonc').write_text(json.dumps(config), encoding='utf-8')
           PY
           pnpm exec wrangler d1 migrations apply puripuly-heart-broker \
             --remote --config .deploy-direct/wrangler.migrations.jsonc
 
       - name: Require deploy-ready ordinary schema
         shell: bash
-        working-directory: broker
+        working-directory: services/broker
         run: |
           schema_json="$(pnpm exec wrangler d1 execute \
             puripuly-heart-broker --remote --config wrangler.production.jsonc \
@@ -204,7 +252,7 @@ jobs:
 
 
       - name: Deploy canonical broker worker
-        working-directory: broker
+        working-directory: services/broker
         run: pnpm exec wrangler deploy --keep-vars --config wrangler.production.jsonc
 
       - name: Verify deployed health and public foundation
@@ -247,7 +295,7 @@ jobs:
               assert trial['provider'] == 'OpenRouter'
               expected_models = ast.literal_eval(re.search(
                   r'export const MANAGED_TRIAL_ALLOWED_MODELS = (\[.*?\]) as const;',
-                  Path('broker/src/trial-policy.ts').read_text(encoding='utf-8'),
+                  Path('services/broker/src/trial-policy.ts').read_text(encoding='utf-8'),
                   re.S,
               ).group(1))
               assert isinstance(trial['models'], list) and set(trial['models']) == set(expected_models)

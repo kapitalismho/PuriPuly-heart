@@ -1187,3 +1187,20 @@ async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gat
     finally:
         fail_cleanup = False
         await provider.close_backend_and_wait()
+
+
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("provider", list(STTProviderName))
+def test_every_recognition_provider_waits_at_most_twelve_seconds_for_final(
+    provider: STTProviderName, channel: str
+) -> None:
+    config = SimpleNamespace(
+        provider=provider.value,
+        channel=channel,
+        drain_timeout_s=1.5,
+        provider_options={},
+    )
+
+    watchdogs = runtime_wiring._recognition_watchdogs(config)
+
+    assert watchdogs.final_timeout_s <= 12.0

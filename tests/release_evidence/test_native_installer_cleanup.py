@@ -4,12 +4,14 @@ import ctypes
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from puripuly_heart.config import prompts as prompts_module
 from puripuly_heart.release_evidence.native_installer_cleanup import (
     LEGACY_SCHEMA,
     NATIVE_SCHEMA,
@@ -70,7 +72,7 @@ def test_known_packaged_user_data_is_preserved_even_if_absent_from_native_invent
     legacy = _manifest(
         LEGACY_SCHEMA, *(_row(path) for path in protected), _row("runtime/obsolete.dll")
     )
-    native = _manifest(NATIVE_SCHEMA, _row("app/prompts/translation_prompt.md"))
+    native = _manifest(NATIVE_SCHEMA, _row("app/puripuly_heart/data/prompts/translation_prompt.md"))
 
     assert [row.path for row in obsolete_owned_files(legacy, native)] == ["runtime/obsolete.dll"]
     plan = cleanup_plan(json.dumps(legacy).encode(), json.dumps(native).encode())
@@ -614,8 +616,10 @@ def test_cleanup_removes_only_exact_owned_files_and_is_idempotent(tmp_path: Path
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"official legacy file")
-    (root / "app/prompts").mkdir(parents=True)
-    (root / "app/prompts/translation_prompt.md").write_bytes(b"new prompt asset")
+    (root / "app/puripuly_heart/data/prompts").mkdir(parents=True)
+    (root / "app/puripuly_heart/data/prompts/translation_prompt.md").write_bytes(
+        b"new prompt asset"
+    )
     plan = _plan(_row("old/deep/exact.dll"), _row("absent.dll"), *(_row(path) for path in obsolete))
 
     process, detail = _invoke(tmp_path, root, plan)
@@ -626,7 +630,9 @@ def test_cleanup_removes_only_exact_owned_files_and_is_idempotent(tmp_path: Path
     assert all(not (root / path).exists() for path in obsolete)
     assert not (root / "scipy").exists()
     assert not (root / "numpy.libs").exists()
-    assert (root / "app/prompts/translation_prompt.md").read_bytes() == b"new prompt asset"
+    assert (
+        root / "app/puripuly_heart/data/prompts/translation_prompt.md"
+    ).read_bytes() == b"new prompt asset"
     process, detail = _invoke(tmp_path, root, plan)
     assert process.returncode == 0, detail
 
@@ -952,3 +958,85 @@ def test_native_upgrade_never_follows_inventory_reparse_targets(tmp_path, invent
     assert target.read_bytes() == original
     assert (root / "PuriPulyHeartGpuWorker.exe").read_bytes() == prior["PuriPulyHeartGpuWorker.exe"]
     assert (root / "ggml-cpu-retired.dll").exists()
+
+
+@WINDOWS
+def test_prompt_relocation_cleanup_preserves_customizations_and_usable_package_resources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "installed"
+    packaged = root / "app/puripuly_heart/data/prompts"
+    shutil.copytree(ROOT / "src/puripuly_heart/data/prompts", packaged)
+    current = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in packaged.rglob("*")
+        if path.is_file()
+    }
+    matching = root / "app/prompts/translation_prompt.md"
+    matching.parent.mkdir(parents=True)
+    matching.write_bytes((packaged / "translation_prompt.md").read_bytes())
+    modified = root / "app/prompts/prompt-rules/target-language/english.md"
+    modified.parent.mkdir(parents=True)
+    customized = b"x" * len((packaged / "prompt-rules/target-language/english.md").read_bytes())
+    modified.write_bytes(customized)
+    unknown = root / "app/prompts/unrecognized.md"
+    unknown.write_bytes(b"unrecognized custom prompt")
+    user_prompt = root / "prompts/translation_prompt.md"
+    user_prompt.parent.mkdir()
+    user_prompt.write_bytes(b"saved user customization")
+    legacy = _manifest(LEGACY_SCHEMA, _row("prompts/translation_prompt.md"))
+    native = _manifest(
+        NATIVE_SCHEMA, *(_row(path, content) for path, content in sorted(current.items()))
+    )
+    plan = cleanup_plan(json.dumps(legacy).encode(), json.dumps(native).encode())
+
+    assert {row["path"]: (row["bytes"], row["sha256"]) for row in plan["inventory"]} == {
+        path.replace("app/puripuly_heart/data/prompts/", "app/prompts/", 1): (
+            len(content),
+            hashlib.sha256(content).hexdigest(),
+        )
+        for path, content in current.items()
+    }
+    assert plan["preserved_paths"] == ["prompts/translation_prompt.md"]
+    process, detail = _invoke(tmp_path, root, plan)
+
+    assert process.returncode == 0, detail
+    assert not matching.exists()
+    assert modified.read_bytes() == customized
+    assert unknown.read_bytes() == b"unrecognized custom prompt"
+    assert user_prompt.read_bytes() == b"saved user customization"
+    assert all((root / path).read_bytes() == content for path, content in current.items())
+    monkeypatch.delenv("PURIPULY_HEART_PROMPTS_DIR", raising=False)
+    monkeypatch.setenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", str(root / "app"))
+    prompts_module._reset_prompt_cache_for_tests()
+    assert prompts_module.get_prompts_dir() == packaged
+    rendered = prompts_module.render_translation_prompt_template(
+        prompts_module.get_translation_prompt_template(),
+        source_name="Korean",
+        target_name="English",
+    )
+    assert "Use contractions" in rendered
+    assert "아까 그분 목소리" in rendered
+    assert "${" not in rendered
+
+
+def test_prompt_relocation_cleanup_keeps_each_known_owned_identity() -> None:
+    path = "app/prompts/translation_prompt.md"
+    legacy_row = _row(path, b"known older bundled prompt")
+    current_row = _row(
+        "app/puripuly_heart/data/prompts/translation_prompt.md", b"byte-identical moved prompt"
+    )
+    legacy = _manifest(LEGACY_SCHEMA, legacy_row)
+    native = _manifest(NATIVE_SCHEMA, current_row)
+
+    plan = cleanup_plan(json.dumps(legacy).encode(), json.dumps(native).encode())
+
+    assert plan["inventory"] == [
+        {
+            **legacy_row,
+            "alternative_identities": [
+                {"bytes": current_row["bytes"], "sha256": current_row["sha256"]}
+            ],
+        }
+    ]

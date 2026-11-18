@@ -1219,6 +1219,61 @@ async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires
 
 
 @pytest.mark.asyncio
+async def test_waiting_self_speech_expires_only_after_it_ends() -> None:
+    sink = BlockingRecognitionSink()
+    adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: sink)
+    owner, _, _, _, _, _ = build_owner(sink=adapter)
+    await owner.apply_intent(config(), enabled=True)
+    guarded = owner.guard_vad_sink()
+    guarded.wholly_unsent_ttl_s = 0.05
+
+    def speech_start(segment_id: object, order: int) -> SpeechStart:
+        now = asyncio.get_running_loop().time()
+        span = AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=order,
+            source_sample_rate_hz=16_000,
+            source_start_sample=order * 8,
+            source_end_sample=order * 8 + 8,
+            source_start_monotonic_s=now,
+            source_end_monotonic_s=now + 8 / 16_000,
+            normalized_sample_rate_hz=16_000,
+            normalized_start_sample=order * 8,
+            normalized_end_sample=order * 8 + 8,
+        )
+        return SpeechStart(
+            segment_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+            chunk_capture=(span,),
+        )
+
+    blocking_id = uuid4()
+    await guarded.handle_vad_event(speech_start(blocking_id, 1))
+    await guarded.handle_vad_event(SpeechEnd(blocking_id))
+    await sink.started.wait()
+
+    waiting_id = uuid4()
+    await guarded.handle_vad_event(speech_start(waiting_id, 2))
+    await asyncio.sleep(0.12)
+    assert sink.rejections == []
+    assert waiting_id in guarded._unsent_segments
+
+    await guarded.handle_vad_event(SpeechEnd(waiting_id))
+    await asyncio.sleep(0.02)
+    assert sink.rejections == []
+    await asyncio.sleep(0.07)
+    assert [
+        (rejection[0].segment.identity.segment_id, rejection[1], rejection[2])
+        for rejection in sink.rejections
+    ] == [(waiting_id, "recognition_admission_timeout", "expired")]
+
+    sink.release.set()
+    await guarded.abort()
+    await owner.apply_intent(config(), enabled=False)
+
+
+@pytest.mark.asyncio
 async def test_production_adapter_routes_buffer_failure_to_immediate_scoped_terminal() -> None:
     sink = BlockingRecognitionSink()
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: sink)
