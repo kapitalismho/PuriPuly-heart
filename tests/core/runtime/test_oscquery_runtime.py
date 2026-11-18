@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -10,8 +11,14 @@ import pytest
 from puripuly_heart.app.ports.oscquery import (
     OscQueryAdvertisement,
     OscQueryServiceInfo,
+    OscQueryServicesChanged,
 )
-from puripuly_heart.core.osc.oscquery import OSCJSON_SERVICE_TYPE, ZeroconfOscQueryService
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.osc.oscquery import (
+    OSC_SERVICE_TYPE,
+    OSCJSON_SERVICE_TYPE,
+    ZeroconfOscQueryService,
+)
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
 from puripuly_heart.core.runtime.oscquery import OscQueryRuntime
 
@@ -21,6 +28,8 @@ class FakeService:
         self.started = 0
         self.stopped = 0
         self.advertisements: list[OscQueryAdvertisement] = []
+        self.discoveries = 0
+        self.services_changed: OscQueryServicesChanged | None = None
         self.info: OscQueryServiceInfo | None = OscQueryServiceInfo(
             service_id="vrchat",
             host="127.0.0.1",
@@ -28,13 +37,17 @@ class FakeService:
             is_vrchat=True,
         )
 
-    async def start(self, _callback=None) -> None:
+    async def start(self, services_changed: OscQueryServicesChanged | None = None) -> None:
         self.started += 1
+        self.services_changed = services_changed
 
     async def stop(self) -> None:
         self.stopped += 1
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
+        self.discoveries += 1
         return self.info
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
@@ -57,7 +70,9 @@ class StartupRaceService(FakeService):
         self.started += 1
         self._services_changed = services_changed
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo:
         self._discoveries += 1
         result = self.info
         if self._discoveries == 1:
@@ -68,7 +83,7 @@ class StartupRaceService(FakeService):
                 is_vrchat=True,
             )
             if self._services_changed is not None:
-                await self._services_changed(())
+                self._services_changed(())
         assert result is not None
         return result
 
@@ -138,11 +153,13 @@ async def test_failed_automatic_start_can_restart_cleanly_with_current_discovery
     class FailOnceDiscovery(FakeService):
         fail = True
 
-        async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+        async def discover_vrchat(
+            self, *, preferred_service_id: str | None = None
+        ) -> OscQueryServiceInfo | None:
             if self.fail:
                 self.fail = False
                 raise OSError("controlled discovery failure")
-            return await super().discover_vrchat()
+            return await super().discover_vrchat(preferred_service_id=preferred_service_id)
 
     service = FailOnceDiscovery()
     destinations = []
@@ -203,7 +220,7 @@ async def test_oscquery_start_applies_discovery_events_during_initialization() -
 
 
 @pytest.mark.asyncio
-async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_callback() -> None:
+async def test_healthy_probe_detects_silent_disappearance_then_waits_for_rediscovery() -> None:
     service = FakeService()
     events: list[tuple[str, object]] = []
     runtime = OscQueryRuntime(
@@ -213,7 +230,7 @@ async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_ca
         receiver_effective_port=lambda: 49152,
         sender_destination_changed=lambda host, port: events.append((host, port)),
         snapshot_publisher=lambda reason, _generation: events.append(("snapshot", reason)),
-        discovery_poll_interval_seconds=0.01,
+        healthy_probe_interval_seconds=0.1,
     )
     await runtime.start("automatic", manual_send_port=9123)
     await asyncio.sleep(0.03)
@@ -225,6 +242,9 @@ async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_ca
 
     assert runtime.effective_send_port == 9000
     assert runtime.avatar_tree is None
+    discoveries = service.discoveries
+    await asyncio.sleep(0.2)
+    assert service.discoveries == discoveries
 
     service.info = OscQueryServiceInfo(
         service_id="vrchat-restarted",
@@ -232,12 +252,13 @@ async def test_oscquery_monitor_detects_disappearance_and_rediscovery_without_ca
         osc_send_port=9999,
         is_vrchat=True,
     )
+    assert service.services_changed is not None
+    service.services_changed((service.info,))
     await _wait_until(lambda: runtime.effective_send_port == 9999)
 
     assert ("127.0.0.1", 9999) in events
     assert events.count(("snapshot", "discovery")) == 1
     await runtime.stop()
-    assert runtime._monitor_task is None
 
 
 async def _noop() -> None:
@@ -254,19 +275,26 @@ async def _wait_until(predicate, timeout: float = 1.0) -> None:
     raise AssertionError("condition did not become true")
 
 
-@pytest.mark.asyncio
-async def test_real_host_info_transient_recovers_through_existing_monitor_without_new_mdns() -> (
-    None
-):
-    class LocalDiscovery(ZeroconfOscQueryService):
-        async def start(self, _services_changed=None) -> None:
-            self.started = True
+class LocalDiscovery(ZeroconfOscQueryService):
+    async def start(self, services_changed=None) -> None:
+        self.started = True
+        self._loop = asyncio.get_running_loop()
+        self._services_changed = services_changed
 
-        async def advertise_receiver(self, advertisement) -> None:
-            self.advertisement = advertisement
+    async def advertise_receiver(self, advertisement) -> None:
+        self.advertisement = advertisement
+
+
+@pytest.mark.asyncio
+async def test_real_host_info_transient_recovers_through_existing_monitor_without_new_mdns(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="puripuly_heart.core.runtime.oscquery")
 
     failures = 0
-    requests = 0
+    portless_replies = 0
+    recoveries_before_request: list[int] = []
+    requests: list[float] = []
     destinations: asyncio.Queue[tuple[str, int]] = asyncio.Queue()
     target = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     target.bind(("127.0.0.1", 0))
@@ -277,16 +305,22 @@ async def test_real_host_info_transient_recovers_through_existing_monitor_withou
     sender = VrchatOscUdpSender()
 
     async def serve(reader, writer):
-        nonlocal failures, requests
+        nonlocal failures, portless_replies
         try:
             request = await reader.readuntil(b"\r\n\r\n")
             failed = False
             if b"?HOST_INFO" in request:
-                requests += 1
+                requests.append(asyncio.get_running_loop().time())
+                recoveries_before_request.append(
+                    caplog.messages.count("[OSCQuery] Discovery recovered")
+                )
                 if failures:
                     failures -= 1
                     failed = True
                 payload = {"OSC_IP": "127.0.0.1", "OSC_PORT": target_port}
+                if not failed and portless_replies:
+                    portless_replies -= 1
+                    payload = {}
             else:
                 payload = {}
             body = json.dumps(payload).encode()
@@ -326,24 +360,40 @@ async def test_real_host_info_transient_recovers_through_existing_monitor_withou
         receiver_stop=_noop,
         receiver_effective_port=lambda: receiver_port,
         sender_destination_changed=apply_destination,
-        discovery_poll_interval_seconds=0.1,
+        healthy_probe_interval_seconds=0.15,
+        discovery_retry_delays_seconds=(0.04, 0.08, 0.12),
     )
     try:
         await runtime.start("automatic")
         assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", target_port)
         assert sender.port == target_port
-        failures = 1
+        failures = 4
+        portless_replies = 1
+        first_failure = len(requests)
+        assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", 9000)
         assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", 9000)
         assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", target_port)
-        assert requests >= 3
+        attempt_times = requests[first_failure:]
+        assert len(attempt_times) == 6
+        assert recoveries_before_request[first_failure:] == [0] * 6
+        for earlier, later, delay in zip(
+            attempt_times, attempt_times[1:], (0.04, 0.08, 0.12, 0.12, 0.12)
+        ):
+            assert later - earlier >= delay
+        assert caplog.messages.count("[Failure] structured_failure") == 1
+        assert caplog.messages.count("[OSCQuery] Discovery recovered") == 1
         assert runtime.service_info is not None
         assert runtime.effective_receive_port == receiver_port
         assert receiver.fileno() >= 0
+        failures = 1
+        assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", 9000)
+        assert caplog.messages.count("[Failure] structured_failure") == 2
+        assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", target_port)
         service._queue_service_update(OSCJSON_SERVICE_TYPE, service_name, None)
         assert await asyncio.wait_for(destinations.get(), timeout=5) == ("127.0.0.1", 9000)
-        removed_requests = requests
+        removed_requests = len(requests)
         await asyncio.sleep(0.25)
-        assert requests == removed_requests
+        assert len(requests) == removed_requests
         assert runtime.service_info is None
         assert sender.port == 9000
     finally:
@@ -353,6 +403,200 @@ async def test_real_host_info_transient_recovers_through_existing_monitor_withou
         receiver.close()
         target.close()
         sender.close()
+
+
+@pytest.mark.asyncio
+async def test_mixed_outage_survives_mdns_replacement_and_recovers_once(caplog) -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    replaced = asyncio.Event()
+    alternate_port = None
+
+    class Discovery(LocalDiscovery):
+        async def _resolve_host_info(self, service):
+            if service.service_id == "VRChat-B":
+                return replace(service, osc_send_port=alternate_port)
+            if service.query_port == 19011:
+                entered.set()
+                await release.wait()
+            elif service.query_port == 19012:
+                replaced.set()
+            raise OSError("synthetic HOST_INFO failure")
+
+    logger_name = "puripuly_heart.core.runtime.oscquery"
+    caplog.set_level("INFO", logger=logger_name)
+    service = Discovery()
+    runtime = OscQueryRuntime(
+        service,
+        _noop,
+        _noop,
+        lambda: 49152,
+        discovery_retry_delays_seconds=(3600,),
+    )
+
+    def update(name, port):
+        record = (
+            SimpleNamespace(parsed_addresses=lambda: ["127.0.0.1"], port=port, properties={})
+            if port is not None
+            else None
+        )
+        service._queue_service_update(
+            OSCJSON_SERVICE_TYPE, f"{name}.{OSCJSON_SERVICE_TYPE}", record
+        )
+
+    def discovery_logs():
+        return [
+            (record.levelname, getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, (None,) * 3)[2])
+            for record in caplog.records
+            if record.name == logger_name
+        ]
+
+    try:
+        update("VRChat-A", 19010)
+        update("VRChat-B", 19020)
+        await runtime.start("automatic")
+        assert runtime.effective_send_port == 9000
+        assert service.discovery_observation == "unavailable"
+        assert discovery_logs() == [("WARNING", "degraded")]
+
+        update("VRChat-B", None)
+        update("VRChat-A", 19011)
+        await asyncio.wait_for(entered.wait(), 2)
+        update("VRChat-A", 19012)
+        release.set()
+        await asyncio.wait_for(replaced.wait(), 2)
+        assert service.discovery_observation == "unavailable"
+        assert discovery_logs() == [("WARNING", "degraded")]
+
+        alternate_port = 19021
+        update("VRChat-B", 19020)
+        assert await runtime.refresh(
+            publish_snapshot=False, force_requery=True, report_discovery_failure=True
+        )
+        assert runtime.effective_send_port == alternate_port
+        assert discovery_logs() == [("WARNING", "degraded"), ("INFO", "recovered")]
+    finally:
+        release.set()
+        await runtime.stop()
+
+
+@pytest.mark.asyncio
+async def test_mdns_burst_probes_once_and_removal_cancels_failed_discovery_retry(caplog) -> None:
+    requests = []
+    preferred_portless = False
+
+    class Discovery(LocalDiscovery):
+        async def _resolve_host_info(self, service):
+            requests.append(service.service_id)
+            if service.service_id == "VRChat":
+                if preferred_portless:
+                    return replace(service, osc_send_port=19002)
+                raise OSError("synthetic HOST_INFO failure")
+            if preferred_portless:
+                return replace(service, osc_send_port=None)
+            return service
+
+    caplog.set_level("INFO", logger="puripuly_heart.core.runtime.oscquery")
+    service = Discovery()
+    runtime = OscQueryRuntime(
+        service,
+        _noop,
+        _noop,
+        lambda: 49152,
+        healthy_probe_interval_seconds=0.1,
+        discovery_retry_delays_seconds=(0.6,),
+    )
+
+    def update(name, service_type, port):
+        info = (
+            SimpleNamespace(parsed_addresses=lambda: ["127.0.0.1"], port=port, properties={})
+            if port is not None
+            else None
+        )
+        service._queue_service_update(service_type, f"{name}.{service_type}", info)
+
+    try:
+        await runtime.start("automatic")
+        assert service.discovery_observation == "absent"
+        update("VRChat", OSCJSON_SERVICE_TYPE, 19010)
+        update("VRChat", OSC_SERVICE_TYPE, 19000)
+        await _wait_until(lambda: service.discovery_observation == "unavailable")
+        update("VRChat", OSCJSON_SERVICE_TYPE, 19010)
+        update("VRChat", OSC_SERVICE_TYPE, 19000)
+        await asyncio.sleep(0.15)
+        assert requests == ["VRChat"]
+        assert runtime.effective_send_port == 9000
+
+        assert not await runtime.refresh(publish_snapshot=False, report_discovery_failure=True)
+        assert requests == ["VRChat", "VRChat"]
+        assert caplog.messages.count("[Failure] structured_failure") == 2
+
+        update("VRChat", OSCJSON_SERVICE_TYPE, None)
+        update("VRChat", OSC_SERVICE_TYPE, None)
+        await _wait_until(lambda: service.discovery_observation == "absent")
+        await asyncio.sleep(0.7)
+        assert requests == ["VRChat", "VRChat"]
+        assert service.discovery_failure is None
+        assert "[OSCQuery] Discovery recovered" not in caplog.messages
+
+        update("VRChat", OSCJSON_SERVICE_TYPE, 19010)
+        update("VRChat-good", OSC_SERVICE_TYPE, 19001)
+        await _wait_until(lambda: runtime.effective_send_port == 19001)
+        assert requests[2:4] == ["VRChat", "VRChat-good"]
+        await _wait_until(lambda: len(requests) >= 5)
+        assert requests[4] == "VRChat-good"
+        attempts = len(requests)
+        preferred_portless = True
+        await _wait_until(lambda: runtime.effective_send_port == 19002)
+        assert requests[attempts : attempts + 2] == ["VRChat-good", "VRChat"]
+        assert caplog.messages.count("[Failure] structured_failure") == 2
+    finally:
+        await runtime.stop()
+
+
+@pytest.mark.asyncio
+async def test_startup_mdns_burst_and_later_destination_metadata_change() -> None:
+    requests: list[int | None] = []
+    destinations: list[tuple[str, int]] = []
+    destination_host = "127.0.0.1"
+
+    class Discovery(LocalDiscovery):
+        async def advertise_receiver(self, advertisement) -> None:
+            await super().advertise_receiver(advertisement)
+            update(OSCJSON_SERVICE_TYPE, 19010)
+            asyncio.get_running_loop().call_soon(update, OSC_SERVICE_TYPE, 19000)
+
+        async def _resolve_host_info(self, service):
+            requests.append(service.osc_send_port)
+            return replace(service, host=destination_host)
+
+    service = Discovery()
+
+    def update(service_type, port):
+        record = SimpleNamespace(
+            parsed_addresses=lambda: ["127.0.0.1"],
+            port=port,
+            properties={b"OSC_IP": destination_host.encode("ascii")},
+        )
+        service._queue_service_update(service_type, f"VRChat.{service_type}", record)
+
+    runtime = OscQueryRuntime(
+        service,
+        _noop,
+        _noop,
+        lambda: 49152,
+        sender_destination_changed=lambda host, port: destinations.append((host, port)),
+    )
+    try:
+        await runtime.start("automatic")
+        assert requests == [19000]
+        assert destinations[-1] == ("127.0.0.1", 19000)
+        destination_host = "127.0.0.2"
+        update(OSCJSON_SERVICE_TYPE, 19010)
+        await _wait_until(lambda: destinations[-1] == ("127.0.0.2", 19000))
+        assert requests == [19000, 19000]
+    finally:
+        await runtime.stop()
 
 
 @pytest.mark.asyncio

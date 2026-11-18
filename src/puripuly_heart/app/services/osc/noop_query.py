@@ -23,7 +23,9 @@ class NoopOscQueryService(OscQueryServicePort):
         self.started = False
         self.advertisement = None
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
         return None
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:

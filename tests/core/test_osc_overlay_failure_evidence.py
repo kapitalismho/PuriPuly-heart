@@ -96,14 +96,25 @@ async def test_unavailable_avatar_does_not_assert_missing_parameters():
 
 
 @pytest.mark.asyncio
-async def test_monitor_and_cleanup_retain_safe_failures_without_changing_polling(monkeypatch):
+async def test_monitor_retries_and_cleanup_retains_safe_failures():
     attempts = 0
 
     class Service:
-        async def discover_vrchat(self):
+        async def start(self, _services_changed=None):
+            pass
+
+        async def advertise_receiver(self, _advertisement):
+            pass
+
+        async def query_avatar(self, _service):
+            return {}
+
+        async def discover_vrchat(self, *, preferred_service_id=None):
             nonlocal attempts
             attempts += 1
             if attempts == 1:
+                return OscQueryServiceInfo("VRChat", "127.0.0.1", osc_send_port=19000)
+            if attempts == 2:
                 raise OSError(10061, "private endpoint")
             completed.set()
             return None
@@ -116,13 +127,14 @@ async def test_monitor_and_cleanup_retain_safe_failures_without_changing_polling
 
     completed = asyncio.Event()
     runtime = OscQueryRuntime(
-        Service(), _noop, _noop, lambda: 1, discovery_poll_interval_seconds=0.1
+        Service(),
+        _noop,
+        _noop,
+        lambda: 1,
+        healthy_probe_interval_seconds=0.1,
+        discovery_retry_delays_seconds=(0.1,),
     )
-    runtime.mode = "automatic"
-    runtime._started = True
-    runtime._service_started = True
-    runtime.advertised_port = 1
-    runtime._start_discovery_monitor()
+    await runtime.start("automatic")
     await asyncio.wait_for(completed.wait(), 2)
     assert attempts >= 2
     await runtime.stop()
