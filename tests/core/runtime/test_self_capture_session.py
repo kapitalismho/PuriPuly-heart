@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
     AudioSegmentTerminalReceipt,
     CaptureStreamInput,
+    OwnedVadEvent,
 )
 from puripuly_heart.core.audio.source import AudioSourceOpenFailure
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
@@ -1219,16 +1220,16 @@ async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires
 
 
 @pytest.mark.asyncio
-async def test_waiting_self_speech_expires_only_after_it_ends() -> None:
+async def test_waiting_self_speech_expires_only_after_it_ends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     sink = BlockingRecognitionSink()
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: sink)
-    owner, _, _, _, _, _ = build_owner(sink=adapter)
-    await owner.apply_intent(config(), enabled=True)
-    guarded = owner.guard_vad_sink()
-    guarded.wholly_unsent_ttl_s = 0.05
+    owner, _, _, _, capture_loop, _ = build_owner(sink=adapter)
+    loop = asyncio.get_running_loop()
 
     def speech_start(segment_id: object, order: int) -> SpeechStart:
-        now = asyncio.get_running_loop().time()
+        now = loop.time()
         span = AudioCaptureSpan(
             capture_epoch=1,
             callback_sequence=order,
@@ -1248,29 +1249,54 @@ async def test_waiting_self_speech_expires_only_after_it_ends() -> None:
             chunk_capture=(span,),
         )
 
-    blocking_id = uuid4()
-    await guarded.handle_vad_event(speech_start(blocking_id, 1))
-    await guarded.handle_vad_event(SpeechEnd(blocking_id))
-    await sink.started.wait()
+    try:
+        await owner.apply_intent(config(), enabled=True)
+        await asyncio.wait_for(capture_loop.started.wait(), timeout=1.0)
+        guarded = capture_loop.calls[0]["sink"]
+        ttl = guarded.wholly_unsent_ttl_s
 
-    waiting_id = uuid4()
-    await guarded.handle_vad_event(speech_start(waiting_id, 2))
-    await asyncio.sleep(0.12)
-    assert sink.rejections == []
-    assert waiting_id in guarded._unsent_segments
+        blocking_id = uuid4()
+        await guarded.handle_vad_event(speech_start(blocking_id, 1))
+        await guarded.handle_vad_event(SpeechEnd(blocking_id))
+        await asyncio.wait_for(sink.started.wait(), timeout=1.0)
 
-    await guarded.handle_vad_event(SpeechEnd(waiting_id))
-    await asyncio.sleep(0.02)
-    assert sink.rejections == []
-    await asyncio.sleep(0.07)
-    assert [
-        (rejection[0].segment.identity.segment_id, rejection[1], rejection[2])
-        for rejection in sink.rejections
-    ] == [(waiting_id, "recognition_admission_timeout", "expired")]
+        now = loop.time()
+        observe_vad_event = guarded.ledger.observe_vad_event
 
-    sink.release.set()
-    await guarded.abort()
-    await owner.apply_intent(config(), enabled=False)
+        def observe_with_seal_delay(event: object, *, now_monotonic_s: float) -> OwnedVadEvent:
+            nonlocal now
+            observed = observe_vad_event(event, now_monotonic_s=now_monotonic_s)
+            if isinstance(event, SpeechEnd):
+                now += ttl / 2
+            return observed
+
+        async def advance_through_due_timers(when: float) -> None:
+            nonlocal now
+            now = when
+            checkpoint = loop.create_future()
+            loop.call_at(when, checkpoint.set_result, None)
+            await checkpoint
+
+        with monkeypatch.context() as clock_patch:
+            clock_patch.setattr(loop, "time", lambda: now)
+            clock_patch.setattr(guarded.ledger, "observe_vad_event", observe_with_seal_delay)
+            waiting_id = uuid4()
+            await guarded.handle_vad_event(speech_start(waiting_id, 2))
+            sealed_at = now + ttl + 1
+            await advance_through_due_timers(sealed_at)
+            assert sink.rejections == [], "queued Self speech expired before SpeechEnd"
+
+            await guarded.handle_vad_event(SpeechEnd(waiting_id))
+            await advance_through_due_timers(sealed_at + ttl - 1)
+            assert sink.rejections == [], "queued Self speech expired before its sealed deadline"
+            await advance_through_due_timers(sealed_at + ttl + 1)
+            assert [
+                (owned.segment.identity.segment_id, reason, outcome)
+                for owned, reason, outcome in sink.rejections
+            ] == [(waiting_id, "recognition_admission_timeout", "expired")]
+    finally:
+        sink.release.set()
+        await owner.close()
 
 
 @pytest.mark.asyncio
