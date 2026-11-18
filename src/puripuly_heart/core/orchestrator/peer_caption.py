@@ -287,7 +287,12 @@ class PeerCaptionOwner:
                     raise result
 
     def _new_caption(
-        self, transcript: Transcript, provider_id: str, scope: tuple[object, ...]
+        self,
+        transcript: Transcript,
+        provider_id: str,
+        scope: tuple[object, ...],
+        *,
+        track_scribe_lineage: bool,
     ) -> _Caption:
         if transcript.publication_generation is None or transcript.source_order is None:
             raise ValueError("Cloud Peer requires admitted publication identity")
@@ -299,7 +304,7 @@ class PeerCaptionOwner:
             scope,
             predecessor=self._tail,
         )
-        if provider_id == _SCRIBE_SOURCE:
+        if track_scribe_lineage:
             caption.lineage = self.output.output_runtime.open_peer_caption_lineage()
         self._tail = caption.admitted
         return caption
@@ -374,8 +379,14 @@ class PeerCaptionOwner:
             started = (
                 transcript.created_at if transcript.created_at is not None else self.clock.now()
             )
-            caption = self._new_caption(transcript, provider_id, scope)
-            if not self.speaker_diarization(provider_id):
+            diarization = self.speaker_diarization(provider_id)
+            caption = self._new_caption(
+                transcript,
+                provider_id,
+                scope,
+                track_scribe_lineage=provider_id == _SCRIBE_SOURCE and diarization,
+            )
+            if not diarization:
                 caption.speaker_assignment = SpeakerAssignment(
                     SpeakerAttribution("non_diarized"),
                     scope_order=(caption.generation, caption.source_order, 0),
@@ -639,7 +650,9 @@ class PeerCaptionOwner:
         caption = (
             segment.caption
             if segment is not None
-            else self._new_caption(transcript, provider_id, scope)
+            else self._new_caption(
+                transcript, provider_id, scope, track_scribe_lineage=scribe_commit is not None
+            )
         )
         if scribe_commit is not None:
             if scribe_family is None:

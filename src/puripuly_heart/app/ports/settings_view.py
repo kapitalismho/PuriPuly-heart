@@ -369,6 +369,11 @@ class SonioxSpeakerDiarizationEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class ScribeSpeakerDiarizationEdit:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -448,6 +453,7 @@ ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
     | CloudFreeTierProvidersEdit
     | SonioxSpeakerDiarizationEdit
+    | ScribeSpeakerDiarizationEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -493,6 +499,7 @@ __all__ = [
     "AudioSettingsIntent",
     "ChatboxSourceSettingsIntent",
     "CloudFreeTierProvidersEdit",
+    "ScribeSpeakerDiarizationEdit",
     "SonioxSpeakerDiarizationEdit",
     "ClipboardSettingsIntent",
     "CustomSttEndpointEdit",

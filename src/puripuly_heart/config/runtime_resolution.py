@@ -746,6 +746,7 @@ class STTRuntimeIntent:
     gemini_transcribe_auto_language: bool = False
     elevenlabs_scribe_language_code: str | None = None
     elevenlabs_scribe_auto_language: bool = False
+    elevenlabs_scribe_enable_speaker_diarization: bool = False
     qwen_region: str = QWEN_REGION_BEIJING
     qwen_connection: AlibabaConnection | None = None
     soniox_model: str = SONIOX_STT_MODEL_RT_V6
@@ -1338,7 +1339,10 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
             }
         provider_options = {
             **provider_options,
-            "enable_speaker_diarization": intent.channel == RUNTIME_CHANNEL_PEER,
+            "enable_speaker_diarization": (
+                intent.channel == RUNTIME_CHANNEL_PEER
+                and intent.elevenlabs_scribe_enable_speaker_diarization
+            ),
         }
     elif provider == STT_PROVIDER_QWEN_AUDIO:
         model = QWEN_AUDIO_STT_MODEL

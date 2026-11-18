@@ -57,6 +57,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenBeijingApiHostEdit,
     QwenRegionEdit,
     QwenSingaporeApiHostEdit,
+    ScribeSpeakerDiarizationEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SonioxSpeakerDiarizationEdit,
@@ -712,6 +713,17 @@ def materialize_provider_apply_intent(
                         provider.value
                         for provider in normalize_cloud_free_tier_providers(edit.providers)
                     ],
+                ),
+            )
+        elif isinstance(edit, ScribeSpeakerDiarizationEdit):
+            updated = _with_intent(
+                updated,
+                stt=replace(
+                    updated.intent.stt,
+                    elevenlabs_scribe=replace(
+                        updated.intent.stt.elevenlabs_scribe,
+                        enable_speaker_diarization=edit.enabled,
+                    ),
                 ),
             )
         elif isinstance(edit, SonioxSpeakerDiarizationEdit):

@@ -60,12 +60,13 @@ def _write_json_bytes(path: Path, data: dict[str, Any]) -> bytes:
     return raw_bytes
 
 
-def test_scribe_v3_model_migration_persists_without_altering_provider_or_user_intent(tmp_path):
+@pytest.mark.parametrize(("version", "model"), [(55, "scribe_v2_realtime"), (56, "scribe_v3_live")])
+def test_scribe_diarization_migrates_off_without_altering_other_intent(tmp_path, version, model):
     raw = _serialization().to_dict(AppSettingsVNext())
-    raw["settings_version"] = 55
+    raw["settings_version"] = version
     stt = raw["intent"]["stt"]
     stt["provider"] = "elevenlabs_scribe"
-    stt["elevenlabs_scribe"]["model"] = "scribe_v2_realtime"
+    stt["elevenlabs_scribe"] = {"model": model}
     stt["soniox"]["enable_speaker_diarization"] = False
     stt["custom_terms"]["en"] = ["PuriPuly"]
     raw["intent"]["languages"]["peer_source_mode"] = "manual"
@@ -78,14 +79,15 @@ def test_scribe_v3_model_migration_persists_without_altering_provider_or_user_in
     assert persisted["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
     assert persisted["intent"]["stt"] == {
         **stt,
-        "elevenlabs_scribe": {"model": "scribe_v3_live"},
+        "elevenlabs_scribe": {"model": "scribe_v3_live", "enable_speaker_diarization": False},
     }
     assert persisted["intent"]["languages"]["peer_source_mode"] == "manual"
     assert persisted["intent"]["languages"]["peer_source_language"] == "ja"
     (backup,) = tmp_path.glob("settings.json.pre-v*.bak")
     assert backup.read_bytes() == original
     reopened = _compat().load_vnext_settings(path)
-    assert reopened.ok and reopened.settings.intent.stt.elevenlabs_scribe.model == "scribe_v3_live"
+    assert reopened.ok and not reopened.migrated
+    assert reopened.settings.intent.stt.elevenlabs_scribe.enable_speaker_diarization is False
 
 
 @pytest.mark.parametrize(

@@ -1,23 +1,39 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
-from puripuly_heart.config.runtime_resolution import STTRuntimeIntent, resolve_stt_config
+from puripuly_heart.app.adapters.peer_capture.peer_capture_provider import (
+    PeerCaptureProviderAdapter,
+)
+from puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink import (
+    PeerCaptureVadSinkAdapter,
+)
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    SharedSTTProviderFactory,
+)
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
+    build_peer_stt_provider_request,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.conversation_history import ConversationHistory
-from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.observability import ConversationRecord
-from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
-    TranslationChannelOwnerCallbacks,
-)
-from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import STTFinalSpeakerEvidence, STTProviderTurnTerminal
-from tests.core.runtime.test_peer_capture_session import make_config, make_owner, wait_until
+from tests.core.runtime.test_local_asr_provider_runtime import FakeProvisioningPort
+from tests.core.runtime.test_peer_capture_session import (
+    FakeAdmission,
+    FakeSource,
+    FakeTargetResolver,
+    wait_until,
+)
 from tests.core.test_peer_caption_lifecycle import ControlledBackend, idle
 from tests.core.test_peer_overlay_policy import Surface, Timeline, presenter_for
 from tests.helpers.fakes import RecordingOscQueue
@@ -39,48 +55,67 @@ async def _idle(harness):
 
 
 @pytest.fixture
-async def route(monkeypatch):
+async def capture_route(monkeypatch):
     timeline = Timeline()
     surface = Surface()
     presenter = presenter_for(timeline, surface)
     await presenter.begin_native_retry_epoch(enabled=True)
     socket = FakeScribeWebSocket("native-scope")
     native_scope = "native-scope"
+    socket_provider = None
     urls = []
 
     async def connect(url, *, additional_headers):
-        nonlocal socket, native_scope
-        if socket.closed:
+        nonlocal socket, native_scope, socket_provider
+        if urls:
             native_scope = f"native-scope-{len(urls)}"
             socket = FakeScribeWebSocket(native_scope)
         assert additional_headers == {"xi-api-key": "controlled"}
         urls.append(url)
+        socket_provider = runtime.current_provider("peer")
         return socket
 
     monkeypatch.setattr(network_clients, "external_websocket_connect", connect)
     secrets = InMemorySecretStore()
     secrets.set("elevenlabs_scribe_api_key", "controlled")
-    config = make_config(provider_id="elevenlabs_scribe")
-    engine = await SharedSTTProviderFactory(secrets, timeline.clock, 300.0, None).create(
-        ProviderRuntimeBuildRequest(
-            config=resolve_stt_config(
-                STTRuntimeIntent(
-                    channel="peer",
-                    provider="elevenlabs_scribe",
-                    source_language="en",
-                    elevenlabs_scribe_language_code="en",
-                )
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider="elevenlabs_scribe"),
+            languages=replace(
+                settings.intent.languages, peer_source_mode="manual", peer_source_language="en"
             ),
-            provider_signature=config.provider_signature,
-            recognition_projection="scoped",
-            runtime_signature=config.runtime_signature,
         ),
-        gpu_runtime=None,
     )
+    runtime_factory = LocalASRProviderRuntimeFactory(
+        SharedSTTProviderFactory(secrets, timeline.clock, 300.0, None),
+        FakeProvisioningPort(),
+        timeline.clock,
+    )
+    callbacks = None
+    evidence = []
+    terminals = []
+
+    async def observe(event):
+        if isinstance(event, STTProviderTurnTerminal):
+            terminals.append(event)
+        elif isinstance(event, STTFinalSpeakerEvidence):
+            evidence.append(event)
+        assert callbacks is not None
+        await callbacks.peer_event_handler(event)
+
+    class RuntimeFactory:
+        def create(self, harness_callbacks):
+            nonlocal callbacks
+            callbacks = harness_callbacks.peer_exception_handler.__self__
+            return runtime_factory.create(replace(harness_callbacks, peer_event_handler=observe))
+
     backend = ControlledBackend()
     history = _ConversationObserver()
     harness = compose_translation_test_harness(
-        peer_stt=engine,
+        local_asr_provider_runtime_factory=RuntimeFactory(),
         llm=backend,
         osc=RecordingOscQueue(),
         clock=timeline.clock,
@@ -91,45 +126,64 @@ async def route(monkeypatch):
         peer_translation_enabled=True,
     )
 
-    class Sink:
-        handle_owned_vad_event = staticmethod(harness.peer_owner.handle_peer_owned_vad_event)
-
-    sink_started = asyncio.get_running_loop().create_future()
-
-    async def run_audio_loop(**kwargs):
-        sink_started.set_result(kwargs["sink"])
-        await asyncio.Event().wait()
-
-    capture, *_ = make_owner(sink=Sink(), clock=timeline.clock, run_audio_loop=run_audio_loop)
-    callbacks = TranslationChannelOwnerCallbacks(SttSessionStateProjection())
-    callbacks.bind_self(harness.self_owner)
-    callbacks.bind_peer(harness.peer_owner)
+    runtime = harness.local_asr_runtime
+    capture = PeerCaptureSessionOwner(
+        admission=FakeAdmission(),
+        target_resolver=FakeTargetResolver(),
+        provider=PeerCaptureProviderAdapter(runtime, harness.peer_owner),
+        clock=timeline.clock,
+        provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
+            config, gpu_device_id="auto", warmup=warmup
+        ),
+        source_factory=lambda *_: FakeSource(),
+        vad_factory=lambda _: object(),
+        run_audio_loop=lambda **_: asyncio.Event().wait(),
+        vad_sink=PeerCaptureVadSinkAdapter(lambda: harness.peer_owner),
+    )
+    assert callbacks is not None
     callbacks.bind_peer_capture(capture)
     capture.bind_publication_generation_observer(
         activated=harness.output_runtime.activate_peer_generation,
         retired=harness.output_runtime.retire_peer_generation,
     )
-    evidence = []
-    terminals = []
 
-    async def observe(event):
-        if isinstance(event, STTProviderTurnTerminal):
-            terminals.append(event)
-        elif isinstance(event, STTFinalSpeakerEvidence):
-            evidence.append(event)
-        await callbacks.peer_event_handler(event)
+    async def apply_diarization(enabled):
+        stt = settings.intent.stt
+        next_settings = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                stt=replace(
+                    stt,
+                    elevenlabs_scribe=replace(
+                        stt.elevenlabs_scribe, enable_speaker_diarization=enabled
+                    ),
+                ),
+            ),
+        )
+        config = build_peer_capture_session_config_from_vnext(next_settings)
+        result = await capture.apply_intent(config, enabled=True)
+        assert result.effective_active and result.runtime_signature == config.runtime_signature
+        assert runtime.snapshot.channel_for("peer").speaker_diarization is enabled
 
     try:
         await harness.start()
-        engine.bind_event_sink(observe)
-        await capture.apply_intent(config, enabled=True)
-        guarded = await asyncio.wait_for(sink_started, 2)
-        ledger = capture.segment_ledger
-        assert ledger is not None
+        await apply_diarization(True)
+        guarded = capture.guard_vad_sink()
+
+        async def drain():
+            engine = runtime.current_provider("peer")
+            await engine.wait_for_event_ingress_drain()
 
         async def committed(text, *speakers, partial=False):
             terminal_index = len(terminals)
-            index = 0 if socket.closed else socket.commits
+            index = (
+                0
+                if socket.closed or socket_provider is not runtime.current_provider("peer")
+                else socket.commits
+            )
+            ledger = capture.segment_ledger
+            assert ledger is not None
             start, chunks, end = _owned_deepgram_events(
                 ledger, start_sample=(terminal_index + 1) * 1000
             )
@@ -142,11 +196,15 @@ async def route(monkeypatch):
             if speakers:
                 push_diarized(index, speakers)
             await wait_until(lambda: len(terminals) > terminal_index, timeout_s=2)
-            await engine.wait_for_event_ingress_drain()
+            await drain()
             terminal = terminals[terminal_index]
             assert terminal.text == text and terminal.text_authority == "authoritative"
-            assert terminal.native_segment.provider_session_id == native_scope
-            assert terminal.native_segment.segment_index == index
+            if runtime.snapshot.channel_for("peer").speaker_diarization:
+                assert terminal.native_segment.provider_session_id == native_scope
+                assert terminal.native_segment.segment_index == index
+            else:
+                assert terminal.native_segment is None
+                assert terminal.final_speaker_runs == ()
             assert any(
                 receipt.identity == terminal.identity.segment
                 for receipt in ledger.terminal_receipts
@@ -165,14 +223,70 @@ async def route(monkeypatch):
             original = len(evidence)
             push_diarized(index, words)
             await wait_until(lambda: len(evidence) > original, timeout_s=2)
-            await engine.wait_for_event_ingress_drain()
+            await drain()
             return evidence[-1]
 
-        yield harness, backend, presenter, timeline, surface, history, committed, diarized, socket, urls
+        yield (
+            (
+                harness,
+                backend,
+                presenter,
+                timeline,
+                surface,
+                history,
+                committed,
+                diarized,
+                socket,
+                urls,
+            ),
+            apply_diarization,
+            evidence,
+        )
     finally:
         await capture.close()
         await harness.stop()
         await presenter.close()
+
+
+@pytest.fixture
+def route(capture_route):
+    return capture_route[0]
+
+
+@pytest.mark.asyncio
+async def test_scribe_toggle_rejects_retired_evidence_and_keeps_ordinary_translation(capture_route):
+    route, apply_diarization, evidence = capture_route
+    harness, backend, presenter, _, _, history, committed, _, first_socket, urls = route
+    await committed("Old head. Old tail.")
+    await _idle(harness)
+    await apply_diarization(False)
+    first_socket.push(
+        "diarized_transcript",
+        segment_index=0,
+        text="Old head. Old tail.",
+        words=[
+            {"text": "Old head. ", "speaker_id": "speaker-A"},
+            {"text": "Old tail.", "speaker_id": "speaker-B"},
+        ],
+    )
+    await wait_until(lambda: bool(evidence), timeout_s=2)
+    fresh = await committed(
+        "Fresh head. Fresh tail.", ("Fresh head. ", "speaker-A"), ("Fresh tail.", "speaker-B")
+    )
+    await _idle(harness)
+
+    assert [parse_qs(urlsplit(url).query)["diarize"] for url in urls] == [["true"], ["false"]]
+    assert parse_qs(urlsplit(urls[-1]).query)["include_timestamps"] == ["false"]
+    (stale,) = evidence
+    assert stale.revisions[0].native_segment.provider_session_id == "native-scope"
+    assert [call.text for call in backend.calls] == [
+        "Old head. Old tail.",
+        "Fresh head. Fresh tail.",
+    ]
+    assert history.conversation_records[-1].source_text == "Fresh head. Fresh tail."
+    block = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{fresh}")
+    assert block.speaker_style == "gold"
+    assert block.primary_text == "translated:Fresh head. Fresh tail."
 
 
 @pytest.mark.asyncio

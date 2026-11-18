@@ -2,7 +2,7 @@
 
 ## Authority and status
 
-The owner requested implementing the discussed Scribe v3 integration, repeating the same experiment against the retained results, investigating observed problems, and explicitly checking readability when speaker information arrives late, including expired captions reappearing. This authorizes local product implementation and bounded public-audio/service verification. It supersedes the earlier analysis-only boundary for this follow-up, not the historical findings in [the original report](issue441-results.md).
+The owner requested implementing the discussed Scribe v3 integration, repeating the same experiment against the retained results, investigating observed problems, and explicitly checking readability when speaker information arrives late, including expired captions reappearing. This authorizes local product implementation and bounded public-audio/service verification. It supersedes the earlier analysis-only boundary for this follow-up, not the historical findings in the archived original report.
 
 The integration, bounded repair review and owner-reduced comparison are complete locally: one six-clip recognition pass, three synthetic Desktop scenarios, and three selected actual-MT/Desktop cases. This record does not claim release, deployment, PR publication or issue closure.
 
@@ -142,7 +142,7 @@ Actual visual references: `display/natural-2/mt-01/natural-005.png`, `mt-02/natu
 
 ### Evidence locations and documentation
 
-Local retained evidence under `.tmp/issue441/scribe-integration/`:
+Historical evidence under `.tmp/issue441/scribe-integration/` is retained inside `.tmp/issue441-retained-evidence.tar.gz` with its original member paths, not as an active experiment directory:
 
 - `experiment/source-method-v4.json`: file SHA-256 `2bf749d22da6f5265872a4525c6cf3ea3500565c2a16c77a41aa9835338d602b`; frozen original inputs and method.
 - `capture/live-1/`, `experiment/capture-live-1.stdout`, `experiment/live-result-1.md`, `experiment/live-summary-1.json`: raw capture, original failure receipt and interpreted boundary evidence.
@@ -155,4 +155,24 @@ Local retained evidence under `.tmp/issue441/scribe-integration/`:
 
 ### Completion receipt
 
-Independent terminal evidence audit accepted candidate `7acc9268d9c7eb9d9bb13c5678497e28bdb9d14f` under the owner's reduced scope. No additional product changes followed. The task-owned temporary Desktop/replay/extraction helpers were removed after verification; raw inputs, captures, scores, selected bodies, service responses, PNGs and receipts remain. Maintained benchmark entrypoints remain in the repository. No owned renderer process remains from the completed runs, and no remote publication or installed-setting change was performed.
+Independent terminal evidence audit accepted candidate `7acc9268d9c7eb9d9bb13c5678497e28bdb9d14f` under the owner's reduced scope. At that checkpoint, the task-owned temporary Desktop/replay/extraction helpers were removed after verification, while raw inputs, captures, scores, selected bodies, service responses, PNGs, receipts and benchmark entrypoints remained. No owned renderer process remained, and no remote publication or installed-setting change was performed. The subsequent backend-option and retirement work does not turn that historical receipt into verification of a different candidate.
+
+### Backend-only speaker option
+
+`stt.elevenlabs_scribe.enable_speaker_diarization` is now a persisted, application-control setting, defaulting to false for new and migrated settings. It affects only direct Peer Scribe. Self and rolling Scribe remain non-diarized, and Soniox keeps its independent setting and existing behavior. Turning it off preserves ordinary recognition/translation while disabling native speaker regrouping; a setting change refreshes the effective Peer scope so a retired socket cannot revise the successor.
+
+No settings controls, UI snapshots, renderer/layout code, labels or translations were changed. The shared `app/ports/settings_view.py` contract gained only a typed backend edit variant and export. `docs/verification.md` now requires explicitly enabling this option before a delayed-speaker scenario.
+
+Seventeen focused product checks passed: Scribe integration, Scribe/Soniox factory selection, migration/serialization, and the existing Soniox live handoff. The toggle regression delivers a late old-socket split, observes no retranslation, and verifies fresh translation on the new socket. Two earlier test attempts incorrectly expected immediate socket closure; the completed assertion instead observes actual late delivery and its consumer-visible result. Scoped Ruff checks passed; Black checks passed after one assertion was wrapped without changing its behavior.
+
+An isolated source headless host was exercised through its CLI. Applying the option returned terminal `applied` with `settings_commit_success_runtime_applied` at revision 3. Three completed recognition probes observed actual outgoing `diarize`/`include_timestamps` values of false before apply, true after apply, and true after starting a fresh host from the saved settings. Each returned an authoritative final and completed cleanup; both hosts exited 0. Scribe transport was controlled, credentials and writable roots were synthetic/isolated, and capture, telemetry and outputs were disabled. Early probe failures involved PID/receipt assertions and a degraded apply caused by a missing synthetic translation credential; these were corrected in the probe, not hidden by a product fallback. No live service, GUI or full-suite claim is made. The disposable probe was removed after completion.
+
+### Experiment retirement
+
+The owner subsequently authorized the backend option and experiment cleanup, explicitly excluding UI work. Eleven experiment-only Python helpers, their three benchmark test files, two frozen manifests and three superseded reports were removed from the maintained tree. Product regression tests and this consolidated result record remain.
+
+Before removal, 413 regular evidence/source files were archived and checked byte-for-byte against their originals. Local archive: `.tmp/issue441-retained-evidence.tar.gz`, 153,931,626 bytes, SHA-256 `6b2603e0be5dc9c0d9421f4d35ec66a95bb875edc174b9ef5a76a13c91be78fc`. It includes the historical manifests, retired tooling, original reports, failed attempts and completed results. Temporary native build/runtime/model copies and redundant downloaded Seoul corpus archives were excluded and deleted; the extracted input and annotation files remain.
+
+Because #454 is in progress, its input files, lexical records, scores, Soniox S0/S1 runs and selection links, and input-diagnosis directory remain at their existing `.tmp/issue441/` paths. Other historical arms and Scribe evidence are available from the archive. Shared source audio outside this worktree was not touched. The former 13G experiment tree now occupies 663M, plus the 147M archive, as reported by `du`. The offline PR test-selection check passed after retirement: 606 covered files and 10 intentional exclusions.
+
+Protected-document drift: `benchmarks/asr/README.md` still calls #441 result processing/write-up remaining and does not describe this retirement/archive. It was not edited. The architecture and native-overlay summary gaps described above also remain. No paid experiment, provider-quality comparison, UI work, base integration, PR, merge or GitHub tracking change was performed by this cleanup.

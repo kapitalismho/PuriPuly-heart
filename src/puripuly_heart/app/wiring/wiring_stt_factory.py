@@ -400,6 +400,9 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         gemini_transcribe_auto_language=automatic_gemini,
         elevenlabs_scribe_language_code=elevenlabs_scribe_language,
         elevenlabs_scribe_auto_language=automatic_scribe,
+        elevenlabs_scribe_enable_speaker_diarization=(
+            intent.stt.elevenlabs_scribe.enable_speaker_diarization
+        ),
         qwen_region=intent.translation.qwen.region,
         qwen_connection=(
             resolve_alibaba_connection(

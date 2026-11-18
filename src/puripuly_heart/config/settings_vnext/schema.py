@@ -24,7 +24,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 56
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 57
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -365,6 +365,7 @@ class GeminiTranscribeSTTIntent:
 @dataclass(frozen=True, slots=True)
 class ElevenLabsScribeSTTIntent:
     model: str = ELEVENLABS_SCRIBE_STT_MODEL
+    enable_speaker_diarization: bool = False
 
     def __post_init__(self) -> None:
         if self.model != ELEVENLABS_SCRIBE_STT_MODEL:
