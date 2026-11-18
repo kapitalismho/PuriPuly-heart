@@ -772,7 +772,7 @@
   "agent_chat.report.sending": "发送中",
   "agent_chat.report.failed": "失败",
   "agent_chat.report.retry": "重新发送",
-  "agent_chat.report.contact": "在 X 上联系",
+  "agent_chat.report.contact": "在 X 私信",
   "agent_chat.account.login": "登录",
   "agent_chat.account.usage": "查看用量",
   "agent_chat.ask_puri": "问问 Puri",

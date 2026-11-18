@@ -298,7 +298,7 @@ async def test_report_card_states(monkeypatch):
     assert zone(left(view)).on_click is None
     sent = AgentReportOffer("support-1", 0, "sent", ticket="PP-0123456789ABCDEF")
     owner.publish(snapshot(report_offers=(sent,)))
-    assert texts(left(view))[1:] == ["PP-0123456789ABCDEF", "X로 문의하기"]
+    assert texts(left(view))[1:] == ["PP-0123456789ABCDEF", "X DM으로 보내기"]
     zone(left(view)).on_click(None)
     assert opened == [agent_chat.X_CONTACT_URL]
     owner.publish(snapshot(report_offers=(AgentReportOffer("support-2", 0, "offered"),)))

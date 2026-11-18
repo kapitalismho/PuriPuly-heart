@@ -120,7 +120,7 @@ _CORE_QUERIES = frozenset({"app.status", "settings.current", "diagnostics"})
 _MODULE_QUERIES = {
     "audio": _SETTINGS_QUERIES | {"audio.devices"},
     "recognition": _SETTINGS_QUERIES | {"secrets.presence"},
-    "translation": _SETTINGS_QUERIES | {"secrets.presence"},
+    "translation": _SETTINGS_QUERIES | {"secrets.presence", "accounts.status"},
     "accounts": frozenset({"accounts.status"}),
     "languages": _SETTINGS_QUERIES,
     "output": _SETTINGS_QUERIES | {"overlay.status", "osc.status"},
@@ -440,6 +440,14 @@ def _module(snapshot: Mapping, module: str, localize: Callable[[str], str]) -> t
     result, catalog = _settings(snapshot, MODULE_FIELDS[module], localize)
     if module in MODULE_KEYS:
         result.update(_keys(snapshot, module))
+    if module == "translation":
+        managed = _mapping(_mapping(snapshot.get("accounts")).get("managed"))
+        if managed.get("selected") is True:
+            result["managed"] = {
+                key: deepcopy(managed[key])
+                for key in ("provider", "credential_present", "trial", "budget")
+                if key in managed
+            }
     if module == "audio" and isinstance(snapshot.get("audio"), Mapping):
         result["devices"] = {
             key: deepcopy(value)

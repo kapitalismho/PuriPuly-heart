@@ -772,7 +772,7 @@
   "agent_chat.report.sending": "보내는 중",
   "agent_chat.report.failed": "실패",
   "agent_chat.report.retry": "다시 보내기",
-  "agent_chat.report.contact": "X로 문의하기",
+  "agent_chat.report.contact": "X DM으로 보내기",
   "agent_chat.account.login": "로그인",
   "agent_chat.account.usage": "사용량 보기",
   "agent_chat.ask_puri": "Puri에게 물어보기",

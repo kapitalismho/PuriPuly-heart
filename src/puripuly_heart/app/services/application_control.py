@@ -69,6 +69,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import canonical
 from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetUnavailable,
 )
+from puripuly_heart.app.services.managed.managed_auth import MANAGED_TRIAL_STATES
 from puripuly_heart.app.services.recognition_probe import (
     RECOGNITION_PROBE_METADATA,
     run_recognition_probe,
@@ -479,6 +480,8 @@ def _accounts_status(application: object, retain: Callable[..., dict]) -> dict:
             }
             provider = source.get("provider")
             managed["provider"] = provider if provider in ("qq", "discord") else None
+            trial = source.get("trial")
+            managed["trial"] = trial if trial in MANAGED_TRIAL_STATES else "unknown"
             budget = source.get("budget")
             budget = budget if isinstance(budget, Mapping) else {}
             availability = budget.get("availability")

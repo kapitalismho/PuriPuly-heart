@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
@@ -99,15 +101,33 @@ def test_state_resolves_managed_selection_and_secret_through_injected_store() ->
     assert state.runtime_available is True
 
 
-def test_state_contains_secret_resolution_failure_as_key_unavailable() -> None:
-    def fail(*_args, **_kwargs):
-        raise RuntimeError("secret store unavailable")
+@pytest.mark.parametrize("managed_selected", [True, False])
+def test_state_preserves_unknown_trial_when_credential_read_fails(managed_selected) -> None:
+    class UnreadableStore(SecretStore):
+        def get(self, key: str) -> str | None:
+            raise PermissionError("secret store unavailable")
 
-    state = _adapter(_managed_settings(china=True), secret_store_factory=fail).state()
+    settings = _managed_settings(china=managed_selected)
+    if not managed_selected:
+        settings = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    settings.intent.translation,
+                    model="index_translate_35b",
+                    connection="public_api",
+                    openrouter_selected_source="none",
+                ),
+            ),
+        )
+    state = _adapter(
+        settings, secret_store_factory=lambda *_args, **_kwargs: UnreadableStore({})
+    ).state()
 
-    assert state.managed_selected is True
-    assert state.managed_china is True
+    assert state.managed_selected is managed_selected
     assert state.local_key_available is False
+    assert state.trial == "unknown"
 
 
 def test_transaction_settings_values_exclude_raw_secrets() -> None:

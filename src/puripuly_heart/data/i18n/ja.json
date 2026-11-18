@@ -772,7 +772,7 @@
   "agent_chat.report.sending": "送信中",
   "agent_chat.report.failed": "失敗",
   "agent_chat.report.retry": "もう一度送る",
-  "agent_chat.report.contact": "Xで問い合わせる",
+  "agent_chat.report.contact": "XでDMする",
   "agent_chat.account.login": "ログイン",
   "agent_chat.account.usage": "使用量を見る",
   "agent_chat.ask_puri": "Puriに聞く",

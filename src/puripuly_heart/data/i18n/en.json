@@ -772,7 +772,7 @@
   "agent_chat.report.sending": "Sending",
   "agent_chat.report.failed": "Failed",
   "agent_chat.report.retry": "Send again",
-  "agent_chat.report.contact": "Contact on X",
+  "agent_chat.report.contact": "DM ticket on X",
   "agent_chat.account.login": "Sign in",
   "agent_chat.account.usage": "View usage",
   "agent_chat.ask_puri": "Ask Puri",
