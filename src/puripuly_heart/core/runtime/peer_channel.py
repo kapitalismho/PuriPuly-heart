@@ -248,6 +248,11 @@ class _GenerationGuardedVadSink:
         ledger = self.runtime.segment_ledger
         if ledger is None:
             return
+        if ledger.settings.provider_id == "elevenlabs_scribe":
+            if event.capture:
+                self.runtime._current_stream_capture_epoch = event.capture[-1].capture_epoch
+            elif event.boundary_reason == "source_discontinuity":
+                self.runtime._current_stream_capture_epoch = None
         qwen_discontinuity = (
             ledger.settings.provider_id == "qwen_audio"
             and event.boundary_reason == "source_discontinuity"
@@ -372,6 +377,8 @@ class _GenerationGuardedVadSink:
             raise RuntimeError("peer VAD dispatch worker stopped")
         if isinstance(event, OwnedVadEvent) and isinstance(event.event, SpeechStart):
             self._stream_drop_pending = False
+            if ledger is not None and ledger.settings.provider_id == "elevenlabs_scribe":
+                self.runtime._current_stream_capture_epoch = event.segment.identity.capture_epoch
         if (
             isinstance(event, OwnedStreamInput)
             and event.event.chunk.size

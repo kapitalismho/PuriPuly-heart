@@ -311,7 +311,7 @@ def test_settings_modal_multi_select_toggles_without_closing() -> None:
         title="Cloud Free Tier",
         options=[
             OptionItem(value="gemini_transcribe", label="Gemini 3.5 Transcribe"),
-            OptionItem(value="elevenlabs_scribe", label="ElevenLabs Scribe v2"),
+            OptionItem(value="elevenlabs_scribe", label="ElevenLabs Scribe v3 Live"),
             OptionItem(value="deepgram", label="Deepgram"),
         ],
         on_select=lambda _value: None,

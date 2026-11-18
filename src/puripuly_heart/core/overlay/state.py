@@ -17,6 +17,7 @@ from puripuly_heart.core.overlay.protocol import (
 )
 from puripuly_heart.core.overlay.sink import (
     PeerActiveUpdate,
+    PeerCaptionLineage,
     PeerTranscriptFinal,
     SelfActiveClear,
     SelfActiveUpdate,
@@ -90,6 +91,7 @@ class OverlayLogicalTurnEntry:
     peer_caption_revision: int = -1
     peer_caption_final: bool = False
     peer_source_only: bool = False
+    peer_lineage: PeerCaptionLineage | None = None
     peer_fragments: tuple[str, ...] = ()
     peer_partition_text: str | None = None
     peer_partition_scale: float = 1.0
@@ -1371,6 +1373,15 @@ class OverlayPresentationState:
         entry = self.entry_for(event.channel, event.utterance_id)
         if event.seq < entry.last_updated_seq:
             return OverlayReductionResult(False)
+        revision = event.peer_lineage_revision
+        if revision is not None and revision.attribution_only:
+            if entry.speaker_assignment == event.speaker_assignment:
+                return OverlayReductionResult(False)
+            entry.speaker_assignment = event.speaker_assignment
+            entry.speaker_style = None
+            entry.speaker_gray_reason = None
+            entry.last_updated_seq = event.seq
+            return OverlayReductionResult(True)
         event_source_language = _content_language_or_none(event.source_language)
         event_target_language = _content_language_or_none(event.target_language)
         if event.peer_caption_revision < entry.peer_caption_revision or (
@@ -1404,7 +1415,7 @@ class OverlayPresentationState:
         native_caption = (
             event.peer_caption_revision > 0
             and event.speaker_assignment is not None
-            and event.speaker_assignment.attribution.source == "soniox"
+            and event.speaker_assignment.attribution.source in {"soniox", "elevenlabs_scribe"}
         )
         self._remember_entry_input_seq(entry, event_seq=event.seq)
         if event.source_text.strip():
@@ -1424,6 +1435,9 @@ class OverlayPresentationState:
         entry.peer_caption_revision = event.peer_caption_revision
         entry.peer_caption_final = isinstance(event, TranslationFinal)
         entry.peer_publication_id = event.event_id
+        if revision is not None:
+            entry.peer_lineage = revision.lineage
+            revision.lineage.admitted_members.add(entry.utterance_id)
         entry.peer_source_only = source_only
         if event.text.strip() or source_only:
             if native_caption:

@@ -18,7 +18,8 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigSnapshotPort,
 )
-from puripuly_heart.core.speaker_identity import native_soniox_attribution
+from puripuly_heart.core.overlay.sink import PeerCaptionRevision
+from puripuly_heart.core.speaker_identity import native_peer_attribution
 from puripuly_heart.core.translation_policy import (
     TranslationContextPolicy,
     TranslationRuntimePolicy,
@@ -187,7 +188,7 @@ def _source_speaker_runs(
 ) -> tuple[FinalSpeakerRun, ...]:
     runs = transcript.final_speaker_runs
     if "".join(run.text for run in runs) != transcript.text:
-        attribution = native_soniox_attribution(transcript.text, runs)
+        attribution = native_peer_attribution(transcript.text, runs)
         return (
             FinalSpeakerRun(
                 transcript.text[start:end],
@@ -207,11 +208,11 @@ def _source_speaker_runs(
     return tuple(selected)
 
 
-def _native_soniox_source_groups(transcript: Transcript) -> tuple[_FinalTranscriptSegment, ...]:
+def _native_peer_source_groups(transcript: Transcript) -> tuple[_FinalTranscriptSegment, ...]:
     groups: list[_FinalTranscriptSegment] = []
     previous_attribution = None
     for segment in _final_transcript_segments(transcript, split_speakers=True):
-        attribution = native_soniox_attribution(
+        attribution = native_peer_attribution(
             segment.text,
             _source_speaker_runs(transcript, segment.source_text_start, segment.source_text_end),
         )
@@ -417,6 +418,9 @@ class TranslationOutputSubmission:
     peer_request_kind: Literal["final", "preview", "repair", "continuation"] = "final"
     peer_caption_revision: int = 0
     peer_superseded_unit_ids: tuple[UUID, ...] = ()
+    peer_lineage_revision: PeerCaptionRevision | None = field(default=None, compare=False)
+    peer_history_after: UUID | None = None
+    peer_history_removals: tuple[UUID, ...] = ()
     failure_diagnostics: ErrorDiagnostics | None = None
 
     def __post_init__(self) -> None:

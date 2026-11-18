@@ -22,6 +22,7 @@ from puripuly_heart.config.llm_profiles import (
 
 MAX_CUSTOM_VOCAB_TERMS = 100
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
+ELEVENLABS_SCRIBE_STT_MODEL = "scribe_v3_live"
 
 
 LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS = frozenset(

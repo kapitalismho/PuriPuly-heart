@@ -10,9 +10,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 try:
-    from benchmarks.asr.issue373_score import load, timing
+    from benchmarks.asr.issue441_records import load, timing
 except ModuleNotFoundError:
-    from issue373_score import load, timing
+    from issue441_records import load, timing
 
 
 ARMS = ("N", "S0", "S1", "E0", "T1", "T2")
@@ -757,8 +757,8 @@ def connected(run):
     )
 
 
-def score_recording(recording, run, evidence=""):
-    if run is None or not connected(run):
+def score_recording(recording, run, evidence="", *, include_unavailable=False):
+    if run is None or (not include_unavailable and not connected(run)):
         return {
             "recording_id": recording["id"],
             "language": recording["language"],

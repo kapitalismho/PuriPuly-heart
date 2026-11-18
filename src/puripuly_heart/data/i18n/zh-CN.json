@@ -451,7 +451,7 @@
   "provider.alibaba_singapore": "阿里云（新加坡）",
   "provider.deepgram": "Deepgram",
   "provider.gemini_transcribe": "Gemini 3.5 Transcribe",
-  "provider.elevenlabs_scribe": "ElevenLabs Scribe v2",
+  "provider.elevenlabs_scribe": "ElevenLabs Scribe v3 Live",
   "provider.rolling_free": "自动选择\n(云免费档)",
   "provider.rolling_free.description": "登记API密钥即可免费使用",
   "provider.soniox": "Soniox",

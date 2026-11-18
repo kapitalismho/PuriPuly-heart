@@ -17,8 +17,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
-import issue373
 import numpy as np
+
+if __package__:
+    from . import issue441_records as records
+else:
+    import issue441_records as records
 
 RATE = 16000
 ARMS = ("S0", "S1", "E0", "T1", "T2")
@@ -119,15 +123,20 @@ class Run:
         )
         self.journal.flush()
 
-    def event(self, kind, raw, *, arrival=None):
+    def event(self, kind, raw, *, arrival=None, arrival_mono=None, session_id=None):
+        observed = time.monotonic() if arrival_mono is None else arrival_mono
         row = dict(
             seq=len(self.data["events"]),
-            arrival_s=self.now() if arrival is None else arrival,
+            arrival_s=(
+                observed - (self.origin if self.origin is not None else self.created)
+                if arrival is None
+                else arrival
+            ),
             kind=kind,
-            raw=issue373.encode(raw),
-            session_id=self.session_id,
+            raw=records.encode(raw),
+            session_id=session_id or self.session_id,
             clock_basis="source_origin" if self.origin is not None else "startup_origin",
-            arrival_mono_s=time.monotonic(),
+            arrival_mono_s=observed,
         )
         self.data["events"].append(row)
         self.append_journal("event", row)
@@ -142,6 +151,12 @@ class Run:
             if row["clock_basis"] == "startup_origin":
                 row["arrival_s"] = row["arrival_mono_s"] - self.origin
                 row["clock_basis"] = "source_origin"
+        if self.data["snapshots"]:
+            arrival = {row["seq"]: row["arrival_s"] for row in self.data["events"]}
+            for row in self.data["snapshots"]:
+                row["arrival_s"] = arrival[row["event_seq"]]
+            for row in self.data["observations"]:
+                row["arrival_s"] = arrival[row["event_seq"]]
         for row in self.data["rows"]:
             row["t"] += self.created - self.origin
         for row in self.data["sends"]:
@@ -155,7 +170,7 @@ class Run:
         row = {
             "t": self.now(),
             "kind": kind,
-            **{key: issue373.encode(value) for key, value in values.items()},
+            **{key: records.encode(value) for key, value in values.items()},
         }
         self.data["rows"].append(row)
         self.append_journal("row", row)
@@ -179,8 +194,21 @@ class Run:
         temporary.replace(self.path)
         self.last_save = time.monotonic()
 
-    async def send(self, send, payload, *, samples=0, ranges=(), kind="audio", **extra):
-        start = self.wire_samples / RATE
+    async def send(
+        self,
+        send,
+        payload,
+        *,
+        samples=0,
+        ranges=(),
+        kind="audio",
+        session_id=None,
+        transmitted_start_samples=None,
+        **extra,
+    ):
+        start = (
+            self.wire_samples if transmitted_start_samples is None else transmitted_start_samples
+        ) / RATE
         ranges = list(ranges)
         row = dict(
             source_start_s=ranges[0]["start_s"] if ranges else None,
@@ -194,7 +222,7 @@ class Run:
             status="attempted",
             kind=kind,
             source_ranges=ranges,
-            session_id=self.session_id,
+            session_id=session_id or self.session_id,
             **extra,
         )
         self.data["sends"].append(row)
@@ -290,7 +318,7 @@ class Run:
                 provider_end_s=end,
                 source_ranges=ranges,
                 mapping_status=mapping,
-                session_id=self.session_id,
+                session_id=event["session_id"],
                 raw=word.get("_raw", word),
             )
             indices.append(len(self.data["observations"]))
@@ -305,15 +333,15 @@ class Run:
             segment_index=segment_index,
             settled=settled,
             kind=kind,
-            session_id=self.session_id,
+            session_id=event["session_id"],
         )
         self.data["snapshots"].append(row)
         self.append_journal(
             "snapshot", {**row, "observations": [self.data["observations"][i] for i in indices]}
         )
 
-    def native(self, raw):
-        event = self.event("native", raw)
+    def native(self, raw, *, arrival_mono=None, session_id=None):
+        event = self.event("native", raw, arrival_mono=arrival_mono, session_id=session_id)
         if self.args.arm.startswith("S"):
             if "tokens" not in raw:
                 return event
@@ -416,7 +444,7 @@ def install_controller_tap(run):
                 ),
                 pause_ms=controller._observed_pause_ms(),
                 probe_status=controller._probe_status,
-                completion=issue373.encode(controller._completion),
+                completion=records.encode(controller._completion),
                 decision=controller._completion_boundary_decision,
                 source_frontier=controller._source_frontier,
                 **kwargs,
@@ -432,13 +460,13 @@ def install_controller_tap(run):
             "smart_turn_probe",
             dict(
                 status=controller._probe_status,
-                request=issue373.encode(controller._smart_turn_owner.snapshot),
+                request=records.encode(controller._smart_turn_owner.snapshot),
             ),
         )
         return result
 
     async def completion(controller, value):
-        run.event("smart_turn_completion", issue373.encode(value))
+        run.event("smart_turn_completion", records.encode(value))
         return await originals["_receive_completion"](controller, value)
 
     ListenDeliveryController._seal_locked = seal
@@ -463,7 +491,7 @@ async def prepare_smart(run):
     smart = SmartTurnInferenceOwner(model_path=path)
     smart.request_prepare()
     await smart._prepare_task
-    run.event("smart_turn_ready", issue373.encode(smart.snapshot))
+    run.event("smart_turn_ready", records.encode(smart.snapshot))
     if smart.snapshot.availability != "ready":
         await smart.close()
         raise RuntimeError("real_smart_turn_not_ready")
@@ -473,10 +501,12 @@ async def prepare_smart(run):
 class Source:
     terminal_reason = None
 
-    def __init__(self, run, *, continuous=None, chunk_samples=512):
+    def __init__(self, run, *, continuous=None, chunk_samples=512, sample_limit=None):
         self.run = run
         self.continuous = continuous
         self.chunk_samples = chunk_samples
+        self.sample_limit = sample_limit
+        self.released_samples = 0
         self.closed = asyncio.Event()
 
     async def frames(self):
@@ -486,13 +516,20 @@ class Source:
         run.start_source()
         offset = sequence = 0
         with wave.open(str(run.recording["audio_path"]), "rb") as wav:
-            while payload := wav.readframes(self.chunk_samples):
+            while self.sample_limit is None or offset < self.sample_limit:
+                pending = self.chunk_samples
+                if self.sample_limit is not None:
+                    pending = min(pending, self.sample_limit - offset)
+                payload = wav.readframes(pending)
+                if not payload:
+                    break
                 count = len(payload) // 2
                 end = offset + count
                 await asyncio.sleep(max(0.0, run.origin + end / RATE - time.monotonic()))
                 if self.continuous:
                     await self.continuous(payload, offset / RATE, end / RATE)
                 samples = np.frombuffer(payload, dtype="<i2").astype(np.float32) / 32768
+                self.released_samples = end
                 yield AudioFrameF32(
                     samples=samples,
                     sample_rate_hz=RATE,
@@ -868,8 +905,8 @@ async def run_e0(run, scribe):
                 run.event(
                     "controller_boundary",
                     dict(
-                        event=issue373.encode(event),
-                        segment=issue373.encode(owned.segment),
+                        event=records.encode(event),
+                        segment=records.encode(owned.segment),
                         sent_frontier_s=scribe.latest_frontier,
                     ),
                 )
@@ -903,16 +940,16 @@ async def run_e0(run, scribe):
         ),
         vad_speech_threshold=0.4,
     )
-    run.data["metadata"]["controller_config"] = issue373.encode(cfg)
+    run.data["metadata"]["controller_config"] = records.encode(cfg)
     try:
         await owner.apply_intent(cfg, enabled=True)
         await asyncio.wait_for(source.closed.wait(), run.recording["duration_s"] + 60)
         run.event(
             "controller_completed",
             dict(
-                snapshot=issue373.encode(owner.snapshot),
-                ledgers=[issue373.encode(ledger.snapshots) for ledger in owner.segment_ledgers],
-                smart_turn=issue373.encode(smart.snapshot),
+                snapshot=records.encode(owner.snapshot),
+                ledgers=[records.encode(ledger.snapshots) for ledger in owner.segment_ledgers],
+                smart_turn=records.encode(smart.snapshot),
             ),
         )
         if not run.data["eof"]["source_reached"]:
@@ -959,7 +996,7 @@ async def application_replay(run):
 
     class Backend(TranslationBackend):
         async def translate(self, request):
-            application["requests"].append(dict(t=clock.now(), request=issue373.encode(request)))
+            application["requests"].append(dict(t=clock.now(), request=records.encode(request)))
             return Translation(
                 utterance_id=request.utterance_id,
                 text="[deterministic structural translation] " + request.text,
@@ -969,7 +1006,7 @@ async def application_replay(run):
             pass
 
     async def emit(event):
-        application["events"].append(dict(t=clock.now(), event=issue373.encode(event)))
+        application["events"].append(dict(t=clock.now(), event=records.encode(event)))
 
     original_prepare, original_fragment = (
         PeerCaptionOwner._prepare,
@@ -978,7 +1015,7 @@ async def application_replay(run):
 
     def prepare(owner, caption, source, kind, config):
         application["captions"].append(
-            dict(t=clock.now(), kind=kind, source=source, caption=issue373.encode(caption))
+            dict(t=clock.now(), kind=kind, source=source, caption=records.encode(caption))
         )
         return original_prepare(owner, caption, source, kind, config)
 
@@ -988,10 +1025,10 @@ async def application_replay(run):
         application["groups"].append(
             dict(
                 t=clock.now(),
-                transcript=issue373.encode(transcript),
-                assignment=issue373.encode(assignment),
-                previous=issue373.encode(previous),
-                accepted_caption=issue373.encode(owner._last),
+                transcript=records.encode(transcript),
+                assignment=records.encode(assignment),
+                previous=records.encode(previous),
+                accepted_caption=records.encode(owner._last),
                 kind=application["captions"][-1]["kind"] if application["captions"] else None,
             )
         )
@@ -1033,17 +1070,17 @@ async def application_replay(run):
                 await harness.peer_owner.cloud_captions.check_previews()
                 await idle()
             clock.advance(max(0, target - clock.now()))
-            event = issue373.decode(row["event"])
+            event = records.decode(row["event"])
             if row["kind"] == "update":
                 await harness.peer_owner.handle_provider_update(event)
             else:
                 await harness.peer_owner.handle_provider_turn_terminal(
-                    issue373.decode(row["receipt"]), event
+                    records.decode(row["receipt"]), event
                 )
             await idle()
         application.update(
-            history=issue373.encode(harness.peer_runtime.translation_history),
-            counts=issue373.encode(harness.peer_owner.cloud_captions.request_counts),
+            history=records.encode(harness.peer_runtime.translation_history),
+            counts=records.encode(harness.peer_owner.cloud_captions.request_counts),
             clock_origin_estimate=run.origin or run.created,
         )
     finally:
@@ -1131,7 +1168,7 @@ async def run_s1(run):
                 kind="context_audio" if kwargs["context_only"] else "audio",
                 ranges=source_ranges(kwargs["source_ranges"]),
                 context_only=kwargs["context_only"],
-                identity=issue373.encode(identity),
+                identity=records.encode(identity),
                 payload_sequence=kwargs["payload_sequence"],
             )
         )
@@ -1223,7 +1260,7 @@ async def run_s1(run):
         ),
         vad_speech_threshold=0.4,
     )
-    run.data["metadata"]["controller_config"] = issue373.encode(cfg)
+    run.data["metadata"]["controller_config"] = records.encode(cfg)
     try:
         settings = owner._segment_settings_snapshot(cfg)
         await engine._ensure_session(
@@ -1250,7 +1287,7 @@ async def run_s1(run):
         await owner.close()
         await engine.close()
         await smart.close()
-        run.event("smart_turn_closed", issue373.encode(smart.snapshot))
+        run.event("smart_turn_closed", records.encode(smart.snapshot))
         restore_controller()
         for name, original in originals.items():
             setattr(_SonioxSession, name, original)

@@ -356,23 +356,6 @@ wheels = [
 ]
 
 [[package]]
-name = "elevenlabs"
-version = "2.65.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "requests" },
-    { name = "typing-extensions" },
-    { name = "websockets" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/87/3d/377b384f02a773ce49be063e1200b696fae0348842d5abb42fe247af993f/elevenlabs-2.65.0.tar.gz", hash = "sha256:3c35174df6c1962b8344b6d57f939bd4d79ac83d202ad31c768b6a387d1f5d0c", size = 794837, upload-time = "2026-08-25T19:07:17.752Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/c1/77d6e1320bfe96d71e49d238395e52d8e39920d86ecb2d6fdd1d9b70364a/elevenlabs-2.65.0-py3-none-any.whl", hash = "sha256:23589c7e674f6e0f818cb3e9c8df31a4ab1029917f9843154cd4ef38ba55c389", size = 2103478, upload-time = "2026-08-25T19:07:15.985Z" },
-]
-
-[[package]]
 name = "execnet"
 version = "2.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1045,7 +1028,6 @@ source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
     { name = "deepgram-sdk" },
-    { name = "elevenlabs" },
     { name = "flet" },
     { name = "flet-desktop" },
     { name = "google-genai" },
@@ -1103,7 +1085,6 @@ requires-dist = [
     { name = "cmake", marker = "extra == 'build'", specifier = ">=3.31" },
     { name = "cryptography", specifier = "==50.0.2" },
     { name = "deepgram-sdk", specifier = "==7.8.1" },
-    { name = "elevenlabs", specifier = ">=2.60.0,<3.0.0" },
     { name = "flet", specifier = "==1.0.5" },
     { name = "flet-cli", marker = "extra == 'build'", specifier = "==1.0.5" },
     { name = "flet-desktop", specifier = "==1.0.5" },

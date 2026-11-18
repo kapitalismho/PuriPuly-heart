@@ -24,6 +24,7 @@ from .sink import (
     OverlayEventUnion,
     OverlaySink,
     PeerActiveUpdate,
+    PeerCaptionLineage,
     PeerPacingWaitObserver,
     PeerTranscriptFinal,
     SelfActiveClear,
@@ -130,6 +131,7 @@ class OverlayPresenter(OverlaySink):
     _active_speaker_scope: tuple[str, str] | None = field(init=False, default=None)
     _active_speaker_order: tuple[int, int, int] = field(init=False, default=(0, 0, 0))
     _retired_peer_generation: int = field(init=False, default=-1)
+    _peer_lineage_scene: object = field(init=False, default_factory=object)
     _peer_registration_context: dict[str, _PeerCaptionRegistration] = field(
         init=False, default_factory=dict
     )
@@ -197,6 +199,7 @@ class OverlayPresenter(OverlaySink):
         return self._presentation_state.snapshot()
 
     def reset_scene(self) -> None:
+        self._peer_lineage_scene = object()
         self._cancel_all_expiration_tasks()
         self._clear_entries_for_reason("scene_reset")
         self._acceptance.reset()
@@ -217,6 +220,7 @@ class OverlayPresenter(OverlaySink):
         )
 
     async def clear_for_runtime_detach(self) -> None:
+        self._peer_lineage_scene = object()
         await self._cancel_all_expiration_tasks_and_wait()
         self._clear_entries_for_reason("scene_reset")
         self._acceptance.reset()
@@ -293,6 +297,7 @@ class OverlayPresenter(OverlaySink):
             existing = self._acceptance.retained_receipt(receipt_event)
             if existing is not None:
                 return existing
+            self._expire_closed_entries(now=self.clock.now())
             event = self._acceptance.normalize_sequence(event, self._entries)
             peer_fragments = self._presentation_state.peer_fragment_plan(
                 event, translation_enabled=self.translation_enabled
@@ -342,6 +347,49 @@ class OverlayPresenter(OverlaySink):
                 event, peer_fragments=peer_fragments, on_accepted=remember_application
             )
             return receipt
+
+    def open_peer_caption_lineage(self) -> PeerCaptionLineage:
+        return PeerCaptionLineage(self._peer_lineage_scene)
+
+    def peer_caption_lineage_is_live(self, lineage: PeerCaptionLineage) -> bool:
+        return (
+            lineage.scene is self._peer_lineage_scene
+            and not (self._closing or self._closed)
+            and (
+                not lineage.admitted_members
+                or any(
+                    self._live_peer_lineage_member(lineage, uid) for uid in lineage.admitted_members
+                )
+            )
+        )
+
+    def peer_caption_lineage_members_are_live(
+        self, lineage: PeerCaptionLineage, members: tuple[UUID, ...]
+    ) -> bool:
+        return self.peer_caption_lineage_is_live(lineage) and all(
+            uid not in lineage.admitted_members or self._live_peer_lineage_member(lineage, uid)
+            for uid in members
+        )
+
+    def _live_peer_lineage_member(self, lineage: PeerCaptionLineage, uid: UUID) -> bool:
+        entry = self._entries.get(("peer", uid))
+        if (
+            entry is None
+            or entry.peer_lineage is not lineage
+            or entry.retained_hidden
+            or not self._peer_parent_is_current(entry)
+        ):
+            return False
+        now = self.clock.now()
+        for member in (entry, *self._presentation_state.peer_registrations.values()):
+            if member is not entry and member.peer_parent_id != uid:
+                continue
+            if member.peer_departed or member.peer_dormant or member.peer_registered_at is None:
+                continue
+            deadline = self._entry_expiration_deadline(member)
+            if member.peer_pending or deadline is None or now < deadline:
+                return True
+        return False
 
     async def register_peer_caption(
         self,
@@ -547,9 +595,16 @@ class OverlayPresenter(OverlaySink):
                 if registration.started_at is not None:
                     entry.peer_registered_at = registration.started_at
         self._acceptance.record_entry_ordering(event, self._entries)
+        attribution_only = (
+            isinstance(event, TranslationStreamUpdate)
+            and event.peer_lineage_revision is not None
+            and event.peer_lineage_revision.attribution_only
+        )
         if changed:
             await self._publish_if_changed(
-                admit_peer=event.channel != "self", on_accepted=on_accepted
+                admit_peer=event.channel != "self" and not attribution_only,
+                attribution_only=attribution_only,
+                on_accepted=on_accepted,
             )
         elif on_accepted is not None:
             on_accepted()
@@ -571,7 +626,26 @@ class OverlayPresenter(OverlaySink):
             and not self._peer_parent_is_current(entry)
         ):
             return "stale"
-        self._expire_closed_entries(now=self.clock.now())
+        if isinstance(event, TranslationStreamUpdate) and event.peer_lineage_revision is not None:
+            update = event.peer_lineage_revision
+            lineage = update.lineage
+            if (
+                (update.is_current is not None and not update.is_current())
+                or not self.peer_caption_lineage_members_are_live(lineage, update.required_members)
+                or (
+                    len(lineage.admitted_members) >= 4096
+                    and event.utterance_id not in lineage.admitted_members
+                )
+                or (
+                    (event.utterance_id in lineage.admitted_members or update.attribution_only)
+                    and not self._live_peer_lineage_member(lineage, event.utterance_id)
+                )
+            ):
+                return "peer_caption_lineage_retired"
+            if update.attribution_only:
+                if entry is None or event.seq <= entry.last_updated_seq:
+                    return "stale"
+                return None
         return self._acceptance.rejection_reason(
             event,
             self._entries,
@@ -975,6 +1049,7 @@ class OverlayPresenter(OverlaySink):
         *,
         admit_peer: bool = True,
         force_protocol_publish: bool = False,
+        attribution_only: bool = False,
         on_accepted: Callable[[], None] | None = None,
     ) -> None:
         now = self.clock.now()
@@ -1035,7 +1110,7 @@ class OverlayPresenter(OverlaySink):
                     if entry.channel == "peer"
                 },
             )
-            if self.native_retry_enabled
+            if self.native_retry_enabled and not attribution_only
             else False
         )
         previous_rendered_signature = self._presentation_state.rendered_blocks_signature(

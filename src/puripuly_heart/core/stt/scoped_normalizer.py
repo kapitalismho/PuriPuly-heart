@@ -228,7 +228,10 @@ class STTScopedTurnNormalizer:
             included_contributions=tuple(self._contributions),
             failure_diagnostics=terminal.failure_diagnostics,
             recognition_origins=self._recognition_origins,
+            is_current=terminal.is_current,
             failure_resource_id=terminal.failure_resource_id,
+            native_segment=terminal.native_segment if outcome == "final" else None,
+            observed_at=terminal.observed_at,
         )
         return self._terminal
 

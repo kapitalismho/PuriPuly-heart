@@ -451,7 +451,7 @@
   "provider.alibaba_singapore": "Alibaba (シンガポール)",
   "provider.deepgram": "Deepgram",
   "provider.gemini_transcribe": "Gemini 3.5 Transcribe",
-  "provider.elevenlabs_scribe": "ElevenLabs Scribe v2",
+  "provider.elevenlabs_scribe": "ElevenLabs Scribe v3 Live",
   "provider.rolling_free": "自動選択\n(クラウドフリーティア)",
   "provider.rolling_free.description": "APIキーを登録すれば無料で使えます",
   "provider.soniox": "Soniox",

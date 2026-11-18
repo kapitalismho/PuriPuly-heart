@@ -451,7 +451,7 @@
   "provider.alibaba_singapore": "Alibaba (Сингапур)",
   "provider.deepgram": "Deepgram",
   "provider.gemini_transcribe": "Gemini 3.5 Transcribe",
-  "provider.elevenlabs_scribe": "ElevenLabs Scribe v2",
+  "provider.elevenlabs_scribe": "ElevenLabs Scribe v3 Live",
   "provider.rolling_free": "Автовыбор\n(клауд фри тир)",
   "provider.rolling_free.description": "Бесплатно после добавления API-ключа",
   "provider.soniox": "Soniox",

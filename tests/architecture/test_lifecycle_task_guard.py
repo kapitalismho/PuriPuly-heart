@@ -468,7 +468,7 @@ TASK_CREATION_REVIEWS = (
     *_reviews(
         "providers/stt/elevenlabs_scribe.py",
         {"_ElevenLabsScribeSession.start": 2},
-        "ElevenLabs Scribe session owns its connection-event drain and keepalive tasks under provider session close semantics",
+        "ElevenLabs Scribe session owns its raw connection receiver and keepalive through close",
         classification="legacy_exception",
     ),
     *_reviews(
@@ -509,11 +509,6 @@ TASK_CREATION_REVIEWS = (
             "_QwenAudioSession._schedule_slot_retirement": 1,
         },
         "Each Qwen channel retains slot receivers, final watchdogs, retiring transports and one shielded close task per physical slot; stop and abort join cleanup, and unconfirmed session release remains quarantined",
-    ),
-    *_reviews(
-        "providers/stt/sdk_network.py",
-        {"ExternalScribeRealtime._connect_audio": 1},
-        "External Scribe adapter transfers the message task into RealtimeConnection._message_task; the pinned SDK connection close cancels and awaits it",
     ),
     *_reviews(
         "providers/stt/soniox.py",
