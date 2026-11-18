@@ -45,9 +45,14 @@ async def route(monkeypatch):
     presenter = presenter_for(timeline, surface)
     await presenter.begin_native_retry_epoch(enabled=True)
     socket = FakeScribeWebSocket("native-scope")
+    native_scope = "native-scope"
     urls = []
 
     async def connect(url, *, additional_headers):
+        nonlocal socket, native_scope
+        if socket.closed:
+            native_scope = f"native-scope-{len(urls)}"
+            socket = FakeScribeWebSocket(native_scope)
         assert additional_headers == {"xi-api-key": "controlled"}
         urls.append(url)
         return socket
@@ -122,20 +127,25 @@ async def route(monkeypatch):
         ledger = capture.segment_ledger
         assert ledger is not None
 
-        async def committed(text, *speakers):
-            index = socket.commits
-            start, chunks, end = _owned_deepgram_events(ledger, start_sample=(index + 1) * 1000)
+        async def committed(text, *speakers, partial=False):
+            terminal_index = len(terminals)
+            index = 0 if socket.closed else socket.commits
+            start, chunks, end = _owned_deepgram_events(
+                ledger, start_sample=(terminal_index + 1) * 1000
+            )
             for event in (start, *chunks, end):
                 await guarded.handle_owned_vad_event(event)
             await wait_until(lambda: socket.commits == index + 1, timeout_s=2)
+            if partial:
+                socket.push("partial_transcript", text=text)
             socket.push("committed_transcript", text=text, segment_index=index)
             if speakers:
                 push_diarized(index, speakers)
-            await wait_until(lambda: len(terminals) > index, timeout_s=2)
+            await wait_until(lambda: len(terminals) > terminal_index, timeout_s=2)
             await engine.wait_for_event_ingress_drain()
-            terminal = terminals[index]
+            terminal = terminals[terminal_index]
             assert terminal.text == text and terminal.text_authority == "authoritative"
-            assert terminal.native_segment.provider_session_id == "native-scope"
+            assert terminal.native_segment.provider_session_id == native_scope
             assert terminal.native_segment.segment_index == index
             assert any(
                 receipt.identity == terminal.identity.segment
@@ -156,6 +166,7 @@ async def route(monkeypatch):
             push_diarized(index, words)
             await wait_until(lambda: len(evidence) > original, timeout_s=2)
             await engine.wait_for_event_ingress_drain()
+            return evidence[-1]
 
         yield harness, backend, presenter, timeline, surface, history, committed, diarized, socket, urls
     finally:
@@ -392,3 +403,62 @@ async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_
         for snapshot in surface.snapshots
         for block in snapshot.blocks
     )
+
+
+@pytest.mark.asyncio
+async def test_admitted_scribe_split_survives_clean_socket_retirement(route):
+    harness, backend, presenter, timeline, _, history, committed, diarized, socket, urls = route
+    backend.block = True
+    await committed("Accepted head. Accepted tail.")
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    evidence = await diarized(0, ("Accepted head. ", "speaker-A"), ("Accepted tail.", "speaker-B"))
+    await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
+    socket.emit_close()
+    await wait_until(lambda: socket.closed and not evidence.is_current(), timeout_s=2)
+    for completion in backend.completions:
+        completion.set_result(None)
+    await _idle(harness)
+    assert [record.source_text for record in history.conversation_records] == [
+        "Accepted head.",
+        "Accepted tail.",
+    ]
+    assert {block.secondary_text for block in presenter.snapshot().blocks} == {
+        "Accepted head.",
+        "Accepted tail.",
+    }
+    backend.block = False
+    fresh = await committed("Fresh successor.")
+    await _idle(harness)
+    await timeline.advance(1.1)
+    assert len(urls) == 2
+    assert history.conversation_records[-1].source_text == "Fresh successor."
+    assert any(block.id == f"peer:{fresh}" for block in presenter.snapshot().blocks)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("speaker", ["speaker-A", "speaker-B"])
+async def test_scribe_unknown_continuation_tracks_split_tail_boundary(route, monkeypatch, speaker):
+    lines = 3.0
+    monkeypatch.setattr(
+        "puripuly_heart.core.orchestrator.peer_caption.estimate_peer_translation_lines",
+        lambda *_, **__: lines,
+    )
+    harness, backend, _, timeline, _, history, committed, diarized, _, _ = route
+    await committed("The first part, and the second part,")
+    await _idle(harness)
+    await timeline.advance(0.2)
+    unknown = await committed("and an unassigned continuation", partial=True)
+    await _idle(harness)
+    assert history.conversation_records[-1].utterance_id == str(unknown)
+    assert history.conversation_records[-1].source_text == "and an unassigned continuation"
+    await diarized(0, ("The first part, ", "speaker-A"), ("and the second part,", "speaker-B"))
+    await _idle(harness)
+    lines = 2.0
+    await timeline.advance(0.2)
+    successor = await committed("and another part", ("and another part", speaker), partial=True)
+    await _idle(harness)
+    matching = speaker == "speaker-B"
+    expected = "and an unassigned continuation and another part" if matching else "and another part"
+    assert backend.calls[-1].text == expected
+    assert history.conversation_records[-1].source_text == expected
+    assert history.conversation_records[-1].utterance_id == str(unknown if matching else successor)

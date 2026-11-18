@@ -263,6 +263,7 @@ class Application:
                 return await self.deliver(
                     kind,
                     *args,
+                    speaker_merge=kwargs.get("speaker_merge"),
                     scoped_row_index=current_row.get(),
                     action=lambda: method(peer, *args, **kwargs),
                 )
@@ -307,7 +308,14 @@ class Application:
             output.retire_peer_generation(value)
 
     async def deliver(
-        self, kind, *values, is_current=None, scoped_row_index=None, row=None, action=None
+        self,
+        kind,
+        *values,
+        is_current=None,
+        speaker_merge=None,
+        scoped_row_index=None,
+        row=None,
+        action=None,
     ):
         if row is None:
             row = {
@@ -318,6 +326,8 @@ class Application:
                 "values": records.encode(values),
                 "scoped_row_index": scoped_row_index,
             }
+            if kind == "speaker_evidence":
+                row["speaker_merge"] = records.encode(speaker_merge)
         self.trace["admissions"].append(row)
         token = ADMISSION.set(row["ordinal"])
         try:
@@ -329,7 +339,9 @@ class Application:
             elif kind == "terminal":
                 await self.peer.handle_provider_turn_terminal(*values)
             elif kind == "speaker_evidence":
-                await self.peer.handle_speaker_evidence(values[0], is_current=is_current)
+                await self.peer.handle_speaker_evidence(
+                    values[0], is_current=is_current, speaker_merge=speaker_merge
+                )
             elif kind == "epoch_ended":
                 await self.peer.handle_provider_epoch_ended(values[0])
             elif kind == "input_release":
@@ -365,6 +377,41 @@ class Application:
         )
 
 
+def decode_speaker_admission(row, scoped_rows, values):
+    from puripuly_heart.core.stt.backend import STTFinalSpeakerEvidence
+
+    index = row["scoped_row_index"]
+    checked(type(index) is int and 0 <= index < len(scoped_rows), "Missing scoped speaker evidence")
+    linked = scoped_rows[index]
+    checked(linked["kind"] == "scoped_event", "Speaker evidence must link to a scoped event")
+    event = records.decode(linked["event"])
+    checked(isinstance(event, STTFinalSpeakerEvidence), "Unexpected scoped speaker evidence type")
+    revisions = values[0]
+    checked(
+        all(
+            revision in event.revisions
+            and revision.identity.provider_epoch_id == event.provider_epoch_id
+            for revision in revisions
+        ),
+        "Recorded speaker revisions do not match admitted scoped identity",
+    )
+    merge = event.speaker_merge
+    if "speaker_merge" in row:
+        checked(
+            records.decode(row["speaker_merge"]) == merge,
+            "Recorded speaker merge does not match scoped evidence",
+        )
+    if merge is not None:
+        checked(
+            all(
+                revision.native_segment.provider_session_id == merge.provider_session_id
+                for revision in revisions
+            ),
+            "Speaker merge belongs to another native session",
+        )
+    return event.provider_epoch_id, merge
+
+
 async def replay_admitted(
     pack, *, overlay_sink, translation_backend, clock, checkpoint=None, advance_to=None
 ):
@@ -398,6 +445,7 @@ async def replay_admitted(
                 continue
             values = records.decode(row["values"])
             guard = None
+            speaker_merge = None
             if kind in {"update", "terminal"}:
                 event = values[-1]
                 live_epochs.add(event.identity.provider_epoch_id)
@@ -417,14 +465,14 @@ async def replay_admitted(
                         ),
                     )
             elif kind == "speaker_evidence":
-                epochs = frozenset(revision.identity.provider_epoch_id for revision in values[0])
+                epoch, speaker_merge = decode_speaker_admission(row, pack["owned_rows"], values)
 
-                def guard(epochs=epochs):
-                    return epochs <= live_epochs
+                def guard(epoch=epoch):
+                    return epoch in live_epochs
 
             elif kind == "epoch_ended":
                 live_epochs.discard(values[0].provider_epoch_id)
-            await app.deliver(kind, *values, is_current=guard, row=row)
+            await app.deliver(kind, *values, is_current=guard, speaker_merge=speaker_merge, row=row)
         await app.settle()
         return app.trace
 
@@ -555,7 +603,7 @@ def make_selection(capture, case):
     }
 
 
-def export_fresh(root, frozen, capture_directory, output, candidate):
+def export_fresh(root, frozen, capture_directory, output, candidate, capture_candidate):
     method = frozen["fresh_application_and_display"]
     selected = set(method["selected_cases"])
     checked(digest(root / SELECTION) == frozen["preserved"][SELECTION], "Frozen selection drift")
@@ -572,7 +620,7 @@ def export_fresh(root, frozen, capture_directory, output, candidate):
         meta = capture["metadata"]
         checked(
             (capture["arm"], capture["recording_id"], meta["checkout"], meta["input_sha256"])
-            == (ARM, recording["id"], candidate, recording["sha256"]),
+            == (ARM, recording["id"], capture_candidate, recording["sha256"]),
             "Capture identity drift",
         )
         checked(
@@ -586,7 +634,12 @@ def export_fresh(root, frozen, capture_directory, output, candidate):
             "source_method_sha256": canonical_hash(frozen),
             "source_method_file_sha256": meta["source_method_file_sha256"],
             "source_origin_mono_s": capture["source_origin_mono_s"],
-            "capture": {"path": str(path), "sha256": digest(path), "status": capture["status"]},
+            "capture": {
+                "candidate": capture_candidate,
+                "path": str(path),
+                "sha256": digest(path),
+                "status": capture["status"],
+            },
             "boundary": "Admitted production Peer input from the captured I441 session; no raw rejoin or reconstructed source ownership in Desktop replay",
             "transport_sessions": capture["transport_sessions"],
             "session_scopes": capture["session_scopes"],
@@ -631,6 +684,7 @@ def export_fresh(root, frozen, capture_directory, output, candidate):
         output / "selection-index.json",
         {
             "candidate": candidate,
+            "capture_candidate": capture_candidate,
             "cases": sorted(outputs, key=lambda row: row["case"]),
             "superseded_display_cases": method["superseded_display_cases"],
         },
@@ -643,11 +697,19 @@ def main():
     parser.add_argument("--frozen", type=Path, required=True)
     parser.add_argument("--captures", type=Path, required=True)
     parser.add_argument("--candidate", required=True)
+    parser.add_argument("--capture-candidate", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     root = args.root.resolve()
     candidate = candidate_import_root(root, args.candidate)
-    export_fresh(root, records.load(args.frozen), args.captures, args.output, candidate)
+    export_fresh(
+        root,
+        records.load(args.frozen),
+        args.captures,
+        args.output,
+        candidate,
+        args.capture_candidate,
+    )
 
 
 if __name__ == "__main__":

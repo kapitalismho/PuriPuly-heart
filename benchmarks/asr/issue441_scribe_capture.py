@@ -48,6 +48,55 @@ RATE = cloud.RATE
 PROVIDER = "elevenlabs_scribe"
 
 
+def owned_commit_settlements(completed_writes, rows, indexed):
+    def authority(identity):
+        identity = records.plain(identity)
+        return (
+            identity["provider_epoch_id"],
+            identity["provider_turn_id"],
+            identity["segment"]["segment_id"],
+        )
+
+    expected = {authority(row["identity"]): row["session_id"] for row in completed_writes}
+    received = {}
+    for row in rows:
+        if row["kind"] != "final":
+            continue
+        terminal, receipt = records.plain(row["event"]), records.plain(row["receipt"])
+        key = authority(terminal["identity"])
+        outcome = terminal["outcome"]
+        if (
+            key not in expected
+            or outcome not in {"final", "empty"}
+            or (
+                receipt["outcome"] != outcome
+                or receipt["text_authority"] != "authoritative"
+                or receipt["provider_epoch_id"] != key[0]
+                or receipt["provider_turn_id"] != key[1]
+                or receipt["identity"]["segment_id"] != key[2]
+            )
+        ):
+            continue
+        for item in terminal["provenance"]:
+            session, native_index = item.get("native_task_id"), item.get("native_item_id")
+            if (
+                item.get("barrier") != "committed_transcript"
+                or session != expected[key]
+                or not isinstance(native_index, str)
+                or not native_index.isascii()
+                or not native_index.isdecimal()
+            ):
+                continue
+            index = int(native_index)
+            if indexed.get((session, index)) is (outcome == "final"):
+                received[key] = {"session_id": session, "segment_index": index, "outcome": outcome}
+                break
+    return {
+        "settled_owned_commits": list(received.values()),
+        "unsettled_commit_authorities": [key for key in expected if key not in received],
+    }
+
+
 def map_word(sends, session, observed, start, end):
     if start is None or end is None or not math.isfinite(start) or not math.isfinite(end):
         return None, None, [], "missing_provider_timing"
@@ -141,7 +190,7 @@ class Capture(cloud.Run):
                 continue
             key = row["session_id"], index
             if raw.get("message_type") == "committed_transcript":
-                commits[key] = bool(raw.get("text"))
+                commits[key] = bool((raw.get("text") or "").strip())
             elif raw.get("message_type") == "diarized_transcript":
                 diarized.add(key)
         missing = {key for key, nonempty in commits.items() if nonempty and key not in diarized}
@@ -623,6 +672,9 @@ async def capture(run):
                         and row["event"].get("$type", "").endswith(":STTProviderTurnTerminal")
                         and row["event"]["fields"].get("native_segment") is not None
                     ]
+                    settlements = owned_commit_settlements(
+                        completed_commits, run.data["rows"], indexed
+                    )
                     run.data["eof"]["control_written"] = any(
                         row["kind"] == "eof_commit" for row in completed_commits
                     )
@@ -633,6 +685,7 @@ async def capture(run):
                         nonempty_missing_diarization=sorted(missing),
                         completed_commit_writes=len(completed_commits),
                         scoped_indexed_terminal_events=len(native_terminals),
+                        **settlements,
                         observed_only="Bounded experiment observation, no protocol EOF acknowledgement or complete late-event guarantee",
                     )
                     if missing:
@@ -640,9 +693,12 @@ async def capture(run):
                             RuntimeError("indexed_diarization_unseen_within_observation"),
                             "bounded_drain",
                         )
-                    if len(completed_commits) != len(native_terminals):
+                    if settlements["unsettled_commit_authorities"] or len(
+                        settlements["settled_owned_commits"]
+                    ) != len(completed_commits):
                         run.error(
-                            RuntimeError("incomplete_indexed_terminals_at_drain"), "bounded_drain"
+                            RuntimeError("incomplete_owned_commit_settlement_at_drain"),
+                            "bounded_drain",
                         )
                 await engine.close_backend_and_wait()
                 await super().release(**kwargs)

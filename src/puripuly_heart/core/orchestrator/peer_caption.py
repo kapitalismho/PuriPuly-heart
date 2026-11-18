@@ -197,7 +197,6 @@ class _Caption:
     scribe_parts: tuple[_ScribePart, ...] = ()
     lineage: PeerCaptionLineage | None = None
     required_lineage_members: tuple[UUID, ...] = ()
-    evidence_is_current: Callable[[], bool] | None = None
     history_after: UUID | None = None
     history_removals: tuple[UUID, ...] = ()
 
@@ -817,7 +816,6 @@ class PeerCaptionOwner:
         caption.sealed = sealed
         caption.revision += 1
         if caption.scribe_family is not None:
-            caption.evidence_is_current = None
             caption.required_lineage_members = ()
         self._last = caption
         prepared = self._prepare(caption, source, kind, config)
@@ -1081,7 +1079,6 @@ class PeerCaptionOwner:
                         if uid != caption.utterance_id
                     )
                 )
-                caption.evidence_is_current = is_current
                 if caption.context is None:
                     caption.context = inherited_context
                 caption.predecessor = predecessor
@@ -1122,6 +1119,15 @@ class PeerCaptionOwner:
                 self._tail = predecessor or self._last.admitted
         if repairs:
             self._revise_scribe_context(old, next_captions, family.config)
+            boundaries = {
+                prior.utterance_id: caption.utterance_id
+                for caption, _fragment, overlaps, _changed in layout
+                for prior in overlaps
+            }
+            for retained in self._scribe_families.values():
+                for member in retained.captions:
+                    if member.scribe_continues in boundaries:
+                        member.scribe_continues = boundaries[member.scribe_continues]
         for caption, prepared, admission in repairs:
             self._start(
                 self._execute_scribe_request(
@@ -1308,10 +1314,8 @@ class PeerCaptionOwner:
         if (
             epoch != self._epoch
             or revision != caption.revision
-            or (caption.evidence_is_current is not None and not caption.evidence_is_current())
             or (
-                caption.evidence_is_current is not None
-                and caption.lineage is not None
+                caption.lineage is not None
                 and not self.output.output_runtime.peer_caption_lineage_members_are_live(
                     caption.lineage, (caption.utterance_id, *caption.required_lineage_members)
                 )
@@ -1393,15 +1397,10 @@ class PeerCaptionOwner:
     ) -> None:
         epoch = self._epoch
         scribe_plan = caption.scribe_family is not None
-        evidence_current = caption.evidence_is_current
         required_members = caption.required_lineage_members
 
         def is_current() -> bool:
-            return (
-                epoch == self._epoch
-                and (not scribe_plan or caption.revision == revision)
-                and (evidence_current is None or evidence_current())
-            )
+            return epoch == self._epoch and (not scribe_plan or caption.revision == revision)
 
         source_language = prepared.source_language if prepared is not None else detected_language
         target_language = self.requests.target_language_for("peer", config.value)

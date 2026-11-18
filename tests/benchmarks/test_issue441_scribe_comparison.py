@@ -1,8 +1,15 @@
+import json
+from types import SimpleNamespace
+from uuid import UUID
+
 import pytest
 
-from benchmarks.asr.issue441_scribe_capture import map_word
+from benchmarks.asr import issue441_records as records
+from benchmarks.asr.issue441_scribe_capture import map_word, owned_commit_settlements
 from benchmarks.asr.issue441_scribe_fresh import (
+    Application,
     actual_source_index,
+    decode_speaker_admission,
     match_interval,
     request_key,
     reserve_selected,
@@ -11,6 +18,14 @@ from benchmarks.asr.issue441_scribe_replay import (
     classify_metadata,
     exact_coverage,
     selected_requests,
+)
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.stt.backend import (
+    STTFinalSpeakerEvidence,
+    STTFinalSpeakerRevision,
+    STTNativeSegmentRef,
+    STTNativeSpeakerMerge,
+    STTProviderTurnIdentity,
 )
 
 
@@ -211,3 +226,103 @@ def test_fresh_selection_requires_actual_scoped_current_word_range():
         "not_complete_group",
         [],
     )
+
+
+async def test_recorded_speaker_admission_roundtrips_none_and_typed_merge():
+    def revision(order):
+        segment = AudioSegmentIdentity(1, order, UUID(int=order), 0)
+        return STTFinalSpeakerRevision(
+            STTProviderTurnIdentity(segment, "epoch", f"turn-{order}"),
+            STTNativeSegmentRef("live", order),
+            (),
+        )
+
+    admitted, filtered = revision(1), revision(2)
+    delivered = []
+
+    async def speaker_handler(revisions, *, is_current, speaker_merge):
+        assert is_current()
+        delivered.append((revisions, speaker_merge))
+
+    app = Application({}, SimpleNamespace(now=lambda: 1.0), lambda: 0.0)
+    app.peer = SimpleNamespace(
+        handle_speaker_evidence=speaker_handler, cloud_captions=SimpleNamespace(_scribe_families={})
+    )
+    app.harness = SimpleNamespace(peer_runtime=SimpleNamespace(translation_history=[]))
+    calls = (None, STTNativeSpeakerMerge("live", "spk-a", "spk-b"))
+    for merge in calls:
+        event = STTFinalSpeakerEvidence("epoch", (admitted, filtered), 1.0, speaker_merge=merge)
+        scoped = {"kind": "scoped_event", "event": records.encode(event)}
+        await app.deliver(
+            "speaker_evidence",
+            (admitted,),
+            speaker_merge=merge,
+            scoped_row_index=1,
+            is_current=lambda: True,
+        )
+        row = json.loads(json.dumps(app.trace["admissions"][-1]))
+        scoped_rows = [scoped, scoped]
+        values = records.decode(row["values"])
+        assert "speaker_merge" in row
+        assert decode_speaker_admission(row, scoped_rows, values) == ("epoch", merge)
+        del row["speaker_merge"]
+        _, recovered = decode_speaker_admission(row, scoped_rows, values)
+        await app.deliver(
+            "speaker_evidence", *values, row=row, is_current=lambda: True, speaker_merge=recovered
+        )
+        wrong_scope = {
+            "kind": "scoped_event",
+            "event": records.encode(
+                STTFinalSpeakerEvidence(
+                    "other-epoch", (admitted, filtered), 1.0, speaker_merge=merge
+                )
+            ),
+        }
+        with pytest.raises(ValueError, match="admitted scoped identity"):
+            decode_speaker_admission(row, [scoped, wrong_scope], values)
+    assert delivered == [((admitted,), merge) for merge in calls for _ in range(2)]
+
+
+def test_owned_empty_commit_is_settled_not_failed_or_missing():
+    identity = {
+        "provider_epoch_id": "epoch",
+        "provider_turn_id": "turn",
+        "segment": {"segment_id": "capture"},
+    }
+    writes = [{"identity": identity, "session_id": "live"}]
+    native = {("live", 1): False}
+    receipt = {
+        "outcome": "empty",
+        "text_authority": "authoritative",
+        "provider_epoch_id": "epoch",
+        "provider_turn_id": "turn",
+        "identity": identity["segment"],
+    }
+    event = {
+        "identity": identity,
+        "outcome": "empty",
+        "native_segment": None,
+        "provenance": [
+            {"native_task_id": "live", "native_item_id": "1", "barrier": "committed_transcript"}
+        ],
+    }
+    row = {"kind": "final", "event": event, "receipt": receipt}
+    assert owned_commit_settlements(writes, [row], native) == {
+        "settled_owned_commits": [{"session_id": "live", "segment_index": 1, "outcome": "empty"}],
+        "unsettled_commit_authorities": [],
+    }
+    failed = {
+        **row,
+        "event": {**event, "outcome": "failed"},
+        "receipt": {**receipt, "outcome": "failed", "text_authority": "none"},
+    }
+    for rows, index in (
+        ([failed], native),
+        ([row], {}),
+        ([], native),
+        ([row], {("old", 1): False}),
+    ):
+        assert owned_commit_settlements(writes, rows, index) == {
+            "settled_owned_commits": [],
+            "unsettled_commit_authorities": [("epoch", "turn", "capture")],
+        }

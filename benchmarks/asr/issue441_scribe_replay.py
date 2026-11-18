@@ -525,7 +525,9 @@ async def replay(root, pack, output, candidate, source_method):
                     await peer.handle_provider_update(replace(accepted, observed_at=now()))
                 elif isinstance(accepted, STTFinalSpeakerEvidence):
                     await peer.handle_speaker_evidence(
-                        accepted.revisions, is_current=accepted.is_current
+                        accepted.revisions,
+                        is_current=accepted.is_current,
+                        speaker_merge=accepted.speaker_merge,
                     )
                 elif isinstance(accepted, STTProviderTurnTerminal):
                     identity = accepted.identity
