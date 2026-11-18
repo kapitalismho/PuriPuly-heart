@@ -334,6 +334,98 @@ async def test_resumed_speech_keeps_exact_previous_sentence_coverage_until_new_u
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["stable_append", "final_only"])
+async def test_long_self_continuation_reaches_overlay_and_chatbox_after_visible_ttl(route):
+    provider, sender, clock = HeldTranslations(), Sender(), FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=ChatboxPaginator(sender=sender, clock=clock),
+        overlay_sink=presenter,
+        clock=clock,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+    )
+    updates = SourceUpdates(harness, route)
+    first = "First sentence."
+    continued = "First sentence. Still speaking without a completed sentence"
+    try:
+        await harness.self_owner.handle_vad_event(
+            SpeechStart(updates.uid, np.empty(0, dtype=np.float32), np.empty(0, dtype=np.float32))
+        )
+        await updates.update(first)
+        await eventually(lambda: (first, "en") in provider.responses)
+        provider.finish(first, "first translation")
+        await eventually(lambda: visible(presenter) == [(first, "first translation")])
+        initial = presenter.snapshot().blocks[0]
+
+        clock.advance(9)
+        await updates.update(continued)
+        await eventually(lambda: (continued, "en") in provider.responses)
+        assert visible(presenter) == [(first, "first translation")]
+        await harness.self_owner.handle_vad_event(SpeechEnd(updates.uid))
+        await updates.terminal(continued)
+        provider.finish(continued, "complete long translation")
+        await harness.translation_turns.wait_for_idle()
+        await eventually(lambda: any("complete long translation" in p for p in sender.packets))
+
+        assert visible(presenter) == [(continued, "complete long translation")]
+        final = presenter.snapshot().blocks[0]
+        assert (final.id, final.occupant_key, final.appearance_seq) == (
+            initial.id,
+            initial.occupant_key,
+            initial.appearance_seq,
+        )
+        clock.advance(8.1)
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        assert visible(presenter) == []
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_self_source_closure_starts_idle_expiry_without_changing_visible_text():
+    clock = FakeClock()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
+    adapter = OverlayEventAdapter(clock=clock)
+    uid = uuid4()
+
+    async def caption(revision, closed):
+        return await presenter.emit(
+            adapter.self_active_update(
+                utterance_id=uid,
+                occupant_key=f"self:{uid}",
+                text="Unchanged sentence.",
+                secondary_text="same translation",
+                caption_source_closed=closed,
+                caption_complete=closed,
+                caption_revision=revision,
+                turn_generation=0,
+                turn_order=0,
+            )
+        )
+
+    try:
+        await caption(1, False)
+        clock.advance(20)
+        receipt = await caption(2, True)
+        assert receipt.outcome == "applied"
+        assert visible(presenter) == [("Unchanged sentence.", "same translation")]
+        clock.advance(7)
+        await caption(3, True)
+        clock.advance(1.1)
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        assert visible(presenter) == []
+        receipt = await caption(4, True)
+        assert receipt.outcome == "stale"
+        assert visible(presenter) == []
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
 async def test_pending_punctuated_successor_waits_for_translation_or_source_closure():
     provider, osc = HeldTranslations(), RecordingOscQueue()
     presenter = OverlayPresenter(calibration=OverlayCalibration())

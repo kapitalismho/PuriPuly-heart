@@ -38,6 +38,8 @@ For startup-timeout or cancellation changes, observe cleanup of any already spaw
 
 When relevant to the change, vary short/long/short content, simultaneous Self/Peer results, or clear/hide followed by a fresh caption. Observe stable layout and channel separation, stale revisions staying superseded, and the new caption returning without resurrecting cleared content.
 
+For long Self speech, let an early sentence and its translation become visible, then continue the same open turn for more than 8 seconds without another eligible caption update. The current caption must remain available, and the eventual closed-source/final translation must replace it under the same turn identity. Check that chatbox delivery continues independently. Source closure starts the caption's idle expiry; later visible content can refresh it, but duplicate closed updates cannot. After expiry, cancellation, or replacement, stale results must not revive retired captions.
+
 **Environment:** The actual desktop GUI for desktop claims; built native runtime, SteamVR, and headset for VR presentation; VRChat and configured OSC for chatbox presentation. A controlled OSC receiver can prove packet receipt but not the game's visible chatbox. Use prepared input only at the affected production boundary. Peer content must never reach the chatbox, destinations must remain independent, and expired/cleared captions must not reappear. For settings-triggered layout changes, compose with [settings and application management](#settings-and-application-management).
 
 ## Image translation

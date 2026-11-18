@@ -521,10 +521,18 @@ class OverlayPresenter(OverlaySink):
         peer_fragments: PeerFragmentPlan | None = None,
         on_accepted: Callable[[], None] | None = None,
     ) -> None:
-        previous = self._entries.get((event.channel, event.utterance_id))
+        key = (event.channel, event.utterance_id)
+        previous = self._entries.get(key)
         first_registration = previous is None or previous.peer_registered_at is None
+        closing_live_self_source = (
+            isinstance(event, SelfActiveUpdate)
+            and event.caption_source_closed is True
+            and self._live_self_turn_key == key
+            and previous is not None
+            and not previous.source_closed
+        )
         changed = self._apply_event(event, peer_fragments=peer_fragments)
-        entry = self._entries.get((event.channel, event.utterance_id))
+        entry = self._entries.get(key)
         registration = self._peer_registration_context.get(event.event_id)
         if registration is not None and entry is not None:
             entry.peer_publication_generation = registration.generation
@@ -549,7 +557,9 @@ class OverlayPresenter(OverlaySink):
         self._acceptance.record_entry_ordering(event, self._entries)
         if changed:
             await self._publish_if_changed(
-                admit_peer=event.channel != "self", on_accepted=on_accepted
+                admit_peer=event.channel != "self",
+                force_protocol_publish=closing_live_self_source,
+                on_accepted=on_accepted,
             )
         elif on_accepted is not None:
             on_accepted()
