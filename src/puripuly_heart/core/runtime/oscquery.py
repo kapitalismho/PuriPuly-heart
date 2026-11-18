@@ -14,7 +14,10 @@ from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryServiceInfo,
     OscQueryServicePort,
 )
-from puripuly_heart.core.runtime.logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import (
+    LIVE_AUDIENCE_BASIC,
+    LIVE_AUDIENCE_RECORD_ATTRIBUTE,
+)
 
 OscConnectionMode = Literal["automatic", "manual", "off"]
 OscReceiverStarter = Callable[[], Awaitable[object]]
@@ -354,7 +357,11 @@ class OscQueryRuntime:
                     self._discovery_warned = True
         if usable:
             if self._discovery_warned and not recovery_reported:
-                emit_basic_log(logger, "[OSCQuery] Discovery recovered")
+                logger.log(
+                    logging.INFO,
+                    "[OSCQuery] Discovery recovered",
+                    extra={LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC},
+                )
             self._probe_at = asyncio.get_running_loop().time() + self.healthy_probe_interval_seconds
         elif unavailable or service_info is not None:
             self._schedule_retry()
