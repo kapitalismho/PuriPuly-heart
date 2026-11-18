@@ -4,7 +4,7 @@
 
 The owner requested implementing the discussed Scribe v3 integration, repeating the same experiment against the retained results, investigating observed problems, and explicitly checking readability when speaker information arrives late, including expired captions reappearing. This authorizes local product implementation and bounded public-audio/service verification. It supersedes the earlier analysis-only boundary for this follow-up, not the historical findings in [the original report](issue441-results.md).
 
-Implementation and verification are pending. This record does not claim a working integration, successful comparison, release, deployment, PR publication, or issue closure.
+The integration, bounded repair review and owner-reduced comparison are complete locally: one six-clip recognition pass, three synthetic Desktop scenarios, and three selected actual-MT/Desktop cases. This record does not claim release, deployment, PR publication or issue closure.
 
 - Implementation baseline: `4dab89126bcee83bc501fd95f5bbd742ef861d37`, a clean merge of the retained experiment head `b28e92edfdb06dca7d74f2815a3e964feb2a3002` with `dev` at `fc8b0b1eb2312cc1bf56ddd5c3def7d379f1da65`.
 - The existing Scribe route moves to v3. Do not change the default provider, add a v2 compatibility mode, or modify the user's installed settings.
@@ -51,4 +51,104 @@ Investigate concrete failures and repair in-scope product defects before final r
 
 ## Evidence and completion
 
-Pending: implementation, focused deterministic behavior checks, the declared same-input comparison, connected actual Desktop observations, independent checkpoint review and terminal completion audit. Later sections will record executed evidence, findings, repairs, user-visible changes and protected-document drift. No completion claim is made while these obligations remain pending.
+### Implementation and repairs
+
+Implementation commit: `48b0db31e58e0a2d06c3ed72734a77afbd455057`. Repaired application candidate: `00ee2630083f36b4771a635bb8bdb00969472c96`.
+
+- The existing route uses `scribe_v3_live`; saved settings migrate to version 56. Peer requests native diarization/timestamps; Self and rolling capture remain non-diarized. The default provider and installed user settings were not changed.
+- Raw WebSocket transport replaces the SDK wrapper that did not expose the needed diarization/events. Text completion and post-commit speaker evidence are separate. Native association uses actual session and segment index, with confirmed local writes and bounded retention.
+- Identity-only changes update attribution without another MT request or lifetime reset. Changed partitions retranslate complete source groups. Caption lineage prevents expired families from returning through newly created child IDs.
+- Independent whole-checkpoint review found three concrete defects, all repaired and independently verified: accepted split translations could be lost on clean socket retirement; unknown continuation could follow the split head rather than the adjacent tail; experimental replay omitted the required merge keyword and lost merge semantics. Publication now retains accepted source authority across normal socket retirement, continuation follows the source boundary, and replay retains typed merge evidence.
+- The live experiment also exposed an observer counting error: an authoritative empty recognition result was classified as a missing indexed terminal. The recorder now distinguishes authoritative empty settlement from missing/failed/wrong-session evidence. Original failed status and process exit remain preserved.
+
+### Same-source recognition comparison
+
+One pass over the same six 120-second public clips; no quality retry, new corpus, Soniox rerun or turn-prediction run. Capture used commit `48b0db31e58e`; the later repairs do not change its native recognition path. All six source EOFs and normal WebSocket closes were observed. The cohort exited 1 because EN diagnostic was labeled partial by the observer: all 26 commits actually settled, including one authoritative empty result without `native_segment`. This was not a provider timeout or dropped terminal.
+
+C/W/U means correct / wrong / unassigned at the unchanged 120 point anchors. Online is the original reference-span end plus one second; eventual includes later native evidence.
+
+| Arm | Online C/W/U | Eventual C/W/U |
+|---|---:|---:|
+| N, retained activity-only model | 119/0/1 | 119/0/1 |
+| S0, retained Soniox continuous input | 49/2/69 | 50/3/67 |
+| S1, retained Soniox product input | 46/4/70 | 46/4/70 |
+| E0, retained Scribe continuous input | 86/1/33 | 98/0/22 |
+| I441, integrated Scribe product input | 93/2/25 | 99/1/20 |
+
+N does not recognize text. Soniox's native timestamp coverage and application envelopes are different representations; its unassigned points are not a count of missing words or omitted input. Those distinctions and the confirmed Soniox input-loss investigation remain in #454. This table is not a blanket provider-quality ranking.
+
+I441's final result gains one correct point but also introduces one wrong point relative to E0. This is not persuasive evidence of a quality improvement. I441 eventual unassigned points comprise 16 without timed coverage and four without a speaker; neither category alone proves deleted text. Per-language eventual C/W/U: EN 35/1/4 of 40, JA 33/0/7 of 40, KO 15/0/5 of 20, ZH 16/0/4 of 20. The 24 fixed change/re-entry edges had 15 available observations in each view; only 2 online and 3 eventual pairs were correct.
+
+The independently frozen lexical supplement also shows no clear improvement:
+
+| Eligible lexical units | E0 eventual C/W/U | I441 eventual C/W/U |
+|---|---:|---:|
+| EN: 40 words | 38/0/2 | 37/1/2 |
+| KO: 20 words | 17/0/3 | 17/0/3 |
+| JA: 36 phrases | 17/0/19 | 17/0/19 |
+
+These heterogeneous, partly overlapping units are not WER/CER or DER. There is no Chinese lexical ground truth.
+
+Input is deliberately not identical at the provider boundary: I441 used current Silero/SmartTurn/manual product control, while E0 sent continuous PCM. Of 720 source seconds, 40.468 were not transmitted; 3.000 seconds were replayed context, yielding 682.532 seconds of completed local PCM writes without generated padding. These are input-policy measurements, not recognized-word loss, server admission or billing. I441 used auto-language ASR; its application harness used an explicit per-clip MT source language. The server echoed language detection disabled, unlike E0's explicit enabled request. These differences prevent attributing score changes solely to integration.
+
+Commit-to-first timed native identity was 45.3 ms median / 71.3 ms p95 over 125 of 127 indexed commits, versus retained E0's 60.9 / 277.2 ms over 126 of 128. This is metadata delay after committed text, not speech-to-caption latency or a causal speedup estimate.
+
+### Application workload and end-of-input limit
+
+At the capture candidate, all 121 ordinary nonempty indexed commits received current Peer speaker evidence. Five source-EOF commits received native diarization only after source authority ended, so none entered current Peer attribution. Do not equate eventual native score with eventual on-screen speaker coverage, or add an unapproved metadata wait to hide this boundary.
+
+The 121 admitted updates produced 71 identity-only changes without new backend work, 49 partition changes that started 151 repair requests, and one no-change update. Overall, the controlled backend returned 349 requests: 57 final, 49 continuation, 72 preview and 171 repair. This establishes substantial retranslation work, not paid cost or a universal multiplier. The new strategy preserves current no-wait policy; it does not eliminate provider fragmentation or make regrouping free.
+
+### Readability and verification
+
+The actual production Desktop/Flet surface ran three controlled cases at `48b0db31e58e`, each once and with exit 0:
+
+- Late identity: the same readable card changed gray to gold; one MT request total, unchanged registration and exact eight-second expiry deadline.
+- Live split: a combined card became two readable source-group captions with their own originals, in the observed order. Ten transition samples over 1.44 seconds showed only initial and settled states, with no sampled blank, clipping, reorder or old return. This does not prove absence of sub-sample transients.
+- Expiry: late identity and split evidence caused no new old-group MT, pending child or scene. Seven samples stayed blank; a fresh caption then appeared alone.
+
+These cases used synthetic owned input, controlled raw Scribe frames and deterministic MT through the real capture ledger, adapter, scoped callbacks, caption/output owners, authenticated bridge and Desktop renderer. They are not live-provider-to-GUI latency or headset proof. Owned renderer trees exited gracefully, and manifests, scratch roots and backdrops were removed.
+
+Focused product evidence: final initial gate 43 passed; earlier overlapping provider/caption gate 323 passed and settings/factory gate 460 passed. After repair, 37 distinct caption checks passed across the composed Scribe and native-caption files; the two new continuation cases were rerun after correcting probe assertions about an empty test prompt and serialized UUIDs. The accepted-text retirement test, expired-family rejection and fresh-socket successor passed. Comparison tooling's final focused gate: 10 passed. Scoped Ruff/Black checks passed; no full-suite or type-check claim. Independent repair review returned `repair_verified`.
+
+### Selected actual translation
+
+At repaired candidate `00ee2630083f`, the three frozen intervals selected 15 complete application requests: 1 for `mt-01`, 5 for `mt-02`, and 9 for `mt-07`. All effective bodies were checked with the production request builder, including explicit source/target/channel, bound prompt variables and exact model/provider options. Repaired-candidate replay matched every selected lineage and body before paid dispatch. A compressed-clock probe missed two Japanese requests; ordinary recorded pacing matched all nine. That probe scheduling difference did not justify changing the product or rerunning recognition.
+
+The original `google/gemma-4-26b-a4b-it` profile was retained: LATENCY/DEFAULT, temperature 0.6, reasoning none, default 100 output tokens and 30-second timeout. One exact historical body/response was reused for `mt-01`; 14 fresh calls all completed with HTTP 200 and the requested model, served by NextBit/Makora. Fresh call durations were 0.396–1.520 seconds. Returned usage totals: 13,357 input tokens, 244 output tokens and USD 0.00115853 reported cost. This is the response-reported charge for these calls, not an invoice or extrapolated product cost.
+
+| Case | Observed translation outcome | Comparison limit |
+|---|---|---|
+| `mt-01`, short single speaker | `Okay.` → `알겠어요.`; exact valid historical response reused. | E0's complete selected group was longer. This is not a matched sentence-quality improvement. |
+| `mt-02`, English speaker change | Complete groups remain understandable: the presentation/borrowing request and the affirmative reply are translated separately. Later joining/regrouping changes the reply wording again. | Five application requests rather than E0's three prepared whole/group units; source context and later group coverage differ. |
+| `mt-07`, Japanese fragmentation | Native boundaries split `やっぱ楽しみ方` into `やっ / ぱ楽しみ / 方…`, producing `앗 / 아, 기대된다 / 방식…`. Another group ends at `健` and leaves that character untranslated. | E0 already fragmented `楽しみ方` and `なんか`; the current policy has not fixed that problem. Native recognized text also changes `ラーメン` to `ラム`; whole/group MT interpret the latter as rum/RAM respectively. |
+
+The result supports integration feasibility, not a translation-quality win. The product faithfully uses native speaker partitions, but those partitions can fall inside words. Preserving source coverage and translating each complete *speaker group* does not restore a broken linguistic unit. A new smoothing rule, a metadata wait, or using speaker IDs only for styling would change policy and needs an owner decision; none was silently added.
+
+### Connected natural Desktop observations
+
+All three cases ran serially at `00ee2630083f` through the repaired admission replay, real caption/output owners, authenticated bridge and actual Desktop/Flet child. The same selected native-capture lineage and effective request bodies reached 1/5/9 retained real replies. Full captured warm-up was preserved through the last selected admission. Each selected response was delayed by its measured service duration; nonselected warm-up/surrounding requests used controlled source echoes. Those echoes are not translation-quality evidence. This is paced replay, not live ASR-to-MT-to-GUI latency.
+
+The three runs exited 0; every renderer reported graceful acknowledged exit 0, with scratch, manifests and owned backdrops removed. There were 17/27/37 pixel samples respectively, targeting 150 ms spacing during selected output, plus independently inspected PNGs.
+
+- `mt-01`: one readable `알겠어요.` / `Okay.` card.
+- `mt-02`: both real speaker groups were readable without clipping, but the affirmative reply appeared before the presentation/borrowing request. Its translation completed faster; current first-renderable registration order is not source-speech order. The reply then visibly changed wording after another group revision.
+- `mt-07`: the actual screen displayed short fragments such as `앗`, `아, 기대된다`, and `, 뭐`, followed by the RAM interpretation. At two adjacent samples approximately 0.19 seconds apart, both cards changed. This is a rapid-content/reordering readability problem, even though no intermediate blank was sampled. The existing ready-first/two-slot/one-second-wait policy does not turn erroneous within-word speaker boundaries into readable sentences.
+- No departed caption identity returned in the sampled selected transitions. The deliberate late-after-expiry/no-revival proof remains the separate synthetic case above. Absence of a sampled blank is not absence of every possible transient.
+
+Actual visual references: `display/natural-2/mt-01/natural-005.png`, `mt-02/natural-013.png`, and `mt-07/natural-011.png` / `natural-014.png`. Per-case `receipt.json` retains request matches, presenter/bridge state, pixel timestamps and cleanup. The initial Desktop wrapper attempt stopped before renderer startup because it read the capture pin from the wrong JSON level; that probe error was corrected, with no extra MT calls.
+
+**Decision:** keep the default provider unchanged. Native speaker IDs are usable for live attribution, but immediate source splitting is not yet a quality recommendation for difficult Japanese dialogue. Changing word-boundary treatment, queue/order policy, or attribution waiting is a separate product choice rather than an unreported fix to this experiment.
+
+### Evidence locations and documentation
+
+Local retained evidence under `.tmp/issue441/scribe-integration/`:
+
+- `experiment/source-method-v4.json`: file SHA-256 `2bf749d22da6f5265872a4525c6cf3ea3500565c2a16c77a41aa9835338d602b`; frozen original inputs and method.
+- `capture/live-1/`, `experiment/capture-live-1.stdout`, `experiment/live-result-1.md`, `experiment/live-summary-1.json`: raw capture, original failure receipt and interpreted boundary evidence.
+- `scores/comparison-1.json`: SHA-256 `3449c784664c5cfa78d6c846dedd7863f064acd07180f589de8b449eaff7332b`; unchanged fixed-point/lexical scoring and retained baselines.
+- `replay/i441-1/selection-index.json`: three selected packs, with separate capture and repaired-application pins.
+- `implementation/evidence.md`, `display/candidate-synthetic-results.md`, and per-case PNG/receipt directories: executed checks and actual Desktop observations.
+- `display/natural-2/prepared.json`, `mt-result.json`, and `mt-07-gate-paced.json`: validated effective bodies, actual MT responses/usage, and repaired-candidate request matching. The earlier compressed-clock gate attempts remain distinct.
+
+`docs/verification.md` now gives a bounded delayed-speaker scenario. Protected documentation was not edited: `docs/architecture.md` does not yet describe the new bounded post-commit speaker-evidence path; `native/overlay/README.md` omits the new still-live lineage rule in its abbreviated Python-ownership summary. Neither implies a native protocol change. User-visible changes are the Scribe v3 route/label and live Peer attribution/group corrections; the default provider and user's saved settings were not switched.
