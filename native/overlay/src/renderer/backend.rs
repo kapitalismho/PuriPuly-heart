@@ -354,6 +354,15 @@ impl CaptionRenderer {
         self.test_incomplete_producer.get() || self.backend.borrow().has_incomplete_producer()
     }
 
+    #[cfg(windows)]
+    pub(crate) fn flush_submitted_frame(&self) {
+        if let RenderBackend::Windows(renderer) = &*self.backend.borrow() {
+            unsafe {
+                renderer.d3d_context.Flush();
+            }
+        }
+    }
+
     pub async fn prepare_frame_for_submission(
         &self,
         cancellation: &ReadinessCancellation,

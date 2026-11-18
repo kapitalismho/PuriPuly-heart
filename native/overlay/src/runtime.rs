@@ -1023,6 +1023,8 @@ impl PresentationRuntime {
             self.retain_failed_presentation_causes(presentation_correlation);
             return Err(RuntimeFailure::OpenVr(error.native_failure().at("submit_frame")));
         }
+        #[cfg(windows)]
+        renderer.flush_submitted_frame();
         if should_show_after_submit {
             self.presentation_diagnostics.configure_event_metadata(
                 "frame_submit_text_visible",

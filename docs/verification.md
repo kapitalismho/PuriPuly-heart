@@ -38,6 +38,8 @@ For startup-timeout or cancellation changes, observe cleanup of any already spaw
 
 When relevant to the change, vary short/long/short content, simultaneous Self/Peer results, or clear/hide followed by a fresh caption. Observe stable layout and channel separation, stale revisions staying superseded, and the new caption returning without resurrecting cleared content.
 
+For sparse SteamVR caption freshness, compare the whole owned destination image with a separate reference render. Record each read's start/end and intervening render/submission activity; a sample that overlaps later work does not prove first-submit delivery. Check transparent pixels separately from overlay visibility, verify the effective child retry profile, and keep compositor timing measurements separate from intrusive texture readback. Readback is not physical headset presentation.
+
 **Environment:** The actual desktop GUI for desktop claims; built native runtime, SteamVR, and headset for VR presentation; VRChat and configured OSC for chatbox presentation. A controlled OSC receiver can prove packet receipt but not the game's visible chatbox. Use prepared input only at the affected production boundary. Peer content must never reach the chatbox, destinations must remain independent, and expired/cleared captions must not reappear. For settings-triggered layout changes, compose with [settings and application management](#settings-and-application-management).
 
 ## Image translation
