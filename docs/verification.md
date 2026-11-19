@@ -76,6 +76,16 @@ Existing opt-in [model/reference experiments](../native/overlay/tests/photo_proc
 
 **Measurements:** Follow the [chatbot benchmark instructions](../benchmarks/chatbot/README.md), [CLI help/results](../benchmarks/chatbot/__main__.py), and [calibration implementation](../benchmarks/chatbot/judging.py). Controlled smoke checks use synthetic responses/state and are not live-model evaluation. Live-model evaluation requires the documented isolated resources and access policy; preserve `blocked_calibration` and other blocked/calibration status rather than treating completed conversations as a calibrated pass. Neither mode proves actual GUI interaction or real application effects. Choose comparisons for the engineering question; do not duplicate the simulator's case inventories, commands, rubrics, or model policy here.
 
+## Native release builds
+
+**Entrypoint:** Request [Native Release](../.github/workflows/release-native.yml) on `dev` with an existing `vMAJOR.MINOR.PATCH` tag, using the Actions UI or `gh workflow run release-native.yml --ref dev -f tag=<tag>`. Pushing a tag no longer starts the full build. The workflow verifies the selected tag's synchronized versions and exact commit, then builds that commit on GitHub-hosted Windows and stages a draft release. Maintainer publication remains separate.
+
+**Immediate build verification:** Run the relevant release-evidence checks and exercise the affected [ASR release builder](../scripts/ci/build-asr-worker-release.ps1) and overlay locked release build in isolated short target directories. For cache changes, retain compiler outputs but assemble fresh final artifacts; a bounded rebuild from an isolated source copy can establish version refresh without changing release tags. Check the staged ASR inventory, hashes, executable versions, and overlay startup contract. A small synthetic Inno compile/extraction can check the configured compression preset and byte preservation, but does not qualify the complete product installer.
+
+**Hosted evidence:** Record the selected tag/SHA, `dev` cache scope, compiler paths, and restore/save results from the workflow logs. Cache hits still run normal locked builds and the existing packaged-runtime, metadata, host startup, overlay startup-contract, and ASR version checks. Local compiler reuse is not evidence of GitHub cache transfer or a hosted speedup. Report unavailable hosted checks explicitly; do not claim installer size savings or release-time improvements without measurements.
+
+Keep the extensive `-VerifyInstallerLifecycle` path in [the artifact builder](../scripts/ci/build-native-release-artifacts.ps1) opt-in for relevant installer behavior changes. Compiler caching and compression changes do not require a repeated release campaign.
+
 ## Compose, maintain, report
 
 Examples of selection, not additional required scenarios:

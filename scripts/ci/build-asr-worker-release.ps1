@@ -18,8 +18,7 @@ foreach ($relative in @("Include\vulkan\vulkan.h", "Lib\vulkan-1.lib", "Bin\glsl
 $TargetDir = [System.IO.Path]::GetFullPath($TargetDir)
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 $buildId = [Guid]::NewGuid().ToString("N")
-$freshTarget = Join-Path $TargetDir $buildId
-New-Item -ItemType Directory -Path $freshTarget | Out-Null
+New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
 $environment = @{}
 $names = @(Get-ChildItem Env: | Where-Object {
     $_.Name -match '^(CMAKE.*|TRANSCRIBE_.*|GGML_.*|(?:(?:HOST|TARGET)_)?(?:CFLAGS.*|CXXFLAGS.*|CPPFLAGS.*|LDFLAGS.*|CC.*|CXX.*|CMAKE.*)|CL|_CL_|LINK|_LINK_|RUSTFLAGS|CARGO_ENCODED_RUSTFLAGS|RUSTC.*|CARGO_BUILD_RUST.*|CARGO_BUILD_TARGET|CARGO_TARGET_.*)$'
@@ -35,9 +34,9 @@ try {
     $env:TRANSCRIBE_CMAKE_ARGS = "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF -DCMAKE_SUPPRESS_REGENERATION=ON -DCMAKE_PROJECT_transcribe_INCLUDE=`"$languagePatch`""
     $env:CMAKE_PREFIX_PATH = $env:VULKAN_SDK
     $env:RUSTFLAGS = "-C target-cpu=x86-64"
-    & cargo build --manifest-path native/asr_worker/Cargo.toml --locked --release --bin PuriPulyHeartASRWorker --target x86_64-pc-windows-msvc --target-dir $freshTarget
+    & cargo build --manifest-path native/asr_worker/Cargo.toml --locked --release --bin PuriPulyHeartASRWorker --target x86_64-pc-windows-msvc --target-dir $TargetDir
     if ($LASTEXITCODE -ne 0) { throw "ASR worker Cargo build failed: $LASTEXITCODE" }
-    $release = Join-Path $freshTarget "x86_64-pc-windows-msvc\release"
+    $release = Join-Path $TargetDir "x86_64-pc-windows-msvc\release"
     $sources = Get-Content -LiteralPath (Join-Path $release "asr-worker-runtime-sources.json") -Raw | ConvertFrom-Json
     if ($sources.schema_version -ne 1) { throw "Unsupported ASR runtime source inventory" }
     $files = [ordered]@{}
@@ -95,12 +94,12 @@ try {
     $record = [ordered]@{
         schema_version = 1
         build_id = $buildId
-        target_dir = $freshTarget
+        target_dir = $TargetDir
         cpu_selection = "upstream-cpuid"
         files = $inventory
     }
     $record | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $oldInventory -Encoding utf8NoBOM
-    Write-Host "ASR worker runtime staged from $freshTarget to $OutputDir"
+    Write-Host "ASR worker runtime staged from $TargetDir to $OutputDir"
 } finally {
     Pop-Location
     foreach ($name in $environment.Keys) {
