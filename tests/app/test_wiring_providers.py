@@ -1536,14 +1536,13 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
     assert self_backend.language_hints_strict is True
     assert peer_backend.language_hints == ["en"]
     assert peer_backend.language_hints_strict is False
-    assert self_backend.enable_speaker_diarization is True
-    assert peer_backend.enable_speaker_diarization is True
+    assert self_backend.enable_speaker_diarization is False
+    assert peer_backend.enable_speaker_diarization is False
 
 
 def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channels() -> None:
-    enabled_settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
-    settings = enabled_settings
-    settings = replace(
+    settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
+    enabled_settings = replace(
         settings,
         intent=replace(
             settings.intent,
@@ -1551,7 +1550,7 @@ def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channel
                 settings.intent.stt,
                 soniox=replace(
                     settings.intent.stt.soniox,
-                    enable_speaker_diarization=False,
+                    enable_speaker_diarization=True,
                 ),
             ),
         ),
@@ -1612,7 +1611,7 @@ def test_scribe_diarization_only_changes_direct_peer_runtime() -> None:
             assert isinstance(member, ElevenLabsScribeSTTBackend) and not member.diarize
         else:
             assert isinstance(backend, SonioxRealtimeSTTBackend)
-            assert backend.enable_speaker_diarization is True
+            assert backend.enable_speaker_diarization is False
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:

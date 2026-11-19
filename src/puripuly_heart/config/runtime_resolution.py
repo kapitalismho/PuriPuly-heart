@@ -754,7 +754,7 @@ class STTRuntimeIntent:
     soniox_keepalive_interval_s: float = SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S
     soniox_trailing_silence_ms: int = SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS
     soniox_enable_language_identification: bool = False
-    soniox_enable_speaker_diarization: bool = True
+    soniox_enable_speaker_diarization: bool = False
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
     qwen_audio_language_hints: tuple[str, ...] | None = None

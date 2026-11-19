@@ -1435,7 +1435,7 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("keepalive_interval_s"),
         resolved.provider_options.get("trailing_silence_ms"),
         resolved.provider_options.get("enable_language_identification", False),
-        resolved.provider_options.get("enable_speaker_diarization", True),
+        resolved.provider_options.get("enable_speaker_diarization", False),
         resolved.provider_options.get("language_hints"),
         resolved.provider_options.get("language_codes"),
         resolved.provider_options.get("language_code"),

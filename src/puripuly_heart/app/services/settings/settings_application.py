@@ -246,6 +246,9 @@ def settings_view_surface_snapshots(
             intent.stt.cloud_free_tier_providers
         ),
         soniox_speaker_diarization_enabled=intent.stt.soniox.enable_speaker_diarization,
+        scribe_speaker_diarization_enabled=(
+            intent.stt.elevenlabs_scribe.enable_speaker_diarization
+        ),
         llm_provider=LLMProviderName(
             provider_llm_for_translation(translation.model, translation.connection)
         ),
