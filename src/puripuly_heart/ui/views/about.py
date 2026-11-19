@@ -1,6 +1,7 @@
 """About page view with version, credits, acknowledgments, and license info."""
 
 import webbrowser
+from dataclasses import dataclass
 
 import flet as ft
 
@@ -20,6 +21,7 @@ from puripuly_heart.ui.theme import (
 )
 
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
+_SPECIAL_THANKS_AVATAR_SIZE = 96
 
 
 def _load_third_party_notices() -> str:
@@ -40,6 +42,56 @@ def _get_profile_image_path() -> str:
         return str(current_runtime_layout().package_resource("data", "pictures", "salee_pic.png"))
     except Exception:
         return ""
+
+
+def _get_special_thanks_image_path(image_file: str) -> str:
+    """Get a Special Thanks avatar path from package data, or "" when it is not bundled."""
+    try:
+        path = current_runtime_layout().package_resource(
+            "data", "pictures", "special_thanks", image_file
+        )
+    except Exception:
+        return ""
+    return str(path) if path.is_file() else ""
+
+
+def _special_thanks_initial(display_name: str) -> str:
+    """Return the first letter shown when a Special Thanks avatar is not bundled."""
+    return next((char for char in display_name if char.isalnum()), "?").upper()
+
+
+@dataclass(frozen=True, slots=True)
+class SpecialThanksEntry:
+    name_key: str
+    image_file: str
+    url: str | None = None
+
+
+SPECIAL_THANKS_COLUMNS = 3
+
+# Special thanks entries - add new people here, update locale bundles,
+# and place the avatar in data/pictures/special_thanks/
+SPECIAL_THANKS_ENTRIES: tuple[SpecialThanksEntry, ...] = (
+    SpecialThanksEntry("about.special_thanks.name.sui_32c", "sui_32c.png"),
+    SpecialThanksEntry("about.special_thanks.name.nagikokoro", "nagikokoro.png"),
+    SpecialThanksEntry("about.special_thanks.name.motoka96", "motoka96.png"),
+    SpecialThanksEntry("about.special_thanks.name.ykol", "ykol.png"),
+    SpecialThanksEntry("about.special_thanks.name.kascr", "kascr.png"),
+    SpecialThanksEntry("about.special_thanks.name.just_monika_v", "just_monika_v.png"),
+    SpecialThanksEntry("about.special_thanks.name.fluvia", "fluvia.png"),
+    SpecialThanksEntry("about.special_thanks.name.han_chole", "han_chole.png"),
+    SpecialThanksEntry("about.special_thanks.name.ea_pe", "ea_pe.png"),
+    SpecialThanksEntry("about.special_thanks.name.ephedrine", "ephedrine.png"),
+    SpecialThanksEntry("about.special_thanks.name.eri", "eri.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.fzcfweasdferttgg_png", "fzcfweasdferttgg_png.png"
+    ),
+    SpecialThanksEntry("about.special_thanks.name.welcius", "welcius.png"),
+    SpecialThanksEntry("about.special_thanks.name.nunu299", "nunu299.png"),
+    SpecialThanksEntry("about.special_thanks.name.tsuyu_shiro", "tsuyu_shiro.png"),
+    SpecialThanksEntry("about.special_thanks.name.garanshiro", "garanshiro.png"),
+    SpecialThanksEntry("about.special_thanks.name.koz39", "koz39.png"),
+)
 
 
 class AboutView(ft.Column):
@@ -200,40 +252,20 @@ class AboutView(ft.Column):
 
         return self._wrap_card(card_content)
 
-    # Special thanks name keys - add new names here and update locale bundles
-    _SPECIAL_THANKS_NAME_KEYS = [
-        "about.special_thanks.name.sui_32c",
-        "about.special_thanks.name.nagikokoro",
-        "about.special_thanks.name.motoka96",
-        "about.special_thanks.name.ykol",
-        "about.special_thanks.name.kascr",
-        "about.special_thanks.name.just_monika_v",
-        "about.special_thanks.name.fluvia",
-        "about.special_thanks.name.han_chole",
-        "about.special_thanks.name.ea_pe",
-        "about.special_thanks.name.ephedrine",
-        "about.special_thanks.name.eri",
-        "about.special_thanks.name.fzcfweasdferttgg_png",
-        "about.special_thanks.name.welcius",
-        "about.special_thanks.name.nunu299",
-        "about.special_thanks.name.tsuyu_shiro",
-        "about.special_thanks.name.garanshiro",
-        "about.special_thanks.name.koz39",
-    ]
-
     def _build_special_thanks_card(self) -> ft.Control:
-        """Build Special Thanks section."""
-        thanks_items = []
-        for name_key in self._SPECIAL_THANKS_NAME_KEYS:
-            name = t(name_key)
-            item = ft.Container(
-                content=ft.Text(name, size=28, color=COLOR_ON_BACKGROUND),
-                on_hover=self._on_thanks_hover,
-            )
-            thanks_items.append(item)
+        """Build Special Thanks section as a grid of people inside one card."""
+        people = [self._build_special_thanks_person(entry) for entry in SPECIAL_THANKS_ENTRIES]
 
-        # Add "and you!" at the end
-        thanks_items.append(ft.Text("\nand you!", size=28, color=COLOR_ON_BACKGROUND, italic=True))
+        grid_rows = []
+        for start in range(0, len(people), SPECIAL_THANKS_COLUMNS):
+            row_people = people[start : start + SPECIAL_THANKS_COLUMNS]
+            row_people += [ft.Container()] * (SPECIAL_THANKS_COLUMNS - len(row_people))
+            grid_rows.append(
+                ft.Row(
+                    controls=[ft.Container(content=person, expand=True) for person in row_people],
+                    spacing=24,
+                )
+            )
 
         card_content = ft.Column(
             controls=[
@@ -244,19 +276,63 @@ class AboutView(ft.Column):
                     color=COLOR_SECONDARY,
                 ),
                 ft.Container(height=16),
+                ft.Column(controls=grid_rows, spacing=28),
                 ft.Container(
-                    content=ft.Column(
-                        controls=thanks_items,
-                        spacing=8,
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    width=float("inf"),
+                    content=ft.Text("and you!", size=28, color=COLOR_ON_BACKGROUND, italic=True),
+                    alignment=_CENTER_ALIGNMENT,
+                    padding=ft.Padding.only(top=24),
                 ),
             ],
-            spacing=8,
         )
 
         return self._wrap_card(card_content, height=None)
+
+    def _build_special_thanks_person(self, entry: SpecialThanksEntry) -> ft.Control:
+        """Build one Special Thanks person with a round avatar and a name."""
+        display_name = t(entry.name_key)
+        image_path = _get_special_thanks_image_path(entry.image_file)
+        avatar = ft.Container(
+            content=(
+                ft.Image(
+                    src=image_path,
+                    width=_SPECIAL_THANKS_AVATAR_SIZE,
+                    height=_SPECIAL_THANKS_AVATAR_SIZE,
+                    fit=ft.BoxFit.COVER,
+                    border_radius=_SPECIAL_THANKS_AVATAR_SIZE,
+                )
+                if image_path
+                else ft.Text(
+                    _special_thanks_initial(display_name),
+                    size=40,
+                    weight=ft.FontWeight.BOLD,
+                    color=COLOR_SECONDARY,
+                )
+            ),
+            width=_SPECIAL_THANKS_AVATAR_SIZE,
+            height=_SPECIAL_THANKS_AVATAR_SIZE,
+            border_radius=_SPECIAL_THANKS_AVATAR_SIZE,
+            bgcolor=ft.Colors.WHITE,
+            alignment=_CENTER_ALIGNMENT,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+        )
+        name = ft.Text(
+            display_name,
+            size=28,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_ON_BACKGROUND,
+            max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        return ft.Container(
+            content=ft.Row(
+                controls=[avatar, ft.Container(content=name, expand=True)],
+                spacing=16,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            on_click=(lambda _, u=entry.url: webbrowser.open(u)) if entry.url else None,
+            on_hover=self._on_thanks_hover,
+            data=name,
+        )
 
     def _build_licenses_card(self) -> ft.Control:
         """Build Open Source Licenses section."""
@@ -319,8 +395,8 @@ class AboutView(ft.Column):
         text.update()
 
     def _on_thanks_hover(self, e):
-        """Handle hover on thanks text."""
-        text = e.control.content
+        """Handle hover on a Special Thanks person."""
+        text = e.control.data
         text.color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         text.update()
 
