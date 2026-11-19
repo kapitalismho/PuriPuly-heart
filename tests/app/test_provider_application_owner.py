@@ -300,7 +300,10 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
 
 
 @pytest.mark.asyncio
-async def test_provider_application_owner_runtime_only_apply_does_not_persist() -> None:
+@pytest.mark.parametrize("preserve_draft", [False, True])
+async def test_provider_application_owner_runtime_only_apply_does_not_persist(
+    preserve_draft: bool,
+) -> None:
     events: list[object] = []
     owner = _owner(
         settings=FakeSettingsOwner(AppSettingsVNext(), events),
@@ -310,24 +313,12 @@ async def test_provider_application_owner_runtime_only_apply_does_not_persist() 
         events=events,
     )
 
-    result = await owner.apply(persist_settings=False)
+    if preserve_draft:
+        result = await owner.apply(persist_settings=False, refresh_ui=False)
+    else:
+        result = await owner.apply(persist_settings=False)
 
     assert result is True
-    assert events == ["preserve", "capture", "plan", "runtime", "sync_ui"]
-
-
-@pytest.mark.asyncio
-async def test_provider_application_owner_runtime_only_apply_can_preserve_ui_draft() -> None:
-    events: list[object] = []
-    owner = _owner(
-        settings=FakeSettingsOwner(AppSettingsVNext(), events),
-        runtime=FakeRuntimeOwner(events),
-        service=RecordingMutationService([]),
-        results=SettingsTransactionResultOwner(),
-        events=events,
+    assert events == ["preserve", "capture", "plan", "runtime"] + (
+        [] if preserve_draft else ["sync_ui"]
     )
-
-    result = await owner.apply(persist_settings=False, refresh_ui=False)
-
-    assert result is True
-    assert events == ["preserve", "capture", "plan", "runtime"]

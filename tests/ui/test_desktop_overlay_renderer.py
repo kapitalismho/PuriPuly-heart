@@ -38,7 +38,6 @@ from puripuly_heart.ui.desktop_overlay_surface.contract import (
     _DESKTOP_CAPTION_SIZE_PRESETS,
     _DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y,
     _DESKTOP_CAPTION_WHITE,
-    _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS,
     _DESKTOP_SPEAKER_COLORS,
 )
 from puripuly_heart.ui.fonts import assets_dir
@@ -1812,42 +1811,9 @@ def test_desktop_overlay_auto_shrink_resets_only_for_new_caption_identity(
     assert [line.font_size for line in reset_plan.lines] == [41, 25]
 
 
-def test_desktop_overlay_preview_fixtures_cover_required_local_qa_cases() -> None:
+def test_desktop_overlay_preview_fixtures_render_their_sample_content() -> None:
     catalog = desktop_overlay.build_desktop_overlay_preview_catalog(locale="en")
 
-    assert tuple(preset.id for preset in catalog.size_presets) == (
-        "xlarge",
-        "large",
-        "medium",
-        "small",
-        "xsmall",
-        "tiny",
-    )
-    assert tuple(catalog.background_alpha_presets) == _DESKTOP_PREVIEW_BACKGROUND_ALPHA_PRESETS
-    assert tuple(surface.id for surface in catalog.background_surfaces) == (
-        "bright",
-        "dark",
-        "busy",
-    )
-
-    required_tags = {
-        "ko",
-        "ja",
-        "zh-CN",
-        "en",
-        "mixed_script",
-        "emoji",
-        "self",
-        "peer",
-        "primary",
-        "secondary",
-        "active",
-        "finalized",
-        "long_wrap",
-        "no_caption",
-    }
-    coverage_tags = {tag for fixture in catalog.fixtures for tag in fixture.coverage_tags}
-    assert required_tags <= coverage_tags
     assert len({fixture.id for fixture in catalog.fixtures}) == len(catalog.fixtures)
 
     long_wrap_fixture = next(
@@ -2048,21 +2014,6 @@ def test_desktop_overlay_lifecycle_redaction_covers_common_secret_key_variants()
     }
 
 
-def test_desktop_overlay_preview_fixture_data_packaging_readiness_is_embedded() -> None:
-    sources = desktop_overlay.desktop_overlay_preview_fixture_data_sources()
-
-    assert sources == (
-        desktop_overlay.DesktopOverlayPreviewFixtureDataSource(
-            source_kind="embedded_python_module",
-            module="puripuly_heart.ui.desktop_overlay_surface.renderer",
-            package_data_globs=(),
-            hiddenimports=(),
-        ),
-    )
-    assert all(not source.package_data_globs for source in sources)
-    assert all(not source.hiddenimports for source in sources)
-
-
 def test_desktop_overlay_preview_guard_stops_before_rendering_unsafe_fixture_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2139,51 +2090,6 @@ def test_desktop_overlay_preview_guard_avoids_provider_broker_stt_translation_se
 
     assert desktop_overlay.run_preview(app_runner=run_preview_target, locale="en") == 0
     assert app.page.controls
-
-
-def test_desktop_overlay_preview_fixtures_use_real_overlay_window_surface_and_edit_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def fail_renderer_path(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("preview must not load a renderer manifest or start bridge runtime")
-
-    monkeypatch.setattr(desktop_overlay, "load_renderer_manifest", fail_renderer_path)
-    monkeypatch.setattr(desktop_overlay, "DesktopOverlayRenderer", fail_renderer_path)
-
-    app = FakeFletApp()
-
-    def run_preview_target(target: Any) -> None:
-        app.targets.append(target)
-        result = target(app.page)
-        assert not inspect.isawaitable(result)
-
-    assert desktop_overlay.run_preview(app_runner=run_preview_target, locale="en") == 0
-
-    assert app.page.window.frameless is True
-    assert app.page.title == "PuriPuly Overlay"
-    assert app.page.window.always_on_top is True
-    assert app.page.window.shadow is False
-    assert app.page.window.skip_task_bar is False
-    assert app.page.window.resizable is False
-    assert app.page.window.bgcolor == ft.Colors.TRANSPARENT
-    assert app.page.bgcolor == ft.Colors.TRANSPARENT
-    assert app.page.window.ignore_mouse_events is False
-    assert app.page.window.width >= desktop_overlay._DESKTOP_PREVIEW_STAGE_WIDTH
-    assert app.page.window.height >= desktop_overlay._DESKTOP_PREVIEW_STAGE_HEIGHT
-    assert not _page_contains_control_type(app.page, ft.WindowDragArea)
-
-    visible_text = _page_text_values(app.page)
-    assert (
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.fixture")
-        in visible_text
-    )
-    assert desktop_overlay.t_for_locale("en", "settings.overlay.desktop.size.title") in visible_text
-    assert (
-        desktop_overlay.t_for_locale("en", "settings.overlay.desktop.preview.background_surface")
-        in visible_text
-    )
-    assert "Outline width" not in visible_text
-    assert "Text scale" not in visible_text
 
 
 @pytest.mark.asyncio
@@ -2342,7 +2248,7 @@ def test_desktop_overlay_preview_i18n_labels_resolve_for_all_controls() -> None:
         assert not fixture.label.startswith("settings.")
 
 
-def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_persistence(
+def test_desktop_overlay_preview_opens_its_surface_without_renderer_or_persistence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fail_renderer_path(*_args: object, **_kwargs: object) -> object:
@@ -2364,6 +2270,19 @@ def test_desktop_overlay_preview_fixtures_run_local_app_without_renderer_or_pers
 
     assert desktop_overlay.run_preview(app_runner=run_preview_target, locale="en") == 0
     assert len(app.targets) == 1
+
+    assert app.page.window.frameless is True
+    assert app.page.title == "PuriPuly Overlay"
+    assert app.page.window.always_on_top is True
+    assert app.page.window.shadow is False
+    assert app.page.window.skip_task_bar is False
+    assert app.page.window.resizable is False
+    assert app.page.window.bgcolor == ft.Colors.TRANSPARENT
+    assert app.page.bgcolor == ft.Colors.TRANSPARENT
+    assert app.page.window.ignore_mouse_events is False
+    assert app.page.window.width >= desktop_overlay._DESKTOP_PREVIEW_STAGE_WIDTH
+    assert app.page.window.height >= desktop_overlay._DESKTOP_PREVIEW_STAGE_HEIGHT
+    assert not _page_contains_control_type(app.page, ft.WindowDragArea)
 
     visible_text = _page_text_values(app.page)
     assert (

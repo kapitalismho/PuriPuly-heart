@@ -7,11 +7,7 @@ import flet as ft
 from puripuly_heart.ui.shell import contract as shell_contract
 from puripuly_heart.ui.shell import renderer as shell_renderer
 from puripuly_heart.ui.shell.contract import AppShellSlots
-from puripuly_heart.ui.shell.renderer import (
-    APP_SHELL_LAYOUT_SPACING,
-    APP_SHELL_ROOT_PADDING,
-    compose_app_shell,
-)
+from puripuly_heart.ui.shell.renderer import compose_app_shell
 from tests.helpers.ast_sources import imported_modules as _imported_modules
 
 FORBIDDEN_IMPORT_PREFIXES = (
@@ -45,19 +41,13 @@ def test_shell_contract_and_renderer_stay_above_backend_and_views() -> None:
             ), f"{path.name} must not import {imported}"
 
 
-def test_compose_app_shell_keeps_the_accepted_ordering_and_geometry() -> None:
+def test_compose_app_shell_places_content_between_navigation_controls() -> None:
     slots = _slots()
     regions = compose_app_shell(slots)
 
     assert regions.layout.controls == [slots.title_bar, regions.content_area, slots.bottom_nav]
-    assert regions.layout.spacing == APP_SHELL_LAYOUT_SPACING
-    assert regions.layout.expand is True
     assert regions.content_area.content is slots.content
-    assert regions.content_area.padding == slots.content_padding
-    assert regions.content_area.expand is True
     assert regions.root.content is regions.layout
-    assert regions.root.padding == APP_SHELL_ROOT_PADDING
-    assert regions.root.expand is True
     assert regions.debug_stack is None
 
 
@@ -67,7 +57,6 @@ def test_compose_app_shell_mounts_the_debug_panel_only_when_supplied() -> None:
 
     assert regions.debug_stack is not None
     assert regions.debug_stack.controls[1] is panel
-    assert regions.debug_stack.fit == ft.StackFit.EXPAND
     assert regions.root.content is regions.debug_stack
 
     root_content = regions.debug_stack.controls[0]

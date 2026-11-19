@@ -329,7 +329,16 @@ def test_corrupted_secret_material_preserves_existing_authority_for_recovery() -
     assert store.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "managed-key"
 
 
-def test_broker_public_key_mismatch_preserves_existing_authority_for_recovery() -> None:
+@pytest.mark.parametrize(
+    ("broker_installation_id", "broker_device_public_key"),
+    [
+        pytest.param(None, "broker-mismatch-public-key", id="device-public-key"),
+        pytest.param("01961ad7-a7c1-7000-8000-aaaaaaaaaaaa", None, id="installation-id"),
+    ],
+)
+def test_broker_binding_mismatch_preserves_existing_authority_for_recovery(
+    broker_installation_id: str | None, broker_device_public_key: str | None
+) -> None:
     settings = ReleaseSettings()
     store = InMemorySecretStore()
 
@@ -346,34 +355,8 @@ def test_broker_public_key_mismatch_preserves_existing_authority_for_recovery() 
         ensure_managed_identity_bundle(
             _managed_state(settings),
             store,
-            broker_device_public_key="broker-mismatch-public-key",
-        )
-
-    assert settings.managed_identity.installation_id == first.installation_id
-    assert managed_identity_payload(settings) == before
-    assert store.get(MANAGED_DEVICE_PRIVATE_KEY_SECRET) == private_before
-    assert store.get(OPENROUTER_BYOK_API_KEY_SECRET) == "byok-key"
-    assert store.get(OPENROUTER_MANAGED_API_KEY_SECRET) == "managed-key"
-
-
-def test_broker_installation_id_mismatch_preserves_existing_authority_for_recovery() -> None:
-    settings = ReleaseSettings()
-    store = InMemorySecretStore()
-
-    first = ensure_managed_identity_bundle(_managed_state(settings), store)
-    settings.managed_identity.release_token = "release-1"
-    settings.managed_identity.release_token_expires_at = "2026-04-08T06:00:45.000Z"
-    store.set(OPENROUTER_BYOK_API_KEY_SECRET, "byok-key")
-    store.set(OPENROUTER_MANAGED_API_KEY_SECRET, "managed-key")
-
-    before = managed_identity_payload(settings)
-    private_before = store.get(MANAGED_DEVICE_PRIVATE_KEY_SECRET)
-
-    with pytest.raises(ValueError, match="requires recovery"):
-        ensure_managed_identity_bundle(
-            _managed_state(settings),
-            store,
-            broker_installation_id="01961ad7-a7c1-7000-8000-aaaaaaaaaaaa",
+            broker_installation_id=broker_installation_id,
+            broker_device_public_key=broker_device_public_key,
         )
 
     assert settings.managed_identity.installation_id == first.installation_id

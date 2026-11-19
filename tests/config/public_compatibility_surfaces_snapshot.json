@@ -207,57 +207,5 @@
     "resolved_runtime_forbidden_alias_fields": [
       "selection_alias"
     ]
-  },
-  "guard_coverage": {
-    "secret_store": [
-      "tests/config/test_public_compatibility_surfaces.py::test_settings_serialization_excludes_secret_store_registry_keys",
-      "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_fixture_decrypts_and_freezes_wire_format",
-      "tests/config/test_public_compatibility_surfaces.py::test_secret_store_encrypted_file_path_resolution_and_env_passphrase",
-      "tests/app/test_wiring_secrets.py::test_create_secret_store_encrypted_file_resolves_relative_path",
-      "tests/app/test_wiring_secrets.py::test_create_secret_store_encrypted_file_requires_passphrase",
-      "tests/app/test_wiring_providers.py::test_create_llm_provider_openrouter_uses_env_fallback",
-      "tests/app/test_wiring_providers.py::test_create_llm_provider_local_llm_ignores_optional_env_key",
-      "tests/app/test_wiring_providers.py::test_create_llm_provider_local_llm_uses_secret_store_key_even_when_env_is_set",
-      "tests/core/test_encrypted_secret_store.py::test_retained_stores_observe_new_keys_rotations_and_deletions",
-      "tests/config/test_config_and_secrets.py::test_encrypted_file_secret_store_does_not_store_plaintext",
-      "tests/core/test_openrouter_credentials.py::test_resolve_openrouter_credentials_uses_selected_byok_key_without_managed_fallback"
-    ],
-    "broker_v1": [
-      "tests/core/test_managed_openrouter_broker_client.py::test_challenge_parses_fingerprint_salt",
-      "tests/core/test_managed_openrouter_broker_client.py::test_start_discord_oauth_posts_redirect_and_parses_success_payload",
-      "tests/core/test_managed_openrouter_broker_client.py::test_issue_discord_managed_key_posts_signed_payload_and_parses_success",
-      "tests/core/test_managed_openrouter_broker_client.py::test_nested_broker_error_envelope_becomes_release_error"
-    ],
-    "overlay": [
-      "tests/config/test_public_compatibility_surfaces.py::test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape",
-      "tests/config/test_public_compatibility_surfaces.py::test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff",
-      "tests/core/test_overlay_manifest.py::test_overlay_manifest_round_trips_contract_fields",
-      "tests/core/test_overlay_manifest.py::test_overlay_manifest_rejects_live_runtime_state_fields",
-      "tests/core/test_overlay_protocol.py::test_overlay_presentation_snapshot_round_trips_blocks_and_calibration",
-      "tests/core/test_overlay_bridge.py::test_overlay_bridge_sends_authenticated_initial_snapshot",
-      "tests/app/test_overlay_process_manager.py::test_overlay_process_manager_waits_for_overlay_ready_before_connected",
-      "tests/app/test_desktop_overlay_runner.py::test_overlay_manifest_serialization_omits_target_and_desktop_runtime_fields",
-      "tests/ui/test_desktop_overlay_renderer.py::test_desktop_overlay_snapshot_mapping_roles_secondary_promotion_and_channel_colors"
-    ],
-    "prompt_loader": [
-      "tests/config/test_public_compatibility_surfaces.py::test_prompt_loader_prefers_named_files_then_defaults",
-      "tests/config/test_prompt_loader.py::test_load_prompt_for_llm_providers_uses_shared_translation_prompt",
-      "tests/config/test_prompt_loader.py::test_load_prompt_for_provider_requires_translation_prompt_for_llm_provider",
-      "tests/config/test_prompt_loader.py::test_get_default_prompt_reads_translation_prompt"
-    ],
-    "provider_aliases": [
-      "tests/config/test_config_and_secrets.py::test_openrouter_alias_for_fields_does_not_expose_deepseek_v4_pro"
-    ],
-    "provider_runtime_public_config": [
-      "tests/config/test_public_compatibility_surfaces.py::test_provider_runtime_public_config_snapshot_matches_resolved_contracts",
-      "tests/config/test_runtime_resolution.py::test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime"
-    ],
-    "i18n_parity": [
-      "tests/ui/test_i18n_key_usage.py::test_i18n_bundles_share_the_same_keys"
-    ],
-    "packaging": [
-      "tests/release_evidence/test_local_asr_installer.py::test_compiled_identity_and_current_schema_telemetry_reader"
-    ]
-  },
-  "blockers": []
+  }
 }

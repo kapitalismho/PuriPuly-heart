@@ -73,16 +73,18 @@ def test_calibration_rejects_invalid_numeric_input_without_discovery_or_disclosu
     assert value not in output.out + output.err
 
 
-def test_auth_login_stdin_keeps_identity_and_credential_out_of_output(monkeypatch, capsys):
-    credential = "private-credential-unique"
-    identity = "private-identity-unique"
+@pytest.mark.parametrize("provider", ["qq", "discord"])
+def test_auth_login_accepts_supported_stdin_without_echoing_credentials(
+    monkeypatch, capsys, provider
+):
+    fields = (
+        {"qq_identity": "private-identity-unique", "credential": "private-credential-unique"}
+        if provider == "qq"
+        else {}
+    )
     submitted = []
     monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
-    monkeypatch.setattr(
-        sys,
-        "stdin",
-        io.StringIO(json.dumps({"qq_identity": identity, "credential": credential})),
-    )
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(fields)))
 
     async def fake_request(_record, method, arguments=None, *, timeout):
         assert method == "submit"
@@ -95,14 +97,13 @@ def test_auth_login_stdin_keeps_identity_and_credential_out_of_output(monkeypatc
         }
 
     monkeypatch.setattr(cli, "request", fake_request)
-    assert cli.main(["auth", "login", "qq", "--stdin"]) == 0
+    assert cli.main(["auth", "login", provider, "--stdin"]) == 0
     assert submitted[0]["values"] == {
-        "provider": "qq",
-        "qq_identity": identity,
-        "credential": credential,
+        "provider": provider,
+        **fields,
         "open_browser": False,
     }
     output = capsys.readouterr()
-    assert credential not in output.out + output.err
-    assert identity not in output.out + output.err
+    for value in fields.values():
+        assert value not in output.out + output.err
     assert json.loads(output.out)["status"] == "applied"

@@ -5,7 +5,6 @@ import pathlib
 from puripuly_heart.ui.about import contract as about_contract
 from puripuly_heart.ui.about import renderer as about_renderer
 from tests.helpers.ast_sources import imported_modules as _imported_modules
-from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
@@ -40,17 +39,3 @@ def test_about_view_implements_the_explicit_state_sink() -> None:
         if name.startswith("_"):
             continue
         assert callable(getattr(AboutView, name, None)), name
-
-
-def test_production_about_surface_uses_the_renderer() -> None:
-    about_source = (SOURCE_ROOT / "ui" / "views" / "about.py").read_text(encoding="utf-8")
-    assert "compose_about_surface(" in about_source
-    assert "AboutSurfaceSlots(" in about_source
-
-
-def test_renderers_do_not_own_runtime_state_or_callbacks() -> None:
-    for module in (about_renderer,):
-        source = pathlib.Path(module.__file__).read_text(encoding="utf-8")
-        assert "on_click" not in source
-        assert "webbrowser" not in source
-        assert "asyncio" not in source

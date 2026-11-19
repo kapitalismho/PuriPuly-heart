@@ -1,50 +1,32 @@
 from __future__ import annotations
 
 import ast
-import importlib
 from pathlib import Path
 
 import pytest
 
-MODULE_NAME = "puripuly_heart.core.stt.local_qwen_hallucination"
-
-
-def _load_detector_module():
-    try:
-        return importlib.import_module(MODULE_NAME)
-    except ModuleNotFoundError as exc:
-        if exc.name == MODULE_NAME:
-            pytest.fail(f"Detector module is missing: {MODULE_NAME}")
-        raise
+from puripuly_heart.core.stt import local_qwen_hallucination as detector
 
 
 def test_known_local_qwen_hallucination_set_contains_only_selected_artifacts() -> None:
-    module = _load_detector_module()
-
-    assert module.KNOWN_LOCAL_QWEN_HALLUCINATIONS == frozenset({"leşme", "acia"})
+    assert detector.KNOWN_LOCAL_QWEN_HALLUCINATIONS == frozenset({"leşme", "acia"})
 
 
 @pytest.mark.parametrize("text", ["leşme", "acia", "  leşme  ", "\tacia\r\n"])
 def test_known_local_qwen_hallucination_detector_accepts_exact_artifacts_after_strip(
     text: str,
 ) -> None:
-    module = _load_detector_module()
-
-    assert module.is_known_local_qwen_hallucination(text) is True
-
-
-@pytest.mark.parametrize("text", ["的答案", "虚构", "夫", "夫夫", "格力"])
-def test_known_local_qwen_hallucination_detector_rejects_chinese_looking_exclusions(
-    text: str,
-) -> None:
-    module = _load_detector_module()
-
-    assert module.is_known_local_qwen_hallucination(text) is False
+    assert detector.is_known_local_qwen_hallucination(text) is True
 
 
 @pytest.mark.parametrize(
     "text",
     [
+        "的答案",
+        "虚构",
+        "夫",
+        "夫夫",
+        "格力",
         "",
         "   ",
         "Leşme",
@@ -60,19 +42,14 @@ def test_known_local_qwen_hallucination_detector_rejects_chinese_looking_exclusi
         "xaciax",
     ],
 )
-def test_known_local_qwen_hallucination_detector_rejects_partial_case_and_fuzzy_variants(
-    text: str,
-) -> None:
-    module = _load_detector_module()
-
-    assert module.is_known_local_qwen_hallucination(text) is False
+def test_known_local_qwen_hallucination_detector_rejects_other_text(text: str) -> None:
+    assert detector.is_known_local_qwen_hallucination(text) is False
 
 
 def test_known_local_qwen_hallucination_detector_has_no_ui_settings_provider_or_flet_imports() -> (
     None
 ):
-    module = _load_detector_module()
-    module_path = Path(module.__file__)
+    module_path = Path(detector.__file__)
     tree = ast.parse(module_path.read_text(encoding="utf-8"))
     imports: list[str] = []
 

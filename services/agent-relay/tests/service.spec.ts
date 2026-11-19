@@ -70,8 +70,12 @@ describe('bounded relay service', () => {
         expect(await response.json(), `${path}: ${name}`).toMatchObject({ error: { code: 'service_authentication_failed' } });
       }
     }
-    for (const secret of [undefined, '', 'short']) {
-      expect((await relay.fetch(request(), { ...env, PURI_TOKEN_SECRET: secret })).status).toBe(503);
+    for (const [path, body] of [['/v1/respond', respond], ['/v1/classify', classify]] as const) {
+      for (const secret of [undefined, '', 'short']) {
+        const response = await relay.fetch(request(path, body), { ...env, PURI_TOKEN_SECRET: secret });
+        expect(response.status, path).toBe(503);
+        expect(await response.json()).toMatchObject({ error: { code: 'service_shutdown' } });
+      }
     }
     expect(upstream).not.toHaveBeenCalled();
   });

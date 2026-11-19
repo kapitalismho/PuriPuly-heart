@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import app from '../src/index';
-import {
-  BROKER_SERVICE_NAME,
-  MANAGED_TRIAL_BUDGET_POLICY,
-  MANAGED_TRIAL_COST_ACCOUNTING_POLICY,
-  MANAGED_TRIAL_ENTITLEMENT_POLICY,
-  MANAGED_TRIAL_LIVE_USAGE_POLICY,
-  TRIAL_PROVIDER_POLICY,
-} from '../src/contract';
+import { BROKER_SERVICE_NAME } from '../src/contract';
 
 describe('broker foundation', () => {
-  it('exposes a fetch-compatible Hono worker app with explicit bindings', async () => {
-    expect(app.fetch).toBeTypeOf('function');
+  it('publishes the Broker boundary and managed trial policy', async () => {
+    const managedPath = {
+      provider: 'OpenRouter',
+      models: [
+        'google/gemma-4-26b-a4b-it',
+        'google/gemma-4-31b-it',
+        'deepseek/deepseek-v4.1-flash-1017',
+        'deepseek/deepseek-v4-flash-0731',
+        'deepseek/deepseek-v4-flash',
+      ],
+    };
 
     const response = await app.request('http://broker.test/v1/foundation');
     expect(response.status).toBe(200);
@@ -62,25 +64,32 @@ describe('broker foundation', () => {
         inferencePath: 'app-direct-to-openrouter',
       },
       trialProviderPolicy: {
-        managedFreeTrial: {
-          provider: 'OpenRouter',
-          models: [
-            'google/gemma-4-26b-a4b-it',
-            'google/gemma-4-31b-it',
-            'deepseek/deepseek-v4.1-flash-1017',
-            'deepseek/deepseek-v4-flash-0731',
-            'deepseek/deepseek-v4-flash',
-          ],
-        },
+        managedFreeTrial: managedPath,
         upstreamProviderRouting: 'unpinned-by-broker',
         excludedProviders: ['Alibaba'],
       },
       managedTrialPolicy: {
-        managedPath: TRIAL_PROVIDER_POLICY.managedFreeTrial,
-        budget: MANAGED_TRIAL_BUDGET_POLICY,
-        onboardingCostAccounting: MANAGED_TRIAL_COST_ACCOUNTING_POLICY,
-        entitlement: MANAGED_TRIAL_ENTITLEMENT_POLICY,
-        liveUsage: MANAGED_TRIAL_LIVE_USAGE_POLICY,
+        managedPath,
+        budget: { currency: 'USD', hardLimit: 0.07, limitReset: null },
+        onboardingCostAccounting: {
+          scope: 'llm-only',
+          estimationBasis: { inputTokens: 1000, outputTokens: 15, llmCallsPerUtterance: 1.3 },
+          operationalBufferPercent: { min: 5, max: 10 },
+        },
+        entitlement: {
+          lifecycle: ['none', 'pending_release', 'active', 'expired', 'revoked'],
+          managedAvailability: { field: 'managed_availability', reportedSeparatelyFromLifecycle: true },
+          issuance: {
+            keyScope: 'user-specific',
+            maxManagedKeysPerEligibleInstallation: 1,
+            expiry: { durationMonths: 3, anchor: 'issued_at' },
+          },
+        },
+        liveUsage: {
+          managedAvailability: { field: 'managed_availability', reportedSeparatelyFromLifecycle: true },
+          sourceOfTruthAfterRelease: { provider: 'OpenRouter', signals: ['key-metadata', 'provider-failures'] },
+          brokerTracksRemainingBudget: false,
+        },
       },
     });
   });
