@@ -151,7 +151,7 @@ $llamaCache = Join-Path $BuildRoot "llama-cache"
 $artifactRoot = Join-Path $BuildRoot "artifact"
 $evidenceRoot = Join-Path $BuildRoot "evidence"
 $overlayTarget = Join-Path $BuildRoot "overlay-target"
-$gpuTarget = Join-Path $BuildRoot "gpu-target"
+$asrTarget = Join-Path $BuildRoot "asr"
 $consoleBuildRoot = Join-Path $BuildRoot "console-build"
 
 New-Item -ItemType Directory -Path $BuildRoot -Force | Out-Null
@@ -346,7 +346,7 @@ company = "salee"
     Invoke-Checked -FilePath $cargoCommand -ArgumentList @(
         "build", "--manifest-path", (Join-Path $repoRoot "native\overlay\Cargo.toml"), "--locked", "--release", "--bin", "PuriPulyHeartOverlay", "--target-dir", $overlayTarget
     ) -WorkingDirectory $repoRoot
-    & (Join-Path $PSScriptRoot "build-asr-worker-release.ps1") -TargetDir $gpuTarget -OutputDir $artifactRoot
+    & (Join-Path $PSScriptRoot "build-asr-worker-release.ps1") -TargetDir $asrTarget -OutputDir $artifactRoot
     Copy-Item -LiteralPath (Join-Path $overlayTarget "release\PuriPulyHeartOverlay.exe") -Destination $artifactRoot -Force
     Copy-Item -LiteralPath (Join-Path $repoRoot "third_party\openvr\win64\openvr_api.dll") -Destination $artifactRoot -Force
     $cmakeCommand = (Get-Command cmake -ErrorAction Stop).Source
