@@ -43,7 +43,10 @@ from puripuly_heart.core.diagnostics import (
     exception_diagnostics,
 )
 from puripuly_heart.core.error_messages import stt_failure_report
-from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
+    ProviderRuntimeAttachment,
+    ProviderRuntimeBuildRequest,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -763,7 +766,7 @@ class PeerCaptureSessionOwner:
         self._provider_attachment_token: object | None = None
         self._provider_ingress_ready: asyncio.Event | None = None
         self._provider_setup_task: asyncio.Task[object] | None = None
-        self._pending_provider_failures: dict[object, Exception | None] = {}
+        self._pending_provider_failures: dict[object, Exception | ErrorDiagnostics | None] = {}
         self._pending_provider_recoveries: dict[
             PeerCaptureTerminalFailureHandler,
             tuple[tuple[object, ...], object],
@@ -914,12 +917,7 @@ class PeerCaptureSessionOwner:
             and ledger is not None
             and ledger.activation_generation == stream.activation_generation
             and self._current_stream_capture_epoch == stream.capture_epoch
-            and stream.settings_scope
-            == (
-                ledger.settings.provider_id,
-                ledger.settings.provider_signature,
-                ledger.settings.runtime_signature,
-            )
+            and stream.settings_scope == ledger.settings.recognition_scope
         )
 
     def bind_publication_generation_observer(
@@ -1281,7 +1279,6 @@ class PeerCaptureSessionOwner:
                 self._provider_signature = None
             reusable = (
                 self._provider.is_ready(config)
-                and self._provider_attachment_token is not None
                 and self._provider_signature == config.provider_signature
                 and self._provider_runtime_signature == config.runtime_signature
             )
@@ -1300,10 +1297,7 @@ class PeerCaptureSessionOwner:
                             config, config.local_provider, operation=provider_operation
                         ),
                         start=False,
-                        on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
-                            exc,
-                            attachment_token=attachment_token,
-                        ),
+                        on_terminal_failure=self._provider_failure_handler(attachment_token),
                     )
                 except asyncio.CancelledError:
                     self._pending_provider_failures.pop(attachment_token, None)
@@ -1440,12 +1434,7 @@ class PeerCaptureSessionOwner:
         attachment_token = object()
         self._pending_provider_failures[attachment_token] = None
 
-        async def on_terminal_failure(exc: Exception) -> None:
-            await self._on_terminal_stt_failure(
-                exc,
-                attachment_token=attachment_token,
-            )
-
+        on_terminal_failure = self._provider_failure_handler(attachment_token)
         self._pending_provider_recoveries[on_terminal_failure] = (
             config.provider_signature,
             attachment_token,
@@ -1484,8 +1473,12 @@ class PeerCaptureSessionOwner:
                 if on_terminal_failure is not None:
                     self.abort_provider_recovery(on_terminal_failure)
                 raise RuntimeError("recovered Peer provider is not attached")
-            attachment_token = pending[1] if pending is not None else object()
-            pending_failure = self._pending_provider_failures.pop(attachment_token, None)
+            attachment_token = pending[1] if pending is not None else None
+            pending_failure = (
+                self._pending_provider_failures.pop(attachment_token, None)
+                if attachment_token is not None
+                else None
+            )
             async with self._lock:
                 if self._closed:
                     raise RuntimeError("PeerCaptureSessionOwner is closed")
@@ -1587,10 +1580,7 @@ class PeerCaptureSessionOwner:
                 result = await self._provider.handoff(
                     prepared.provider,
                     start=True,
-                    on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
-                        exc,
-                        attachment_token=attachment_token,
-                    ),
+                    on_terminal_failure=self._provider_failure_handler(attachment_token),
                 )
             except asyncio.CancelledError:
                 self._pending_provider_failures.pop(attachment_token, None)
@@ -1748,10 +1738,6 @@ class PeerCaptureSessionOwner:
             if self._is_superseded(generation):
                 await self._close_if_possible(source)
                 return
-            segment_ledger = PeerAudioSegmentLedger(
-                activation_generation=generation,
-                settings=self._segment_settings_snapshot(config),
-            )
             provider_ingress_ready = asyncio.Event()
             async with self._lock:
                 superseded = self._is_superseded(generation)
@@ -1776,6 +1762,18 @@ class PeerCaptureSessionOwner:
             async with self._lock:
                 superseded = self._is_superseded(generation)
                 if not superseded:
+                    reusable = (
+                        self._provider.is_ready(config)
+                        and self._provider_signature == config.provider_signature
+                        and self._provider_runtime_signature == config.runtime_signature
+                    )
+                    attachment_token = self._provider_attachment_token if reusable else object()
+                    segment_ledger = PeerAudioSegmentLedger(
+                        activation_generation=generation,
+                        settings=self._segment_settings_snapshot(
+                            config, provider_activation=attachment_token
+                        ),
+                    )
                     self._audio_source = source
                     self._vad = vad
                     self._signature = config.runtime_signature
@@ -1807,15 +1805,7 @@ class PeerCaptureSessionOwner:
                 await self._close_if_possible(source)
                 return
             self._notify_state_changed()
-            reusable = (
-                self._provider.is_ready(config)
-                and self._provider_attachment_token is not None
-                and self._provider_signature == config.provider_signature
-                and self._provider_runtime_signature == config.runtime_signature
-            )
-            attachment_token = self._provider_attachment_token
             if not reusable:
-                attachment_token = object()
                 self._pending_provider_failures[attachment_token] = None
                 self._provider_status = PeerCaptureProviderStatus.PENDING
                 self._notify_state_changed()
@@ -1828,10 +1818,7 @@ class PeerCaptureSessionOwner:
                     result = await self._provider.replace(
                         request,
                         start=False,
-                        on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
-                            exc,
-                            attachment_token=attachment_token,
-                        ),
+                        on_terminal_failure=self._provider_failure_handler(attachment_token),
                     )
                 except BaseException:
                     self._pending_provider_failures.pop(attachment_token, None)
@@ -2083,9 +2070,15 @@ class PeerCaptureSessionOwner:
             failure_observed=failure_observed,
         )
 
+    def _provider_failure_handler(self, attachment_token: object) -> ProviderRuntimeAttachment:
+        return ProviderRuntimeAttachment(
+            attachment_token,
+            lambda exc: self._on_terminal_stt_failure(exc, attachment_token=attachment_token),
+        )
+
     async def _on_terminal_stt_failure(
         self,
-        exc: Exception,
+        exc: Exception | ErrorDiagnostics,
         *,
         attachment_token: object | None,
     ) -> None:
@@ -2551,7 +2544,9 @@ class PeerCaptureSessionOwner:
         if self._segment_ledger is not None:
             self._segment_ledger.rebind(
                 activation_generation=generation,
-                settings=self._segment_settings_snapshot(config),
+                settings=self._segment_settings_snapshot(
+                    config, provider_activation=self._provider_attachment_token
+                ),
             )
 
     def _effective_segment_settings(self) -> AudioSegmentSettingsSnapshot | None:
@@ -2607,6 +2602,8 @@ class PeerCaptureSessionOwner:
     def _segment_settings_snapshot(
         self,
         config: PeerCaptureSessionConfig,
+        *,
+        provider_activation: object | None,
     ) -> AudioSegmentSettingsSnapshot:
         delivery_profile, delivery_threshold = self._delivery_policy_for_config(config)
         return AudioSegmentSettingsSnapshot(
@@ -2631,6 +2628,7 @@ class PeerCaptureSessionOwner:
             delivery_input_revision=(
                 SMART_TURN_INPUT_REVISION if delivery_profile == "on" else None
             ),
+            provider_activation=provider_activation,
         )
 
     def _failure_reason_from_startup_exception(

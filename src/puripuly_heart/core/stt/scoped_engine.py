@@ -254,6 +254,7 @@ class ScopedRecognitionEngine:
     session_lifetime_enabled: bool = True
     probe_session_factory: STTProbeSessionFactory | None = None
     probe_settings: AudioSegmentSettingsSnapshot | None = None
+    provider_activation: object | None = field(init=False, default=None, repr=False)
     probe_sessions: list[STTScopedTurnSession] = field(init=False, default_factory=list, repr=False)
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
@@ -1482,7 +1483,10 @@ class ScopedRecognitionEngine:
         authority_generation: int,
     ) -> None:
         scope = self._settings_scope(settings)
-        if self.accepted_settings_scope is not None and scope != self.accepted_settings_scope:
+        if (
+            self.accepted_settings_scope is not None
+            and settings.provider_configuration_scope != self.accepted_settings_scope
+        ):
             raise PermanentSTTScopedSessionError("provider_configuration_scope_mismatch")
         if self._terminal_failure_notified:
             raise PermanentSTTScopedSessionError("provider_recovery_exhausted")
@@ -3526,11 +3530,7 @@ class ScopedRecognitionEngine:
 
     @staticmethod
     def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:
-        return (
-            settings.provider_id,
-            settings.provider_signature,
-            settings.runtime_signature,
-        )
+        return settings.recognition_scope
 
     @staticmethod
     def _consume_task_result(task: asyncio.Future[object]) -> None:

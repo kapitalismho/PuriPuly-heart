@@ -172,21 +172,23 @@ async def capture_route(monkeypatch):
         guarded = capture.guard_vad_sink()
 
         async def drain():
-            engine = runtime.current_provider("peer")
-            await engine.wait_for_event_ingress_drain()
+            assert socket_provider is not None
+            await socket_provider.wait_for_event_ingress_drain()
 
-        async def committed(text, *speakers, partial=False):
-            terminal_index = len(terminals)
-            index = (
-                0
-                if socket.closed or socket_provider is not runtime.current_provider("peer")
-                else socket.commits
-            )
+        def own_turn():
             ledger = capture.segment_ledger
             assert ledger is not None
-            start, chunks, end = _owned_deepgram_events(
-                ledger, start_sample=(terminal_index + 1) * 1000
+            return _owned_deepgram_events(ledger, start_sample=(len(terminals) + 1) * 1000)
+
+        async def committed(text, *speakers, partial=False, owned=None):
+            terminal_index = len(terminals)
+            reuse_socket = owned is not None or (
+                not socket.closed and socket_provider is runtime.current_provider("peer")
             )
+            index = socket.commits if reuse_socket else 0
+            ledger = capture.segment_ledger
+            assert ledger is not None
+            start, chunks, end = own_turn() if owned is None else owned
             for event in (start, *chunks, end):
                 await guarded.handle_owned_vad_event(event)
             await wait_until(lambda: socket.commits == index + 1, timeout_s=2)
@@ -240,7 +242,7 @@ async def capture_route(monkeypatch):
                 urls,
             ),
             apply_diarization,
-            evidence,
+            own_turn,
         )
     finally:
         await capture.close()
@@ -254,38 +256,48 @@ def route(capture_route):
 
 
 @pytest.mark.asyncio
-async def test_scribe_toggle_rejects_retired_evidence_and_keeps_ordinary_translation(capture_route):
-    route, apply_diarization, evidence = capture_route
-    harness, backend, presenter, _, _, history, committed, _, first_socket, urls = route
+@pytest.mark.parametrize("reenable", [False, True])
+async def test_scribe_toggle_rejects_retired_evidence_and_keeps_translation(
+    capture_route, reenable
+):
+    route, apply_diarization, own_turn = capture_route
+    harness, backend, presenter, _, _, history, committed, diarized, first_socket, urls = route
     await committed("Old head. Old tail.")
     await _idle(harness)
+    original_blocks = presenter.snapshot().blocks
+    pending = own_turn() if reenable else None
     await apply_diarization(False)
-    first_socket.push(
-        "diarized_transcript",
-        segment_index=0,
-        text="Old head. Old tail.",
-        words=[
-            {"text": "Old head. ", "speaker_id": "speaker-A"},
-            {"text": "Old tail.", "speaker_id": "speaker-B"},
-        ],
-    )
-    await wait_until(lambda: bool(evidence), timeout_s=2)
-    fresh = await committed(
-        "Fresh head. Fresh tail.", ("Fresh head. ", "speaker-A"), ("Fresh tail.", "speaker-B")
-    )
+    if reenable:
+        await apply_diarization(True)
+
+    assert len(urls) == 1 and not first_socket.closed
+    stale = await diarized(0, ("Old head. ", "speaker-A"), ("Old tail.", "speaker-B"))
+    await _idle(harness)
+    assert presenter.snapshot().blocks == original_blocks
+    assert [call.text for call in backend.calls] == ["Old head. Old tail."]
+    assert stale.revisions[0].native_segment.provider_session_id == "native-scope"
+
+    expected_sources = ["Old head. Old tail."]
+    if pending is not None:
+        await committed("Pending older speech.", owned=pending)
+        await _idle(harness)
+        assert len(urls) == 1 and first_socket.commits == 2
+        assert history.conversation_records[-1].source_text == "Pending older speech."
+        expected_sources.append("Pending older speech.")
+
+    old_commits = first_socket.commits
+    speakers = () if reenable else (("Fresh head. ", "speaker-A"), ("Fresh tail.", "speaker-B"))
+    fresh = await committed("Fresh head. Fresh tail.", *speakers)
     await _idle(harness)
 
-    assert [parse_qs(urlsplit(url).query)["diarize"] for url in urls] == [["true"], ["false"]]
-    assert parse_qs(urlsplit(urls[-1]).query)["include_timestamps"] == ["false"]
-    (stale,) = evidence
-    assert stale.revisions[0].native_segment.provider_session_id == "native-scope"
-    assert [call.text for call in backend.calls] == [
-        "Old head. Old tail.",
-        "Fresh head. Fresh tail.",
-    ]
+    assert first_socket.commits == old_commits
+    fresh_option = "true" if reenable else "false"
+    assert [parse_qs(urlsplit(url).query)["diarize"] for url in urls] == [["true"], [fresh_option]]
+    assert parse_qs(urlsplit(urls[-1]).query)["include_timestamps"] == [fresh_option]
+    assert [call.text for call in backend.calls] == [*expected_sources, "Fresh head. Fresh tail."]
     assert history.conversation_records[-1].source_text == "Fresh head. Fresh tail."
     block = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{fresh}")
-    assert block.speaker_style == "gold"
+    assert block.speaker_style == ("gray" if reenable else "gold")
     assert block.primary_text == "translated:Fresh head. Fresh tail."
 
 

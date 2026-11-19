@@ -126,6 +126,8 @@ async def recovery_pipeline(channel, provider_id, session_factory):
         await capture.apply_intent(capture_config, enabled=True)
         await wait_until(lambda: capture.snapshot.effective_active)
         guarded = capture.guard_vad_sink()
+        if channel == "self":
+            engine.provider_activation = guarded.ledger.settings.provider_activation
 
         async def vad_event(event, order):
             if channel == "self":

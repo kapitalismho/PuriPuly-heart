@@ -40,6 +40,18 @@ class AudioSegmentSettingsSnapshot:
     delivery_availability: str = "disabled"
     delivery_threshold: float | None = None
     delivery_input_revision: str | None = None
+    provider_activation: object | None = field(default=None, repr=False)
+
+    @property
+    def provider_configuration_scope(self) -> tuple[object, ...]:
+        return (self.provider_id, self.provider_signature, self.runtime_signature)
+
+    @property
+    def recognition_scope(self) -> tuple[object, ...]:
+        scope = self.provider_configuration_scope
+        if self.provider_activation is None:
+            return scope
+        return (*scope, self.provider_activation)
 
 
 @dataclass(frozen=True, slots=True)

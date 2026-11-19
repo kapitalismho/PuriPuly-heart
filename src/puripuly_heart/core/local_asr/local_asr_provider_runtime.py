@@ -63,6 +63,15 @@ ProviderRuntimeRecoveryQuiesce = Callable[
 ]
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class ProviderRuntimeAttachment:
+    token: object
+    on_failure: ProviderRuntimeTerminalFailureSink
+
+    def __call__(self, exc: Exception | ErrorDiagnostics) -> Awaitable[None]:
+        return self.on_failure(exc)
+
+
 @dataclass(frozen=True, slots=True)
 class LocalASRProviderRuntimeCallbacks:
     self_event_handler: ProviderRuntimeEventHandler
@@ -419,6 +428,7 @@ __all__ = [
     "LocalASRProviderRuntimePort",
     "LocalASRProviderRuntimeSnapshot",
     "ProviderGpuRuntimePort",
+    "ProviderRuntimeAttachment",
     "ProviderRuntimeBuildRequest",
     "ProviderRuntimeChannel",
     "ProviderRuntimeChannelPhase",

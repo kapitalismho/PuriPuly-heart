@@ -252,15 +252,7 @@ class SelfTranslationChannelOwner:
         resume_overlay_resync_buffer: _MergeBuffer | None = None
         low_latency_mode = self.config_snapshot().value.low_latency_mode
         source_identity = owned.segment.identity if owned is not None else None
-        recognition_scope = (
-            (
-                owned.segment.settings.provider_id,
-                owned.segment.settings.provider_signature,
-                owned.segment.settings.runtime_signature,
-            )
-            if owned is not None
-            else None
-        )
+        recognition_scope = owned.segment.settings.recognition_scope if owned is not None else None
         if isinstance(vad_event, SpeechStart) and low_latency_mode:
             self._mark_resume_pending(
                 vad_event,

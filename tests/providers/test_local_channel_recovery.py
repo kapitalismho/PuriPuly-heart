@@ -123,6 +123,7 @@ async def test_fun_asr_decode_failure_crosses_capture_and_real_translation_consu
         await capture.apply_intent(capture_config, enabled=True)
         await loop.started.wait()
         guarded = loop.calls[0]["sink"]
+        engine.provider_activation = guarded.ledger.settings.provider_activation
         initial_loop = capture.loop_task
         for order in range(3 if always_fail else 2):
             segment_id = uuid4()
