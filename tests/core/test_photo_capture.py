@@ -312,6 +312,42 @@ async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp
         assert (await capture(watcher)).path == replacement.resolve()
 
 
+@pytest.mark.parametrize("transition", ["truncated", "replaced"])
+async def test_rotation_does_not_offer_startup_or_replacement_log_content(tmp_path, transition):
+    photos = tmp_path / "photos"
+    logs = tmp_path / "logs"
+    photos.mkdir()
+    logs.mkdir()
+    retiring = logs / "output_log_a.txt"
+    successor = logs / "output_log_b.txt"
+    startup = tmp_path / "startup.png"
+    startup.write_bytes(b"startup")
+    startup_line = f"[VRC Camera] Took screenshot to: {startup}\n"
+    retiring.write_text(startup_line + "unrelated\n" * 100, encoding="utf-8")
+
+    async with watching(photos, logs) as (watcher, source):
+        if transition == "truncated":
+            retiring.write_text(startup_line, encoding="utf-8")
+        else:
+            other = tmp_path / "other.png"
+            other.write_bytes(b"belongs to a different log")
+            replacement = tmp_path / "replacement.txt"
+            replacement.write_text(f"[VRC Camera] Took screenshot to: {other}\n", encoding="utf-8")
+            replacement.replace(retiring)
+        successor.write_text("session started\n", encoding="utf-8")
+        stamp = retiring.stat().st_mtime_ns + 1_000_000_000
+        os.utime(successor, ns=(stamp, stamp))
+        source.emit(retiring, successor, created=(successor,))
+        await quiet(watcher)
+
+        fresh = tmp_path / "fresh.png"
+        fresh.write_bytes(b"fresh")
+        with successor.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {fresh}\n")
+        source.emit(successor)
+        assert (await capture(watcher)).path == fresh.resolve()
+
+
 async def test_overflow_resynchronizes_without_replaying_seen_photos(tmp_path):
     photos = tmp_path / "photos"
     photos.mkdir()

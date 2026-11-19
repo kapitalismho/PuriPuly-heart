@@ -1025,7 +1025,7 @@ async def test_only_explicit_final_message_reaches_staged_lifecycle_before_compl
             temporary_root=tmp_path,
         )
         try:
-            captured = PhotoCapture(photo.source_path, 1, (1, 2), 1234, time.monotonic())
+            captured = PhotoCapture(photo.source_path, 1, (1, 2), 1_234_000_000, time.monotonic())
             assert await owner.captured(captured)
             identifier = owner.snapshot["photo"]["photo_id"]
             assert owner.pull(identifier, "pull")
