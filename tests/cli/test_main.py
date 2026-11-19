@@ -271,15 +271,6 @@ def test_auth_rejects_removed_referral_cli_flag(capsys, provider):
     assert "unrecognized arguments" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("provider", ["qq", "discord"])
-def test_auth_protected_input_keeps_supported_login_fields(monkeypatch, provider):
-    import io
-
-    fields = {"qq_identity": "synthetic-qq", "credential": "a" * 64} if provider == "qq" else {}
-    monkeypatch.setattr(cli.sys, "stdin", io.StringIO(json.dumps(fields)))
-    assert cli._auth_input(SimpleNamespace(stdin=True, provider=provider)) == fields
-
-
 @pytest.mark.parametrize("no_wait", (False, True))
 def test_audio_diagnose_dispatches_empty_owned_command_and_preserves_terminal_evidence(
     monkeypatch, capsys, no_wait

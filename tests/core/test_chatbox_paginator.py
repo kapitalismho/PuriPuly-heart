@@ -749,24 +749,13 @@ def test_two_line_translation_preserves_newline_across_pagination() -> None:
     assert all(len(page) <= 5 for page in sender.sent)
 
 
-def test_metadata_free_multiline_message_keeps_legacy_wrapping() -> None:
-    clock = FakeClock()
-    sender = FakeSender()
-    paginator = ChatboxPaginator(
-        sender=sender,
-        clock=clock,
-        max_chars=5,
-        page_interval_s=3.0,
-    )
-
-    paginator.enqueue(_message("abcd\nefgh", clock))
-    clock.advance(3.0)
-    paginator.process_due()
-
-    assert sender.sent == ["abcd", "efgh"]
-
-
-def test_single_target_turn_identity_keeps_legacy_multiline_wrapping() -> None:
+@pytest.mark.parametrize(
+    ("turn_generation", "turn_order"),
+    [pytest.param(None, None, id="no-turn-identity"), pytest.param(1, 0, id="single-target-turn")],
+)
+def test_single_target_multiline_messages_keep_legacy_wrapping(
+    turn_generation: int | None, turn_order: int | None
+) -> None:
     clock = FakeClock()
     sender = FakeSender()
     paginator = ChatboxPaginator(
@@ -780,9 +769,8 @@ def test_single_target_turn_identity_keeps_legacy_multiline_wrapping() -> None:
         _message(
             "abcd\nefgh",
             clock,
-            turn_generation=1,
-            turn_order=0,
-            presentation_revision=0,
+            turn_generation=turn_generation,
+            turn_order=turn_order,
         )
     )
     clock.advance(3.0)

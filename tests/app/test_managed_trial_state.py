@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from puripuly_heart.app.services.agent_chat.modules import model_context, topic_queries
+from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
+from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.agent_chat.tools import project_accounts
 from puripuly_heart.app.wiring.wiring_managed_auth_factory import _managed_trial
 from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+from tests.app.test_agent_chat import Records
 
 PENDING = ManagedConnectionState(
     pending_managed_operation_id="ph-mop-v1_synthetic",
@@ -67,20 +69,20 @@ def test_puri_accounts_context_carries_only_known_trial_states(trial, expected):
 
 
 @pytest.mark.parametrize("selected", [True, False])
-def test_translation_context_carries_trial_only_for_selected_managed_connection(selected):
-    accounts = project_accounts(
-        {
-            "managed": {
-                "provider": "discord",
-                "available": True,
-                "selected": selected,
-                "credential_present": False,
-                "trial": "claimed_without_key",
-            }
+async def test_translation_context_carries_trial_only_for_selected_managed_connection(selected):
+    control = Records()
+    control.values["accounts.status"] = {
+        "managed": {
+            "provider": "discord",
+            "available": True,
+            "selected": selected,
+            "credential_present": False,
+            "trial": "claimed_without_key",
         }
-    )
-
-    context = model_context({"accounts": accounts}, modules=("translation",))
+    }
+    snapshot = await collect_agent_context(control, activity=AgentActivity(), topic="translation")
+    context = model_context(snapshot, topic="translation")
+    assert context["missing"] == []
 
     assert "accounts" not in context
     if selected:
@@ -88,7 +90,3 @@ def test_translation_context_carries_trial_only_for_selected_managed_connection(
         assert context["translation"]["managed"]["credential_present"] is False
     else:
         assert "managed" not in context["translation"]
-
-
-def test_translation_topic_reads_account_status():
-    assert "accounts.status" in topic_queries("translation")

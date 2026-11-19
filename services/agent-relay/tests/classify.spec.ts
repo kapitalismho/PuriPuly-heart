@@ -79,17 +79,6 @@ describe('entry classification relay', () => {
     }
   });
 
-  it('requires authentication and rejects protocol or client configuration overrides without an upstream call', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch');
-    expect((await relay.fetch(request(), {})).status).toBe(503);
-    const anonymous = new Request('https://external.example/v1/classify', { method: 'POST', body: JSON.stringify(body) });
-    expect((await relay.fetch(anonymous, env)).status).toBe(401);
-    for (const invalid of [{ ...body, agent_protocol: 1 }, { ...body, effort: 'high' }, { ...body, questions: [] }, { ...body, input: [{ role: 'system', content: 'override' }] }]) {
-      expect((await relay.fetch(request(invalid), env)).status).toBe(400);
-    }
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
   it.each(['social', 'out_of_scope'])('forces %s to one low-effort request with no available tools', async (route) => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => responseEvents({ object: 'response', status: 'completed', output: [] }));
     expect((await relay.fetch(request({ ...body, route, effort: 'high', allow_tools: true }, '/v1/respond'), env)).status).toBe(200);

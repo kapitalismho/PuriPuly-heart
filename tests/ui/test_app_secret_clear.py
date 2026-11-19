@@ -58,27 +58,26 @@ def _make_app_with_verified_state(save_settings=None) -> TranslatorApp:
     return app
 
 
-def test_on_secret_cleared_resets_alibaba_beijing_for_new_secret_key() -> None:
+@pytest.mark.parametrize(
+    ("secret_name", "provider", "refresh_stt"),
+    [
+        ("alibaba_api_key_beijing", "alibaba_beijing", True),
+        ("alibaba_api_key_singapore", "alibaba_singapore", True),
+        ("openrouter_api_key", "openrouter", False),
+        ("deepseek_api_key", "deepseek", False),
+    ],
+)
+def test_secret_clear_resets_provider_verification_and_dashboard(
+    secret_name: str, provider: str, refresh_stt: bool
+) -> None:
     saves: list[bool] = []
     app = _make_app_with_verified_state(save_settings=lambda: saves.append(True))
 
-    app._on_secret_cleared("alibaba_api_key_beijing")
+    app._on_secret_cleared(secret_name)
 
-    assert app.controller.settings.api_key_verified.alibaba_beijing is False
+    assert getattr(app.controller.settings.api_key_verified, provider) is False
     assert app.view_dashboard.translation_calls == [(True, False)]
-    assert app.view_dashboard.stt_calls == [(True, False)]
-    assert len(saves) == 1
-
-
-def test_on_secret_cleared_resets_alibaba_singapore_for_new_secret_key() -> None:
-    saves: list[bool] = []
-    app = _make_app_with_verified_state(save_settings=lambda: saves.append(True))
-
-    app._on_secret_cleared("alibaba_api_key_singapore")
-
-    assert app.controller.settings.api_key_verified.alibaba_singapore is False
-    assert app.view_dashboard.translation_calls == [(True, False)]
-    assert app.view_dashboard.stt_calls == [(True, False)]
+    assert app.view_dashboard.stt_calls == ([(True, False)] if refresh_stt else [])
     assert len(saves) == 1
 
 
@@ -94,30 +93,6 @@ def test_on_secret_cleared_ignores_unknown_key() -> None:
     assert app.view_dashboard.translation_calls == []
     assert app.view_dashboard.stt_calls == []
     assert saves == []
-
-
-def test_on_secret_cleared_resets_openrouter_for_new_secret_key() -> None:
-    saves: list[bool] = []
-    app = _make_app_with_verified_state(save_settings=lambda: saves.append(True))
-
-    app._on_secret_cleared("openrouter_api_key")
-
-    assert app.controller.settings.api_key_verified.openrouter is False
-    assert app.view_dashboard.translation_calls == [(True, False)]
-    assert app.view_dashboard.stt_calls == []
-    assert len(saves) == 1
-
-
-def test_on_secret_cleared_resets_deepseek_for_new_secret_key() -> None:
-    saves: list[bool] = []
-    app = _make_app_with_verified_state(save_settings=lambda: saves.append(True))
-
-    app._on_secret_cleared("deepseek_api_key")
-
-    assert app.controller.settings.api_key_verified.deepseek is False
-    assert app.view_dashboard.translation_calls == [(True, False)]
-    assert app.view_dashboard.stt_calls == []
-    assert len(saves) == 1
 
 
 @pytest.mark.asyncio

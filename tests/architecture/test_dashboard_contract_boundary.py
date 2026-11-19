@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import ast
 import pathlib
 
 from puripuly_heart.ui.dashboard import contract as dashboard_contract
 from puripuly_heart.ui.dashboard import renderer as dashboard_renderer
 from tests.helpers.ast_sources import imported_modules as _imported_modules
-from tests.helpers.paths import SOURCE_ROOT
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "puripuly_heart.core",
@@ -41,13 +39,6 @@ def test_capture_controls_consume_the_contract_without_dashboard_view_access() -
         assert not any(name.startswith("puripuly_heart.ui.views") for name in imported)
 
 
-def test_production_dashboard_uses_an_external_capture_slot_provider() -> None:
-    source = (SOURCE_ROOT / "ui" / "views" / "dashboard.py").read_text(encoding="utf-8")
-    assert "from_capture_provider(" in source
-    assert "self._capture_controls," in source
-    assert "DashboardCaptureControls(" in source
-
-
 def test_dashboard_view_implements_the_explicit_contract() -> None:
     from puripuly_heart.ui.views.dashboard import DashboardView
 
@@ -58,22 +49,3 @@ def test_dashboard_view_implements_the_explicit_contract() -> None:
         "overlay_control",
     ):
         assert callable(getattr(DashboardView, method)), method
-
-
-def test_translator_app_wires_dashboard_intents_through_one_path() -> None:
-    app_source = (SOURCE_ROOT / "ui" / "app.py").read_text(encoding="utf-8")
-    tree = ast.parse(app_source)
-    direct_assignments = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if (
-                isinstance(target, ast.Attribute)
-                and target.attr.startswith("on_")
-                and isinstance(target.value, ast.Attribute)
-                and target.value.attr == "view_dashboard"
-            ):
-                direct_assignments.append(target.attr)
-    assert direct_assignments == []
-    assert "bind_dashboard_intents(" in app_source

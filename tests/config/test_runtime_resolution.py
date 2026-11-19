@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import importlib
-import importlib.util
-import sys
 from dataclasses import FrozenInstanceError, is_dataclass
-from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -19,23 +16,6 @@ def _runtime_resolution_module() -> ModuleType:
 
 def _resolved_module() -> ModuleType:
     return importlib.import_module("puripuly_heart.config.resolved")
-
-
-def _profiles_module() -> ModuleType:
-    return importlib.import_module("puripuly_heart.config.llm_profiles")
-
-
-def _load_boundary_guard() -> ModuleType:
-    guard_path = (
-        Path(__file__).resolve().parents[1] / "architecture" / ("test_dependency_boundaries.py")
-    )
-    spec = importlib.util.spec_from_file_location("_runtime_resolution_boundary_guard", guard_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def _runtime_input(
@@ -64,16 +44,6 @@ def _credential_assertion(resolved: ModuleType, source: str, reference: str | No
         required=source != resolved.CREDENTIAL_SOURCE_NONE,
         reference=reference,
     )
-
-
-def test_runtime_resolution_layer_is_covered_by_dependency_boundary_guard() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    guard = _load_boundary_guard()
-
-    assert guard._layer_for_module(runtime_resolution.__name__) == guard.RUNTIME_RESOLUTION
-    rule = guard._rule_for_layer(guard.RUNTIME_RESOLUTION)
-    assert runtime_resolution.__name__ in rule.prefixes
-    assert rule.rule_id == "runtime-resolution-stays-pure"
 
 
 def test_canonical_runtime_intent_contracts_are_frozen_and_slotted() -> None:

@@ -64,29 +64,6 @@ def imported_modules(path: Path) -> set[str]:
     return imported_modules_from_source(path.read_text(encoding="utf-8"))
 
 
-def method_source(path: Path, class_name: str, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == class_name:
-            for item in node.body:
-                if (
-                    isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    and item.name == method_name
-                ):
-                    return ast.get_source_segment(source, item) or ""
-    raise AssertionError(f"{class_name}.{method_name} not found in {path}")
-
-
-def method_source_unscoped(path: Path, method_name: str) -> str:
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == method_name:
-            return ast.get_source_segment(source, node) or ""
-    raise AssertionError(f"method not found: {method_name}")
-
-
 def call_name(node: ast.Call) -> str | None:
     if isinstance(node.func, ast.Name):
         return node.func.id
@@ -103,12 +80,3 @@ def assert_no_forbidden_imports(path: Path, forbidden_prefixes: tuple[str, ...])
         for forbidden in forbidden_prefixes
         if imported == forbidden or imported.startswith(f"{forbidden}.")
     }
-
-
-def find_constructions(class_names: tuple[str, ...], root: Path) -> dict[str, list[str]]:
-    results: dict[str, list[str]] = {name: [] for name in class_names}
-    for module, tree in first_party_ast_sources(root, (".",)):
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and (name := call_name(node)) in results:
-                results[name].append(module)
-    return results

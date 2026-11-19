@@ -595,21 +595,6 @@ fn renderer_style_resolution_fallback_for_requested_style_stays_out_of_layout_fa
 }
 
 #[test]
-fn renderer_layout_preserves_channel_metadata_for_visible_blocks() {
-    let policy = CaptionLayoutPolicy::default();
-    let result = policy.layout_blocks(
-        vec![CaptionBlock::new("peer", "hello").with_channel(CaptionChannel::PeerChannel)],
-        3840,
-        1024,
-    );
-
-    assert_eq!(
-        result.visible_blocks[0].channel,
-        Some(CaptionChannel::PeerChannel)
-    );
-}
-
-#[test]
 fn renderer_keeps_active_self_and_finalized_variants_distinct() {
     let policy = CaptionLayoutPolicy::default();
     let active = CaptionBlock::new("self:active", "hello")

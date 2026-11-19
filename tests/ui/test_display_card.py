@@ -71,18 +71,19 @@ def test_only_the_source_text_uses_the_dimmed_colour(
     card = DisplayCard(on_submit=lambda _text: None)
     _mute_display_updates(monkeypatch, card)
 
-    assert display_card_module.DISPLAY_SOURCE_COLOR != display_card_module.DISPLAY_MESSAGE_COLOR
-
     card.set_display("source text", font_family="font-source")
     assert _visible_text(card) == "source text"
-    assert _visible_color(card) == display_card_module.DISPLAY_SOURCE_COLOR
+    source_color = _visible_color(card)
+    assert source_color == display_card_module.COLOR_DISPLAY_SOURCE
     assert card._display_text.weight == display_card_module.DISPLAY_SOURCE_WEIGHT
+    assert card._display_text.weight != display_card_module.ft.FontWeight.BOLD
     assert card._display_text.font_family == "font-source"
 
     card.set_display_translation("translated text", font_family="font-target")
     assert _visible_text(card) == "translated text"
-    assert _visible_color(card) == display_card_module.DISPLAY_MESSAGE_COLOR
-    assert card._display_text.weight == display_card_module.DISPLAY_MESSAGE_WEIGHT
+    assert _visible_color(card) == display_card_module.COLOR_NEUTRAL_DARK
+    assert _visible_color(card) != source_color
+    assert card._display_text.weight == display_card_module.ft.FontWeight.BOLD
     assert card._display_text.font_family == "font-target"
 
 
@@ -227,14 +228,6 @@ def test_display_text_is_selectable_and_wraps_within_the_line_budget(
     assert smallest_size < biggest_size
     assert card._display_text.max_lines > fewest_lines
     assert card._display_text.max_lines == display_card_module._lines_for_size(smallest_size)
-
-
-def test_only_the_source_colour_is_dimmed_relative_to_messages() -> None:
-    assert display_card_module.DISPLAY_SOURCE_COLOR == display_card_module.COLOR_DISPLAY_SOURCE
-    assert display_card_module.DISPLAY_MESSAGE_COLOR == display_card_module.COLOR_NEUTRAL_DARK
-    assert display_card_module.DISPLAY_SOURCE_COLOR != display_card_module.DISPLAY_MESSAGE_COLOR
-    assert display_card_module.DISPLAY_SOURCE_WEIGHT != display_card_module.DISPLAY_MESSAGE_WEIGHT
-    assert display_card_module.DISPLAY_MESSAGE_WEIGHT == display_card_module.ft.FontWeight.BOLD
 
 
 def test_translation_never_grows_the_text_beyond_its_source_size(

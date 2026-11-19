@@ -100,10 +100,12 @@ def test_bottom_docked_subtab_hover_reacts_to_boolean_payloads() -> None:
     assert inactive_tab.label.color == COLOR_SECONDARY
 
 
-def test_prompt_editor_field_fills_available_width() -> None:
-    editor = PromptEditor()
+def test_prompt_editor_fills_available_width_with_baseline_insets() -> None:
+    field = PromptEditor().controls[0]
 
-    assert editor._text_field.width == FILL_PARENT_WIDTH
+    assert isinstance(field, ft.TextField)
+    assert field.width == FILL_PARENT_WIDTH
+    assert field.content_padding == ft.Padding.symmetric(horizontal=8, vertical=16)
 
 
 def _unsized_text_fields(tree: ast.AST) -> list[int]:
@@ -141,7 +143,7 @@ def test_every_text_field_declares_an_explicit_width_or_expand() -> None:
     assert unsized == []
 
 
-def test_app_theme_restores_the_click_cursor_on_material_buttons() -> None:
+def test_app_theme_restores_the_click_cursor_and_baseline_button_padding() -> None:
     theme = get_app_theme(font_family="Pretendard")
 
     button_themes = (
@@ -154,6 +156,7 @@ def test_app_theme_restores_the_click_cursor_on_material_buttons() -> None:
     for button_theme in button_themes:
         assert button_theme is not None
         assert button_theme.style is not None
+        assert button_theme.style.padding == ft.Padding.all(8)
         assert button_theme.style.mouse_cursor == {
             ft.ControlState.DISABLED: ft.MouseCursor.BASIC,
             ft.ControlState.DEFAULT: ft.MouseCursor.CLICK,

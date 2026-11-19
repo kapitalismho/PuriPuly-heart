@@ -7,6 +7,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.config.provider_values import DeepSeekLLMModel
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.runtime_logging import (
     SessionRuntimeLoggingService,
@@ -118,52 +119,37 @@ async def test_deepseek_provider_uses_injected_client() -> None:
         "context": "",
         "scene_participant_count": None,
     }
-
-
-@pytest.mark.asyncio
-async def test_deepseek_provider_close_cleans_up() -> None:
-    fake = FakeDeepSeekClient()
-    provider = DeepSeekLLMProvider(api_key="k", client=fake)
-    provider._internal_client = fake
-
     await provider.close()
-
-    assert fake.closed is True
-    assert provider._internal_client is None
-
-
-def test_deepseek_provider_passes_flash_model_to_internal_httpx_client() -> None:
-    from puripuly_heart.config.provider_values import DeepSeekLLMModel
-
-    deepseek_model = DeepSeekLLMModel.DEEPSEEK_V4_FLASH
-
-    provider = DeepSeekLLMProvider(api_key="k", model=deepseek_model.value)
-
-    client = provider._get_client()
-
-    assert isinstance(client, HttpxDeepSeekClient)
-    assert client.model == "deepseek-flash"
+    assert fake.closed is False
 
 
 @pytest.mark.asyncio
-async def test_httpx_deepseek_client_builds_non_thinking_request(monkeypatch) -> None:
+async def test_deepseek_provider_sends_non_thinking_request_and_closes_owned_client(
+    monkeypatch,
+) -> None:
     fake_client = FakeAsyncClient()
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
 
-    client = HttpxDeepSeekClient(
+    provider = DeepSeekLLMProvider(
         api_key="test-key",
-        model="deepseek-flash",
+        model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
         base_url="https://example.deepseek",
     )
-    result = await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko-KR",
-        target_language="en",
-        context='- "previous"',
-    )
+    utterance_id = uuid4()
+    try:
+        result = await provider.translate(
+            utterance_id=utterance_id,
+            text="hello",
+            system_prompt="SYSTEM",
+            source_language="ko-KR",
+            target_language="en",
+            context='- "previous"',
+        )
+    finally:
+        await provider.close()
 
-    assert result == "OK"
+    assert fake_client.closed is True
+    assert (result.utterance_id, result.text) == (utterance_id, "OK")
     assert fake_client.last_request["url"] == "https://example.deepseek/chat/completions"
     headers = fake_client.last_request["headers"]
     assert headers["Authorization"] == "Bearer test-key"

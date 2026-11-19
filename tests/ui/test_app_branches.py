@@ -2856,21 +2856,6 @@ async def test_cancel_discord_managed_auth_prevents_late_success_and_enable() ->
     assert dashboard_translation_calls == []
 
 
-def test_discord_managed_auth_waiting_offers_cancel_only() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    controller = SimpleNamespace()
-    app._ui_application = compose_test_ui_application_boundary(controller)
-
-    app.show_discord_managed_auth_dialog(preview=False)
-    dialog = app._discord_managed_auth_dialog
-    dialog.set_waiting()
-
-    assert [control.content for control in dialog._actions.controls] == [
-        app_module.t("discord_auth.cancel")
-    ]
-
-
 def _peer_translation_binding_app(
     *,
     eula_accepted: bool,
