@@ -109,7 +109,7 @@ class PhotoLifecycle:
                 "path": str(capture.path),
                 "expected_file_id": [str(item) for item in capture.file_id],
                 "file_size": capture.file_size,
-                "shutter_unix_ms": capture.shutter_unix_ms,
+                "shutter_unix_ms": capture.shutter_unix_ns // 1_000_000,
                 "attempt_id": photo.attempt_id,
                 "phase": photo.phase,
                 "offer_open": photo.phase == "offer" and self._age(photo) < 10,
@@ -173,6 +173,11 @@ class PhotoLifecycle:
         self, capture: PhotoCapture, *, is_current: Callable[[], bool] = lambda: True
     ) -> bool:
         if self._frozen or not is_current() or self._clock() - capture.observed_monotonic >= 10:
+            return False
+        if (
+            self._current is not None
+            and capture.shutter_unix_ns < self._current.capture.shutter_unix_ns
+        ):
             return False
         self._capture_generation += 1
         generation = self._capture_generation

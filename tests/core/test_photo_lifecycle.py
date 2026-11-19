@@ -64,7 +64,7 @@ def block(source="source", translation="translated", *, google=False):
 
 
 def capture(path, clock=0):
-    return PhotoCapture(path, 1, (1, 2), 1234, clock)
+    return PhotoCapture(path, 1, (1, 2), 1_234_000_000, clock)
 
 
 class Harness:
@@ -212,8 +212,8 @@ async def test_capture_identity_is_immutable_through_prepare_reopen_and_replacem
             [block(), PhotoStreamCompleted({}, "gpt-6-luna")],
         ],
     )
-    first = PhotoCapture(tmp_path / "first.png", 17, (9, 2**100), 1234, 0)
-    second = PhotoCapture(tmp_path / "second.png", 23, (10, 2**101), 1235, 0)
+    first = PhotoCapture(tmp_path / "first.png", 17, (9, 2**100), 1_234_000_000, 0)
+    second = PhotoCapture(tmp_path / "second.png", 23, (10, 2**101), 1_234_000_001, 0)
     try:
         assert await h.owner.captured(first)
         await eventually(lambda: h.connections and h.connections[0].opened)
@@ -238,8 +238,10 @@ async def test_capture_identity_is_immutable_through_prepare_reopen_and_replacem
         assert h.photo["path"] == str(first.path)
         assert h.photo["expected_file_id"] == ["9", str(2**100)]
         assert await h.owner.captured(second)
+        assert not await h.owner.captured(first)
         second_id = h.photo["photo_id"]
         assert second_id != first_id
+        assert h.photo["shutter_unix_ms"] == before_pull["shutter_unix_ms"] == 1234
         assert h.photo["path"] == str(second.path)
         assert h.photo["expected_file_id"] == ["10", str(2**101)]
         assert h.photo["attempt_id"] == 0 and h.photo["image"] is None
