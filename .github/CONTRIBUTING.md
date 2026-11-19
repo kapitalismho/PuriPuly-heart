@@ -38,8 +38,7 @@ This entry point applies the required upstream patches. Review the [Fun-ASR lang
 
 ## Releases
 
-Pushing a `vMAJOR.MINOR.PATCH` tag runs [Native Release](workflows/release-native.yml), producing a Windows installer and a draft release containing that installer.
-
-Before tagging, synchronize versions in `pyproject.toml`, `src/puripuly_heart/__init__.py`, `installer/application-identity.iss`, `native/overlay/Cargo.toml`, and `native/asr_worker/Cargo.toml`.
-
-Manual reruns use the selected tag's commit, not newer branch changes. Never move a published release tag; ship fixes under a new version.
+1. Synchronize versions in `pyproject.toml`, `src/puripuly_heart/__init__.py`, `installer/application-identity.iss`, `native/overlay/Cargo.toml`, and `native/asr_worker/Cargo.toml`.
+2. Create and push a `vMAJOR.MINOR.PATCH` tag for that commit. Pushing the tag does not start a build.
+3. In GitHub Actions, open [Native Release](workflows/release-native.yml) and open the **Run workflow** menu. Choose `dev` in the **Branch** dropdown, enter the existing release tag in the `tag` field, and click **Run workflow**. The workflow builds the verified tag commit, not the tip of `dev`, and attaches the Windows installer to a draft release.
+4. After the workflow succeeds, review the draft and publish it separately. Never move a published release tag; ship fixes under a new version.
