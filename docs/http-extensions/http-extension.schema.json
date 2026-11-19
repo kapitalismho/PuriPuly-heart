@@ -201,7 +201,7 @@
         },
         "additionalProperties": false
       },
-      "description": "Credential declarations. Every declared secret must be used by a {{secret:<id>}} placeholder in headers, query, or body. Secret values are stored by the system credential store."
+      "description": "Credential declarations. Every declared secret must be used by a {{secret:<id>}} placeholder in headers, query, or body. Secret values are stored by the application's configured credential store (system keyring or encrypted file), not in the extension file."
     },
     "language_map": {
       "type": "object",

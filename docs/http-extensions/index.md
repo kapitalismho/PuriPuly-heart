@@ -61,7 +61,7 @@ The translated text must be non-empty.
 
 ## Secrets
 
-`secrets` is an array of `{ "id", "label" }`. Each entry declares a credential the user fills in the settings UI; values are stored through the system credential store, not in the extension file. `id` must match the identifier pattern and be unique; `label` is the input label shown in the UI.
+`secrets` is an array of `{ "id", "label" }`. Each entry declares a credential the user fills in the settings UI; values are stored through the application's configured credential store (system keyring or encrypted file), not in the extension file. `id` must match the identifier pattern and be unique; `label` is the input label shown in the UI.
 
 An extension without credentials declares an empty array (or omits the field):
 
