@@ -111,6 +111,7 @@ def test_about_view_special_thanks_names_render_from_i18n(
         "about.special_thanks.name.ephedrine": "localized:Ephedrine",
         "about.special_thanks.name.eri": "localized:~ eri ~",
         "about.special_thanks.name.tsuyu_shiro": "localized:梅雨Shiro",
+        "about.special_thanks.name.koz39": "localized:KOZ39",
     }
 
     monkeypatch.setattr(
@@ -127,7 +128,7 @@ def test_about_view_special_thanks_names_render_from_i18n(
     assert rendered_names == list(localized_names.values())
 
 
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja"])
+@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja", "ru"])
 def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str) -> None:
     expected_names = {
         "about.special_thanks.name.sui_32c": "SUI_32C",
@@ -143,6 +144,7 @@ def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str
         "about.special_thanks.name.eri": "~ eri ~",
         "about.special_thanks.name.fzcfweasdferttgg_png": "fzcfweasdferttgg-png",
         "about.special_thanks.name.tsuyu_shiro": "梅雨Shiro",
+        "about.special_thanks.name.koz39": "KOZ39",
     }
 
     bundle = i18n_module._load_bundle(locale)
