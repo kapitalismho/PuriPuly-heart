@@ -95,11 +95,6 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
-from puripuly_heart.app.services.index_selection import (
-    IndexManagedAllowanceObservation,
-    IndexSelectionOwner,
-    translation_selection,
-)
 from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
 from puripuly_heart.app.services.local_asr.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr.local_asr_gpu_provisioning import (
@@ -189,12 +184,6 @@ from puripuly_heart.app.wiring.wiring_composition import (
     create_vrchat_osc_presence_probe_owner,
     create_windows_desktop_work_area,
 )
-from puripuly_heart.app.wiring.wiring_index_selection import (
-    IndexManagedAllowanceObserver,
-    check_index_availability,
-    gemma_fallback_settings,
-    unknown_managed_allowance,
-)
 from puripuly_heart.app.wiring.wiring_local_asr_application import (
     LocalASRApplicationRuntime,
     compose_local_asr_application,
@@ -221,7 +210,6 @@ from puripuly_heart.app.wiring.wiring_provider_runtime import (
     compose_provider_runtime,
 )
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
-    build_llm_provider_signature,
     provider_llm_for_translation,
 )
 from puripuly_heart.app.wiring.wiring_runtime_composition import RuntimeCompositionComponents
@@ -2115,95 +2103,10 @@ def compose_application_runtime(
     )
     require_settings_application().provider_runtime = provider_runtime.runtime
 
-    def selected_translation_runtime_applied() -> bool:
-        current = settings.canonical
-        return bool(
-            current is not None
-            and pipeline.llm_runtime is not None
-            and pipeline.llm_runtime.provider is not None
-            and signatures.last_llm_provider
-            == build_llm_provider_signature(current, http_extensions=http_extensions)
-        )
-
-    async def commit_index_fallback(
-        observation: IndexManagedAllowanceObservation,
-        guard: Callable[[], bool],
-        transition_guard: Callable[[], bool],
-    ):
-        async with control._resource_lock:
-            async with control._lock:
-                if ingress.frozen or not guard():
-                    return None
-                connection = "managed"
-                if observation.state == "exhausted":
-                    if (
-                        observation.confirm_current is not None
-                        and await observation.confirm_current()
-                    ):
-                        connection = "openrouter"
-                    else:
-                        unknown = unknown_managed_allowance("credential_not_current")
-                        index_selection.allowance_observation = unknown
-                        if unknown.diagnostics is not None:
-                            runtime_logging.emit_failure(
-                                unknown.diagnostics, severity="warning", disposition="degraded"
-                            )
-                current = settings.canonical
-                if current is None or translation_selection(current) != (
-                    "index_translate_35b",
-                    "public_api",
-                ):
-                    return None
-                result = await provider_application.apply_translation_selection(
-                    gemma_fallback_settings(current, connection),
-                    commit_guard=lambda: (
-                        not ingress.frozen
-                        and guard()
-                        and translation_selection(settings.canonical)
-                        == ("index_translate_35b", "public_api")
-                    ),
-                    runtime_guard=lambda: not ingress.frozen and transition_guard(),
-                )
-                if (
-                    result is not None
-                    and result.status
-                    in {
-                        "settings_commit_success_runtime_applied",
-                        "settings_commit_success_runtime_degraded",
-                        "settings_commit_success_runtime_interrupted",
-                    }
-                    and (
-                        not selected_translation_runtime_applied()
-                        or not await index_allowance.destination_credential_available()
-                    )
-                ):
-                    managed_account.translation.disable_for_provider_transition()
-                return result
-
-    index_allowance = IndexManagedAllowanceObserver(
-        settings=settings,
-        config_path=config_path,
-        verifier=require_provider_verifier(),
-        ingress_frozen=lambda: ingress.frozen,
-    )
-    index_selection = IndexSelectionOwner(
-        settings_provider=lambda: settings.committed_settings or settings.canonical,
-        probe=check_index_availability,
-        observe_allowance=index_allowance.observe,
-        commit_fallback=commit_index_fallback,
-        message_sink=show_short_message,
-        diagnostic_sink=lambda diagnostic: runtime_logging.emit_failure(
-            diagnostic, severity="warning", disposition="degraded"
-        ),
-        selected_runtime_applied=selected_translation_runtime_applied,
-        timeout_sink=managed_account.translation.disable_for_provider_transition,
-    )
-
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
         on_self_capture_state(components.self_capture.snapshot)
-        index_selection.start()
         llm_connection_readiness.sync()
 
     pipeline_launcher = RuntimePipelineLauncher(
@@ -2492,7 +2395,6 @@ def compose_application_runtime(
         settings_secrets=SettingsSecretsOwner(
             secret_store_factory=create_settings_secret_store,
         ),
-        index_selection=index_selection,
         settings_results=settings_owner.results,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         runtime_control_authority=runtime_control_authority,
@@ -2539,7 +2441,6 @@ def compose_application_runtime(
                 gpu_device_id=canonical.intent.stt.gpu_device_id,
             )
         ),
-        selection_committed=index_selection.selection_changed,
         osc_discovery_retry=lambda: require_vrc_mic_sync().retry_automatic_discovery(),
     )
     application.attach_control(control)
@@ -2601,18 +2502,6 @@ def compose_application_runtime(
                 owner_name="ApplicationControlOwner",
                 callback_name="freeze_ingress",
                 callback=control.freeze_ingress,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
-                owner_name="IndexSelectionOwner",
-                callback_name="stop_ingress",
-                callback=index_selection.stop_ingress,
-            ),
-            application_shutdown_callback(
-                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-                owner_name="IndexSelectionOwner",
-                callback_name="close",
-                callback=index_selection.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,

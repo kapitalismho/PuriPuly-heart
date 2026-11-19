@@ -14,6 +14,7 @@ from puripuly_heart.core.osc.oscquery_contract import (
     OscQueryServiceInfo,
     OscQueryServicePort,
 )
+from puripuly_heart.core.runtime.logging import emit_basic_log
 
 OscConnectionMode = Literal["automatic", "manual", "off"]
 OscReceiverStarter = Callable[[], Awaitable[object]]
@@ -25,6 +26,7 @@ OscResyncGenerationProvider = Callable[[], int]
 OscResyncStarter = Callable[[str, int | None], int | None]
 OscAvatarInspector = Callable[[Mapping[str, object]], Awaitable[None] | None]
 VRCHAT_OSC_DEFAULT_INPUT_PORT: Final = 9000
+_MDNS_COALESCE_SECONDS: Final = 0.05
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +42,8 @@ class OscQueryRuntime:
     resync_generation_provider: OscResyncGenerationProvider | None = None
     avatar_inspector: OscAvatarInspector | None = None
     receiver_host: str = "127.0.0.1"
-    discovery_poll_interval_seconds: float = 2.0
+    healthy_probe_interval_seconds: float = 60.0
+    discovery_retry_delays_seconds: tuple[float, ...] = (2.0, 5.0, 15.0, 30.0)
     application_current: Callable[[], bool] | None = None
     mode: OscConnectionMode = "off"
     service_info: OscQueryServiceInfo | None = field(init=False, default=None)
@@ -51,7 +54,6 @@ class OscQueryRuntime:
     _started: bool = field(init=False, default=False)
     failures: tuple[ErrorDiagnostics, ...] = field(init=False, default=())
     _service_started: bool = field(init=False, default=False)
-    _refresh_requested: bool = field(init=False, default=False)
     _fallback_send_port: int = field(init=False, default=VRCHAT_OSC_DEFAULT_INPUT_PORT)
     _lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _monitor_scope: LifecycleScope = field(
@@ -60,6 +62,11 @@ class OscQueryRuntime:
         repr=False,
     )
     _monitor_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _discovery_wakeup: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
+    _mdns_refresh_at: float | None = field(init=False, default=None)
+    _probe_at: float | None = field(init=False, default=None)
+    _retry_step: int = field(init=False, default=0)
+    _discovery_warned: bool = field(init=False, default=False)
 
     @property
     def started(self) -> bool:
@@ -74,6 +81,7 @@ class OscQueryRuntime:
         preserve_receiver: bool = False,
         publish_snapshot: bool = True,
         is_current: Callable[[], bool] | None = None,
+        report_discovery_failure: bool = False,
     ) -> None:
         async with self._lock:
             await self._stop_locked(stop_receiver=not preserve_receiver)
@@ -99,6 +107,8 @@ class OscQueryRuntime:
                 await self.service.start(self._services_changed)
                 await self.receiver_start()
                 self.effective_receive_port = self.receiver_effective_port()
+                await self._coalesce_startup_changes()
+                self._mdns_refresh_at = None
                 self.service_info = await self.service.discover_vrchat()
                 if not self._application_current() or (is_current is not None and not is_current()):
                     await self._stop_locked(stop_receiver=not preserve_receiver)
@@ -122,9 +132,15 @@ class OscQueryRuntime:
                     await self._stop_locked(stop_receiver=not preserve_receiver)
                     return
                 self._started = True
-                if self._refresh_requested:
-                    self._refresh_requested = False
-                    await self._refresh_locked(publish_snapshot=False)
+                if self._mdns_refresh_at is not None:
+                    await self._coalesce_startup_changes()
+                    await self._refresh_locked(
+                        publish_snapshot=False,
+                        is_current=is_current,
+                        report_discovery_failure=report_discovery_failure,
+                    )
+                else:
+                    self._schedule_after_discovery(self.service_info, report_discovery_failure)
                 if publish_snapshot and self.snapshot_publisher is not None:
                     await _maybe_await(self.snapshot_publisher("start", snapshot_generation))
                 self._start_discovery_monitor()
@@ -138,12 +154,14 @@ class OscQueryRuntime:
         publish_snapshot: bool = True,
         force_requery: bool = False,
         is_current: Callable[[], bool] | None = None,
+        report_discovery_failure: bool = False,
     ) -> bool:
         async with self._lock:
             return await self._refresh_locked(
                 publish_snapshot=publish_snapshot,
                 force_requery=force_requery,
                 is_current=is_current,
+                report_discovery_failure=report_discovery_failure,
             )
 
     async def target_is_applied(self, service: OscQueryServiceInfo | None) -> bool:
@@ -164,6 +182,8 @@ class OscQueryRuntime:
         publish_snapshot: bool,
         force_requery: bool = False,
         is_current: Callable[[], bool] | None = None,
+        report_discovery_failure: bool = False,
+        preferred_service_id: str | None = None,
     ) -> bool:
         if not self._started or self.mode != "automatic" or not self._application_current():
             return False
@@ -174,9 +194,20 @@ class OscQueryRuntime:
             and self.resync_generation_provider is not None
             else None
         )
-        service_info = await self.service.discover_vrchat()
+        pending_mdns = self._mdns_refresh_at
+        self._mdns_refresh_at = None
+        try:
+            service_info = await self.service.discover_vrchat(
+                preferred_service_id=preferred_service_id
+            )
+        except Exception, asyncio.CancelledError:
+            if pending_mdns is not None and self._mdns_refresh_at is None:
+                self._mdns_refresh_at = pending_mdns
+                self._discovery_wakeup.set()
+            raise
         if not self._application_current() or (is_current is not None and not is_current()):
             return False
+        self._schedule_after_discovery(service_info, report_discovery_failure)
         changed = service_info != self.service_info
         if not changed and not force_requery:
             return service_info is not None and service_info.osc_send_port is not None
@@ -241,20 +272,30 @@ class OscQueryRuntime:
                 self._retain_failure(exc, "service_stop")
         self._started = False
         self._service_started = False
-        self._refresh_requested = False
+        self._mdns_refresh_at = None
+        self._probe_at = None
+        self._retry_step = 0
+        self._discovery_warned = False
+        self._discovery_wakeup.clear()
         self.service_info = None
         self.advertised_port = None
         self.effective_send_port = None
         self.effective_receive_port = None
         self.avatar_tree = None
 
-    async def _services_changed(self, _services: object) -> None:
-        if self.mode != "automatic":
+    def _services_changed(self, _services: object) -> None:
+        if self.mode != "automatic" or not self._service_started:
             return
-        if not self._started:
-            self._refresh_requested = True
-            return
-        await self.refresh()
+        if self._mdns_refresh_at is None:
+            self._mdns_refresh_at = asyncio.get_running_loop().time() + _MDNS_COALESCE_SECONDS
+            self._discovery_wakeup.set()
+
+    async def _coalesce_startup_changes(self) -> None:
+        deadline = self._mdns_refresh_at
+        if deadline is not None:
+            delay = deadline - asyncio.get_running_loop().time()
+            if delay > 0:
+                await asyncio.sleep(delay)
 
     def _application_current(self) -> bool:
         return self.application_current is None or self.application_current()
@@ -293,14 +334,85 @@ class OscQueryRuntime:
             name="discovery",
         )
 
+    def _schedule_after_discovery(
+        self, service_info: OscQueryServiceInfo | None, report_discovery_failure: bool
+    ) -> None:
+        unavailable = getattr(self.service, "discovery_observation", None) == "unavailable"
+        usable = service_info is not None and service_info.osc_send_port is not None
+        recovery_reported = False
+        if report_discovery_failure or (unavailable and not self._discovery_warned):
+            failure = getattr(self.service, "discovery_failure", None)
+            if isinstance(failure, ErrorDiagnostics):
+                emit_failure(
+                    logger,
+                    failure,
+                    severity="warning" if unavailable else "info",
+                    disposition="recovered" if usable else "degraded",
+                )
+                recovery_reported = usable
+                if unavailable:
+                    self._discovery_warned = True
+        if usable:
+            if self._discovery_warned and not recovery_reported:
+                emit_basic_log(logger, "[OSCQuery] Discovery recovered")
+            self._probe_at = asyncio.get_running_loop().time() + self.healthy_probe_interval_seconds
+        elif unavailable or service_info is not None:
+            self._schedule_retry()
+            return
+        elif self._mdns_refresh_at is not None:
+            return
+        else:
+            self._probe_at = None
+        self._retry_step = 0
+        self._discovery_warned = False
+        self._discovery_wakeup.set()
+
+    def _schedule_retry(self) -> None:
+        delays = self.discovery_retry_delays_seconds
+        delay = delays[min(self._retry_step, len(delays) - 1)]
+        self._probe_at = asyncio.get_running_loop().time() + delay
+        self._retry_step = min(self._retry_step + 1, len(delays))
+        self._discovery_wakeup.set()
+
+    def _next_discovery_at(self) -> float | None:
+        return self._mdns_refresh_at if self._mdns_refresh_at is not None else self._probe_at
+
     async def _monitor_discovery(self) -> None:
-        interval = max(0.1, float(self.discovery_poll_interval_seconds))
+        loop = asyncio.get_running_loop()
         while self._started and self.mode == "automatic":
-            await asyncio.sleep(interval)
-            try:
-                await self.refresh()
-            except Exception as exc:
-                self._retain_failure(exc, "discovery_monitor")
+            self._discovery_wakeup.clear()
+            deadline = self._next_discovery_at()
+            if deadline is None or deadline > loop.time():
+                try:
+                    async with asyncio.timeout_at(deadline):
+                        await self._discovery_wakeup.wait()
+                except TimeoutError:
+                    pass
+                continue
+            async with self._lock:
+                deadline = self._next_discovery_at()
+                if deadline is None or deadline > loop.time():
+                    continue
+                preferred_service_id = (
+                    self.service_info.service_id
+                    if self._mdns_refresh_at is None and not self._retry_step and self.service_info
+                    else None
+                )
+                self._mdns_refresh_at = None
+                self._probe_at = None
+                if not self._application_current():
+                    continue
+                try:
+                    await self._refresh_locked(
+                        publish_snapshot=True,
+                        preferred_service_id=preferred_service_id,
+                    )
+                except Exception as exc:
+                    if self._application_current():
+                        if not self._discovery_warned:
+                            self._retain_failure(exc, "discovery_monitor")
+                            self._discovery_warned = True
+                        self._schedule_retry()
 
     def _retain_failure(self, exc: Exception, operation: str) -> None:
         diagnostics = exception_diagnostics(

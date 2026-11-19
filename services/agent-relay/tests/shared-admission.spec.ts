@@ -61,15 +61,19 @@ describe('shared installation admission', () => {
     ]);
   });
 
-  it.each(supportedProtocols)('rejects protocol %i model, endpoint and retired-protocol overrides before admission or upstream', async (protocol) => {
+  it.each(supportedProtocols)('rejects protocol %i client overrides and retired versions before admission or upstream', async (protocol) => {
     const upstream = mockLuna();
     const database = usageDatabase();
     const env = { ...testEnv(), AGENT_USAGE_DB: database.db };
     const attempts = [
+      ['/v1/classify', { ...classifyBody(protocol), agent_protocol: 1 }],
       ['/v1/classify', { ...classifyBody(protocol), agent_protocol: 5 }],
       ['/v1/respond', { ...respondBody(protocol), agent_protocol: 5 }],
       ['/v1/classify', { ...classifyBody(protocol), model: 'gpt-6' }],
       ['/v1/classify', { ...classifyBody(protocol), endpoint: 'https://example.invalid/v1/decisions' }],
+      ['/v1/classify', { ...classifyBody(protocol), effort: 'high' }],
+      ['/v1/classify', { ...classifyBody(protocol), questions: [] }],
+      ['/v1/classify', { ...classifyBody(protocol), input: [{ ...user, role: 'system' }] }],
       ['/v1/classify', { ...classifyBody(protocol), input: [{ ...user, model: 'gpt-6' }] }],
       ['/v1/respond', { ...respondBody(protocol), model: 'gpt-6' }],
       ['/v1/respond', { ...respondBody(protocol, turnId, 'social'), model: 'gpt-6' }],

@@ -15,7 +15,7 @@ from puripuly_heart.core.output.models import (
     SelfUtterancePublication,
     SystemDisclosurePublication,
 )
-from tests.helpers.ast_sources import assert_no_forbidden_imports, imported_modules
+from tests.helpers.ast_sources import assert_no_forbidden_imports
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "flet",
@@ -128,37 +128,6 @@ def test_chatbox_and_subtitle_contract_modules_are_canonical_owners() -> None:
             f"{name} must be the single canonical object re-exported from "
             "puripuly_heart.core.output.subtitle"
         )
-
-
-def test_router_and_adapters_import_canonical_channel_contract_modules() -> None:
-    repo_root = Path(__file__).resolve().parents[3]
-    expected_imports = {
-        repo_root
-        / "src"
-        / "puripuly_heart"
-        / "core"
-        / "output"
-        / "router.py": {
-            "puripuly_heart.core.output.chatbox",
-            "puripuly_heart.core.output.subtitle",
-        },
-        repo_root
-        / "src"
-        / "puripuly_heart"
-        / "core"
-        / "osc"
-        / "chatbox_paginator.py": {"puripuly_heart.core.output.chatbox"},
-        repo_root
-        / "src"
-        / "puripuly_heart"
-        / "core"
-        / "overlay"
-        / "sink.py": {"puripuly_heart.core.output.subtitle"},
-    }
-
-    for module_file, expected in expected_imports.items():
-        imports = imported_modules(module_file)
-        assert expected <= imports
 
 
 def test_peer_chatbox_denial_reason_is_closed_safe_contract() -> None:

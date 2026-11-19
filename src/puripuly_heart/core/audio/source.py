@@ -20,7 +20,7 @@ from puripuly_heart.core.audio.format import (
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import emit_basic_log
 
 logger = logging.getLogger(__name__)
 

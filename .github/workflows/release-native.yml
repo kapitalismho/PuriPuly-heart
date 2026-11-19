@@ -1,9 +1,6 @@
 name: Native Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -15,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-native-${{ inputs.tag || github.ref_name }}
+  group: release-native-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
@@ -30,22 +27,26 @@ env:
 jobs:
   verify-version:
     name: Verify native tag and version sync
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.sync.outputs.version }}
       tag: ${{ steps.sync.outputs.tag }}
       source-sha: ${{ steps.sync.outputs.source-sha }}
     steps:
+      - name: Require the dev branch
+        run: test "$GITHUB_REF" = refs/heads/dev
+
       - name: Checkout native release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
 
       - name: Validate native tag and project versions
         id: sync
         env:
-          TAG_NAME: ${{ inputs.tag || github.ref_name }}
+          TAG_NAME: ${{ inputs.tag }}
         run: |
           python - <<'PY'
           import os
@@ -98,6 +99,9 @@ jobs:
     name: Build native Windows installer
     runs-on: windows-2025
     needs: verify-version
+    env:
+      LIBCLANG_PATH: ${{ github.workspace }}\.venv\Lib\site-packages\clang\native
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
     steps:
       - name: Checkout verified native source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -111,12 +115,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra build
-
-      - name: Cache pinned native inputs
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ${{ env.NATIVE_INPUT_ROOT }}
-          key: native-release-inputs-${{ runner.os }}-${{ hashFiles('native/windows_host/upstream-inputs.json') }}
 
       - name: Prepare pinned native inputs and Flet cache
         shell: pwsh
@@ -161,6 +159,76 @@ jobs:
           "CMAKE_PREFIX_PATH=$sdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "$sdkRoot\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Identify native compiler caches
+        id: compiler-cache
+        shell: pwsh
+        env:
+          NATIVE_BUILD_CONFIG: ${{ hashFiles('rust-toolchain.toml', '.cargo/config', '.cargo/config.toml', 'scripts/ci/build-native-experimental.ps1', 'scripts/ci/build-asr-worker-release.ps1', 'native/asr_worker/build.rs', 'native/asr_worker/cmake/**', 'native/overlay/build.rs', 'native/windows_version.rs') }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products "*" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $env:NATIVE_TOOLCHAIN = @(
+            (rustc --version --verbose)
+            (cargo --version --verbose)
+            (Get-Command cmake).Source
+            (cmake --version)[0]
+            $vs
+            (Get-Content -LiteralPath (Join-Path $vs "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"))
+            (Get-ChildItem -Name -Directory (Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\Lib") | Sort-Object)
+          ) -join "`n"
+          @'
+          import hashlib
+          import json
+          import os
+          import tomllib
+          from importlib.metadata import version
+          from pathlib import Path
+
+          common = [os.environ[name] for name in (
+              "NATIVE_TOOLCHAIN", "NATIVE_BUILD_CONFIG", "ImageOS", "ImageVersion",
+              "GITHUB_WORKSPACE", "CARGO_HOME", "LOCALAPPDATA", "TEMP",
+              "NATIVE_BUILD_ROOT", "LIBCLANG_PATH", "CMAKE_POLICY_VERSION_MINIMUM",
+          )]
+          common.append(version("libclang"))
+          common.append({
+              name: value for name, value in os.environ.items()
+              if name.startswith(("CARGO_BUILD_", "CARGO_PROFILE_", "CARGO_TARGET_", "CMAKE_"))
+              or name in ("CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS", "CL", "_CL_", "LINK", "_LINK_")
+          })
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              for crate, target_dir in (("asr_worker", "asr"), ("overlay", "overlay-target")):
+                  root = Path("native") / crate
+                  manifest = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+                  lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
+                  package = manifest["package"]
+                  del package["version"]
+                  for entry in lock["package"]:
+                      if entry["name"] == package["name"] and "source" not in entry:
+                          del entry["version"]
+                  settings = ["x86_64-pc-windows-msvc", "release", manifest, lock]
+                  if crate == "asr_worker":
+                      settings.extend((os.environ["VULKAN_SDK_VERSION"], os.environ["VULKAN_SDK"]))
+                  digest = hashlib.sha256(json.dumps([common, settings], sort_keys=True).encode()).hexdigest()
+                  output.write(f"{crate}={digest}\n")
+                  print(f"Native compiler cache: {os.environ['GITHUB_REF']} {Path(os.environ['NATIVE_BUILD_ROOT']) / target_dir}")
+          '@ | & .\.venv\Scripts\python.exe -
+
+      - name: Cache ASR worker compilation
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ${{ env.NATIVE_BUILD_ROOT }}\asr
+            ${{ env.CARGO_HOME }}\git\db\transcribe.cpp-*
+            ${{ env.CARGO_HOME }}\git\checkouts\transcribe.cpp-*
+          key: native-release-asr-v1-${{ steps.compiler-cache.outputs.asr_worker }}
+
+      - name: Cache overlay compilation
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.NATIVE_BUILD_ROOT }}\overlay-target
+          key: native-release-overlay-v1-${{ steps.compiler-cache.outputs.overlay }}
+
       - name: Prepare pinned portable Inno Setup
         shell: pwsh
         run: |
@@ -185,9 +253,6 @@ jobs:
 
       - name: Build native release artifacts
         shell: pwsh
-        env:
-          LIBCLANG_PATH: ${{ github.workspace }}\.venv\Lib\site-packages\clang\native
-          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           ./scripts/ci/build-native-release-artifacts.ps1 `
             -ToolPython (Join-Path $PWD ".venv/Scripts/python.exe") `
@@ -243,6 +308,22 @@ jobs:
               template.replace("{{INSTALLER_EXE}}", installer), encoding="utf-8"
           )
           PY
+
+      - name: Refuse staging to a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          releases=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100")
+          jq -e --arg tag "$RELEASE_TAG" '
+            if type != "array" or length == 0 or
+              (all(.[]; type == "array" and all(.[]; type == "object" and
+                (.tag_name | type == "string") and (.draft | type == "boolean"))) | not)
+            then error("Invalid GitHub release list")
+            elif any(.[][]; .tag_name == $tag and .draft == false)
+            then error("Refusing to stage an already published release: \($tag)")
+            else true end
+          ' <<<"$releases" >/dev/null
 
       - name: Create native draft release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64

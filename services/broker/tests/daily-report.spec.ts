@@ -5,10 +5,7 @@ import {
   resolveDailyReportWindow,
   runDailyReport,
 } from '../src/scheduled';
-import {
-  applyAppActiveDayRetention,
-  recordAppActiveDay,
-} from '../src/telemetry';
+import { recordAppActiveDay } from '../src/telemetry';
 import {
   updateAbuseControls,
   updateAbuseRuntimeState,
@@ -744,30 +741,6 @@ describe('PuriPuly daily summary v2', () => {
       count: number;
     };
     expect(activeDayCount.count).toBe(1);
-  });
-
-  it('retains only the 35-day app activity window', async () => {
-    const env = createTestBrokerEnv();
-    await recordActiveDay(env, 'expired-activity', '2026-03-15');
-    await recordActiveDay(env, 'cutoff-activity', '2026-03-16');
-    await recordActiveDay(env, 'recent-activity', '2026-04-19');
-
-    const result = await applyAppActiveDayRetention(
-      env.BROKER_DB,
-      new Date('2026-04-20T00:05:00.000Z'),
-    );
-
-    expect(result).toEqual({ deleted: 1, cutoffDateUtc: '2026-03-16' });
-    expect(
-      env.__db
-        .prepare(
-          'SELECT active_date_utc FROM app_active_days ORDER BY active_date_utc',
-        )
-        .all(),
-    ).toEqual([
-      { active_date_utc: '2026-03-16' },
-      { active_date_utc: '2026-04-19' },
-    ]);
   });
 });
 

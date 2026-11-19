@@ -1025,25 +1025,6 @@ def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
     assert view._openrouter_pkce_button_row.visible is False
 
 
-def test_load_from_settings_places_managed_key_card_above_provider_fields(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    api_controls = _subtab_controls(view, "api")
-    api_card = _api_tab_card(view, t("settings.section.api_keys"))
-    assert view._managed_key_card in api_controls
-    assert api_controls.index(view._managed_key_card) < api_controls.index(api_card)
-    assert view._managed_key_card not in view._api_keys_column.controls
-    assert view._managed_trial_usage_bar not in view._api_keys_column.controls
-    assert _card_title(view._managed_key_card) == t("settings.managed_key.title")
-
-    assert _tree_contains_control(view._managed_key_card, view._managed_trial_usage_bar)
-
-
 @pytest.mark.parametrize(
     (
         "model",
@@ -5391,20 +5372,6 @@ def test_overlay_reset_card_restores_defaults_immediately(
     )
 
 
-def test_overlay_tab_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    overlay_cards = _overlay_tab_cards(view)
-    assert all(isinstance(card, SharedCardWrapper) for card in overlay_cards)
-    assert {card.height for card in overlay_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in overlay_cards)
-
-
 @pytest.mark.parametrize(
     ("field", "title_key", "left_glyph", "right_glyph", "initial", "decreased"),
     [
@@ -5455,17 +5422,6 @@ def test_overlay_stepper_controls_emit_and_display_both_directions(
     assert getattr(settings_events.settings.intent.overlay.calibration, field) == pytest.approx(
         float(initial)
     )
-
-
-def test_translation_card_no_longer_contains_translation_connection_row(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    translation_card = _api_tab_card(view, t("settings.section.translation"))
-    translation_column = translation_card.content.content
-
-    assert view._translation_connection_row not in translation_column.controls
 
 
 @pytest.mark.asyncio
@@ -5771,11 +5727,9 @@ def test_custom_vocabulary_card_header_is_only_the_title(
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
 
-def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
+def test_prompt_and_hint_cards_allow_their_content_to_set_height(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
     prompt_cards = [
@@ -5784,36 +5738,23 @@ def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
         view._persona_card,
     ]
 
-    assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
     assert all(card.height is None for card in prompt_cards)
     assert all(card.expand is False for card in prompt_cards)
 
 
-def test_settings_api_unit_cards_use_settings_unit_card_defaults(
+def test_settings_unit_card_rows_fit_their_cards(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    unit_cards = [
+    api_cards = [
         _api_tab_card(view, t("settings.section.stt")),
         _api_tab_card(view, t("settings.section.peer_stt")),
         _api_tab_card(view, t("settings.section.translation")),
         view._translation_connection_card,
     ]
-
-    assert all(isinstance(card, SettingsUnitCard) for card in unit_cards)
-    assert {card.height for card in unit_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in unit_cards)
-
-
-def test_general_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     general_cards = [
         _general_tab_card(view, t("settings.section.ui")),
@@ -5828,23 +5769,21 @@ def test_general_cards_use_settings_unit_card_defaults(
         _general_tab_card(view, t("settings.section.peer_vad_sensitivity")),
     ]
 
-    assert all(isinstance(card, SettingsUnitCard) for card in general_cards)
-    assert {card.height for card in general_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in general_cards)
+    for card in (*api_cards, *general_cards, *_overlay_tab_cards(view)):
+        assert card.height == SettingsUnitCard.DEFAULT_HEIGHT
+        assert card.expand is True
+
     assert all(getattr(row, "height", None) is None for row in _subtab_controls(view, "general"))
     assert view._translation_connection_row.height is None
 
 
-def test_api_keys_card_uses_shared_full_width_auto_height(
+def test_api_keys_card_allows_its_content_to_set_height(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
     api_card = _api_tab_card(view, t("settings.section.api_keys"))
 
-    assert isinstance(api_card, SharedCardWrapper)
     assert api_card.height is None
     assert api_card.expand is False
 

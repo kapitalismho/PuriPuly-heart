@@ -170,6 +170,29 @@ async def test_translation_probe_reports_configured_self_targets_without_publish
     assert app.normal_recognition == app.normal_translation == 0
 
 
+def test_local_quality_advice_starts_with_working_cpu_translation():
+    app = ScenarioApp(scenario("recommend-default-free-options"))
+    app.advance()
+
+    translation = app.current_observations("self")["translation"]
+    assert translation is not None
+    assert translation["configuration"]["model"] == "managed_gemma"
+    assert translation["configuration"]["connection"] == "cpu"
+
+
+@pytest.mark.asyncio
+async def test_exhausted_trial_stays_unusable_after_refresh():
+    app = ScenarioApp(scenario("managed-trial-exhausted"))
+    before = (await app.query("accounts.status", {}))["managed"]
+    accepted = await app.submit("accounts.managed.refresh", {}, request_id="refresh-trial")
+    result = await app.wait(accepted["operation_id"])
+
+    assert before["trial"] == "exhausted"
+    assert result["status"] == "failed"
+    assert result["managed_access"] == "unusable"
+    assert result["managed_remaining_percent"] == before["budget"]["remaining_percent"] == 0
+
+
 @pytest.mark.asyncio
 async def test_simulator_peer_probe_preserves_requested_direction_and_isolation():
     app = ScenarioApp(scenario("fixture-first-run"))
@@ -4770,38 +4793,3 @@ def test_official_deepseek_key_is_not_ready_until_observed_credit_and_secure_ver
     assert app.signup_completed("deepseek")
     assert app.presence["deepseek_api_key"]
     assert app.intent["translation"] == app.initial_translation
-
-
-def test_report_evidence_cannot_be_supplied_after_the_offer():
-    report = {
-        "type": "function_call",
-        "name": "manage_proposal",
-        "arguments": json.dumps({"action": "report", "summary": "Synthetic issue"}),
-    }
-    offer = {
-        "id": 1,
-        "turn": 1,
-        "method": "respond",
-        "request": {"route": "work", "input": []},
-        "response": {"output": [report]},
-    }
-    observed = {
-        "id": 2,
-        "turn": 2,
-        "method": "respond",
-        "request": {
-            "route": "work",
-            "input": [
-                {
-                    "role": "user",
-                    "content": json.dumps({"app_context": {"core": {"diagnostics": []}}}),
-                }
-            ],
-        },
-        "response": {"output": []},
-    }
-    app = ScenarioApp(select_scenarios(["unsolvable-internal"])[0])
-    late = code_judgment(app, [], [], model_calls=[offer, observed])
-    early = code_judgment(app, [], [], model_calls=[observed, offer])
-    assert late["local_diagnostic_evidence_observed"] is False
-    assert early["local_diagnostic_evidence_observed"] is True

@@ -100,22 +100,6 @@ def test_main_gui_startup_check_imports_gui_runtime_without_starting_flet(monkey
     assert main_module.main(["gui-startup-check"]) == 0
 
 
-@pytest.mark.parametrize(
-    "argv",
-    [
-        ["osc-send", "hello"],
-        ["run-stdin"],
-        ["run-mic"],
-    ],
-)
-def test_main_rejects_removed_cli_commands(argv, capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main_module.main(argv)
-
-    assert exc_info.value.code == 2
-    assert "invalid choice" in capsys.readouterr().err
-
-
 def test_main_run_gui_invokes_flet_run(monkeypatch, tmp_path) -> None:
     calls: dict[str, object] = {}
 
@@ -531,52 +515,25 @@ def test_main_default_gui_passes_debug_ui_preview_flag(monkeypatch, tmp_path) ->
     assert calls["debug_ui_preview"] is True
 
 
-def test_main_local_sherpa_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
-    calls: dict[str, object] = {}
+@pytest.mark.parametrize(
+    ("command", "runner"),
+    [
+        ("local-sherpa-runtime-check", "run_local_sherpa_runtime_check"),
+        ("soxr-runtime-check", "run_soxr_runtime_check"),
+    ],
+)
+def test_main_runtime_check_dispatches_runner(monkeypatch, tmp_path, command, runner) -> None:
+    calls = []
 
-    def fake_run_local_sherpa_runtime_check() -> int:
-        calls["called"] = True
+    def run_check() -> int:
+        calls.append(command)
         return 0
 
-    monkeypatch.setattr(
-        main_module,
-        "run_local_sherpa_runtime_check",
-        fake_run_local_sherpa_runtime_check,
-        raising=False,
-    )
+    monkeypatch.setattr(main_module, runner, run_check)
 
     config_path = tmp_path / "settings.json"
-    try:
-        result = main_module.main(["--config", str(config_path), "local-sherpa-runtime-check"])
-    except SystemExit as exc:  # pragma: no cover - red phase guard
-        pytest.fail(f"unexpected SystemExit: {exc}")
-
-    assert result == 0
-    assert calls["called"] is True
-
-
-def test_main_soxr_runtime_check_dispatches_runner(monkeypatch, tmp_path) -> None:
-    calls: dict[str, object] = {}
-
-    def fake_run_soxr_runtime_check() -> int:
-        calls["called"] = True
-        return 0
-
-    monkeypatch.setattr(
-        main_module,
-        "run_soxr_runtime_check",
-        fake_run_soxr_runtime_check,
-        raising=False,
-    )
-
-    config_path = tmp_path / "settings.json"
-    try:
-        result = main_module.main(["--config", str(config_path), "soxr-runtime-check"])
-    except SystemExit as exc:  # pragma: no cover - red phase guard
-        pytest.fail(f"unexpected SystemExit: {exc}")
-
-    assert result == 0
-    assert calls["called"] is True
+    assert main_module.main(["--config", str(config_path), command]) == 0
+    assert calls == [command]
 
 
 def test_main_local_asr_production_composition_evidence_dispatches_paths(

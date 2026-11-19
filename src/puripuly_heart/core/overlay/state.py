@@ -765,6 +765,8 @@ class OverlayPresentationState:
             entry.original_text = event.text
             entry.original_language = _line_language(event.source_language, event.text)
             entry.original_seq = event.seq
+            if event.caption_source_closed:
+                entry.last_meaningful_visible_at = now
         entry.source_closed = bool(event.caption_source_closed)
         self._refresh_entry_visibility_and_expiration(
             key,
@@ -1809,6 +1811,13 @@ class OverlayPresentationState:
         visible_ttl_seconds: float,
         self_translation_min_visible_seconds: float,
     ) -> tuple[float | None, float | None, float | None]:
+        if (
+            entry.channel == "self"
+            and entry.caption_revision > 0
+            and not entry.source_closed
+            and self.live_self_turn_key == ("self", entry.utterance_id)
+        ):
+            return None, None, None
         if entry.channel == "peer" and entry.peer_dormant and not entry.peer_departed:
             parent = entry.parent if isinstance(entry, PeerFragmentRegistration) else entry
             anchor = entry.last_meaningful_visible_at

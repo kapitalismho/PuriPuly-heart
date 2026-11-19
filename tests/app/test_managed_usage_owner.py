@@ -237,6 +237,7 @@ def test_managed_account_snapshot_preserves_failed_usage_observation():
             release_service_available=True,
             ingress_frozen=False,
             local_key_available=True,
+            trial="active",
         ),
         dashboard_action=lambda: "idle",
     )
@@ -290,6 +291,7 @@ async def test_retired_usage_failure_is_scoped_history_not_current_account(raise
             release_service_available=True,
             ingress_frozen=False,
             local_key_available=True,
+            trial="active",
         ),
         dashboard_action=lambda: "idle",
     )
@@ -355,6 +357,7 @@ async def test_warning_delivery_failure_remains_with_originating_usage_scope(new
                 release_service_available=True,
                 ingress_frozen=False,
                 local_key_available=True,
+                trial="active",
             ),
             dashboard_action=lambda: "idle",
         )
@@ -458,3 +461,35 @@ async def test_managed_access_refresh_reports_usability_without_side_effects(res
     assert {key: receipt.get(key) for key in expected} == expected
     assert disabled == []
     await usage.close()
+
+
+@pytest.mark.parametrize(
+    ("remaining_usd", "expected"),
+    [(5, "active"), (0, "exhausted")],
+)
+def test_managed_account_snapshot_reports_trial_usage(remaining_usd, expected):
+    from types import SimpleNamespace
+
+    from puripuly_heart.app.adapters.ui_runtime import UiManagedRuntimeAdapter
+
+    usage = _owner([_state()])
+    usage.usage_metadata = OpenRouterKeyMetadata(
+        limit_usd=10, remaining_usd=remaining_usd, usage_usd=10 - remaining_usd
+    )
+    usage.usage_metadata_entitlement_ref = "entitlement"
+    auth = SimpleNamespace(
+        state_provider=lambda: SimpleNamespace(
+            settings_available=True,
+            managed_selected=True,
+            managed_china=False,
+            release_service_available=True,
+            ingress_frozen=False,
+            local_key_available=True,
+            trial="active",
+        ),
+        dashboard_action=lambda: "idle",
+    )
+    result = UiManagedRuntimeAdapter(
+        SimpleNamespace(auth=auth, usage=usage)
+    ).managed_account_snapshot()
+    assert result["trial"] == expected

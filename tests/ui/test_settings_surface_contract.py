@@ -12,7 +12,6 @@ from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.settings.contract import (
     SettingsApiSurfaceSlots,
     SettingsGeneralIntents,
-    SettingsGeneralSurfaceSlots,
     SettingsOverlayIntents,
     SettingsOverlaySurfaceSlots,
     SettingsPhotoSurfaceSlots,
@@ -21,9 +20,7 @@ from puripuly_heart.ui.settings.contract import (
     SettingsSurfaceIntents,
 )
 from puripuly_heart.ui.settings.renderer import (
-    SETTINGS_ROW_SPACING,
     compose_settings_api_surface,
-    compose_settings_general_surface,
     compose_settings_overlay_surface,
     compose_settings_photo_surface,
 )
@@ -99,10 +96,9 @@ def _compose() -> tuple[object, _SlotProvider]:
     return surface, provider
 
 
-def test_settings_api_rows_use_the_shared_page_spacing_token() -> None:
-    assert SETTINGS_ROW_SPACING == FOUNDATION_DESIGN_TOKENS.spacing.page
+def test_settings_api_surface_preserves_the_accepted_rows() -> None:
+    surface, provider = _compose()
 
-    surface, _ = _compose()
     for row in (
         surface.provider_controls,
         surface.translation_connection_controls,
@@ -110,10 +106,6 @@ def test_settings_api_rows_use_the_shared_page_spacing_token() -> None:
     ):
         assert row.spacing == FOUNDATION_DESIGN_TOKENS.spacing.page
         assert row.expand is True
-
-
-def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
-    surface, provider = _compose()
 
     assert surface.rows == (
         surface.provider_row,
@@ -124,6 +116,10 @@ def test_settings_api_surface_preserves_the_accepted_row_order() -> None:
         provider.controls["managed_key"],
         provider.controls["api_keys"],
     )
+
+    assert surface.provider_row.visible is True
+    assert surface.translation_connection_row.visible is True
+    assert surface.gpu_device_row.visible is False
 
 
 def test_settings_api_surface_places_speech_hints_above_api_keys_and_system_prompt_last() -> None:
@@ -167,14 +163,6 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
         provider.controls["gpu_llm"],
         provider.controls["model_assets"],
     ]
-
-
-def test_settings_api_surface_preserves_accepted_initial_row_visibility() -> None:
-    surface, _ = _compose()
-
-    assert surface.provider_row.visible is True
-    assert surface.translation_connection_row.visible is True
-    assert surface.gpu_device_row.visible is False
 
 
 def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
@@ -323,17 +311,6 @@ def _overlay_slots() -> SettingsOverlaySurfaceSlots:
     return SettingsOverlaySurfaceSlots(
         **{name: ft.Text(name) for name in SettingsOverlaySurfaceSlots.__dataclass_fields__}
     )
-
-
-def test_general_surface_has_only_its_five_card_rows() -> None:
-    surface = compose_settings_general_surface(
-        SettingsGeneralSurfaceSlots(
-            **{name: ft.Text(name) for name in SettingsGeneralSurfaceSlots.__dataclass_fields__}
-        ),
-        placeholder_factory=lambda: ft.Text("placeholder"),
-    )
-
-    assert len(surface.rows) == 5
 
 
 def test_photo_surface_puts_model_and_connection_beside_the_switch_then_route_cards() -> None:

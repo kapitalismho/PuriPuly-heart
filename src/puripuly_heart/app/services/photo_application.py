@@ -124,9 +124,7 @@ class PhotoApplicationOwner:
 
     def _capture_current(self, generation: int) -> bool:
         with self._policy_lock:
-            current = (
-                generation == self._capture_generation and not self._disable_requested
-            )
+            current = generation == self._capture_generation and not self._disable_requested
         return current and not self._frozen and self._enabled()
 
     async def _resolve_current_route(self) -> PhotoRoute | None:
@@ -248,9 +246,7 @@ class PhotoApplicationOwner:
                     self._capture_task = self._scope.create_task(
                         self._next_capture(), name="capture"
                     )
-                policy = self._scope.create_task(
-                    self._policy_changed.wait(), name="policy-wake"
-                )
+                policy = self._scope.create_task(self._policy_changed.wait(), name="policy-wake")
                 changed = self._scope.create_task(
                     self.lifecycle.wait_changed(), name="lifecycle-wake"
                 )

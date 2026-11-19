@@ -1043,12 +1043,3 @@ async def _record_async_call(
     value: str | None = None,
 ) -> None:
     calls.append((action, value))
-
-
-@pytest.mark.asyncio
-async def test_peer_chatbox_deny_still_holds() -> None:
-    from tests.core.test_peer_channel_routing import (
-        test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sent_to_chatbox,
-    )
-
-    await test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sent_to_chatbox()

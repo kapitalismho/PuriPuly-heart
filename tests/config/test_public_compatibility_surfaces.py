@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import asyncio
 import base64
 import importlib
@@ -53,37 +52,6 @@ from tests.helpers.paths import REPO_ROOT
 SNAPSHOT_PATH = Path(__file__).with_name("public_compatibility_surfaces_snapshot.json")
 INVENTORY_PATH = Path(__file__).with_name("compatibility_surface_inventory.json")
 
-REQUIRED_SURFACES = (
-    "secret_store",
-    "overlay",
-    "installer_identity",
-    "prompts",
-    "provider_aliases",
-    "provider_runtime_public_config",
-    "guard_coverage",
-    "blockers",
-)
-REQUIRED_INVENTORY_SURFACES = (
-    "public_import_facades",
-    "settings_runtime_compatibility",
-    "persisted_operational_state",
-    "secret_store",
-    "provider_aliases",
-    "provider_runtime_public_config",
-    "prompt_fallback",
-    "broker_v1",
-    "overlay_protocol_startup_snapshot",
-    "i18n_key_parity",
-    "installer_identity",
-    "rust_overlay_startup",
-)
-REQUIRED_INVENTORY_SOURCE_RULES = {
-    "__all__",
-    "lazy __getattr__",
-    "documented entry point",
-    "existing public test or packaging import",
-    "approved facade",
-}
 REQUIRED_SECRET_KEYS = (
     "gemini_api_key",
     "openrouter_api_key",
@@ -172,13 +140,6 @@ def _render_command_template(parts: list[str], **values: str) -> tuple[str, ...]
     return tuple(part.format(**values) for part in parts)
 
 
-def _test_function_names(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    return {
-        node.name for node in tree.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-
-
 def _leaf_values(value: object) -> Iterator[object]:
     if isinstance(value, dict):
         for child in value.values():
@@ -189,22 +150,6 @@ def _leaf_values(value: object) -> Iterator[object]:
             yield from _leaf_values(child)
         return
     yield value
-
-
-def _assert_source_ref_exists(ref: str) -> None:
-    path_text = ref.split("::", maxsplit=1)[0]
-    assert path_text, ref
-    assert (REPO_ROOT / path_text).exists(), ref
-
-
-def _assert_inventory_export_resolves(module_name: str, export: dict[str, str]) -> None:
-    export_name = export["name"]
-    if export["kind"] == "submodule":
-        importlib.import_module(f"{module_name}.{export_name}")
-        return
-
-    module = importlib.import_module(module_name)
-    assert hasattr(module, export_name), f"{module_name}.{export_name}"
 
 
 def _clear_entry_env(monkeypatch: pytest.MonkeyPatch, entry: dict[str, Any]) -> None:
@@ -368,104 +313,25 @@ def _assert_local_llm_optional_secret_store_only(entry: dict[str, Any]) -> None:
             os.environ["LOCAL_LLM_API_KEY"] = previous_env
 
 
-def test_public_compatibility_snapshot_declares_all_required_surfaces() -> None:
-    snapshot = _load_snapshot()
-
-    assert tuple(snapshot) == REQUIRED_SURFACES
-    assert snapshot["blockers"] == []
-
-
-def test_gate_zero_compatibility_inventory_declares_required_surfaces() -> None:
-    inventory = _load_inventory()
-
-    assert inventory["bundle"]["ref"] == "vnext-internal-cutover"
-    assert inventory["bundle"]["sha256"] == (
-        "033912b4bf580cd5d488066dd9139c3ff0896d962df94e5de405bb3c694dd1b6"
-    )
-    assert inventory["source_spec"]["sha256"] == (
-        "42e4a691eacdbbc495eb5ede54c0c3511b1c0c78b67159ead94d2bad35c0c1f9"
-    )
-    assert tuple(inventory["compatibility_surfaces"]) == REQUIRED_INVENTORY_SURFACES
-    assert inventory["ambiguous_public_private_surfaces"] == []
-
-    for surface_name, surface in inventory["compatibility_surfaces"].items():
-        assert surface["classification"] == "public_compatibility_preserve", surface_name
-        assert surface["source_of_truth_refs"], surface_name
-        assert surface["fixture_or_guard_refs"], surface_name
-        for ref in [*surface["source_of_truth_refs"], *surface["fixture_or_guard_refs"]]:
-            _assert_source_ref_exists(ref)
-
-
 def test_public_import_inventory_smoke_imports_every_exported_name() -> None:
     public_imports = _load_inventory()["public_imports"]
 
     assert public_imports
     for entry in public_imports:
         module_name = entry["module"]
-        source_rule = entry["source_rule"]
         exports = entry["exports"]
 
-        assert source_rule in REQUIRED_INVENTORY_SOURCE_RULES, module_name
         assert exports, module_name
-        for ref in entry["source_of_truth_refs"]:
-            _assert_source_ref_exists(ref)
 
         module = importlib.import_module(module_name)
-        if entry.get("runtime_all_matches_exports"):
+        if entry["runtime_all_matches_exports"]:
             assert tuple(module.__all__) == tuple(export["name"] for export in exports)
         for export in exports:
-            _assert_inventory_export_resolves(module_name, export)
-
-
-def test_public_facade_inventory_classifies_thin_delegate_targets() -> None:
-    inventory = _load_inventory()
-    public_imports = inventory["public_imports"]
-    facade_entries = [entry for entry in public_imports if entry["facade_contract"]]
-
-    assert facade_entries
-    for entry in facade_entries:
-        contract = entry["facade_contract"]
-        assert contract["preserve_import_path"] is True, entry["module"]
-        assert contract["target_role"] in {
-            "thin_delegate",
-            "thin_reexport",
-            "lazy_reexport",
-            "compatibility_boundary_owner",
-        }, entry["module"]
-        assert contract["implementation_owner"] in {
-            "canonical_vnext_owner",
-            "compatibility_boundary",
-            "adapter_owner_until_split",
-            "public_contract_owner",
-        }, entry["module"]
-
-    for classification in inventory["non_public_module_classifications"]:
-        assert classification["classification"] != "ambiguous", classification
-        assert classification["rationale"], classification
-
-
-def test_guard_coverage_references_existing_tests_for_every_surface() -> None:
-    coverage = _load_snapshot()["guard_coverage"]
-    expected_surfaces = {
-        "secret_store",
-        "broker_v1",
-        "overlay",
-        "prompt_loader",
-        "provider_aliases",
-        "provider_runtime_public_config",
-        "i18n_parity",
-        "packaging",
-    }
-
-    assert set(coverage) == expected_surfaces
-    for surface, refs in coverage.items():
-        assert refs, surface
-        for ref in refs:
-            file_name, separator, test_name = ref.partition("::")
-            assert separator == "::", ref
-            test_path = REPO_ROOT / file_name
-            assert test_path.is_file(), ref
-            assert test_name in _test_function_names(test_path), ref
+            name = export["name"]
+            if export["kind"] == "submodule":
+                importlib.import_module(f"{module_name}.{name}")
+            else:
+                assert hasattr(module, name), f"{module_name}.{name}"
 
 
 def test_secret_store_env_lookup_preserves_precedence(

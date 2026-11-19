@@ -47,13 +47,6 @@ from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmis
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationEnablePreparation:
-    intent_revision: int
-    selection_generation: int | None
-    ready: bool
-
-
-@dataclass(frozen=True, slots=True)
 class UiApplicationState:
     config_path: Path
     translation_enabled: bool
@@ -151,7 +144,6 @@ class UiApplicationPort(Protocol):
         enabled: bool,
         *,
         allow_authorization: bool = True,
-        preparation: TranslationEnablePreparation | None = None,
     ) -> object: ...
 
     async def set_stt_enabled(self, enabled: bool) -> object: ...
@@ -439,4 +431,4 @@ class UiApplicationPort(Protocol):
     ) -> object: ...
 
 
-__all__ = ["TranslationEnablePreparation", "UiApplicationPort", "UiApplicationState"]
+__all__ = ["UiApplicationPort", "UiApplicationState"]

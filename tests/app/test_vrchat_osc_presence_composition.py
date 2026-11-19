@@ -91,7 +91,7 @@ async def test_presence_notice_tracks_effective_connection_and_discovery_recover
         service_id="synthetic-vrchat", host="127.0.0.1", osc_send_port=9020, is_vrchat=True
     )
 
-    async def discover():
+    async def discover(_preferred_service_id):
         discovery_started.set()
         await discovery_ready.wait()
         return service_info
@@ -240,7 +240,7 @@ async def controlled_presence_runtime(tmp_path, monkeypatch):
     discovery_started = asyncio.Event()
     discovery_ready = asyncio.Event()
 
-    async def discover():
+    async def discover(_preferred_service_id):
         discovery_started.set()
         await discovery_ready.wait()
         return None

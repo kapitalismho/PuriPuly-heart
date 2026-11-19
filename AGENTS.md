@@ -1,32 +1,23 @@
 ## General
 
 - Code comments are added only when explicitly requested.
-- Do not modify README files, architecture.md, PRIVACY.md, CONTRIBUTING.md, `docs/cli.md`, `docs/vrchat-osc.md`, or `.github/release-template.md` unless explicitly requested.
-- Report drift in these documents caused by your changes, including the affected file and mismatch.
-- Use `docs/architecture.md` as the system map when a task requires reasoning about how the system fits together.
+- Do not modify README files, architecture.md, PRIVACY.md, CONTRIBUTING.md, `docs/cli.md`, `docs/vrchat-osc.md`, or `.github/release-template.md` unless explicitly requested. Report resulting drift by file and mismatch.
+- Use `docs/architecture.md` as the system map.
+- When reporting to the user, explain the key points directly in language that is easy to understand. Include user-visible changes.
 
-* Report any user-visible changes after completing the work.
+## Verification
 
-## Test
-
-- Prefer contract and behavior tests over implementation-detail tests.
-- Test observable outcomes and invariants, keeping tests stable across behavior-preserving refactors.
-- Choose checks that demonstrate promised outcomes, invariants, and failure/recovery behavior across affected components.
-- Use current `capabilities` and `docs/cli.md` for actual-app checks; verify completed operations and effective state, including restart persistence when relevant.
-- Verify the intended build and instance; check presentation and interaction separately in the actual GUI.
-- Use isolated synthetic state and controlled local resources for probes; keep private data and live services outside routine verification.
-- Confirm checks execute, report failures and verification gaps, and use the evidence to guide corrections or further checks.
-- Use `docs/verification.md` to select and compose product-area examples for the changed behavior, not as a mandatory checklist. Follow the same input/result across affected connections and update affected guidance when behavior, entrypoints, prerequisites, or observations change.
+- Product behavior: prioritize observed results in the running app. Compose the smallest relevant path from `docs/verification.md`; follow its setup and evidence boundaries.
+- Code tests: reuse or add checks that cheaply and repeatedly catch meaningful failures or protect required invariants. Test observable contracts, not implementation details.
+- This priority is not an execution order. Use proportionate checks; narrower evidence can establish narrow internal claims. Confirm execution, address failures, and briefly report results and meaningful gaps.
+- Update `docs/verification.md` when reusable paths, entrypoints, inputs, prerequisites, expected observations, or evidence boundaries change. Restoring documented behavior alone does not require a new example.
 
 ## Shared work context
 
-- Read the current issue and applicable decisions before work or GitHub updates, preserving agreed scope and exclusions.
-- Make results, evidence, limits, and next steps understandable without local-session access.
-- Link existing explanations and share only non-sensitive information.
-- Use clear, direct sentences and structured formats such as bullet points for shared work records and GitHub content.
-- Write all content published to GitHub in English.
+- Read the current issue and decisions before work or GitHub updates; preserve scope and exclusions.
+- Keep shared records clear, structured, and understandable without local-session access: results, evidence, limits, and next steps. Link existing explanations; share only non-sensitive information.
+- Publish GitHub content in English.
 
 ## Experimentation
 
-- Treat experiments as engineering probes, using the minimum validation needed to support the immediate engineering decision.
-- Expand an experiment when a plausible result could change the engineering decision, stating the remaining uncertainty and the decision it could affect.
+- Use the smallest probe that informs the engineering decision. Expand only when a plausible result could change it; name the uncertainty and affected decision.

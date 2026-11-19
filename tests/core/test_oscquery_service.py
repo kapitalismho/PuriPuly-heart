@@ -423,3 +423,36 @@ async def test_host_info_result_cannot_resurrect_removed_or_updated_candidate(mo
             )
         release.set()
         assert await pending is None
+
+
+@pytest.mark.asyncio
+async def test_discovery_skips_removed_candidates_and_discards_their_failures(monkeypatch) -> None:
+    service = ZeroconfOscQueryService()
+    names = ["VRChat-A", "VRChat-B", "VRChat-C"]
+    for name in names:
+        service._services[name] = OscQueryServiceInfo(
+            name, "127.0.0.1", query_port=19010, is_vrchat=True
+        )
+    requests = []
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def resolve(info):
+        requests.append(info.service_id)
+        if info.service_id == "VRChat-B":
+            entered.set()
+            await release.wait()
+        raise OSError("synthetic OSCQuery failure")
+
+    monkeypatch.setattr(service, "_resolve_host_info", resolve)
+    pending = asyncio.create_task(service.discover_vrchat())
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        for name in names:
+            service._forget_service(name)
+    finally:
+        release.set()
+    assert await pending is None
+    assert requests == names[:2]
+    assert service.discovery_observation == "absent"
+    assert service.discovery_failure is None

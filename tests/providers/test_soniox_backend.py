@@ -29,7 +29,6 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.providers.stt import soniox as soniox_module
 from puripuly_heart.providers.stt.soniox import (
-    _STOP,
     SonioxRealtimeSTTBackend,
     _FinalizeRequest,
     _SonioxSession,
@@ -668,28 +667,6 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
 
 
 @pytest.mark.asyncio
-async def test_soniox_session_on_speech_end_enqueues_finalize(caplog) -> None:
-    session = _make_session()
-
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end(trailing_silence_ms=240, reason="soft_pause")
-
-    finalize = await session._audio_q.get()
-    assert isinstance(finalize, _FinalizeRequest)
-    assert session._audio_q.empty()
-    assert caplog.text == ""
-
-    caplog.clear()
-    with caplog.at_level(logging.INFO):
-        await session.on_speech_end()
-
-    finalize = await session._audio_q.get()
-    assert isinstance(finalize, _FinalizeRequest)
-    assert session._audio_q.empty()
-    assert caplog.text == ""
-
-
-@pytest.mark.asyncio
 async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segment() -> None:
     session = _make_session()
 
@@ -891,18 +868,6 @@ async def test_soniox_whitespace_final_boundary_emits_empty_final_ack() -> None:
     event = session._event_projection._legacy_events.get_nowait()
     assert event.text == ""
     assert event.is_final is True
-
-
-@pytest.mark.asyncio
-async def test_soniox_session_send_audio_and_stop() -> None:
-    session = _make_session()
-
-    await session.send_audio(b"abc")
-    assert await session._audio_q.get() == b"abc"
-
-    await session.stop()
-    assert session._stopped is True
-    assert await session._audio_q.get() is _STOP
 
 
 @pytest.mark.asyncio

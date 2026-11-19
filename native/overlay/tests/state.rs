@@ -139,33 +139,7 @@ fn overlay_state_deserializes_active_peer_variant() {
 }
 
 #[test]
-fn overlay_state_ignores_lower_revision_snapshots() {
-    let mut state = OverlayState::default();
-
-    assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        revision: 3,
-        calibration: OverlayPresentationCalibration::default(),
-        blocks: vec![block("self:3", "self", "latest", "", true)],
-        speaker_divider: false,
-    }));
-
-    assert!(!state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 2,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![block("peer:2", "peer", "stale", "", true)],
-        speaker_divider: false,
-    }));
-
-    assert_eq!(state.snapshot().revision, 3);
-    assert_eq!(state.blocks()[0].id, "self:3");
-}
-
-#[test]
-fn overlay_state_treats_equal_revision_snapshots_as_noop() {
+fn overlay_state_only_accepts_newer_revisions() {
     let mut state = OverlayState::default();
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
@@ -177,17 +151,19 @@ fn overlay_state_treats_equal_revision_snapshots_as_noop() {
         speaker_divider: false,
     }));
 
-    assert!(!state.apply_snapshot(&OverlayPresentationSnapshot {
-        revision: 4,
-        calibration: OverlayPresentationCalibration::default(),
-        native_fresh_render_generations: None,
-        semantic_retirement_frontiers: Vec::new(),
-        blocks: vec![block("peer:4", "peer", "ignore", "", true)],
-        speaker_divider: false,
-    }));
-    assert_eq!(state.snapshot().revision, 4);
-    assert_eq!(state.blocks()[0].id, "self:4");
-    assert_eq!(state.blocks()[0].primary_text, "keep");
+    for (revision, id, text) in [(2, "peer:2", "stale"), (4, "peer:4", "ignore")] {
+        assert!(
+            !state.apply_snapshot(&OverlayPresentationSnapshot {
+                revision,
+                blocks: vec![block(id, "peer", text, "", true)],
+                ..Default::default()
+            }),
+            "revision {revision} must not replace revision 4"
+        );
+        assert_eq!(state.snapshot().revision, 4, "incoming revision {revision}");
+        assert_eq!(state.blocks()[0].id, "self:4", "incoming revision {revision}");
+        assert_eq!(state.blocks()[0].primary_text, "keep", "incoming revision {revision}");
+    }
 
     assert!(state.apply_snapshot(&OverlayPresentationSnapshot {
         revision: 5,

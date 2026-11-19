@@ -57,7 +57,7 @@ async def test_report_preview_cycles_every_state_without_uploading():
         ["문제", "보고하기"],
         ["문제", "보내는 중"],
         ["실패", "다시 보내기"],
-        [PREVIEW_TICKET, "X로 문의하기"],
+        [PREVIEW_TICKET, "X DM으로 보내기"],
         ["문제", "보고하기"],
     ]
     zone(left(view)).on_click(None)
@@ -65,7 +65,7 @@ async def test_report_preview_cycles_every_state_without_uploading():
     assert texts(left(view))[1:] == ["실패", "다시 보내기"]
     zone(left(view)).on_click(None)
     await asyncio.gather(*tasks)
-    assert texts(left(view))[1:] == [PREVIEW_TICKET, "X로 문의하기"]
+    assert texts(left(view))[1:] == [PREVIEW_TICKET, "X DM으로 보내기"]
     assert card_calls(live) == []
 
 

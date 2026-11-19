@@ -202,7 +202,9 @@ async def test_native_missing_root_filters_unrelated_ancestor_notifications(tmp_
         root.mkdir(parents=True)
         (root / "first.png").write_bytes(b"first")
         changes = await asyncio.wait_for(source.wait_changes(), 3)
-        assert any(path == root or path in root.parents or root in path.parents for path in changes.paths)
+        assert any(
+            path == root or path in root.parents or root in path.parents for path in changes.paths
+        )
     finally:
         await source.close()
 
@@ -211,9 +213,7 @@ def test_missing_root_uses_nearest_existing_ancestor_without_enumeration(tmp_pat
     watch = object.__new__(_DirectoryWatch)
     watch.root = tmp_path / "missing" / "nested" / "photos"
     opened = []
-    watch._kernel = SimpleNamespace(
-        CreateFileW=lambda path, *args: opened.append(path) or 123
-    )
+    watch._kernel = SimpleNamespace(CreateFileW=lambda path, *args: opened.append(path) or 123)
 
     def unexpected(*args, **kwargs):
         raise AssertionError("Enumerating ancestor contents")

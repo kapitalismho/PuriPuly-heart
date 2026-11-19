@@ -30,6 +30,7 @@ from puripuly_heart.app.services.agent_chat.provider_setup import (
     RECOGNITION_ALLOWANCES,
 )
 from puripuly_heart.app.services.application_audio_devices import safe_audio_device_label
+from puripuly_heart.app.services.managed.managed_auth import MANAGED_TRIAL_STATES
 from puripuly_heart.config.audio_host_api import normalize_input_host_api
 from puripuly_heart.config.provider_values import STTProviderName, is_custom_stt_provider
 from puripuly_heart.config.translation_values import (
@@ -170,6 +171,7 @@ def project_accounts(value: object) -> dict:
     if availability != "cached":
         remaining = None
     provider = managed.get("provider")
+    trial = managed.get("trial")
     return {
         "chatgpt": {
             **{
@@ -187,6 +189,7 @@ def project_accounts(value: object) -> dict:
                 key: managed[key] if type(managed.get(key)) is bool else None
                 for key in ("available", "selected", "credential_present", "in_progress")
             },
+            "trial": trial if trial in MANAGED_TRIAL_STATES else "unknown",
             "budget": {
                 "unit": "percent",
                 "remaining_percent": remaining,
@@ -584,6 +587,34 @@ def _rejected(code: str, explanation: str) -> dict:
     return {"status": "rejected", "error": {"code": code, "explanation": explanation}}
 
 
+def _argument_problem(value: object, schema: dict, path: str = "") -> str | None:
+    try:
+        validate(value, schema)
+        return None
+    except ValueError:
+        pass
+    properties = schema.get("properties")
+    if type(value) is dict and isinstance(properties, dict):
+        for key in value:
+            if key in properties:
+                continue
+            parent, _, child = key.partition(".")
+            if child and isinstance(properties.get(parent), dict):
+                return f"{path}{key} is not a field; nest it as {path}{parent}: {{{child}: ...}}"
+            return f"remove {path}{key}, which is not a field of this action"
+        for key in schema.get("required", ()):
+            if key not in value:
+                return f"add {path}{key}"
+        for key, item in value.items():
+            problem = _argument_problem(item, properties[key], f"{path}{key}.")
+            if problem is not None:
+                return problem
+    name = path.removesuffix(".") or "arguments"
+    if value is None:
+        return f"omit {name} instead of sending null"
+    return f"{name} has an unsupported value"
+
+
 class AgentTools:
     def __init__(
         self,
@@ -679,6 +710,8 @@ class AgentTools:
             action = select_app_action(name, arguments)
         except ValueError:
             return _rejected("invalid_arguments", "Choose a supported action for this tool.")
+        if action.tool == "manage_proposal" and "summary" not in action.fields:
+            arguments = {key: value for key, value in arguments.items() if key != "summary"}
         catalog = {}
         if action.settings:
             try:
@@ -686,12 +719,12 @@ class AgentTools:
                 require_current()
             except Exception:
                 return _rejected("settings_unavailable", "Settings choices are unavailable.")
+        schema = action.schema(catalog)
         try:
-            validate(arguments, action.schema(catalog))
+            validate(arguments, schema)
         except ValueError:
-            return _rejected(
-                "invalid_arguments", f"Use {action.signature}; omit other fields and nulls."
-            )
+            problem = _argument_problem(arguments, schema) or "omit other fields and nulls"
+            return _rejected("invalid_arguments", f"Use {action.signature}; {problem}.")
         return await self.execute_action(
             action, action.arguments(arguments), catalog, require_current, request_id
         )

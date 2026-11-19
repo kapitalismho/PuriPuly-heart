@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("flet")
+ft = pytest.importorskip("flet")
 
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.views import about as about_module
@@ -111,6 +111,8 @@ def test_about_view_special_thanks_names_render_from_i18n(
         "about.special_thanks.name.ephedrine": "localized:Ephedrine",
         "about.special_thanks.name.eri": "localized:~ eri ~",
         "about.special_thanks.name.tsuyu_shiro": "localized:梅雨Shiro",
+        "about.special_thanks.name.garanshiro": "localized:garanshiro",
+        "about.special_thanks.name.koz39": "localized:KOZ39",
     }
 
     monkeypatch.setattr(
@@ -127,7 +129,7 @@ def test_about_view_special_thanks_names_render_from_i18n(
     assert rendered_names == list(localized_names.values())
 
 
-@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja"])
+@pytest.mark.parametrize("locale", ["en", "ko", "zh-CN", "ja", "ru"])
 def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str) -> None:
     expected_names = {
         "about.special_thanks.name.sui_32c": "SUI_32C",
@@ -143,6 +145,8 @@ def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str
         "about.special_thanks.name.eri": "~ eri ~",
         "about.special_thanks.name.fzcfweasdferttgg_png": "fzcfweasdferttgg-png",
         "about.special_thanks.name.tsuyu_shiro": "梅雨Shiro",
+        "about.special_thanks.name.garanshiro": "garanshiro",
+        "about.special_thanks.name.koz39": "KOZ39",
     }
 
     bundle = i18n_module._load_bundle(locale)
@@ -168,11 +172,145 @@ def test_about_view_hover_handlers_and_locale_refresh(monkeypatch: pytest.Monkey
     view._on_version_hover(evt)
     assert text.color == about_module.COLOR_PRIMARY
     evt.data = "false"
-    view._on_thanks_hover(evt)
+    view._on_link_hover(evt)
     assert text.color == about_module.COLOR_ON_BACKGROUND
 
     view.apply_locale()
     assert getattr(view, "_updated", False) is True
+
+
+def _walk_controls(control) -> list:
+    found = [control]
+    content = getattr(control, "content", None)
+    if content is not None:
+        found.extend(_walk_controls(content))
+    for child in getattr(control, "controls", None) or []:
+        found.extend(_walk_controls(child))
+    return found
+
+
+def _special_thanks_grid_rows(view: AboutView) -> list:
+    return [
+        control
+        for control in _walk_controls(view.controls[2])
+        if isinstance(control, ft.Row) and control.spacing == 24
+    ]
+
+
+def _special_thanks_people(view: AboutView) -> list:
+    cells = [cell.content for row in _special_thanks_grid_rows(view) for cell in row.controls]
+    return [cell for cell in cells if isinstance(cell.content, ft.Row)]
+
+
+def test_about_view_special_thanks_lays_out_people_three_per_row_in_one_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
+
+    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
+    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
+
+    view = AboutView()
+
+    section = view.controls[2]
+    rows = _special_thanks_grid_rows(view)
+    people = _special_thanks_people(view)
+
+    assert isinstance(section, SharedCardWrapper)
+    assert not any(
+        isinstance(control, SharedCardWrapper) for control in _walk_controls(section)[1:]
+    )
+    assert len(people) == len(about_module.SPECIAL_THANKS_ENTRIES)
+    assert all(len(row.controls) == about_module.SPECIAL_THANKS_COLUMNS for row in rows)
+    assert all(cell.expand is True for row in rows for cell in row.controls)
+
+
+def test_about_view_special_thanks_person_highlights_name_and_opens_url_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
+    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
+    monkeypatch.setattr(about_module.webbrowser, "open", lambda url: opened.append(url))
+    monkeypatch.setattr(
+        about_module,
+        "SPECIAL_THANKS_ENTRIES",
+        (
+            about_module.SpecialThanksEntry(
+                "thanks.linked", "linked.png", "https://example.test/a"
+            ),
+            about_module.SpecialThanksEntry("thanks.unlinked", "unlinked.png"),
+        ),
+    )
+    monkeypatch.setattr(about_module, "t", lambda key, **_params: key)
+
+    view = AboutView()
+    linked, unlinked = _special_thanks_people(view)
+
+    assert _collect_click_handlers(unlinked) == []
+    for handler in _collect_click_handlers(linked):
+        handler(None)
+    assert opened == ["https://example.test/a"]
+
+    for person in (linked, unlinked):
+        name = person.data
+        name.update = lambda: None
+        person.on_hover(types.SimpleNamespace(control=person, data="true"))
+        assert name.color == about_module.COLOR_PRIMARY
+        person.on_hover(types.SimpleNamespace(control=person, data="false"))
+        assert name.color == about_module.COLOR_ON_BACKGROUND
+
+
+def test_about_view_special_thanks_avatar_uses_bundled_image_or_initial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
+    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
+    monkeypatch.setattr(
+        about_module,
+        "SPECIAL_THANKS_ENTRIES",
+        (
+            about_module.SpecialThanksEntry("thanks.with_image", "with.png"),
+            about_module.SpecialThanksEntry("thanks.without_image", "without.png"),
+        ),
+    )
+    monkeypatch.setattr(
+        about_module,
+        "t",
+        lambda key, **_params: {"thanks.without_image": "~ eri ~"}.get(key, key),
+    )
+    monkeypatch.setattr(
+        about_module,
+        "_get_special_thanks_image_path",
+        lambda image_file: "C:/avatars/with.png" if image_file == "with.png" else "",
+    )
+
+    view = AboutView()
+    with_image, without_image = _special_thanks_people(view)
+
+    def avatar_of(person):
+        return person.content.controls[0].content
+
+    assert isinstance(avatar_of(with_image), ft.Image)
+    assert avatar_of(with_image).src == "C:/avatars/with.png"
+    assert isinstance(avatar_of(without_image), ft.Text)
+    assert avatar_of(without_image).value == "E"
+
+
+def test_special_thanks_image_path_requires_a_bundled_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    avatar_dir = tmp_path / "data" / "pictures" / "special_thanks"
+    avatar_dir.mkdir(parents=True)
+    (avatar_dir / "present.png").write_bytes(b"png")
+    layout = types.SimpleNamespace(package_resource=lambda *parts: tmp_path.joinpath(*parts))
+    monkeypatch.setattr(about_module, "current_runtime_layout", lambda: layout)
+
+    assert about_module._get_special_thanks_image_path("present.png") == str(
+        avatar_dir / "present.png"
+    )
+    assert about_module._get_special_thanks_image_path("missing.png") == ""
 
 
 def test_about_helper_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -183,6 +321,7 @@ def test_about_helper_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert about_module._load_third_party_notices() == "Could not load license information."
     assert about_module._get_profile_image_path() == ""
+    assert about_module._get_special_thanks_image_path("anyone.png") == ""
 
 
 def test_about_resources_resolve_real_files_outside_module_archive(

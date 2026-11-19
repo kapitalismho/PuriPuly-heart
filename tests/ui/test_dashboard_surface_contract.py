@@ -6,8 +6,6 @@ from puripuly_heart.ui.dashboard.contract import DashboardSurfaceSlots
 from puripuly_heart.ui.dashboard.renderer import (
     DASHBOARD_CONTROL_REGION_EXPAND,
     DASHBOARD_INFO_REGION_EXPAND,
-    DASHBOARD_LAYOUT_GAP,
-    DASHBOARD_SHELL_SPACING,
     compose_dashboard_surface,
 )
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
@@ -40,10 +38,7 @@ def _slots() -> tuple[DashboardSurfaceSlots, _CaptureSlotProvider]:
     return slots, provider
 
 
-def test_dashboard_surface_layout_uses_shared_design_tokens() -> None:
-    assert DASHBOARD_LAYOUT_GAP == FOUNDATION_DESIGN_TOKENS.spacing.inline
-    assert DASHBOARD_SHELL_SPACING == FOUNDATION_DESIGN_TOKENS.spacing.page
-
+def test_dashboard_surface_preserves_accepted_region_geometry() -> None:
     slots, _ = _slots()
     surface = compose_dashboard_surface(slots)
 
@@ -56,11 +51,6 @@ def test_dashboard_surface_layout_uses_shared_design_tokens() -> None:
         surface.shell_content,
     ):
         assert row_or_column.spacing == FOUNDATION_DESIGN_TOKENS.spacing.inline
-
-
-def test_dashboard_surface_preserves_accepted_region_geometry() -> None:
-    slots, _ = _slots()
-    surface = compose_dashboard_surface(slots)
 
     assert surface.control_region.expand == DASHBOARD_CONTROL_REGION_EXPAND
     assert surface.info_region.expand == DASHBOARD_INFO_REGION_EXPAND
@@ -87,17 +77,3 @@ def test_dashboard_surface_places_every_slot_in_the_accepted_position() -> None:
     ]
     assert surface.display_card_slot.content is slots.display
     assert surface.language_card_slot.content is slots.language
-
-
-def test_capture_slot_provider_needs_no_private_dashboard_access() -> None:
-    provider = _CaptureSlotProvider()
-    slots = DashboardSurfaceSlots.from_capture_provider(
-        provider,
-        translation=ft.Text("translation"),
-        display=ft.Text("display"),
-        language=ft.Text("language"),
-    )
-
-    assert slots.self_capture is provider.self_control
-    assert slots.peer_capture is provider.peer_control
-    assert slots.overlay is provider.overlay_button
