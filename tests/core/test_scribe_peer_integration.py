@@ -261,7 +261,18 @@ async def test_scribe_toggle_rejects_retired_evidence_and_keeps_translation(
     capture_route, reenable
 ):
     route, apply_diarization, own_turn = capture_route
-    harness, backend, presenter, _, _, history, committed, diarized, first_socket, urls = route
+    (
+        harness,
+        backend,
+        presenter,
+        timeline,
+        _,
+        history,
+        committed,
+        diarized,
+        first_socket,
+        urls,
+    ) = route
     await committed("Old head. Old tail.")
     await _idle(harness)
     original_blocks = presenter.snapshot().blocks
@@ -296,7 +307,13 @@ async def test_scribe_toggle_rejects_retired_evidence_and_keeps_translation(
     assert parse_qs(urlsplit(urls[-1]).query)["include_timestamps"] == [fresh_option]
     assert [call.text for call in backend.calls] == [*expected_sources, "Fresh head. Fresh tail."]
     assert history.conversation_records[-1].source_text == "Fresh head. Fresh tail."
-    block = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{fresh}")
+    if reenable:
+        waiting = presenter.peer_fragment_state(fresh, 0)
+        assert waiting is not None and waiting.pending
+        await timeline.advance(1.01)
+    visible = {block.id: block for block in presenter.snapshot().blocks}
+    block = visible.get(f"peer:{fresh}")
+    assert block is not None
     assert block.speaker_style == ("gray" if reenable else "gold")
     assert block.primary_text == "translated:Fresh head. Fresh tail."
 

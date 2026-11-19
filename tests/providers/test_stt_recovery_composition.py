@@ -15,6 +15,7 @@ from puripuly_heart.app.adapters.self_capture.self_capture_vad_sink import SelfC
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.ownership import CaptureStreamInput
 from puripuly_heart.core.diagnostics import serialize_diagnostics
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeAttachment
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -120,14 +121,20 @@ async def recovery_pipeline(channel, provider_id, session_factory):
         capture_config.provider_signature,
         capture_config.runtime_signature,
     )
+
+    async def activate():
+        await capture.apply_intent(capture_config, enabled=True)
+        await wait_until(lambda: capture.snapshot.effective_active)
+        if channel == "self":
+            attachment = provider.terminal_failure_handler
+            assert isinstance(attachment, ProviderRuntimeAttachment)
+            engine.provider_activation = attachment.token
+        return capture.guard_vad_sink()
+
     try:
         await translation.start()
         engine.bind_event_sink(on_event)
-        await capture.apply_intent(capture_config, enabled=True)
-        await wait_until(lambda: capture.snapshot.effective_active)
-        guarded = capture.guard_vad_sink()
-        if channel == "self":
-            engine.provider_activation = guarded.ledger.settings.provider_activation
+        guarded = await activate()
 
         async def vad_event(event, order):
             if channel == "self":
@@ -164,9 +171,7 @@ async def recovery_pipeline(channel, provider_id, session_factory):
             nonlocal guarded
             await capture.apply_intent(capture_config, enabled=False)
             await engine.abort(reason="toggle_off")
-            await capture.apply_intent(capture_config, enabled=True)
-            await wait_until(lambda: capture.snapshot.effective_active)
-            guarded = capture.guard_vad_sink()
+            guarded = await activate()
 
         async def output_for(text):
             def completed():
