@@ -637,7 +637,7 @@
   "settings.photo.route.managed.description": "毎日無料",
   "settings.photo.route.chatgpt": "ChatGPT",
   "settings.photo.route.openai": "公式API",
-  "settings.photo.route.gemini": "Gemini API",
+  "settings.photo.route.gemini": "公式API",
   "settings.photo.remaining.title": "今日の残り回数",
   "settings.photo.remaining.promotion": "2026年まで上限2倍",
   "settings.photo.remaining.value": "{remaining} / {allowance}",

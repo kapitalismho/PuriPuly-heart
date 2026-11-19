@@ -637,7 +637,7 @@
   "settings.photo.route.managed.description": "매일매일 무료",
   "settings.photo.route.chatgpt": "ChatGPT",
   "settings.photo.route.openai": "공식 API",
-  "settings.photo.route.gemini": "Gemini API",
+  "settings.photo.route.gemini": "공식 API",
   "settings.photo.remaining.title": "오늘 남은 횟수",
   "settings.photo.remaining.promotion": "2026년까지 한도 두 배",
   "settings.photo.remaining.value": "{remaining} / {allowance}",

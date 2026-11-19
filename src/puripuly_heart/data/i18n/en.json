@@ -637,7 +637,7 @@
   "settings.photo.route.managed.description": "Free every day",
   "settings.photo.route.chatgpt": "ChatGPT",
   "settings.photo.route.openai": "Official API",
-  "settings.photo.route.gemini": "Gemini API",
+  "settings.photo.route.gemini": "Official API",
   "settings.photo.remaining.title": "Remaining today",
   "settings.photo.remaining.promotion": "Double limit through 2026",
   "settings.photo.remaining.value": "{remaining} / {allowance}",
