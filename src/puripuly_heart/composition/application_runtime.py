@@ -401,6 +401,12 @@ def _copy_provider_prompt_apply_fields(
                 target.intent.stt,
                 provider=source.intent.stt.provider,
                 cloud_free_tier_providers=list(source.intent.stt.cloud_free_tier_providers),
+                elevenlabs_scribe=replace(
+                    target.intent.stt.elevenlabs_scribe,
+                    enable_speaker_diarization=(
+                        source.intent.stt.elevenlabs_scribe.enable_speaker_diarization
+                    ),
+                ),
                 soniox=replace(
                     target.intent.stt.soniox,
                     enable_speaker_diarization=source.intent.stt.soniox.enable_speaker_diarization,

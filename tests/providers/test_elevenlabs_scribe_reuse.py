@@ -8,7 +8,6 @@ import pytest
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
 from puripuly_heart.core.stt.backend import (
-    STTNativeProvenance,
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -17,50 +16,7 @@ from puripuly_heart.core.stt.backend import (
     STTSessionProjection,
 )
 from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
-
-
-class _NoNetworkWebSocket:
-    async def close(self, *_args) -> None:
-        pass
-
-
-class _ControlledConnection:
-    def __init__(self) -> None:
-        from elevenlabs.realtime import RealtimeConnection
-
-        self._sdk_connection = RealtimeConnection(
-            _NoNetworkWebSocket(),
-            current_sample_rate=16000,
-        )
-        self.handlers: dict = {}
-        self.sent: list[dict] = []
-        self.commits = 0
-        self.closed = 0
-        self.commit_gate = asyncio.Event()
-        self.commit_gate.set()
-
-    def on(self, event, callback) -> None:
-        self.handlers[event] = callback
-        self._sdk_connection.on(event, callback)
-
-    async def send(self, payload: dict) -> None:
-        self.sent.append(payload)
-
-    async def commit(self) -> None:
-        self.commits += 1
-        await self.commit_gate.wait()
-
-    async def close(self) -> None:
-        self.closed += 1
-        await self._sdk_connection.close()
-
-    def emit(self, event: str, payload: dict) -> None:
-        self._sdk_connection._emit(event, payload)
-
-    def emit_close(self) -> None:
-        from elevenlabs.realtime import RealtimeEvents
-
-        self._sdk_connection._emit(RealtimeEvents.CLOSE)
+from tests.helpers.scoped_provider_sessions import FakeScribeWebSocket
 
 
 def _request(order: int, *, channel: str = "self") -> STTProviderTurnRequest:
@@ -110,16 +66,17 @@ def _spans() -> tuple[AudioCaptureSpan, ...]:
     )
 
 
-async def _session(connection: _ControlledConnection):
+async def _session(connection: FakeScribeWebSocket, *, diarize=False):
     factories: list = []
 
-    async def factory(options):
-        factories.append(options)
+    async def factory(url, *, additional_headers):
+        factories.append(url)
         return connection
 
     backend = ElevenLabsScribeSTTBackend(
         api_key="key",
-        scribe_connect_factory=factory,
+        websocket_factory=factory,
+        diarize=diarize,
         keepalive_interval_s=60,
     )
     session = await backend.open_session(
@@ -143,11 +100,10 @@ async def _next(session):
 
 @pytest.mark.asyncio
 async def test_consecutive_final_empty_and_identical_turns_reuse_one_connection() -> None:
-    connection = _ControlledConnection()
+    connection = FakeScribeWebSocket()
     session, factories = await _session(connection)
-    queue_task = session._queue_task
+    receive_task = session._receive_task
     keepalive_task = session._keepalive_task
-    handlers = dict(connection.handlers)
     try:
         expected = (("same", "final"), ("", "empty"), ("same", "final"))
         for order, (text, outcome) in enumerate(expected, 1):
@@ -173,23 +129,21 @@ async def test_consecutive_final_empty_and_identical_turns_reuse_one_connection(
                 outcome,
             )
             assert terminal.epoch_disposition == "reuse"
-            assert session._scoped_provenance == []
 
         assert len(factories) == 1
         assert connection.commits == 3
         assert connection.closed == 0
-        assert connection.handlers == handlers
-        assert session._queue_task is queue_task
+        assert session._receive_task is receive_task
         assert session._keepalive_task is keepalive_task
     finally:
         await session.close()
         await session.close()
-    assert connection.closed == 1
+    assert connection.close_count == 1
 
 
 @pytest.mark.asyncio
-async def test_native_sdk_close_retires_idle_epoch_and_rejects_next_begin() -> None:
-    connection = _ControlledConnection()
+async def test_native_close_retires_idle_epoch_and_rejects_next_begin() -> None:
+    connection = FakeScribeWebSocket()
     session, _ = await _session(connection)
     try:
         connection.emit_close()
@@ -205,34 +159,20 @@ async def test_native_sdk_close_retires_idle_epoch_and_rejects_next_begin() -> N
 
 @pytest.mark.asyncio
 async def test_preview_variants_and_precommit_marker_never_complete_turn() -> None:
-    connection = _ControlledConnection()
+    connection = FakeScribeWebSocket()
     session, _ = await _session(connection)
     request = _request(1)
     try:
         await session.begin_turn(request)
         connection.emit(
-            "committed_transcript",
-            {"message_type": "committed_transcript", "text": "too early"},
-        )
-        connection.emit(
             "partial_transcript",
             {"message_type": "partial_transcript", "text": "partial"},
         )
-        connection.emit(
-            "final_transcript",
-            {"message_type": "final_transcript", "text": "preview"},
-        )
-        connection.emit(
-            "final_transcript_with_timestamps",
-            {"message_type": "final_transcript_with_timestamps", "text": "timestamped"},
-        )
+        connection.push("committed_transcript_with_timestamps", text="companion only")
         assert session._event_projection.active_identity == request.identity
         assert not session._event_projection.sealed
         await _seal(session, request)
-        connection.emit(
-            "final_transcript_with_timestamps",
-            {"message_type": "final_transcript_with_timestamps", "text": "still preview"},
-        )
+        connection.push("committed_transcript_with_timestamps", text="still not a final")
         connection.emit(
             "committed_transcript",
             {"message_type": "committed_transcript", "text": "canonical"},
@@ -240,7 +180,7 @@ async def test_preview_variants_and_precommit_marker_never_complete_turn() -> No
 
         events = [await _next(session), await _next(session)]
         assert isinstance(events[0], STTProviderTurnUpdate)
-        assert events[0].text == "still preview"
+        assert events[0].text == "partial"
         assert isinstance(events[1], STTProviderTurnTerminal)
         assert events[1].text == "canonical"
         assert events[1].epoch_disposition == "reuse"
@@ -250,7 +190,7 @@ async def test_preview_variants_and_precommit_marker_never_complete_turn() -> No
 
 @pytest.mark.asyncio
 async def test_callback_during_commit_waits_for_successful_commit_write() -> None:
-    connection = _ControlledConnection()
+    connection = FakeScribeWebSocket()
     connection.commit_gate.clear()
     session, _ = await _session(connection)
     request = _request(1)
@@ -263,8 +203,9 @@ async def test_callback_during_commit_waits_for_successful_commit_write() -> Non
             "committed_transcript",
             {"message_type": "committed_transcript", "text": "after write"},
         )
+        await asyncio.sleep(0)
         assert session._event_projection.active_identity == request.identity
-        assert session._pending_committed is not None
+        assert session._event_projection.scoped_event_depth == 0
         connection.commit_gate.set()
         await seal
         terminal = await _next(session)
@@ -277,13 +218,14 @@ async def test_callback_during_commit_waits_for_successful_commit_write() -> Non
 
 @pytest.mark.asyncio
 async def test_callback_during_failed_commit_cannot_authorize_reuse() -> None:
-    class _FailingCommitConnection(_ControlledConnection):
-        async def commit(self) -> None:
-            self.commits += 1
+    class _FailingCommitConnection(FakeScribeWebSocket):
+        async def send(self, payload: str) -> None:
+            await super().send(payload)
             self.emit(
                 "committed_transcript",
                 {"message_type": "committed_transcript", "text": "not authoritative"},
             )
+            await asyncio.sleep(0)
             raise RuntimeError("commit write failed")
 
     connection = _FailingCommitConnection()
@@ -309,7 +251,7 @@ async def test_callback_during_failed_commit_cannot_authorize_reuse() -> None:
 async def test_missing_committed_text_is_protocol_failure_but_explicit_empty_is_authoritative() -> (
     None
 ):
-    empty_connection = _ControlledConnection()
+    empty_connection = FakeScribeWebSocket()
     empty_session, _ = await _session(empty_connection)
     empty_request = _request(1)
     await empty_session.begin_turn(empty_request)
@@ -327,7 +269,7 @@ async def test_missing_committed_text_is_protocol_failure_but_explicit_empty_is_
     )
     await empty_session.close()
 
-    malformed_connection = _ControlledConnection()
+    malformed_connection = FakeScribeWebSocket()
     malformed_session, _ = await _session(malformed_connection)
     malformed_request = _request(1)
     try:
@@ -349,7 +291,7 @@ async def test_missing_committed_text_is_protocol_failure_but_explicit_empty_is_
 
 @pytest.mark.asyncio
 async def test_idle_duplicate_commit_retires_without_creating_another_terminal() -> None:
-    connection = _ControlledConnection()
+    connection = FakeScribeWebSocket()
     session, _ = await _session(connection)
     request = _request(1)
     try:
@@ -382,7 +324,7 @@ async def test_provider_failure_and_eof_retire_active_turn(
     event_name: str,
     reason: str,
 ) -> None:
-    connection = _ControlledConnection()
+    connection = FakeScribeWebSocket()
     session, _ = await _session(connection)
     request = _request(1)
     try:
@@ -405,8 +347,8 @@ async def test_provider_failure_and_eof_retire_active_turn(
 
 @pytest.mark.asyncio
 async def test_one_channels_failure_does_not_retire_or_close_another_channel() -> None:
-    self_connection = _ControlledConnection()
-    peer_connection = _ControlledConnection()
+    self_connection = FakeScribeWebSocket()
+    peer_connection = FakeScribeWebSocket()
     self_session, _ = await _session(self_connection)
     peer_session, _ = await _session(peer_connection)
     self_request = _request(1, channel="self")
@@ -437,9 +379,9 @@ async def test_one_channels_failure_does_not_retire_or_close_another_channel() -
 
 
 @pytest.mark.asyncio
-async def test_captured_completed_turn_identity_cannot_finish_successor() -> None:
-    connection = _ControlledConnection()
-    session, _ = await _session(connection)
+async def test_consumed_duplicate_index_cannot_finish_successor() -> None:
+    connection = FakeScribeWebSocket()
+    session, _ = await _session(connection, diarize=True)
     first = _request(1)
     second = _request(2)
     try:
@@ -447,21 +389,19 @@ async def test_captured_completed_turn_identity_cannot_finish_successor() -> Non
         await _seal(session, first)
         connection.emit(
             "committed_transcript",
-            {"message_type": "committed_transcript", "text": "same"},
+            {"message_type": "committed_transcript", "segment_index": 0, "text": "same"},
         )
         assert isinstance(await _next(session), STTProviderTurnTerminal)
 
         await session.begin_turn(second)
         await _seal(session, second)
-        session._finish_committed(
-            first.identity,
-            "stale",
-            STTNativeProvenance(barrier="committed_transcript"),
-        )
+        connection.push("committed_transcript", segment_index=0, text="stale")
+        await asyncio.sleep(0)
+        assert session._event_projection.scoped_event_depth == 0
         assert session._event_projection.active_identity == second.identity
         connection.emit(
             "committed_transcript",
-            {"message_type": "committed_transcript", "text": "same"},
+            {"message_type": "committed_transcript", "segment_index": 1, "text": "same"},
         )
         terminal = await _next(session)
         assert isinstance(terminal, STTProviderTurnTerminal)

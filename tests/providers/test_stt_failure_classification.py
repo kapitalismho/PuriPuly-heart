@@ -67,7 +67,7 @@ async def test_deepgram_transport_classification_uses_typed_native_cause(channel
     ],
 )
 async def test_scribe_native_event_policy_is_explicit(channel, reason, retryable):
-    session, _ = _scribe_session()
+    session, _ = await _scribe_session()
     request = replace(_request("elevenlabs_scribe"), channel=channel)
     try:
         await session.begin_turn(request)

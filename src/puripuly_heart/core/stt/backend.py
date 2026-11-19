@@ -111,6 +111,35 @@ class STTProviderTurnUpdate:
 
 
 @dataclass(frozen=True, slots=True)
+class STTNativeSegmentRef:
+    provider_session_id: str
+    segment_index: int
+
+
+@dataclass(frozen=True, slots=True)
+class STTFinalSpeakerRevision:
+    identity: STTProviderTurnIdentity
+    native_segment: STTNativeSegmentRef
+    final_speaker_runs: tuple[FinalSpeakerRun, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class STTNativeSpeakerMerge:
+    provider_session_id: str
+    from_speaker_id: str
+    to_speaker_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class STTFinalSpeakerEvidence:
+    provider_epoch_id: str
+    revisions: tuple[STTFinalSpeakerRevision, ...]
+    observed_at: float
+    is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+    speaker_merge: STTNativeSpeakerMerge | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnTerminal:
     identity: STTProviderTurnIdentity
     outcome: SegmentTerminalOutcome
@@ -128,6 +157,8 @@ class STTProviderTurnTerminal:
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
     failure_resource_id: str | None = None
+    native_segment: STTNativeSegmentRef | None = None
+    observed_at: float | None = None
 
     def __post_init__(self) -> None:
         if self.outcome in {"final", "empty", "suppressed", "cancelled"}:
@@ -147,11 +178,13 @@ _ProviderEvent = TypeVar("_ProviderEvent")
 def scoped_event_for_delivery(
     event: _ProviderEvent,
 ) -> _ProviderEvent | STTProviderTurnTerminal | None:
-    if not isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
+    if not isinstance(
+        event, STTProviderTurnUpdate | STTProviderTurnTerminal | STTFinalSpeakerEvidence
+    ):
         return event
     if event.is_current is None or event.is_current():
         return event
-    if isinstance(event, STTProviderTurnUpdate):
+    if isinstance(event, STTProviderTurnUpdate | STTFinalSpeakerEvidence):
         return None
     return replace(
         event,
@@ -165,6 +198,7 @@ def scoped_event_for_delivery(
         included_contributions=(),
         recognition_origins=(),
         is_current=None,
+        native_segment=None,
     )
 
 
@@ -311,6 +345,7 @@ class STTRecognitionUnitTerminal:
 STTProviderTurnEvent = (
     STTProviderTurnUpdate
     | STTProviderTurnTerminal
+    | STTFinalSpeakerEvidence
     | STTProviderEpochEnded
     | STTProviderInputTerminal
     | STTRecognitionUnit

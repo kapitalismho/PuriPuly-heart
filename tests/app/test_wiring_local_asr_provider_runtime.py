@@ -1099,7 +1099,7 @@ async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gat
     class FailedConnection:
         closed = False
 
-        def on(self, *args):
+        async def recv(self):
             raise ValueError("PRIVATE_STARTUP_FAILURE")
 
         async def close(self):
@@ -1107,7 +1107,7 @@ async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gat
                 raise PermissionError(13, "PRIVATE_STARTUP_CLEANUP")
             self.closed = True
 
-    async def connect(options):
+    async def connect(url, *, additional_headers):
         connection = FailedConnection()
         failed_connections.append(connection)
         return connection
@@ -1137,7 +1137,7 @@ async def test_rolling_startup_cleanup_debt_reaches_runtime_close_and_rebind_gat
     failed = _prepared_rolling_definition(
         name=STTProviderName.ELEVENLABS_SCRIBE,
         api_key="synthetic-old-key",
-        build=lambda key: ElevenLabsScribeSTTBackend(api_key=key, scribe_connect_factory=connect),
+        build=lambda key: ElevenLabsScribeSTTBackend(api_key=key, websocket_factory=connect),
     )
     alternate = _prepared_rolling_definition(
         name=STTProviderName.DEEPGRAM,

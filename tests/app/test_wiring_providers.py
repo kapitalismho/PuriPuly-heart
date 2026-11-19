@@ -1536,14 +1536,13 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
     assert self_backend.language_hints_strict is True
     assert peer_backend.language_hints == ["en"]
     assert peer_backend.language_hints_strict is False
-    assert self_backend.enable_speaker_diarization is True
-    assert peer_backend.enable_speaker_diarization is True
+    assert self_backend.enable_speaker_diarization is False
+    assert peer_backend.enable_speaker_diarization is False
 
 
 def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channels() -> None:
-    enabled_settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
-    settings = enabled_settings
-    settings = replace(
+    settings = _vnext(stt_provider="soniox", peer_stt_provider="soniox")
+    enabled_settings = replace(
         settings,
         intent=replace(
             settings.intent,
@@ -1551,7 +1550,7 @@ def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channel
                 settings.intent.stt,
                 soniox=replace(
                     settings.intent.stt.soniox,
-                    enable_speaker_diarization=False,
+                    enable_speaker_diarization=True,
                 ),
             ),
         ),
@@ -1570,6 +1569,49 @@ def test_soniox_speaker_diarization_setting_rebuilds_and_configures_both_channel
     )
     assert self_backend.enable_speaker_diarization is False
     assert peer_backend.enable_speaker_diarization is False
+
+
+def test_scribe_diarization_only_changes_direct_peer_runtime() -> None:
+    from puripuly_heart.core.stt.rolling import RollingSTTBackend
+    from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
+
+    default = AppSettingsVNext().intent.stt.elevenlabs_scribe
+    enabled = replace(default, enable_speaker_diarization=True)
+    secrets = InMemorySecretStore()
+    secrets.set("elevenlabs_scribe_api_key", "scribe-key")
+    secrets.set("soniox_api_key", "soniox-key")
+    off = _vnext(stt_provider="elevenlabs_scribe", peer_stt_provider="elevenlabs_scribe")
+    on = _vnext(
+        stt_provider="elevenlabs_scribe",
+        peer_stt_provider="elevenlabs_scribe",
+        elevenlabs_scribe=enabled,
+    )
+    peer_off = create_peer_stt_backend(off, secrets=secrets)
+    peer_on = create_peer_stt_backend(on, secrets=secrets)
+    self_on = create_stt_backend(on, secrets=secrets)
+    assert isinstance(peer_off, ElevenLabsScribeSTTBackend) and not peer_off.diarize
+    assert isinstance(peer_on, ElevenLabsScribeSTTBackend) and peer_on.diarize
+    assert isinstance(self_on, ElevenLabsScribeSTTBackend) and not self_on.diarize
+    assert build_peer_stt_provider_signature(on) != build_peer_stt_provider_signature(off)
+    assert build_self_stt_runtime_signature(on) == build_self_stt_runtime_signature(off)
+
+    for provider in ("rolling_free", "soniox"):
+        options = {
+            "peer_stt_provider": provider,
+            "cloud_free_tier_providers": ["elevenlabs_scribe"],
+        }
+        alternate = _vnext(**options, elevenlabs_scribe=enabled)
+        assert build_peer_stt_provider_signature(alternate) == build_peer_stt_provider_signature(
+            _vnext(**options)
+        )
+        backend = create_peer_stt_backend(alternate, secrets=secrets)
+        if isinstance(backend, RollingSTTBackend):
+            (definition,) = backend.providers
+            member = definition.build_backend()
+            assert isinstance(member, ElevenLabsScribeSTTBackend) and not member.diarize
+        else:
+            assert isinstance(backend, SonioxRealtimeSTTBackend)
+            assert backend.enable_speaker_diarization is False
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:

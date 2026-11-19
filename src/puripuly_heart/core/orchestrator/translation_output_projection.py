@@ -2574,27 +2574,28 @@ class TranslationOutputProjectionOwner:
                 if preview
                 else self.overlay_event_adapter.translation_final
             )
-            await self.publish_overlay_event(
-                adapter(
-                    utterance_id=submission.child_utterance_id,
-                    channel="peer",
-                    text=translation.text if translation is not None else "",
-                    source_text=submission.source_text,
-                    source_language=(
-                        translation.source_language
-                        if translation is not None and translation.source_language
-                        else submission.source_language or ""
-                    ),
-                    target_language=submission.target_language,
-                    applied_context_mode=submission.applied_context_mode,
-                    peer_caption_revision=submission.peer_caption_revision,
-                    peer_superseded_unit_ids=submission.peer_superseded_unit_ids,
-                    **(
-                        self._translation_metadata(translation)
-                        if translation is not None
-                        else {"speaker_assignment": submission.speaker_assignment}
-                    ),
+            event = adapter(
+                utterance_id=submission.child_utterance_id,
+                channel="peer",
+                text=translation.text if translation is not None else "",
+                source_text=submission.source_text,
+                source_language=(
+                    translation.source_language
+                    if translation is not None and translation.source_language
+                    else submission.source_language or ""
                 ),
+                target_language=submission.target_language,
+                applied_context_mode=submission.applied_context_mode,
+                peer_caption_revision=submission.peer_caption_revision,
+                peer_superseded_unit_ids=submission.peer_superseded_unit_ids,
+                **(
+                    self._translation_metadata(translation)
+                    if translation is not None
+                    else {"speaker_assignment": submission.speaker_assignment}
+                ),
+            )
+            await self.publish_overlay_event(
+                replace(event, peer_lineage_revision=submission.peer_lineage_revision),
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,
             )
@@ -3056,6 +3057,8 @@ class TranslationOutputProjectionOwner:
             source_order=submission.source_order,
             origin_wall_clock_ms=origin_wall_clock_ms,
             peer_caption_revision=submission.peer_caption_revision,
+            peer_history_after=submission.peer_history_after,
+            peer_history_removals=submission.peer_history_removals,
         )
         self._record_request_context(
             utterance_id=submission.parent_utterance_id,
@@ -3084,6 +3087,7 @@ class TranslationOutputProjectionOwner:
             source_order=submission.source_order,
             origin_wall_clock_ms=translation.origin_wall_clock_ms,
             peer_caption_revision=submission.peer_caption_revision,
+            peer_history_after=submission.peer_history_after,
         )
 
     @staticmethod
@@ -3119,6 +3123,8 @@ class TranslationOutputProjectionOwner:
         source_order: int | None,
         origin_wall_clock_ms: int | None,
         peer_caption_revision: int = 0,
+        peer_history_after: UUID | None = None,
+        peer_history_removals: tuple[UUID, ...] = (),
     ) -> None:
         runtime_logging = self.diagnostics.runtime_logging
         record = getattr(runtime_logging, "record_conversation_observation", None)
@@ -3141,6 +3147,10 @@ class TranslationOutputProjectionOwner:
             metadata["target_index"] = target_index
         if peer_caption_revision:
             metadata["peer_caption_revision"] = peer_caption_revision
+        if peer_history_after is not None:
+            metadata["peer_history_after"] = str(peer_history_after)
+        if peer_history_removals:
+            metadata["peer_history_removals"] = ",".join(map(str, peer_history_removals))
         record(
             utterance_id=str(utterance_id),
             speaker_channel=channel,

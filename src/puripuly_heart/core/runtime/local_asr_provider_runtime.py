@@ -20,6 +20,7 @@ from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
     ProviderGpuRuntimePort,
+    ProviderRuntimeAttachment,
     ProviderRuntimeBuildRequest,
     ProviderRuntimeChannel,
     ProviderRuntimeChannelPhase,
@@ -1013,22 +1014,21 @@ class LocalASRProviderRuntimeOwner:
         settings: AudioSegmentSettingsSnapshot,
     ) -> _ScopedRecognitionProvider:
         handle = self._handles[channel]
-        scope = (
-            settings.provider_id,
-            settings.provider_signature,
-            settings.runtime_signature,
-        )
+        scope = settings.provider_configuration_scope
+
+        def accepts(provider: object) -> bool:
+            return (
+                getattr(provider, "scoped_settings_scope", None) == scope
+                and getattr(provider, "provider_activation", None) is settings.provider_activation
+            )
+
         current, _generation = handle.current_provider_generation()
         target = next(
-            (
-                provider
-                for provider in handle.retained_scoped_providers
-                if getattr(provider, "scoped_settings_scope", None) == scope
-            ),
+            (provider for provider in handle.retained_scoped_providers if accepts(provider)),
             None,
         )
         if target is None and current is not None:
-            if getattr(current, "scoped_settings_scope", None) == scope:
+            if accepts(current):
                 for retired in handle.retained_scoped_providers:
                     if not await handle.retire_retained_scoped_provider(retired):
                         raise RuntimeError("provider_resource_quarantined")
@@ -1393,6 +1393,10 @@ class LocalASRProviderRuntimeOwner:
             provider = await result if inspect.isawaitable(result) else result
             if provider is None:
                 raise RuntimeError("provider factory returned no provider")
+            if isinstance(provider, ScopedRecognitionEngine) and isinstance(
+                on_terminal_failure, ProviderRuntimeAttachment
+            ):
+                provider.provider_activation = on_terminal_failure.token
             if request.warmup:
                 failure_stage = "provider_warmup"
                 if isinstance(provider, ScopedRecognitionEngine):

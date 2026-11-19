@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from collections.abc import AsyncIterator, Callable
+from dataclasses import replace
 
 from puripuly_heart.core.stt.backend import (
+    STTFinalSpeakerEvidence,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -74,6 +76,30 @@ class STTProviderEventBuffer:
     def wake_admission(self) -> None:
         self._space.set()
 
+    def fold_speaker_evidence(
+        self, event: STTFinalSpeakerEvidence
+    ) -> STTFinalSpeakerEvidence | None:
+        revisions = {item.identity: item for item in event.revisions}
+        for index, queued in enumerate(self._events):
+            if not isinstance(queued, STTProviderTurnTerminal):
+                continue
+            item = revisions.get(queued.identity)
+            if item is None or queued.native_segment != item.native_segment:
+                continue
+            if queued.text != "".join(run.text for run in item.final_speaker_runs):
+                continue
+            amended = replace(queued, final_speaker_runs=item.final_speaker_runs)
+            size = (
+                self._recognition_bytes + _recognition_bytes(amended) - _recognition_bytes(queued)
+            )
+            if size <= self.MAX_RECOGNITION_BYTES:
+                self._events[index] = amended
+                self._recognition_bytes = size
+                revisions.pop(queued.identity)
+        if not revisions and event.speaker_merge is None:
+            return None
+        return replace(event, revisions=tuple(revisions.values()))
+
     def put(self, event: STTProviderTurnEvent, *, preserve_observations: bool = False) -> bool:
         if self._closed:
             raise STTProviderEventBufferClosed("provider event buffer is closed")
@@ -82,6 +108,8 @@ class STTProviderEventBuffer:
             return False
         size = _recognition_bytes(event)
         if size + self._recognition_bytes > self.MAX_RECOGNITION_BYTES:
+            if isinstance(event, STTFinalSpeakerEvidence):
+                return False
             self._fail_epoch(epoch_id)
             return False
         if not preserve_observations and _is_provisional_snapshot(event):
@@ -89,7 +117,9 @@ class STTProviderEventBuffer:
         if not preserve_observations and len(self._events) >= self._max_events:
             self._discard_provisional_snapshots_until_room()
         if len(self._events) >= self._max_events:
-            if isinstance(event, STTProviderTurnUpdate) and event.stability == "provisional":
+            if isinstance(event, STTFinalSpeakerEvidence) or (
+                isinstance(event, STTProviderTurnUpdate) and event.stability == "provisional"
+            ):
                 return False
             if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):
                 self._fail_scoped_turn(event)
@@ -183,7 +213,8 @@ class STTProviderEventBuffer:
             queued
             for queued in self._events
             if not (
-                _event_epoch_id(queued) == epoch_id and isinstance(queued, STTProviderTurnUpdate)
+                _event_epoch_id(queued) == epoch_id
+                and isinstance(queued, STTProviderTurnUpdate | STTFinalSpeakerEvidence)
             )
         )
         if len(retained) >= self._max_events + 1:
@@ -214,7 +245,7 @@ def _is_provisional_snapshot(event: STTProviderTurnEvent) -> bool:
 
 
 def _event_epoch_id(event: STTProviderTurnEvent) -> str:
-    if isinstance(event, STTProviderEpochEnded):
+    if isinstance(event, STTProviderEpochEnded | STTFinalSpeakerEvidence):
         return event.provider_epoch_id
     if isinstance(event, STTRecognitionUnitTerminal):
         return event.unit.identity.stream.provider_epoch_id
@@ -228,6 +259,12 @@ def _recognition_bytes(event: STTProviderTurnEvent) -> int:
         return event.unit.retained_bytes
     if isinstance(event, STTRecognitionUnit):
         return event.retained_bytes
+    if isinstance(event, STTFinalSpeakerEvidence):
+        return sum(
+            128 + len(run.text.encode("utf-8")) + len((run.speaker_id or "").encode("utf-8"))
+            for revision in event.revisions
+            for run in revision.final_speaker_runs
+        )
     if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):
         size = len(event.text.encode("utf-8"))
         size += sum(

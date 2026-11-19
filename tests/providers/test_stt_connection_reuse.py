@@ -106,9 +106,7 @@ async def _complete_native_turn(
             )
         )
         return
-    from elevenlabs.types import CommittedTranscriptPayload
-
-    session._on_committed(CommittedTranscriptPayload(text=text))
+    boundary.push("committed_transcript", text=text)
 
 
 @pytest.mark.asyncio
@@ -143,7 +141,7 @@ async def test_actual_adapter_reuses_one_epoch_for_final_and_empty(
             return await _gemini_session(epoch=epoch)
         if member is STTProviderName.SONIOX:
             return _soniox_session(epoch=epoch)
-        return _scribe_session(epoch=epoch)
+        return await _scribe_session(epoch=epoch)
 
     prepared = _PreparedMemberBackend(open_member)
     rolling = (
@@ -707,7 +705,7 @@ async def test_rolling_connection_lifetime_follows_selected_provider(
         if member is STTProviderName.GEMINI_TRANSCRIBE:
             return await _gemini_session(epoch=epoch)
         if member is STTProviderName.ELEVENLABS_SCRIBE:
-            return _scribe_session(epoch=epoch)
+            return await _scribe_session(epoch=epoch)
         return _deepgram_session(epoch=epoch), None
 
     prepared = _PreparedMemberBackend(open_member)

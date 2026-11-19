@@ -10,6 +10,7 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     normalize_legacy_openrouter_model,
 )
+from puripuly_heart.config.provider_values import ELEVENLABS_SCRIBE_STT_MODEL
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
@@ -143,6 +144,11 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
             _migrate_canonical_local_qwen_provider(intent, "stt")
             _migrate_canonical_local_qwen_provider(intent, "peer_stt")
         _migrate_qwen_audio_provider(intent)
+        if _requires_version_migration(settings_version, 56):
+            stt = intent.get("stt")
+            scribe = stt.get("elevenlabs_scribe") if isinstance(stt, dict) else None
+            if isinstance(scribe, dict) and scribe.get("model") in ("scribe_v2_realtime", ""):
+                scribe["model"] = ELEVENLABS_SCRIBE_STT_MODEL
         desktop_audio = (
             dict(intent.get("desktop_audio", {}))
             if isinstance(intent.get("desktop_audio"), Mapping)

@@ -64,8 +64,13 @@ _DEFINITIONS = {
     "stt.custom.endpoint": ("settings.custom_stt.endpoint", "private", "api"),
     "stt.custom.model": ("settings.custom_stt.model", "private", "api"),
     "stt.custom.extra_json": ("settings.custom_stt.extra", "private", "api"),
+    "stt.elevenlabs_scribe.enable_speaker_diarization": (
+        "settings.speaker_diarization",
+        "boolean",
+        "api",
+    ),
     "stt.soniox.enable_speaker_diarization": (
-        "settings.soniox_speaker_diarization",
+        "settings.speaker_diarization",
         "boolean",
         "api",
     ),
@@ -126,6 +131,9 @@ _CANONICAL_PATHS = {
     "local_llm.extra_body_json": "local_llm.extra_body",
     "stt.custom.extra_json": "stt.custom.extra",
     "prompts.system_prompt_override": "prompts.system_prompt_override",
+    "stt.elevenlabs_scribe.enable_speaker_diarization": (
+        "stt.elevenlabs_scribe.enable_speaker_diarization"
+    ),
     "stt.soniox.enable_speaker_diarization": "stt.soniox.enable_speaker_diarization",
 }
 for _field in (

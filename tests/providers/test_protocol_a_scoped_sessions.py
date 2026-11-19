@@ -532,16 +532,9 @@ async def test_soniox_empty_error_and_abort_receipts() -> None:
 
 @pytest.mark.asyncio
 async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_ambiguity() -> None:
-    from elevenlabs.types import CommittedTranscriptPayload, PartialTranscriptPayload
-
-    assert "id" not in CommittedTranscriptPayload.model_fields
-    assert "transcript_id" not in CommittedTranscriptPayload.model_fields
-    assert "commit_id" not in CommittedTranscriptPayload.model_fields
-    session, connection = _scribe_session()
+    session, connection = await _scribe_session()
     request_a = _request("elevenlabs_scribe")
     await session.begin_turn(request_a)
-    session._on_committed(CommittedTranscriptPayload(text="before-commit"))
-    assert session._event_projection.scoped_event_depth == 0
     connection.send_gate.clear()
     send = asyncio.create_task(
         session.send_turn_audio(
@@ -556,7 +549,7 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     assert not send.done()
     connection.send_gate.set()
     await send
-    session._on_partial(PartialTranscriptPayload(text="same"))
+    connection.push("partial_transcript", text="same")
     assert (await _next(session)).text == "same"
     connection.commit_gate.clear()
     seal = asyncio.create_task(
@@ -569,7 +562,8 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     )
     await _wait(lambda: connection.commits == 1)
     assert not seal.done()
-    session._on_committed(CommittedTranscriptPayload(text="same"))
+    connection.push("committed_transcript", text="same")
+    await _wait(lambda: connection.incoming.empty())
     assert session._event_projection.scoped_event_depth == 0
     connection.commit_gate.set()
     await seal
@@ -591,7 +585,7 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    session._on_committed(CommittedTranscriptPayload(text="same"))
+    connection.push("committed_transcript", text="same")
     terminal_b = await _next(session)
     assert (terminal_b.text, terminal_b.epoch_disposition) == ("same", "reuse")
     assert terminal_a.identity != terminal_b.identity
@@ -600,8 +594,8 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
     await session.close()
     assert connection.closed is True
 
-    ambiguous, ambiguous_connection = _scribe_session()
-    ambiguous._on_committed(CommittedTranscriptPayload(text="unsolicited"))
+    ambiguous, ambiguous_connection = await _scribe_session()
+    ambiguous_connection.push("committed_transcript", text="unsolicited")
     ended = await _next(ambiguous)
     assert isinstance(ended, STTProviderEpochEnded)
     assert ended.reason == "scribe_unsolicited_committed_transcript"
@@ -613,9 +607,8 @@ async def test_scribe_actual_payload_shape_reuses_connection_and_detects_idle_am
 
 @pytest.mark.asyncio
 async def test_scribe_empty_error_and_abort_receipts() -> None:
-    from elevenlabs.types import CommittedTranscriptPayload
 
-    empty, _ = _scribe_session()
+    empty, empty_connection = await _scribe_session()
     request = _request("elevenlabs_scribe")
     await empty.begin_turn(request)
     await empty.seal_turn(
@@ -624,7 +617,7 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
         seal_reason="silence",
         observed_trailing_silence_ms=0,
     )
-    empty._on_committed(CommittedTranscriptPayload(text=""))
+    empty_connection.push("committed_transcript", text="")
     terminal = await _next(empty)
     assert (terminal.outcome, terminal.text_authority, terminal.epoch_disposition) == (
         "empty",
@@ -633,17 +626,17 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
     )
     await empty.close()
 
-    errored, _ = _scribe_session()
+    errored, error_connection = await _scribe_session()
     error_request = _request("elevenlabs_scribe")
     await errored.begin_turn(error_request)
-    errored._on_error_event({"message_type": "quota_exceeded"})
+    error_connection.push("quota_exceeded")
     failed = await _next(errored)
     ended = await _next(errored)
     assert failed.failure_reason == "scribe_quota_exceeded"
     assert isinstance(ended, STTProviderEpochEnded)
     await errored.close()
 
-    aborted, _ = _scribe_session()
+    aborted, _ = await _scribe_session()
     abort_request = _request("elevenlabs_scribe")
     await aborted.begin_turn(abort_request)
     await aborted.abort_turn(abort_request.identity, reason="cancelled")
@@ -653,7 +646,7 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
         "cancelled",
     )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
-    with pytest.raises(RuntimeError, match="epoch is retired"):
+    with pytest.raises(RuntimeError, match="session is closed"):
         await aborted.begin_turn(_request("elevenlabs_scribe", 2))
     await aborted.close()
 
@@ -961,7 +954,6 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
     provider_id: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from elevenlabs.types import CommittedTranscriptPayload
 
     async def deepgram_write(_session, _payload) -> None:
         return None
@@ -977,7 +969,7 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
         elif provider_id == "soniox":
             session, boundary = _soniox_session(order=order)
         else:
-            session, boundary = _scribe_session(order=order)
+            session, boundary = await _scribe_session(order=order)
         sessions.append(session)
         native_boundaries.append(boundary)
 
@@ -1033,7 +1025,7 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
                 )
             )
         else:
-            session._on_committed(CommittedTranscriptPayload(text=text))
+            boundary.push("committed_transcript", text=text)
 
     terminals: list[STTProviderTurnTerminal | STTRecognitionUnit] = []
     for session in sessions:

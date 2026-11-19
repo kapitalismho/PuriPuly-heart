@@ -7,6 +7,7 @@ from dataclasses import replace
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
+    STTFinalSpeakerEvidence,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -250,6 +251,18 @@ class STTSessionEventProjection:
         if self._active_identity == event.identity:
             self._active_identity = None
         return accepted
+
+    def put_speaker_evidence(self, event: STTFinalSpeakerEvidence) -> bool:
+        if self._closed or self._retired or event.provider_epoch_id != self.provider_epoch_id:
+            return False
+        buffer = self._scoped_buffer()
+        event = buffer.fold_speaker_evidence(event)
+        if event is None:
+            return True
+        try:
+            return buffer.put(event)
+        except STTProviderEventBufferClosed:
+            return False
 
     def put_recognition(self, event: STTRecognitionUnit) -> bool:
         if (

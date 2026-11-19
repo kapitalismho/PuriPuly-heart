@@ -8,8 +8,9 @@ import pytest
 from websockets.exceptions import SecurityError
 
 from puripuly_heart.core import network_clients
+from puripuly_heart.providers.stt import elevenlabs_scribe
 from puripuly_heart.providers.stt.genai_network import configure_live_network
-from puripuly_heart.providers.stt.sdk_network import ExternalScribeRealtime, deepgram_listen_connect
+from puripuly_heart.providers.stt.sdk_network import deepgram_listen_connect
 from tests.core.test_external_network import certificates as certificates
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
@@ -18,49 +19,47 @@ from tests.core.test_external_network import loopback_websocket_server, recordin
 
 
 @pytest.mark.parametrize("https_proxy", [False, True])
-async def test_scribe_sdk_verified_proxy_audio_event_flow(certificates, monkeypatch, https_proxy):
-    from elevenlabs.realtime import AudioFormat, CommitStrategy, RealtimeEvents
-
+async def test_scribe_raw_verified_proxy_audio_event_flow(certificates, monkeypatch, https_proxy):
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     requests = []
 
     async def handler(ws):
-        requests.append((ws.request.path, ws.request.headers, json.loads(await ws.recv())))
-        await ws.send(json.dumps({"message_type": "partial_transcript", "text": "recognized"}))
+        await ws.send(json.dumps({"message_type": "session_started", "session_id": "native-id"}))
+        audio = json.loads(await ws.recv())
+        commit = json.loads(await ws.recv())
+        requests.append((ws.request.path, ws.request.headers, audio, commit))
+        await ws.send(json.dumps({"message_type": "committed_transcript", "text": "recognized"}))
         await ws.wait_closed()
 
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
         async with loopback_websocket_server(handler, ssl=contexts["valid"]) as server:
-            scribe = ExternalScribeRealtime(
-                api_key="test-key", base_url=f"wss://localhost:{server.sockets[0].getsockname()[1]}"
+            monkeypatch.setattr(
+                elevenlabs_scribe,
+                "_SCRIBE_URL",
+                f"wss://localhost:{server.sockets[0].getsockname()[1]}/v1/speech-to-text/realtime",
             )
-            connection = await scribe.connect(
-                {
-                    "model_id": "scribe_v2_realtime",
-                    "audio_format": AudioFormat.PCM_16000,
-                    "sample_rate": 16000,
-                    "commit_strategy": CommitStrategy.MANUAL,
-                    "language_code": "en",
-                    "keyterms": ["PuriPuly"],
-                }
+            backend = elevenlabs_scribe.ElevenLabsScribeSTTBackend(
+                api_key="test-key", language_code="en", keyterms=("PuriPuly",)
             )
-            result = asyncio.get_running_loop().create_future()
-            connection.on(RealtimeEvents.PARTIAL_TRANSCRIPT, lambda event: result.set_result(event))
+            session = await backend.open_session()
             try:
-                await connection.send({"audio_base_64": "AAA="})
-                assert (await asyncio.wait_for(result, 5))["text"] == "recognized"
+                await session.send_audio(b"\x00\x00")
+                await session.on_speech_end()
+                event = await asyncio.wait_for(anext(session.events()), 5)
+                assert (event.text, event.is_final) == ("recognized", True)
             finally:
-                await connection.close()
-    path, headers, audio = requests[0]
+                await session.close()
+    path, headers, audio, commit = requests[0]
     query = parse_qs(urlsplit(path).query)
-    assert query["model_id"] == ["scribe_v2_realtime"]
+    assert query["model_id"] == ["scribe_v3_live"]
     assert query["language_code"] == ["en"]
     assert query["keyterms"] == ["PuriPuly"]
     assert headers["xi-api-key"] == "test-key"
     assert audio["message_type"] == "input_audio_chunk"
     assert audio["audio_base_64"] == "AAA="
+    assert commit["commit"] and not commit["audio_base_64"]
     assert len(recorded) == 1
 
 
