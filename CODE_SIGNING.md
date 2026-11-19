@@ -43,7 +43,9 @@ All targets must use `PuriPuly <3` and the same release product version. Certifi
 
 ## Release process
 
-Retain GitHub-hosted, tag-triggered builds and manually published draft releases.
+The integrated unsigned Native Release workflow is [manually dispatched on `dev` with a verified tag input](docs/verification.md#native-release-builds); tag creation alone does not start it. It builds the verified tag's exact source on GitHub-hosted Windows and stages a draft for explicit maintainer publication.
+
+The retained signing-branch workflow at `4358383ea319d26807f7dd435d66cefbd27769f7` uses tag-triggered builds and tag-scoped manual dispatch. That historical trigger/origin setup is not integrated into the current workflow. Production integration and its trigger/origin restrictions require separate maintainer approval; the approved two-request signing sequence below is unchanged.
 
 1. Build project binaries and the uninstaller from the intended revision. Finish byte-changing packaging.
 2. Upload those exact files as a workflow artifact and request signing with verified build provenance.
