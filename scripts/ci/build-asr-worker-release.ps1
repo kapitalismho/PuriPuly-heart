@@ -31,7 +31,9 @@ foreach ($name in ($names | Sort-Object -Unique)) {
 Push-Location $repoRoot
 try {
     $languagePatch = (Join-Path $repoRoot "native/asr_worker/cmake/funasr-language.cmake").Replace("\", "/")
-    $env:TRANSCRIBE_CMAKE_ARGS = "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF -DCMAKE_SUPPRESS_REGENERATION=ON -DCMAKE_PROJECT_transcribe_INCLUDE=`"$languagePatch`""
+    $patchHashes = (Get-FileHash -LiteralPath $languagePatch, (Join-Path (Split-Path -Parent $languagePatch) "funasr_language.h")).Hash
+    $patchFingerprint = ($patchHashes -join ":").ToLowerInvariant()
+    $env:TRANSCRIBE_CMAKE_ARGS = "-DTRANSCRIBE_USE_SYSTEM_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF -DCMAKE_SUPPRESS_REGENERATION=ON -DCMAKE_PROJECT_transcribe_INCLUDE=`"$languagePatch`" -DPURIPULY_FUNASR_PATCH_SHA256=$patchFingerprint"
     $env:CMAKE_PREFIX_PATH = $env:VULKAN_SDK
     $env:RUSTFLAGS = "-C target-cpu=x86-64"
     & cargo build --manifest-path native/asr_worker/Cargo.toml --locked --release --bin PuriPulyHeartASRWorker --target x86_64-pc-windows-msvc --target-dir $TargetDir

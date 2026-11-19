@@ -309,6 +309,22 @@ jobs:
           )
           PY
 
+      - name: Refuse staging to a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          releases=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100")
+          jq -e --arg tag "$RELEASE_TAG" '
+            if type != "array" or length == 0 or
+              (all(.[]; type == "array" and all(.[]; type == "object" and
+                (.tag_name | type == "string") and (.draft | type == "boolean"))) | not)
+            then error("Invalid GitHub release list")
+            elif any(.[][]; .tag_name == $tag and .draft == false)
+            then error("Refusing to stage an already published release: \($tag)")
+            else true end
+          ' <<<"$releases" >/dev/null
+
       - name: Create native draft release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
