@@ -26,8 +26,14 @@ class ControlEvents:
     disconnected_consumers: int = 0
 
     def publish(self, event: dict) -> None:
+        self._publish(event, owned=False)
+
+    def _publish(self, entry: dict, *, owned: bool) -> None:
         self.sequence += 1
-        entry = {**deepcopy(event), "sequence": self.sequence, "instance_id": self.instance_id}
+        if not owned:
+            entry = {**deepcopy(entry)}
+        entry["sequence"] = self.sequence
+        entry["instance_id"] = self.instance_id
         self.history.append(entry)
         for subscriber in self.subscribers:
             if subscriber.empty():
@@ -124,7 +130,8 @@ class ControlEvents:
                 utterance_id = payload.utterance_id
             if isinstance(utterance_id, UUID):
                 item["utterance_id"] = str(utterance_id)
-        self.publish(item)
+        scalar_only = all(type(value) is str or value is None for value in item.values())
+        self._publish(item, owned=scalar_only)
 
     async def subscribe(
         self,

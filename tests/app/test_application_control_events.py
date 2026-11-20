@@ -170,9 +170,10 @@ async def test_filters_content_opt_ins_and_osc_privacy_are_independent():
 @pytest.mark.asyncio
 async def test_subscriber_projection_is_copy_isolated_and_unsubscribe_cleans_up():
     events = ControlEvents()
-    published = {"topic": "state", "channel": "self"}
+    published = {"topic": "state", "channel": "self", "detail": {"state": "ready"}}
     events.publish(published)
     published["topic"] = "changed"
+    published["detail"]["state"] = "changed by publisher"
 
     first_stream = events.subscribe(
         topics=[], channel=None, include_transcripts=False, include_translations=False, after=0
@@ -182,6 +183,7 @@ async def test_subscriber_projection_is_copy_isolated_and_unsubscribe_cleans_up(
     first = await asyncio.wait_for(first_task, timeout=5)
     assert len(events.subscribers) == 1
     first["topic"] = "changed by subscriber"
+    first["detail"]["state"] = "changed by subscriber"
     await first_stream.aclose()
     assert events.subscribers == set()
 
@@ -193,4 +195,5 @@ async def test_subscriber_projection_is_copy_isolated_and_unsubscribe_cleans_up(
 
     assert second["sequence"] == 1 and second["topic"] == "state" and second["channel"] == "self"
     assert second["instance_id"] is None
+    assert second["detail"] == {"state": "ready"}
     assert events.history[0]["topic"] == "state"
