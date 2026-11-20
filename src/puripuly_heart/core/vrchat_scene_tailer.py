@@ -73,6 +73,10 @@ class VrchatSceneLogCandidate:
     modified: float
 
 
+def _earliest_log_name_time(start_second: int) -> float:
+    return start_second - _NAME_BEFORE_START_TOLERANCE_S
+
+
 def select_vrchat_log(
     candidates: tuple[VrchatSceneLogCandidate, ...],
     *,
@@ -80,11 +84,12 @@ def select_vrchat_log(
     now: float,
 ) -> Path | None:
     start_second = math.floor(create_time)
+    earliest_name_time = _earliest_log_name_time(start_second)
     owned = [
         candidate
         for candidate in candidates
         if candidate.name_time <= now + _NAME_SKEW_FUTURE_S
-        and candidate.name_time >= start_second - _NAME_BEFORE_START_TOLERANCE_S
+        and candidate.name_time >= earliest_name_time
         and (
             candidate.name_time >= start_second
             or abs(candidate.created - create_time) <= _CTIME_TOLERANCE_S
@@ -139,7 +144,8 @@ class VrchatSceneLogTailer:
     def offset(self) -> int:
         return self._offset
 
-    def scan_candidates(self) -> tuple[VrchatSceneLogCandidate, ...]:
+    def scan_candidates(self, *, create_time: float) -> tuple[VrchatSceneLogCandidate, ...]:
+        earliest_name_time = _earliest_log_name_time(math.floor(create_time))
         try:
             paths = tuple(
                 path
@@ -151,7 +157,7 @@ class VrchatSceneLogTailer:
         found: list[VrchatSceneLogCandidate] = []
         for path in paths:
             name_time = log_start_time(path.name)
-            if name_time is None:
+            if name_time is None or name_time < earliest_name_time:
                 continue
             try:
                 status = path.stat()

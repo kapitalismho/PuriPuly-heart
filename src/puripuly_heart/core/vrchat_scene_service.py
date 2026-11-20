@@ -335,7 +335,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         if create_time is None:
             return
         tailer = self._tailer
-        found = await run_owned_thread_call(tailer.scan_candidates)
+        found = await run_owned_thread_call(lambda: tailer.scan_candidates(create_time=create_time))
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         selected = select_vrchat_log(found, create_time=create_time, now=time.time())
@@ -359,7 +359,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             return
         tailer = self._tailer
         current = self._log_candidate
-        found = await run_owned_thread_call(tailer.scan_candidates)
+        found = await run_owned_thread_call(lambda: tailer.scan_candidates(create_time=create_time))
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         selected = select_vrchat_log(found, create_time=create_time, now=time.time())
