@@ -87,7 +87,6 @@ async def test_output_runtime_chatbox_survives_unencodable_page_and_close_succee
         runtime = OutputRuntime(
             chatbox=ChatboxPaginator(sender=sender, clock=SystemClock(), page_interval_s=0.1),
             clock=SystemClock(),
-            flush_interval_s=0.05,
         )
         await runtime.start(auto_flush_chatbox=True)
 

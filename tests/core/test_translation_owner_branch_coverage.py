@@ -363,9 +363,6 @@ async def test_provider_and_output_owners_start_once_and_deliver_after_repeated_
         assert event.payload == STTSessionState.STREAMING
         assert stt.event_stream_starts == 1
         assert output.chatbox_flush_task is flush_task
-        async with asyncio.timeout(1):
-            while not osc.process_due_calls:
-                await asyncio.sleep(0)
     finally:
         await harness.stop()
     assert stt.closed

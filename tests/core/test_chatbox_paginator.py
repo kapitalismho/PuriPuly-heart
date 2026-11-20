@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 
@@ -513,6 +514,43 @@ def test_chatbox_stage_recorder_separates_enqueue_from_udp_page_send() -> None:
     ]
     assert [fields["page_index"] for fields in first_pages] == [0, 1]
     assert first_pages[1]["remaining_parts"] == 0
+
+
+async def test_waiting_scheduler_delivers_only_the_replacement_tail() -> None:
+    clock = FakeClock()
+    tail_sent = asyncio.Event()
+
+    class Sender(FakeSender):
+        def send_chatbox(self, text: str) -> None:
+            super().send_chatbox(text)
+            if text == "5678":
+                tail_sent.set()
+
+    sender = Sender()
+    paginator = ChatboxPaginator(sender, clock, max_chars=4, page_interval_s=30.0)
+    parent = _message("abcdefgh", clock, turn_generation=2, turn_order=7, presentation_revision=1)
+    scheduler = asyncio.create_task(paginator.run_flush_loop())
+    try:
+        await asyncio.sleep(0)
+        paginator.enqueue(parent)
+        await asyncio.sleep(0)
+        clock.advance(30.0)
+        paginator.enqueue(
+            _message(
+                "12345678",
+                clock,
+                utterance_id=parent.utterance_id,
+                turn_generation=2,
+                turn_order=7,
+                presentation_revision=2,
+            )
+        )
+        clock.advance(30.0)
+        await asyncio.wait_for(tail_sent.wait(), timeout=2.0)
+        assert sender.sent == ["abcd", "1234", "5678"]
+    finally:
+        scheduler.cancel()
+        await asyncio.gather(scheduler, return_exceptions=True)
 
 
 def test_newer_active_revision_replaces_all_unsent_pages() -> None:
