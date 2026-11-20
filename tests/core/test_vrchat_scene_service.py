@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.config.process_capture_resolution import ProcessSnapshot
+from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 
@@ -899,6 +900,68 @@ async def test_terminal_resumes_discovery_and_reused_pid_restart_rebuilds(
         assert snapshots.calls > 0
         assert service._instance_id == f"4242:{new_start}"
         assert service.snapshot().participant_count == 1
+    finally:
+        await service.close()
+
+
+@pytest.mark.parametrize("reason", ["target_exited", "target_identity_mismatch"])
+async def test_watch_rejects_obsolete_process_before_scene_log_replay(tmp_path, reason):
+    class Rejected(PinnedWatcherFactory):
+        def watch(self, identity, on_terminal):
+            handle = super().watch(identity, on_terminal)
+            handle.terminal_reason = reason
+            return handle
+
+    snapshots = CountingSnapshots()
+    created = time.time() - 1
+    snapshots.items = (_snapshot(42, r"C:\VRChat\VRChat.exe", created),)
+    (tmp_path / _log_name(created)).write_text(
+        "\n".join(_roster_block(("Self",), (_USER_A,), "Self")) + "\n", encoding="utf-8"
+    )
+    watcher = Rejected(identity_verified=False)
+    service = _pinned_service(snapshots, watcher, tmp_path)
+    service.quiescence_s = 0
+    service._started = True
+    try:
+        await service._poll_once(service.generation)
+        assert service.snapshot().status == "unavailable"
+        assert watcher.handles[0].closed
+        service.watcher_factory = PinnedWatcherFactory()
+        await service._poll_once(service.generation)
+        assert service.snapshot().participant_count == 1
+    finally:
+        await service.close()
+
+
+@pytest.mark.parametrize("at_registration", [False, True])
+async def test_watch_error_reports_cause_and_keeps_process_discovery(tmp_path, at_registration):
+    cause = exception_diagnostics(
+        PermissionError(13, "private process path"),
+        component="capture.peer",
+        operation="process_watch",
+        code="capture.peer.identity_unavailable",
+    )
+
+    class FailedWatch(PinnedWatcherFactory):
+        def watch(self, identity, on_terminal):
+            handle = super().watch(identity, on_terminal)
+            if at_registration:
+                handle.terminal_reason = "identity_unavailable"
+                handle.failure_diagnostics = cause
+            return handle
+
+    watcher = FailedWatch(identity_verified=not at_registration)
+    snapshots, service, _ = await _ready_pinned(tmp_path, ("Self",), (_USER_A,), watcher)
+    try:
+        if not at_registration:
+            watcher.terminals[0]("identity_unavailable", cause)
+            await asyncio.sleep(0)
+        assert service.failure_diagnostics is cause
+        assert service.snapshot().participant_count == 1
+        assert watcher.handles[0].closed
+        snapshots.items = ()
+        await service._poll_once(service.generation)
+        assert service.snapshot().status == "unavailable"
     finally:
         await service.close()
 

@@ -228,7 +228,8 @@ class VrchatSceneService(SceneSnapshotProvider):
             return
         if not self._in_lifecycle or identity.instance_id != self._instance_id:
             self._begin_lifecycle(identity)
-            await self._replay_current(generation)
+            if self._in_lifecycle:
+                await self._replay_current(generation)
             return
         await self._poll_log(generation)
         self._settle_if_quiet(generation)
@@ -293,10 +294,19 @@ class VrchatSceneService(SceneSnapshotProvider):
         try:
             self._watch = self.watcher_factory.watch(
                 identity,
-                lambda _reason, _diagnostics: loop.call_soon_threadsafe(
-                    self._handle_terminal, generation, instance_id
+                lambda reason, diagnostics: loop.call_soon_threadsafe(
+                    self._handle_terminal, generation, instance_id, reason, diagnostics
                 ),
             )
+            if not getattr(self._watch, "identity_verified", False):
+                reason = getattr(self._watch, "terminal_reason", None)
+                if reason is not None:
+                    self._handle_terminal(
+                        generation,
+                        instance_id,
+                        reason,
+                        getattr(self._watch, "failure_diagnostics", None),
+                    )
         except Exception as exc:
             self._watch = None
             emit_failure(
@@ -323,11 +333,31 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._tracker.reset()
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
 
-    def _handle_terminal(self, generation: int, instance_id: str) -> None:
+    def _handle_terminal(
+        self,
+        generation: int,
+        instance_id: str,
+        reason: str,
+        diagnostics: ErrorDiagnostics | None,
+    ) -> None:
         if generation != self._generation or not self._started:
             return
         if not self._in_lifecycle or instance_id != self._instance_id:
             return
+        if reason == "identity_unavailable":
+            if diagnostics is not None:
+                self.failure_diagnostics = diagnostics
+                emit_failure(
+                    logger,
+                    diagnostics,
+                    severity="warning",
+                    disposition="degraded",
+                    stage="process_watch",
+                )
+            self._close_watch()
+            self._watch = None
+            return
+        self._process_present = None
         self._end_lifecycle()
 
     async def _replay_current(self, generation: int) -> None:
