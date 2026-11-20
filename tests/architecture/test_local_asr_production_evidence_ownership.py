@@ -1,56 +1,23 @@
-import ast
+import inspect
 
-from tests.helpers.paths import REPO_ROOT
-
-DRIVER_PATH = (
-    REPO_ROOT
-    / "src"
-    / "puripuly_heart"
-    / "release_evidence"
-    / "local_asr_production_composition.py"
+from puripuly_heart.composition.local_asr_production_evidence import (
+    compose_local_asr_production_evidence,
 )
-PORT_PATH = (
-    REPO_ROOT / "src" / "puripuly_heart" / "app" / "ports" / "local_asr_production_evidence.py"
-)
-COMPOSITION_PATH = (
-    REPO_ROOT / "src" / "puripuly_heart" / "composition" / "local_asr_production_evidence.py"
-)
-UI_COMPOSITION_PATH = REPO_ROOT / "src" / "puripuly_heart" / "composition" / "ui_application.py"
+from tests.helpers.ast_sources import assert_no_forbidden_imports
+from tests.helpers.paths import SOURCE_ROOT
 
 
-def test_local_asr_evidence_driver_has_no_controller_dependency() -> None:
-    source = DRIVER_PATH.read_text(encoding="utf-8")
-
-    for private_name in (
-        "_load_or_init_settings",
-        "_init_pipeline",
-        "_self_stt_provider_request",
-        "_build_peer_runtime_config",
-        "_peer_stt_provider_request",
+def test_local_asr_evidence_driver_and_port_do_not_import_ui() -> None:
+    for module in (
+        "app/ports/local_asr_production_evidence.py",
+        "release_evidence/local_asr_production_composition.py",
     ):
-        assert f".{private_name}(" not in source
+        assert_no_forbidden_imports(SOURCE_ROOT / module, ("flet", "puripuly_heart.ui"))
 
 
-def test_evidence_contract_is_ui_neutral_and_composition_is_page_free() -> None:
-    port_source = PORT_PATH.read_text(encoding="utf-8")
-    composition_source = COMPOSITION_PATH.read_text(encoding="utf-8")
-    ui_composition_source = UI_COMPOSITION_PATH.read_text(encoding="utf-8")
-
-    assert "puripuly_heart.ui" not in port_source
-    assert "compose_application_runtime(" in composition_source
-    assert "local_asr_evidence_sink=captured.append" in composition_source
-    assert "page" not in composition_source
-    assert "page" not in ui_composition_source
-    imported_modules = {
-        node.module
-        for node in ast.walk(ast.parse(composition_source))
-        if isinstance(node, ast.ImportFrom) and node.module is not None
-    }
-    imported_modules.update(
-        alias.name
-        for node in ast.walk(ast.parse(composition_source))
-        if isinstance(node, ast.Import)
-        for alias in node.names
+def test_local_asr_evidence_composition_does_not_require_a_gui_page() -> None:
+    assert "page" not in inspect.signature(compose_local_asr_production_evidence).parameters
+    assert_no_forbidden_imports(
+        SOURCE_ROOT / "composition" / "local_asr_production_evidence.py",
+        ("flet", "puripuly_heart.ui.app", "puripuly_heart.ui.views"),
     )
-    assert "flet" not in imported_modules
-    assert "_ApplicationLocalASRProductionEvidence" in composition_source

@@ -537,7 +537,13 @@ async def test_qwen_return_blocks_while_its_previous_owned_retirement_is_still_i
                 unsafe.allow_close = True
                 unsafe.hold = False
                 unsafe.release.set()
-                recovered = await runtime.replace_provider(qwen_request, start=True)
+                recovered = await runtime.replace_provider(
+                    qwen_request,
+                    start=True,
+                    on_terminal_failure=peer.owner._provider_failure_handler(
+                        peer.owner._provider_attachment_token
+                    ),
+                )
                 assert recovered.status == "applied" and unsafe.closed
                 assert old.cleanup_debt == 0 and old not in handle._retired_providers
                 await utterance(peer, 0.3)
@@ -605,7 +611,15 @@ async def test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_
             assert not old_socket.closed
             assert handle._event_handler_for(provider=old, generation=0) is None
             before = len(factory.requests)
-            returning = asyncio.create_task(runtime.handoff_provider(request, start=True))
+            returning = asyncio.create_task(
+                runtime.handoff_provider(
+                    request,
+                    start=True,
+                    on_terminal_failure=env.owner._provider_failure_handler(
+                        env.owner._provider_attachment_token
+                    ),
+                )
+            )
             await wait_until(lambda: runtime.snapshot.channel_for("self").phase == "building")
             assert not returning.done()
             assert len(factory.requests) == before and transport.attempts == 1

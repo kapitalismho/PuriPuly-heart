@@ -1,18 +1,37 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import json
 from dataclasses import replace
+from functools import partial
+from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
+import httpx
 import pytest
 
 from puripuly_heart.app.ports.chatgpt_account import ChatGptConnectResult, ChatGptSignOutResult
-from puripuly_heart.app.wiring import create_secret_store, wiring_llm_factory
+from puripuly_heart.app.wiring import (
+    create_secret_store,
+    wiring_llm_factory,
+    wiring_runtime_pipeline,
+)
+from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.headless_application import compose_headless_application
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
 from puripuly_heart.config.settings_vnext.serialization import to_dict
+from puripuly_heart.core.chatgpt import loopback
+from puripuly_heart.core.chatgpt.oauth import (
+    CHATGPT_JWKS_URL,
+    CHATGPT_PLAN_SCOPE,
+    CHATGPT_TOKEN_URL,
+)
 from puripuly_heart.core.chatgpt.session import ChatGptSession
+from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
+from tests.app.test_chatgpt_account import _id_token, _jwk
 
 
 def _isolated_settings(path) -> None:
@@ -23,6 +42,8 @@ def _isolated_settings(path) -> None:
             settings.intent,
             secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
             osc=replace(settings.intent.osc, connection_mode="off"),
+            photo=replace(settings.intent.photo, enabled=False),
+            telemetry=replace(settings.intent.telemetry, enabled=False),
         ),
     )
     path.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
@@ -114,6 +135,126 @@ async def test_cli_chatgpt_login_and_logout_report_outcomes(tmp_path, monkeypatc
         assert signed_out["scope"] == "local_only"
     finally:
         await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_cli_chatgpt_login_publishes_replacement_challenge_after_invalid_grant(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    monkeypatch.setattr(loopback, "CHATGPT_OAUTH_LOOPBACK_PORTS", (0,))
+    monkeypatch.setattr(
+        wiring_runtime_pipeline,
+        "_default_vrchat_scene_service",
+        lambda: VrchatSceneService(
+            snapshots=SimpleNamespace(snapshots=lambda: ()),
+            log_directory=tmp_path / "empty-scene",
+        ),
+    )
+    browser_launches = []
+    monkeypatch.setattr(
+        application_runtime,
+        "ChatGptAccountOwner",
+        partial(application_runtime.ChatGptAccountOwner, browser_opener=browser_launches.append),
+    )
+    path = tmp_path / "settings.json"
+    _isolated_settings(path)
+    issued_client = "oaiapp_test"
+    exchanges = []
+
+    def oauth_response(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == CHATGPT_JWKS_URL:
+            return httpx.Response(200, json={"keys": [_jwk()]})
+        assert str(request.url) == CHATGPT_TOKEN_URL
+        exchanges.append(parse_qs(request.content.decode()))
+        if len(exchanges) == 1:
+            return httpx.Response(400, json={"error": "invalid_grant"})
+        return httpx.Response(
+            200,
+            json={
+                "access_token": "test-access",
+                "refresh_token": "test-refresh",
+                "id_token": _id_token(client_id=issued_client, nonce=second["nonce"][0]),
+                "scope": f"openid email offline_access {CHATGPT_PLAN_SCOPE}",
+            },
+        )
+
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(oauth_response)) as oauth,
+        httpx.AsyncClient(trust_env=False, timeout=5) as browser,
+    ):
+        monkeypatch.setattr(
+            application_runtime,
+            "ChatGptSession",
+            partial(ChatGptSession, http_factory=lambda: oauth),
+        )
+        app = compose_headless_application(path)
+        try:
+            await app.start()
+            control = app.control()
+            control.bind_instance("chatgpt-retry")
+            assert (await control.query("auth.status", {}))["chatgpt"]["signed_in"] is False
+            login = await control.submit(
+                "auth.login",
+                {"provider": "chatgpt", "open_browser": False},
+                request_id="chatgpt-retry",
+            )
+            operation_id = login["operation_id"]
+
+            async def advertised_challenge(previous: str | None = None) -> str:
+                try:
+                    async with asyncio.timeout(5):
+                        while True:
+                            status = await control.query("auth.status", {})
+                            challenge = status["challenge"]
+                            if challenge is not None:
+                                assert challenge["operation_id"] == operation_id
+                                assert challenge["provider"] == "chatgpt"
+                                if (url := challenge["authorization_url"]) != previous:
+                                    return url
+                            pending = await control.operation(operation_id)
+                            assert pending["terminal"] is False, pending
+                            await asyncio.sleep(0.02)
+                except TimeoutError:
+                    stage = "replacement" if previous is not None else "initial"
+                    pytest.fail(f"auth.status did not publish the {stage} ChatGPT challenge")
+
+            async def complete_challenge(params, code, **callback_fields):
+                redirect = httpx.URL(params["redirect_uri"][0])
+                assert (redirect.scheme, redirect.host) == ("http", "127.0.0.1")
+                response = await browser.get(
+                    redirect, params={"state": params["state"][0], "code": code, **callback_fields}
+                )
+                assert response.status_code == 200
+
+            first_url = await advertised_challenge()
+            first = parse_qs(urlsplit(first_url).query)
+            await complete_challenge(first, "first-code", client_id=issued_client)
+
+            second = parse_qs(urlsplit(await advertised_challenge(first_url)).query)
+            assert len(exchanges) == 1
+            assert second["client_id"] == [issued_client]
+            assert second["state"] != first["state"]
+            assert second["code_challenge"] != first["code_challenge"]
+            await complete_challenge(second, "second-code")
+
+            result = await control.wait(operation_id, timeout=5)
+            assert result["status"] == "applied", result
+            assert result["terminal"] is True
+            assert result["operation_id"] == operation_id
+            assert [form["code"] for form in exchanges] == [["first-code"], ["second-code"]]
+            for params, form in zip((first, second), exchanges, strict=True):
+                assert form["client_id"] == [issued_client]
+                verifier = form["code_verifier"][0].encode("ascii")
+                challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier).digest()).rstrip(b"=")
+                assert params["code_challenge"] == [challenge.decode("ascii")]
+            status = await control.query("auth.status", {})
+            assert status["challenge"] is None
+            assert status["chatgpt"]["signed_in"] is True
+            assert not browser_launches
+        finally:
+            await app.stop()
+        assert oauth.is_closed
 
 
 @pytest.mark.asyncio

@@ -513,6 +513,25 @@ def test_reporting_timing_is_advisory_but_upload_still_requires_a_click():
     assert run_status(code, judgment, explanation_only=False, explanation_required=True) == "passed"
 
 
+@pytest.mark.parametrize(("verdict", "status"), [("pass", "passed"), ("fail", "failed")])
+def test_report_ticket_contact_requires_the_contact_explanation(verdict, status):
+    scenario = select_scenarios(["report-ticket-contact"])[0]
+    judgment = {"status": "valid", **evaluation()}
+    next(row for row in judgment["criteria"] if row["name"] == "explained_resolution")[
+        "verdict"
+    ] = verdict
+    code = {"accepted_state": True, "prohibitions_pass": True}
+    assert (
+        run_status(
+            code,
+            judgment,
+            explanation_only=scenario.explanation_only,
+            explanation_required=scenario.explanation_required,
+        )
+        == status
+    )
+
+
 def test_missing_or_duplicate_decision_judgments_are_not_valid():
     result = evaluation()
     assert validate_judgment(result, [], explanation_only=False, decisions=[decision()])

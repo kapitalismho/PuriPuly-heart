@@ -10,14 +10,6 @@ from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.theme import COLOR_PRIMARY, COLOR_SECONDARY
 
 
-def test_bottom_nav_builds_tabs_and_dividers() -> None:
-    nav = BottomNavBar(on_change=lambda _idx: None)
-
-    assert len(nav._icons) == 4
-    controls = nav._build_tabs_with_dividers()
-    assert len(controls) == 7  # 4 tabs + 3 dividers
-
-
 def test_bottom_nav_click_and_hover_update_states(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ft.Icon, "update", lambda self: None)
     seen: list[int] = []

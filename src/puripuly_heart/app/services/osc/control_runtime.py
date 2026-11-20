@@ -459,6 +459,7 @@ class OscControlIntegrationOwner:
                                     publish_snapshot=False,
                                     force_requery=True,
                                     is_current=current,
+                                    report_discovery_failure=True,
                                 )
                             else:
                                 await self.query_runtime.start(
@@ -466,6 +467,7 @@ class OscControlIntegrationOwner:
                                     preserve_receiver=True,
                                     publish_snapshot=False,
                                     is_current=current,
+                                    report_discovery_failure=True,
                                 )
                                 service = self.query_runtime.service_info
                                 found = service is not None and service.osc_send_port is not None

@@ -8,9 +8,9 @@ import pytest
 from puripuly_heart.core.orchestrator.translation_turn import (
     _final_transcript_fragment,
     _final_transcript_segments,
-    _native_soniox_source_groups,
+    _native_peer_source_groups,
 )
-from puripuly_heart.core.speaker_identity import native_soniox_attribution
+from puripuly_heart.core.speaker_identity import native_peer_attribution
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 from tests.core.test_peer_caption_lifecycle import (
     final,
@@ -66,7 +66,7 @@ def test_native_groups_conserve_original_source_and_missing_attribution(
     speakers, expected, representatives
 ):
     item = native(tuple(zip(("one ", "two ", "three"), speakers, strict=True)))
-    groups = _native_soniox_source_groups(item)
+    groups = _native_peer_source_groups(item)
     fragments = [
         _final_transcript_fragment(item, group, item.utterance_id, preserve_speaker_runs=True)
         for group in groups
@@ -79,7 +79,7 @@ def test_native_groups_conserve_original_source_and_missing_attribution(
     assert [
         (attribution.key.local_speaker_id if attribution.key else None)
         for fragment in fragments
-        for attribution in [native_soniox_attribution(fragment.text, fragment.final_speaker_runs)]
+        for attribution in [native_peer_attribution(fragment.text, fragment.final_speaker_runs)]
     ] == representatives
     assert [group.source_text_start for group in groups] == [
         sum(len(text) for text in expected[:index]) for index in range(len(expected))
@@ -91,14 +91,14 @@ def test_native_groups_conserve_original_source_and_missing_attribution(
 
 def test_native_groups_attach_punctuation_without_relaxing_other_segment_callers():
     item = native((("( ", None), ("one", "A"), (", ", None), ("two", "A"), ("!", "B")))
-    (group,) = _native_soniox_source_groups(item)
+    (group,) = _native_peer_source_groups(item)
     fragment = _final_transcript_fragment(
         item, group, item.utterance_id, preserve_speaker_runs=True
     )
     assert fragment.text == item.text
     assert fragment.final_speaker_runs == item.final_speaker_runs
     assert (
-        native_soniox_attribution(fragment.text, fragment.final_speaker_runs).key.local_speaker_id
+        native_peer_attribution(fragment.text, fragment.final_speaker_runs).key.local_speaker_id
         == "A"
     )
     assert [group.text for group in _final_transcript_segments(item, split_speakers=True)] == [
@@ -135,7 +135,7 @@ def test_native_groups_retain_unsafe_or_incompatible_boundaries(boundary):
                 item.final_speaker_runs[2],
             ),
         )
-    groups = _native_soniox_source_groups(item)
+    groups = _native_peer_source_groups(item)
     assert len(groups) == (2 if boundary in ("language", "session") else 3)
     assert "".join(group.text for group in groups) == item.text
 
@@ -143,11 +143,11 @@ def test_native_groups_retain_unsafe_or_incompatible_boundaries(boundary):
 def test_broken_correspondence_retains_text_and_native_fallback_evidence():
     item = native((("one two", "A"),))
     item = replace(item, final_speaker_runs=(replace(item.final_speaker_runs[0], text="wrong"),))
-    (group,) = _native_soniox_source_groups(item)
+    (group,) = _native_peer_source_groups(item)
     fragment = _final_transcript_fragment(
         item, group, item.utterance_id, preserve_speaker_runs=True
     )
-    attribution = native_soniox_attribution(fragment.text, fragment.final_speaker_runs)
+    attribution = native_peer_attribution(fragment.text, fragment.final_speaker_runs)
     assert fragment.text == item.text
     assert attribution.state == "malformed"
     assert attribution.source == "soniox"

@@ -14,6 +14,20 @@ LIVE_AUDIENCE_RECORD_ATTRIBUTE = "_puripuly_heart_live_audience"
 LIVE_AUDIENCE_BASIC = "basic"
 
 
+def emit_basic_log(
+    logger: logging.Logger,
+    message: str,
+    *args: object,
+    level: int = logging.INFO,
+) -> None:
+    logger.log(
+        level,
+        message,
+        *args,
+        extra={LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC},
+    )
+
+
 def emit_safe_fallback_log(
     logger: logging.Logger,
     message: str,

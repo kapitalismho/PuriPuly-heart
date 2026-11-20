@@ -159,7 +159,9 @@ class FakeService:
     async def stop(self) -> None:
         self.stopped += 1
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
         return self.info
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
@@ -210,11 +212,13 @@ class DelayedDiscoveryService(FakeService):
         self.discovery_started = asyncio.Event()
         self.discovery_gate = asyncio.Event()
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
         if self.block_discovery:
             self.discovery_started.set()
             await self.discovery_gate.wait()
-        return await super().discover_vrchat()
+        return await super().discover_vrchat(preferred_service_id=preferred_service_id)
 
 
 class RetryDiscoveryService(DelayedDiscoveryService):
@@ -222,10 +226,12 @@ class RetryDiscoveryService(DelayedDiscoveryService):
         super().__post_init__()
         self.fail_discovery = True
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
         if self.fail_discovery:
             raise OSError("controlled discovery failure")
-        return await super().discover_vrchat()
+        return await super().discover_vrchat(preferred_service_id=preferred_service_id)
 
 
 class DelayedAdvertiseService(FakeService):
@@ -317,7 +323,9 @@ async def test_output_snapshot_separates_local_bind_and_discovery_from_remote_de
     await integration.close()
 
     class FailedDiscoveryService(FakeService):
-        async def discover_vrchat(self) -> OscQueryServiceInfo | None:
+        async def discover_vrchat(
+            self, *, preferred_service_id: str | None = None
+        ) -> OscQueryServiceInfo | None:
             raise OSError("discovery unavailable")
 
     fallback = _integration(
@@ -1996,7 +2004,7 @@ async def test_retry_receipt_correlates_target_after_held_listener_observation(
     )
     service = FakeService(target)
     integration = _integration(settings, receiver, sender, service)
-    integration.query_runtime.discovery_poll_interval_seconds = 3600
+    integration.query_runtime.healthy_probe_interval_seconds = 3600
     entered = asyncio.Event()
     release = asyncio.Event()
     retry = None
@@ -2077,7 +2085,7 @@ async def test_retry_terminal_target_confirmation_wait_is_bounded() -> None:
     receiver = FakeReceiverOwner()
     sender = FakeSender()
     integration = _integration(AppSettingsVNext(), receiver, sender, service)
-    integration.query_runtime.discovery_poll_interval_seconds = 3600
+    integration.query_runtime.healthy_probe_interval_seconds = 3600
     integration._discovery_timeout_seconds = 0.05
     entered = asyncio.Event()
     release = asyncio.Event()
@@ -2117,4 +2125,43 @@ async def test_retry_terminal_target_confirmation_wait_is_bounded() -> None:
             *(task for task in (retry, background) if task is not None),
             return_exceptions=True,
         )
+        await integration.close()
+
+
+@pytest.mark.asyncio
+async def test_explicit_discovery_timeout_preserves_pending_mdns_add() -> None:
+    class AdvertisedService(FakeService):
+        async def start(self, services_changed=None):
+            await super().start(services_changed)
+            self.services_changed = services_changed
+            self.wait_for_timeout = True
+
+        async def discover_vrchat(self, *, preferred_service_id=None):
+            if self.info is not None and self.wait_for_timeout:
+                self.wait_for_timeout = False
+                await asyncio.Event().wait()
+            return self.info
+
+    service = AdvertisedService(None)
+    sender = FakeSender()
+    integration = _integration(AppSettingsVNext(), FakeReceiverOwner(), sender, service)
+    integration._discovery_timeout_seconds = 0.05
+    try:
+        await integration.configure(enabled=False)
+        await integration.wait_automatic_query_start()
+        assert integration.output_snapshot()["destination_source"] == "fallback"
+
+        service.info = OscQueryServiceInfo(
+            service_id="VRChat", host="127.0.0.1", osc_send_port=19000, is_vrchat=True
+        )
+        service.services_changed((service.info,))
+        result = await integration.retry_automatic_discovery()
+        assert result["status"] == "degraded"
+        assert result["reason"] == "discovery_timeout"
+
+        async with asyncio.timeout(2):
+            while integration.output_snapshot()["destination_source"] != "discovered":
+                await asyncio.sleep(0.01)
+        assert sender.destinations[-1] == ("127.0.0.1", 19000)
+    finally:
         await integration.close()

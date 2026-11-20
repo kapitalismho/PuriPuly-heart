@@ -210,6 +210,7 @@ async def test_file_notifications_do_not_scan_photo_or_log_trees(tmp_path, monke
     photos = tmp_path / "photos"
     photos.mkdir()
     async with watching(photos, tmp_path / "logs") as (watcher, source):
+
         def unexpected(*args):
             raise AssertionError("Whole-tree scan for a file notification")
 
@@ -257,7 +258,8 @@ async def test_log_chunks_are_drained_without_another_notification(tmp_path):
         assert (await capture(watcher)).path == new.resolve()
 
 
-async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp_path):
+@pytest.mark.parametrize("startup_log", ["current", "older"])
+async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp_path, startup_log):
     photos = tmp_path / "photos"
     logs = tmp_path / "logs"
     photos.mkdir()
@@ -268,20 +270,82 @@ async def test_log_rotation_truncation_and_return_to_older_log_do_not_replay(tmp
     current = logs / "output_log_current.txt"
     older.write_text(f"[VRC Camera] Took screenshot to: {old}\n", encoding="utf-8")
     current.write_text("startup" * 200, encoding="utf-8")
+    clock = current.stat().st_mtime_ns
+
+    def touch(path, offset_seconds):
+        stamp = clock + offset_seconds * 1_000_000_000
+        os.utime(path, ns=(stamp, stamp))
+
+    touch(older, 1 if startup_log == "older" else -1)
     async with watching(photos, logs) as (watcher, source):
         new = tmp_path / "new.png"
         new.write_bytes(b"new")
         current.write_text(f"[VRC Camera] Took screenshot to: {new}\n", encoding="utf-8")
+        touch(current, 2)
         source.emit(current)
         assert (await capture(watcher)).path == new.resolve()
+        rotated = tmp_path / "rotated.png"
+        rotated.write_bytes(b"rotated")
+        with older.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {rotated}\n")
+        touch(older, 3)
+        source.emit(older)
+        assert (await capture(watcher)).path == rotated.resolve()
+
+        resumed = tmp_path / "resumed.png"
+        resumed.write_bytes(b"resumed")
+        with current.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {resumed}\n")
+            log.write("unrelated\n" * 400)
+        touch(current, 4)
+        source.emit(current)
+        assert (await capture(watcher)).path == resumed.resolve()
+
         current.unlink()
         source.emit(current)
         await quiet(watcher)
         replacement = tmp_path / "replacement.png"
         replacement.write_bytes(b"replacement")
         current.write_text(f"[VRC Camera] Took screenshot to: {replacement}\n", encoding="utf-8")
+        touch(current, 5)
         source.emit(current, created=(current,))
         assert (await capture(watcher)).path == replacement.resolve()
+
+
+@pytest.mark.parametrize("transition", ["truncated", "replaced"])
+async def test_rotation_does_not_offer_startup_or_replacement_log_content(tmp_path, transition):
+    photos = tmp_path / "photos"
+    logs = tmp_path / "logs"
+    photos.mkdir()
+    logs.mkdir()
+    retiring = logs / "output_log_a.txt"
+    successor = logs / "output_log_b.txt"
+    startup = tmp_path / "startup.png"
+    startup.write_bytes(b"startup")
+    startup_line = f"[VRC Camera] Took screenshot to: {startup}\n"
+    retiring.write_text(startup_line + "unrelated\n" * 100, encoding="utf-8")
+
+    async with watching(photos, logs) as (watcher, source):
+        if transition == "truncated":
+            retiring.write_text(startup_line, encoding="utf-8")
+        else:
+            other = tmp_path / "other.png"
+            other.write_bytes(b"belongs to a different log")
+            replacement = tmp_path / "replacement.txt"
+            replacement.write_text(f"[VRC Camera] Took screenshot to: {other}\n", encoding="utf-8")
+            replacement.replace(retiring)
+        successor.write_text("session started\n", encoding="utf-8")
+        stamp = retiring.stat().st_mtime_ns + 1_000_000_000
+        os.utime(successor, ns=(stamp, stamp))
+        source.emit(retiring, successor, created=(successor,))
+        await quiet(watcher)
+
+        fresh = tmp_path / "fresh.png"
+        fresh.write_bytes(b"fresh")
+        with successor.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {fresh}\n")
+        source.emit(successor)
+        assert (await capture(watcher)).path == fresh.resolve()
 
 
 async def test_overflow_resynchronizes_without_replaying_seen_photos(tmp_path):
@@ -327,7 +391,9 @@ async def test_waiter_cancellation_does_not_stop_watching_and_restart_rebaseline
 
 async def test_notification_failure_reaches_waiter_and_close_settles_worker(tmp_path):
     source = Notifications()
-    watcher = PhotoCaptureWatcher(tmp_path / "photos", tmp_path / "logs", notification_source=source)
+    watcher = PhotoCaptureWatcher(
+        tmp_path / "photos", tmp_path / "logs", notification_source=source
+    )
     await watcher.start()
     failure = OSError("native notification failed")
     source.fail(failure)

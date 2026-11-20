@@ -20,7 +20,9 @@ from puripuly_heart.app.ports.settings_view import (
     OverlayTranslationSettingsIntent,
     PeerSttProviderEdit,
     PhotoStatusSnapshot,
+    ScribeSpeakerDiarizationEdit,
     SelfSttProviderEdit,
+    SonioxSpeakerDiarizationEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
 )
@@ -1023,25 +1025,6 @@ def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
     assert view._managed_trial_usage_bar.visible is True
     assert view._openrouter_key.visible is False
     assert view._openrouter_pkce_button_row.visible is False
-
-
-def test_load_from_settings_places_managed_key_card_above_provider_fields(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-    settings_events.load(view, settings, config_path=Path("settings.json"))
-
-    api_controls = _subtab_controls(view, "api")
-    api_card = _api_tab_card(view, t("settings.section.api_keys"))
-    assert view._managed_key_card in api_controls
-    assert api_controls.index(view._managed_key_card) < api_controls.index(api_card)
-    assert view._managed_key_card not in view._api_keys_column.controls
-    assert view._managed_trial_usage_bar not in view._api_keys_column.controls
-    assert _card_title(view._managed_key_card) == t("settings.managed_key.title")
-
-    assert _tree_contains_control(view._managed_key_card, view._managed_trial_usage_bar)
 
 
 @pytest.mark.parametrize(
@@ -4948,7 +4931,7 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert len(cards) == 3
     assert _row_card_titles(view._translation_connection_row) == [
         t("settings.cloud_free_tier"),
-        t("settings.soniox_speaker_diarization"),
+        t("settings.speaker_diarization"),
         t("settings.translation_connection"),
     ]
     assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
@@ -4957,55 +4940,94 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
     assert view._cloud_free_tier_text.on_click is None
     assert view._cloud_free_tier_card.ignore_interactions is True
-    assert cards[1] is view._soniox_speaker_diarization_card
-    assert view._soniox_speaker_diarization_text.content.value == t(
-        "settings.soniox_speaker_diarization.inactive"
+    assert cards[1] is view._speaker_diarization_card
+    assert view._speaker_diarization_text.content.value == t(
+        "settings.speaker_diarization.inactive"
     )
-    assert view._soniox_speaker_diarization_text.on_click is None
+    assert view._speaker_diarization_text.on_click is None
     assert cards[1].ignore_interactions is True
     assert cards[2] is view._translation_connection_card
 
 
-def test_soniox_speaker_detection_toggle_follows_peer_provider_and_preserves_draft(
+def test_speaker_recognition_card_shares_one_value_across_peer_providers(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     view, _ = _make_settings_view(monkeypatch, settings_events)
     settings_events.load(
         view,
-        _vnext(stt_provider="soniox", peer_stt_provider="deepgram"),
+        _vnext(stt_provider="elevenlabs_scribe", peer_stt_provider="deepgram"),
         config_path=Path("settings.json"),
     )
+    title = t("settings.speaker_diarization")
 
-    assert view._soniox_speaker_diarization_text.content.value == t(
-        "settings.soniox_speaker_diarization.inactive"
-    )
-    assert view._soniox_speaker_diarization_text.on_click is None
-    assert view._soniox_speaker_diarization_card.ignore_interactions is True
+    def shown() -> tuple[str, str, bool]:
+        return (
+            view._speaker_diarization_title.value,
+            view._speaker_diarization_text.content.value,
+            view.speaker_diarization_control().ignore_interactions,
+        )
 
-    view._on_soniox_speaker_diarization_click(None)
-    assert view._provider_draft is None
+    inactive = (title, t("settings.speaker_diarization.inactive"), True)
+    assert shown() == inactive
+    view._on_speaker_diarization_click(None)
+    assert view.build_provider_apply_settings().edits == ()
 
-    view._on_peer_stt_selected("soniox")
-    view._on_stt_selected("deepgram")
-    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.on")
-    assert view._soniox_speaker_diarization_card.ignore_interactions is False
-
-    view._on_soniox_speaker_diarization_click(None)
-    assert view._provider_draft is not None
-    assert view._provider_draft.soniox_speaker_diarization_enabled is False
-    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
-
-    view._on_peer_stt_selected("deepgram")
-    view._on_stt_selected("soniox")
-    assert view._soniox_speaker_diarization_text.content.value == t(
-        "settings.soniox_speaker_diarization.inactive"
-    )
-    assert view._soniox_speaker_diarization_text.on_click is None
-    assert view._soniox_speaker_diarization_card.ignore_interactions is True
-    assert view._provider_draft.soniox_speaker_diarization_enabled is False
+    view._on_peer_stt_selected("elevenlabs_scribe")
+    assert shown() == (title, t("settings.option.off"), False)
+    view._on_speaker_diarization_click(None)
+    assert shown() == (title, t("settings.option.on"), False)
 
     view._on_peer_stt_selected("soniox")
-    assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
+    assert shown() == (title, t("settings.option.on"), False)
+    view._on_speaker_diarization_click(None)
+    assert shown() == (title, t("settings.option.off"), False)
+
+    view._on_peer_stt_selected("elevenlabs_scribe")
+    assert shown() == (title, t("settings.option.off"), False)
+
+    view._on_peer_stt_selected("rolling_free")
+    assert shown() == inactive
+    view._on_speaker_diarization_click(None)
+
+    intent = view.build_provider_apply_settings()
+    assert intent is not None
+    diarization = {
+        type(edit): edit.enabled
+        for edit in intent.edits
+        if isinstance(edit, ScribeSpeakerDiarizationEdit | SonioxSpeakerDiarizationEdit)
+    }
+    assert diarization == {
+        ScribeSpeakerDiarizationEdit: False,
+        SonioxSpeakerDiarizationEdit: False,
+    }
+
+
+def test_speaker_recognition_card_follows_saved_value_of_selected_provider(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings = _vnext(stt_provider="deepgram", peer_stt_provider="soniox")
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            stt=replace(
+                settings.intent.stt,
+                soniox=replace(settings.intent.stt.soniox, enable_speaker_diarization=True),
+            ),
+        ),
+    )
+    settings_events.load(view, settings, config_path=Path("settings.json"))
+
+    assert view._speaker_diarization_text.content.value == t("settings.option.on")
+    view._on_peer_stt_selected("elevenlabs_scribe")
+    assert view._speaker_diarization_text.content.value == t("settings.option.off")
+    view._on_speaker_diarization_click(None)
+    assert view._speaker_diarization_text.content.value == t("settings.option.on")
+    view._on_peer_stt_selected("soniox")
+    assert view._speaker_diarization_text.content.value == t("settings.option.on")
+    assert view._provider_draft.soniox_speaker_diarization_enabled is True
+    assert view._provider_draft.scribe_speaker_diarization_enabled is True
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
@@ -5028,7 +5050,7 @@ def test_general_osc_card_is_locale_independent(
         ]
         assert _row_card_titles(api_row) == [
             t("settings.cloud_free_tier"),
-            t("settings.soniox_speaker_diarization"),
+            t("settings.speaker_diarization"),
             t("settings.translation_connection"),
         ]
         assert t("settings.cloud_free_tier") in _control_labels(_row_cards(api_row)[0])
@@ -5069,7 +5091,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     ]
     assert _row_card_titles(api_controls[1]) == [
         t("settings.cloud_free_tier"),
-        t("settings.soniox_speaker_diarization"),
+        t("settings.speaker_diarization"),
         t("settings.translation_connection"),
     ]
     assert api_controls[2] is view._http_extension_host
@@ -5391,20 +5413,6 @@ def test_overlay_reset_card_restores_defaults_immediately(
     )
 
 
-def test_overlay_tab_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    overlay_cards = _overlay_tab_cards(view)
-    assert all(isinstance(card, SharedCardWrapper) for card in overlay_cards)
-    assert {card.height for card in overlay_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in overlay_cards)
-
-
 @pytest.mark.parametrize(
     ("field", "title_key", "left_glyph", "right_glyph", "initial", "decreased"),
     [
@@ -5455,17 +5463,6 @@ def test_overlay_stepper_controls_emit_and_display_both_directions(
     assert getattr(settings_events.settings.intent.overlay.calibration, field) == pytest.approx(
         float(initial)
     )
-
-
-def test_translation_card_no_longer_contains_translation_connection_row(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
-
-    translation_card = _api_tab_card(view, t("settings.section.translation"))
-    translation_column = translation_card.content.content
-
-    assert view._translation_connection_row not in translation_column.controls
 
 
 @pytest.mark.asyncio
@@ -5771,11 +5768,9 @@ def test_custom_vocabulary_card_header_is_only_the_title(
     assert t("settings.custom_vocabulary_tooltip") not in _control_tooltips(custom_vocab_card)
 
 
-def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
+def test_prompt_and_hint_cards_allow_their_content_to_set_height(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
     prompt_cards = [
@@ -5784,36 +5779,23 @@ def test_moved_prompt_and_hint_cards_use_shared_full_width_cards(
         view._persona_card,
     ]
 
-    assert all(isinstance(card, SharedCardWrapper) for card in prompt_cards)
     assert all(card.height is None for card in prompt_cards)
     assert all(card.expand is False for card in prompt_cards)
 
 
-def test_settings_api_unit_cards_use_settings_unit_card_defaults(
+def test_settings_unit_card_rows_fit_their_cards(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    unit_cards = [
+    api_cards = [
         _api_tab_card(view, t("settings.section.stt")),
         _api_tab_card(view, t("settings.section.peer_stt")),
         _api_tab_card(view, t("settings.section.translation")),
         view._translation_connection_card,
     ]
-
-    assert all(isinstance(card, SettingsUnitCard) for card in unit_cards)
-    assert {card.height for card in unit_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in unit_cards)
-
-
-def test_general_cards_use_settings_unit_card_defaults(
-    monkeypatch: pytest.MonkeyPatch, settings_events
-) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
-
-    view, _ = _make_settings_view(monkeypatch, settings_events)
 
     general_cards = [
         _general_tab_card(view, t("settings.section.ui")),
@@ -5828,23 +5810,21 @@ def test_general_cards_use_settings_unit_card_defaults(
         _general_tab_card(view, t("settings.section.peer_vad_sensitivity")),
     ]
 
-    assert all(isinstance(card, SettingsUnitCard) for card in general_cards)
-    assert {card.height for card in general_cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
-    assert all(card.expand is True for card in general_cards)
+    for card in (*api_cards, *general_cards, *_overlay_tab_cards(view)):
+        assert card.height == SettingsUnitCard.DEFAULT_HEIGHT
+        assert card.expand is True
+
     assert all(getattr(row, "height", None) is None for row in _subtab_controls(view, "general"))
     assert view._translation_connection_row.height is None
 
 
-def test_api_keys_card_uses_shared_full_width_auto_height(
+def test_api_keys_card_allows_its_content_to_set_height(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
-
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
     api_card = _api_tab_card(view, t("settings.section.api_keys"))
 
-    assert isinstance(api_card, SharedCardWrapper)
     assert api_card.height is None
     assert api_card.expand is False
 

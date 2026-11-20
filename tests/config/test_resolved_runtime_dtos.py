@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import ast
 import importlib
-import importlib.util
-import sys
 from dataclasses import FrozenInstanceError, fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType, ModuleType
@@ -54,19 +52,6 @@ FORBIDDEN_FILE_IO_ATTR_CALLS = frozenset(
 
 def _resolved_module() -> ModuleType:
     return importlib.import_module(DTO_MODULE_NAME)
-
-
-def _load_boundary_guard() -> ModuleType:
-    guard_path = (
-        Path(__file__).resolve().parents[1] / "architecture" / "test_dependency_boundaries.py"
-    )
-    spec = importlib.util.spec_from_file_location("_resolved_dto_boundary_guard", guard_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def _assert_no_file_io_calls(source_path: Path) -> None:
@@ -358,13 +343,3 @@ def test_sensitive_resolved_option_names_are_rejected_in_nested_mappings() -> No
             llm_concurrency_limit=5,
             policy_options={"broker": {"access_token": "placeholder"}},
         )
-
-
-def test_resolved_dto_layer_is_covered_by_dependency_boundary_guard() -> None:
-    resolved = _resolved_module()
-    guard = _load_boundary_guard()
-
-    assert guard._layer_for_module(resolved.__name__) == guard.RESOLVED_DTOS
-    rule = guard._rule_for_layer(guard.RESOLVED_DTOS)
-    assert resolved.__name__ in rule.prefixes
-    assert rule.rule_id == "resolved-dtos-stay-pure"

@@ -82,7 +82,6 @@ class CanonicalSettingsPatchRepository:
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
     commit_sink: Callable[[], None] | None = None
-    commit_guard: Callable[[], bool] | None = None
     commit_succeeded: bool = False
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
     secondary_omitted_count: int = 0
@@ -131,23 +130,6 @@ class CanonicalSettingsPatchRepository:
         publication = None
         try:
             with self.owner._commit_lock:
-                if self.commit_guard is not None and not self.commit_guard():
-                    return SettingsCommitResult(
-                        succeeded=False,
-                        snapshot=None,
-                        message=None,
-                        diagnostics=ErrorDiagnostics(
-                            component="settings_repository",
-                            operation="save",
-                            code="settings_selection_superseded",
-                            category="lifecycle",
-                            visibility="basic",
-                            content_policy="metadata_only",
-                            status_code=None,
-                            retry_after_ms=None,
-                            fields={"surface": self.surface},
-                        ),
-                    )
                 try:
                     source = self.base_settings or self.committed_settings
                     if request.values and all(
@@ -742,7 +724,6 @@ class SettingsOwner:
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
         commit_sink: Callable[[], None] | None = None,
-        commit_guard: Callable[[], bool] | None = None,
     ) -> CanonicalSettingsPatchRepository:
         return CanonicalSettingsPatchRepository(
             owner=self,
@@ -751,7 +732,6 @@ class SettingsOwner:
             surface=surface,
             provider_verification_binding=provider_verification_binding,
             commit_sink=commit_sink,
-            commit_guard=commit_guard,
         )
 
     def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettingsVNext:

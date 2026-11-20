@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import emit_basic_log
 
 logger = logging.getLogger(__name__)
 

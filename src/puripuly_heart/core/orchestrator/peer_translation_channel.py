@@ -55,6 +55,9 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 )
 from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
 from puripuly_heart.core.stt.backend import (
+    STTFinalSpeakerRevision,
+    STTNativeSegmentRef,
+    STTNativeSpeakerMerge,
     STTProviderEpochEnded,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
@@ -104,9 +107,10 @@ class PeerTranslationChannelOwner:
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _accepting_events: bool = field(init=False, default=True)
     cloud_captions: PeerCaptionOwner = field(init=False)
-    _cloud_final_scopes: dict[UUID, tuple[str, tuple[object, ...], AudioSegmentSnapshot | None]] = (
-        field(default_factory=dict)
-    )
+    _cloud_final_scopes: dict[
+        UUID,
+        tuple[str, tuple[object, ...], AudioSegmentSnapshot | None, STTNativeSegmentRef | None],
+    ] = field(default_factory=dict)
     _native_caption_orders: dict[UUID, tuple[RecognitionStreamIdentity, int]] = field(
         default_factory=dict
     )
@@ -553,6 +557,7 @@ class PeerTranslationChannelOwner:
             provider_id,
             (stream.activation_generation, stream.capture_epoch, stream.provider_epoch_id),
             None,
+            None,
         )
         await self.handle_stt_event(
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
@@ -572,6 +577,19 @@ class PeerTranslationChannelOwner:
             if stream.provider_epoch_id == event.provider_epoch_id:
                 self._native_caption_orders.pop(unit_id, None)
         await self.cloud_captions.retire_epoch(event.provider_epoch_id)
+
+    async def handle_speaker_evidence(
+        self,
+        revisions: tuple[STTFinalSpeakerRevision, ...],
+        *,
+        is_current: Callable[[], bool] | None,
+        speaker_merge: STTNativeSpeakerMerge | None,
+    ) -> None:
+        if not self._accepting_events:
+            return
+        await self.cloud_captions.speaker_evidence(
+            revisions, is_current=is_current, speaker_merge=speaker_merge
+        )
 
     async def handle_provider_turn_terminal(
         self,
@@ -633,6 +651,7 @@ class PeerTranslationChannelOwner:
                 terminal.identity.provider_epoch_id,
             ),
             receipt.segment,
+            terminal.native_segment,
         )
         await self.handle_stt_event(event)
         return event
@@ -718,15 +737,17 @@ class PeerTranslationChannelOwner:
                     provider_id,
                     (event.transcript.publication_generation, provider_id),
                     None,
+                    None,
                 )
-            provider_id, scope, sealed = metadata
-            if self._cloud_captions_accept(provider_id):
+            provider_id, scope, sealed, native_segment = metadata
+            if native_segment is not None or self._cloud_captions_accept(provider_id):
                 await self.cloud_captions.final(
                     event.transcript,
                     provider_id=provider_id,
                     scope=scope,
                     config=self.translation_runtime_config_snapshot(),
                     sealed=sealed,
+                    native_segment=native_segment,
                 )
                 return
             await self.cloud_captions.withdraw(event.transcript.utterance_id)

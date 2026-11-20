@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ast
-
 from tests.helpers.paths import REPO_ROOT
 from tests.helpers.task_creation import (
     ASYNCIO_CREATE_TASK,
@@ -84,11 +82,6 @@ TASK_CREATION_REVIEWS = (
         "app/services/canonical_settings_persistence.py",
         {"SettingsOwner.persist_async": 1},
         "SettingsOwner locally shield-awaits the thread persistence task, including after cancellation, before releasing the call boundary",
-    ),
-    *_reviews(
-        "app/services/index_selection.py",
-        {"IndexSelectionOwner._schedule": 1, "IndexSelectionOwner._run_owned": 1},
-        "IndexSelectionOwner shares one bounded selection result, fences and cancels timed-out work while retaining its owned blocking cleanup, and drains supervisor plus worker tasks on close",
     ),
     *_reviews(
         "app/services/llm_connection_readiness.py",
@@ -468,7 +461,7 @@ TASK_CREATION_REVIEWS = (
     *_reviews(
         "providers/stt/elevenlabs_scribe.py",
         {"_ElevenLabsScribeSession.start": 2},
-        "ElevenLabs Scribe session owns its connection-event drain and keepalive tasks under provider session close semantics",
+        "ElevenLabs Scribe session owns its raw connection receiver and keepalive through close",
         classification="legacy_exception",
     ),
     *_reviews(
@@ -509,11 +502,6 @@ TASK_CREATION_REVIEWS = (
             "_QwenAudioSession._schedule_slot_retirement": 1,
         },
         "Each Qwen channel retains slot receivers, final watchdogs, retiring transports and one shielded close task per physical slot; stop and abort join cleanup, and unconfirmed session release remains quarantined",
-    ),
-    *_reviews(
-        "providers/stt/sdk_network.py",
-        {"ExternalScribeRealtime._connect_audio": 1},
-        "External Scribe adapter transfers the message task into RealtimeConnection._message_task; the pinned SDK connection close cancels and awaits it",
     ),
     *_reviews(
         "providers/stt/soniox.py",
@@ -634,58 +622,3 @@ def test_first_party_creation_sites_have_reviewed_bounded_ownership() -> None:
 def test_reviewed_task_identities_are_unique_and_have_lifetime_rationales() -> None:
     assert len(REVIEWED_TASK_CREATION) == len(TASK_CREATION_REVIEWS)
     assert_task_ownership([], REVIEWED_TASK_CREATION)
-
-
-def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
-    controller_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-    )
-    output_path = REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "output.py"
-    controller_tree = ast.parse(controller_path.read_text(encoding="utf-8"))
-    output_tree = ast.parse(output_path.read_text(encoding="utf-8"))
-    controller_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(controller_tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-    output_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(output_tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-
-    composition_wait = controller_methods["wait_for_event_bridge"]
-    assert "_ui_background_scope" not in composition_wait
-    assert "output_runtime.wait_for_ui_event_bridge_started" in composition_wait
-    assert "hub.output_runtime.wait_for_ui_event_bridge_started" not in composition_wait
-    assert (
-        "_ui_event_bridge_started_wait_task" in output_methods["wait_for_ui_event_bridge_started"]
-    )
-    assert "_cancel_ui_event_bridge_started_wait_task" in output_methods["close"]
-
-
-def test_order44_local_asr_owner_retires_controller_background_scope() -> None:
-    controller_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-    )
-    cpu_repair_path = (
-        REPO_ROOT
-        / "src"
-        / "puripuly_heart"
-        / "app"
-        / "services"
-        / "local_asr"
-        / "local_asr_cpu_repair.py"
-    )
-    provisioning_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "core" / "runtime" / "local_asr_provisioning.py"
-    )
-    controller_source = controller_path.read_text(encoding="utf-8")
-    cpu_repair_source = cpu_repair_path.read_text(encoding="utf-8")
-    provisioning_source = provisioning_path.read_text(encoding="utf-8")
-
-    assert "_ui_background_scope" not in controller_source
-    assert "result_handler=" not in controller_source
-    assert "result_handler=lambda result: self.handle_install_result(" in cpu_repair_source
-    assert "_result_delivery_tasks" in provisioning_source
-    assert "LocalASRProvisioningOwner:install-result-" in provisioning_source

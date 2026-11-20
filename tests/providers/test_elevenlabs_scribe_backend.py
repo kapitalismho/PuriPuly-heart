@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -9,51 +10,11 @@ from puripuly_heart.providers.stt.elevenlabs_scribe import (
     scribe_keyterms,
     scribe_language_code,
 )
-
-
-class _FakeConnection:
-    def __init__(self) -> None:
-        self.handlers: dict = {}
-        self.sent: list[dict] = []
-        self.commits = 0
-        self.closed = False
-
-    def on(self, event, callback) -> None:
-        self.handlers[event] = callback
-
-    async def send(self, payload: dict) -> None:
-        self.sent.append(payload)
-
-    async def commit(self) -> None:
-        self.commits += 1
-
-    async def close(self) -> None:
-        self.closed = True
-
-    def emit_close(self) -> None:
-        from elevenlabs.realtime import RealtimeEvents
-
-        self.handlers[RealtimeEvents.CLOSE]()
-
-
-class _GateEOFWebSocket:
-    def __init__(self) -> None:
-        self.release = asyncio.Event()
-        self.closed = False
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        await self.release.wait()
-        raise StopAsyncIteration
-
-    async def close(self, *_args) -> None:
-        self.closed = True
+from tests.helpers.scoped_provider_sessions import FakeScribeWebSocket
 
 
 def _backend(
-    connection: _FakeConnection,
+    connection: FakeScribeWebSocket,
     *,
     language_code: str | None = "ko",
     keyterms: tuple[str, ...] = (),
@@ -61,8 +22,9 @@ def _backend(
 ) -> tuple[ElevenLabsScribeSTTBackend, list]:
     factories: list = []
 
-    async def factory(options):
-        factories.append(options)
+    async def factory(url, *, additional_headers):
+        assert additional_headers == {"xi-api-key": "key"}
+        factories.append(parse_qs(urlsplit(url).query))
         return connection
 
     backend = ElevenLabsScribeSTTBackend(
@@ -70,15 +32,13 @@ def _backend(
         language_code=language_code,
         keyterms=keyterms,
         keepalive_interval_s=keepalive_interval_s,
-        scribe_connect_factory=factory,
+        websocket_factory=factory,
     )
     return backend, factories
 
 
 def _emit(session, event, data) -> None:
-    connection = session._connection
-    handler = connection.handlers[event]
-    handler(data)
+    session._connection.emit(event, data)
 
 
 @pytest.mark.asyncio
@@ -97,49 +57,45 @@ async def test_open_session_rejects_empty_api_key() -> None:
 
 @pytest.mark.asyncio
 async def test_session_uses_manual_commit_without_vad_parameters() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, factories = _backend(connection, language_code="ko")
     session = await backend.open_session()
     try:
-        options = factories[0]
-        raw = options.model_dump(exclude_none=True) if hasattr(options, "model_dump") else options
-        commit_strategy = raw["commit_strategy"]
-        commit_strategy = getattr(commit_strategy, "value", commit_strategy)
-        assert commit_strategy == "manual"
+        raw = factories[0]
+        assert raw["commit_strategy"] == ["manual"]
         assert "vad_threshold" not in raw
         assert "vad_silence_threshold_secs" not in raw
         assert "min_speech_duration_ms" not in raw
         assert "min_silence_duration_ms" not in raw
-        assert raw["audio_format"] == "pcm_16000"
-        assert raw["sample_rate"] == 16000
-        assert raw["language_code"] == "ko"
-        assert raw["model_id"] == "scribe_v2_realtime"
+        assert raw["audio_format"] == ["pcm_16000"]
+        assert raw["language_code"] == ["ko"]
+        assert raw["model_id"] == ["scribe_v3_live"]
+        assert raw["diarize"] == ["false"]
+        assert raw["include_timestamps"] == ["false"]
+        assert raw["filter_background_audio"] == ["false"]
     finally:
         await session.close()
 
 
 @pytest.mark.asyncio
 async def test_session_omits_language_code_for_auto_language() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, factories = _backend(connection, language_code=None)
     session = await backend.open_session()
     try:
-        options = factories[0]
-        if hasattr(options, "model_dump"):
-            assert getattr(options, "language_code", None) is None
-        else:
-            assert options["language_code"] is None
+        assert "language_code" not in factories[0]
     finally:
         await session.close()
 
 
 @pytest.mark.asyncio
 async def test_committed_transcript_is_authoritative_final() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     events_task = asyncio.create_task(_collect(session, 1))
     try:
+        await session.on_speech_end()
         _emit(
             session,
             "committed_transcript",
@@ -154,7 +110,7 @@ async def test_committed_transcript_is_authoritative_final() -> None:
 
 @pytest.mark.asyncio
 async def test_partial_and_final_transcripts_are_not_authoritative() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     try:
@@ -168,7 +124,7 @@ async def test_partial_and_final_transcripts_are_not_authoritative() -> None:
 
 @pytest.mark.asyncio
 async def test_keepalive_sends_empty_audio_when_idle() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection, keepalive_interval_s=0.01)
     session = await backend.open_session()
     try:
@@ -184,7 +140,14 @@ async def test_keepalive_sends_empty_audio_when_idle() -> None:
                 task.result()
                 break
             await asyncio.sleep(0.01)
-        assert connection.sent == [{"audio_base_64": ""}]
+        assert connection.sent == [
+            {
+                "message_type": "input_audio_chunk",
+                "audio_base_64": "",
+                "sample_rate": 16000,
+                "commit": False,
+            }
+        ]
     finally:
         await session.close()
     assert connection.closed is True
@@ -192,15 +155,21 @@ async def test_keepalive_sends_empty_audio_when_idle() -> None:
 
 @pytest.mark.asyncio
 async def test_speech_end_sends_explicit_commit() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     try:
         await session.send_audio(b"\x00\x00" * 16)
         await session.on_speech_end(trailing_silence_ms=100, reason="silence")
         assert connection.commits == 1
-        assert len(connection.sent) == 1
+        assert len(connection.sent) == 2
         assert connection.sent[0]["audio_base_64"]
+        assert connection.sent[1] == {
+            "message_type": "input_audio_chunk",
+            "audio_base_64": "",
+            "sample_rate": 16000,
+            "commit": True,
+        }
     finally:
         await session.close()
 
@@ -215,7 +184,7 @@ async def test_speech_end_sends_explicit_commit() -> None:
 )
 @pytest.mark.asyncio
 async def test_recoverable_scribe_events_end_stream_without_raising(event_name: str) -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     events_task = asyncio.create_task(_collect(session, 1))
@@ -236,7 +205,7 @@ async def test_recoverable_scribe_events_end_stream_without_raising(event_name: 
 
 @pytest.mark.asyncio
 async def test_send_failure_ends_scribe_session_without_raising() -> None:
-    class RaisingConnection(_FakeConnection):
+    class RaisingConnection(FakeScribeWebSocket):
         async def send(self, payload: dict) -> None:
             _ = payload
             raise RuntimeError("closed")
@@ -255,7 +224,7 @@ async def test_send_failure_ends_scribe_session_without_raising() -> None:
 
 @pytest.mark.asyncio
 async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> None:
-    class RaisingConnection(_FakeConnection):
+    class RaisingConnection(FakeScribeWebSocket):
         async def send(self, payload: dict) -> None:
             _ = payload
             raise RuntimeError("closed")
@@ -266,6 +235,7 @@ async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> Non
     events_task = asyncio.create_task(_collect_error(session))
     try:
         _emit(session, "quota_exceeded", {"message_type": "quota_exceeded", "text": ""})
+        await asyncio.sleep(0)
         await session.send_audio(b"\x00\x00" * 16)
         connection.emit_close()
         error = await asyncio.wait_for(events_task, timeout=1)
@@ -276,7 +246,7 @@ async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> Non
 
 @pytest.mark.asyncio
 async def test_provider_error_events_fail_the_session() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     events_task = asyncio.create_task(_collect_error(session))
@@ -290,13 +260,13 @@ async def test_provider_error_events_fail_the_session() -> None:
 
 @pytest.mark.asyncio
 async def test_close_terminates_event_stream() -> None:
-    connection = _FakeConnection()
+    connection = FakeScribeWebSocket()
     backend, _ = _backend(connection)
     session = await backend.open_session()
     try:
         connection.emit_close()
-        await asyncio.sleep(0.05)
-        assert session._queue_task is not None
+        assert await asyncio.wait_for(_collect(session, 1), timeout=1) == []
+        assert session._receive_task.done()
         await session.close()
         assert connection.closed is True
     finally:
@@ -305,123 +275,51 @@ async def test_close_terminates_event_stream() -> None:
 
 @pytest.mark.asyncio
 async def test_verify_api_key_succeeds_on_session_started() -> None:
-    from elevenlabs.realtime import RealtimeEvents
+    connection = FakeScribeWebSocket()
+    seen_query = []
 
-    connection = _FakeConnection()
-    seen_options: list = []
-
-    async def factory(options):
-        seen_options.append(options)
+    async def factory(url, *, additional_headers):
+        seen_query.append(parse_qs(urlsplit(url).query))
+        assert additional_headers == {"xi-api-key": "secret"}
         return connection
 
-    async def emit_started() -> None:
-        for _ in range(200):
-            handler = connection.handlers.get(RealtimeEvents.SESSION_STARTED)
-            if handler is not None:
-                handler({"message_type": "session_started"})
-                return
-            await asyncio.sleep(0.01)
-        raise AssertionError("session_started handler was never registered")
-
-    task = asyncio.create_task(
-        ElevenLabsScribeSTTBackend.verify_api_key("secret", scribe_connect_factory=factory)
-    )
-    emitter = asyncio.create_task(emit_started())
-    try:
-        assert await asyncio.wait_for(task, timeout=5) is True
-    finally:
-        emitter.cancel()
-        await asyncio.gather(emitter, return_exceptions=True)
-
-    assert connection.closed is True
-    assert seen_options and seen_options[0]["model_id"] == "scribe_v2_realtime"
+    assert await ElevenLabsScribeSTTBackend.verify_api_key("secret", websocket_factory=factory)
+    assert connection.closed
+    assert seen_query[0]["model_id"] == ["scribe_v3_live"]
 
 
 @pytest.mark.asyncio
 async def test_verify_api_key_reports_auth_rejection_as_unauthorized() -> None:
-    from elevenlabs.realtime import RealtimeEvents
-
-    connection = _FakeConnection()
-
-    async def factory(options):
-        _ = options
-        return connection
-
-    async def emit_auth_error() -> None:
-        for _ in range(200):
-            handler = connection.handlers.get(RealtimeEvents.ERROR)
-            if handler is not None:
-                handler({"message_type": "auth_error"})
-                return
-            await asyncio.sleep(0.01)
-        raise AssertionError("error handler was never registered")
-
-    task = asyncio.create_task(
-        ElevenLabsScribeSTTBackend.verify_api_key("bad-secret", scribe_connect_factory=factory)
-    )
-    emitter = asyncio.create_task(emit_auth_error())
-    try:
-        with pytest.raises(Exception) as raised:
-            await asyncio.wait_for(task, timeout=5)
-        assert raised.value.failure_diagnostics.category == "auth"
-        assert raised.value.failure_diagnostics.code == "stt.scribe_auth_error"
-    finally:
-        emitter.cancel()
-        await asyncio.gather(emitter, return_exceptions=True)
-
-    assert connection.closed is True
+    connection = FakeScribeWebSocket(None)
+    connection.push("auth_error")
+    with pytest.raises(RuntimeError) as raised:
+        await ElevenLabsScribeSTTBackend.verify_api_key(
+            "bad-secret", websocket_factory=connection.connect
+        )
+    assert raised.value.failure_diagnostics.category == "auth"
+    assert raised.value.failure_diagnostics.code == "stt.scribe_auth_error"
+    assert connection.closed
 
 
 @pytest.mark.asyncio
 async def test_verify_api_key_reports_close_before_session_start() -> None:
-    from elevenlabs.realtime import RealtimeConnection, RealtimeEvents
-
-    websocket = _GateEOFWebSocket()
-    connection = RealtimeConnection(websocket, current_sample_rate=16000)
-
-    async def factory(options):
-        _ = options
-        connection._message_task = asyncio.create_task(connection._start_message_handler())
-        return connection
-
-    async def emit_close() -> None:
-        for _ in range(200):
-            if RealtimeEvents.CLOSE in connection._event_handlers:
-                websocket.release.set()
-                return
-            await asyncio.sleep(0.01)
-        raise AssertionError("close handler was never registered")
-
-    task = asyncio.create_task(
-        ElevenLabsScribeSTTBackend.verify_api_key(
-            "secret",
-            scribe_connect_factory=factory,
-            settle_timeout_s=0.05,
+    connection = FakeScribeWebSocket(None)
+    connection.emit_close()
+    with pytest.raises(Exception, match="closed before session start"):
+        await ElevenLabsScribeSTTBackend.verify_api_key(
+            "secret", websocket_factory=connection.connect
         )
-    )
-    emitter = asyncio.create_task(emit_close())
-    try:
-        with pytest.raises(Exception, match="closed before session start"):
-            await asyncio.wait_for(task, timeout=1)
-    finally:
-        emitter.cancel()
-        await asyncio.gather(emitter, return_exceptions=True)
-
-    assert websocket.closed is True
+    assert connection.closed
 
 
 @pytest.mark.asyncio
 async def test_verify_api_key_times_out_without_server_signal() -> None:
-    connection = _FakeConnection()
-
-    async def factory(options):
-        _ = options
-        return connection
+    connection = FakeScribeWebSocket(None)
 
     with pytest.raises(TimeoutError, match="timed out waiting for session start"):
         await ElevenLabsScribeSTTBackend.verify_api_key(
             "secret",
-            scribe_connect_factory=factory,
+            websocket_factory=connection.connect,
             settle_timeout_s=0.05,
         )
 
@@ -430,13 +328,10 @@ async def test_verify_api_key_times_out_without_server_signal() -> None:
 
 @pytest.mark.asyncio
 async def test_verify_api_key_rejects_empty_key_without_connecting() -> None:
-    async def factory(options):  # pragma: no cover - must not be called
-        _ = options
+    async def factory(url, *, additional_headers):
         raise AssertionError("factory must not be called for an empty key")
 
-    assert (
-        await ElevenLabsScribeSTTBackend.verify_api_key("", scribe_connect_factory=factory) is False
-    )
+    assert await ElevenLabsScribeSTTBackend.verify_api_key("", websocket_factory=factory) is False
 
 
 def test_scribe_keyterms_normalization() -> None:

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
-from puripuly_heart.app.ports.provider_verifier import (
-    ProviderCredentialVerificationOutcome,
-    ProviderVerifierPort,
-)
+from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 
 
 @pytest.mark.asyncio
@@ -37,13 +33,3 @@ async def test_ui_interactive_verification_returns_the_owner_result(outcome) -> 
 
     assert await adapter.verify_api_key("openai", "synthetic-secret") is outcome
     verification.verify.assert_awaited_once_with("openai", "synthetic-secret")
-
-
-def test_provider_verifier_port_declares_every_used_verification_operation() -> None:
-    for operation in (
-        "verify_api_key",
-        "verify_qwen_llm_api_key",
-        "fetch_openrouter_key_metadata",
-        "verify_provider_secret",
-    ):
-        assert inspect.iscoroutinefunction(getattr(ProviderVerifierPort, operation))

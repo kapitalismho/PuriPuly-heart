@@ -4,9 +4,8 @@ import asyncio
 import inspect
 import ipaddress
 import os
-import time
 import wave
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable, Mapping
 from urllib.parse import urlsplit
@@ -18,12 +17,6 @@ import pytest
 from puripuly_heart.config.provider_values import QwenRegion
 
 INTEGRATION_ENV = "INTEGRATION"
-EVENT_POLL_TIMEOUT_S = float(os.getenv("INTEGRATION_EVENT_POLL_TIMEOUT_S", "0.1"))
-WARMUP_DELAY_S = float(os.getenv("INTEGRATION_WARMUP_S", "0.5"))
-CHUNK_DELAY_S = float(os.getenv("INTEGRATION_CHUNK_DELAY_S", "0.05"))
-RESULT_TIMEOUT_S = float(os.getenv("INTEGRATION_RESULT_TIMEOUT_S", "30"))
-OSC_TIMEOUT_S = float(os.getenv("INTEGRATION_OSC_TIMEOUT_S", "15"))
-ITERATION_DELAY_S = float(os.getenv("INTEGRATION_ITERATION_DELAY_S", "1.0"))
 OPEN_SESSION_TIMEOUT_S = float(os.getenv("INTEGRATION_OPEN_TIMEOUT_S", "15"))
 LOCAL_QWEN_STT_SAMPLE_RATE_HZ = 16000
 
@@ -168,18 +161,6 @@ def load_required_audio_wav(
     return samples, sample_rate
 
 
-def chunk_audio(
-    samples: np.ndarray, *, sample_rate_hz: int, chunk_ms: int | None = None
-) -> tuple[list[np.ndarray], int]:
-    if chunk_ms is None:
-        chunk_ms = int(os.getenv("INTEGRATION_CHUNK_MS", "100"))
-    chunk_samples = int(sample_rate_hz * (chunk_ms / 1000.0))
-    if chunk_samples <= 0:
-        raise ValueError("chunk size must be positive")
-    chunks = [samples[i : i + chunk_samples] for i in range(0, len(samples), chunk_samples)]
-    return chunks, chunk_samples
-
-
 def qwen_region_from_env() -> QwenRegion:
     region_raw = os.getenv("QWEN_REGION", QwenRegion.BEIJING.value).lower()
     try:
@@ -304,61 +285,6 @@ async def require_local_llm_server(
         result = await result
     if not result:
         pytest.skip("local LLM server is unavailable")
-
-
-@dataclass(slots=True)
-class MockOscSender:
-    messages: list[str] = field(default_factory=list)
-    typing_states: list[bool] = field(default_factory=list)
-
-    def send_chatbox(self, text: str) -> None:
-        self.messages.append(text)
-
-    def send_typing(self, is_typing: bool) -> None:
-        self.typing_states.append(is_typing)
-
-
-class SimpleClock:
-    def now(self) -> float:
-        return time.time()
-
-
-async def next_ui_event(queue: asyncio.Queue, *, timeout_s: float | None = None):
-    timeout = EVENT_POLL_TIMEOUT_S if timeout_s is None else timeout_s
-    try:
-        return await asyncio.wait_for(queue.get(), timeout=timeout)
-    except asyncio.TimeoutError:
-        return None
-
-
-async def wait_for_event(event: asyncio.Event, *, timeout_s: float | None = None) -> bool:
-    timeout = RESULT_TIMEOUT_S if timeout_s is None else timeout_s
-    try:
-        await asyncio.wait_for(event.wait(), timeout=timeout)
-        return True
-    except asyncio.TimeoutError:
-        return False
-
-
-async def send_vad_events(
-    owner,
-    utterance_id,
-    chunks: list[np.ndarray],
-    *,
-    chunk_delay_s: float | None = None,
-) -> None:
-    if not chunks:
-        return
-    from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
-
-    delay = CHUNK_DELAY_S if chunk_delay_s is None else chunk_delay_s
-    pre_roll = np.zeros(len(chunks[0]), dtype=np.float32)
-    await owner.handle_vad_event(SpeechStart(utterance_id, pre_roll=pre_roll, chunk=chunks[0]))
-    await asyncio.sleep(delay)
-    for chunk in chunks[1:]:
-        await owner.handle_vad_event(SpeechChunk(utterance_id, chunk=chunk))
-        await asyncio.sleep(delay)
-    await owner.handle_vad_event(SpeechEnd(utterance_id))
 
 
 async def stream_silence(

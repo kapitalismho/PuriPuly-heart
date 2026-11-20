@@ -1,0 +1,644 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import replace
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
+
+from puripuly_heart.app.adapters.peer_capture.peer_capture_provider import (
+    PeerCaptureProviderAdapter,
+)
+from puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink import (
+    PeerCaptureVadSinkAdapter,
+)
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+    LocalASRProviderRuntimeFactory,
+    SharedSTTProviderFactory,
+)
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
+    build_peer_stt_provider_request,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core import network_clients
+from puripuly_heart.core.conversation_history import ConversationHistory
+from puripuly_heart.core.observability import ConversationRecord
+from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.stt.backend import STTFinalSpeakerEvidence, STTProviderTurnTerminal
+from tests.core.runtime.test_local_asr_provider_runtime import FakeProvisioningPort
+from tests.core.runtime.test_peer_capture_session import (
+    FakeAdmission,
+    FakeSource,
+    FakeTargetResolver,
+    wait_until,
+)
+from tests.core.test_peer_caption_lifecycle import ControlledBackend, idle
+from tests.core.test_peer_overlay_policy import Surface, Timeline, presenter_for
+from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.scoped_provider_sessions import FakeScribeWebSocket, _owned_deepgram_events
+from tests.helpers.translation_owners import compose_translation_test_harness
+
+
+class _ConversationObserver(ConversationHistory):
+    def record_conversation_observation(self, **fields):
+        self.observe_conversation(ConversationRecord(**fields))
+
+    def emit_basic(self, *args, **kwargs):
+        pass
+
+
+async def _idle(harness):
+    async with asyncio.timeout(3):
+        await idle(harness)
+
+
+@pytest.fixture
+async def capture_route(monkeypatch):
+    timeline = Timeline()
+    surface = Surface()
+    presenter = presenter_for(timeline, surface)
+    await presenter.begin_native_retry_epoch(enabled=True)
+    socket = FakeScribeWebSocket("native-scope")
+    native_scope = "native-scope"
+    socket_provider = None
+    urls = []
+
+    async def connect(url, *, additional_headers):
+        nonlocal socket, native_scope, socket_provider
+        if urls:
+            native_scope = f"native-scope-{len(urls)}"
+            socket = FakeScribeWebSocket(native_scope)
+        assert additional_headers == {"xi-api-key": "controlled"}
+        urls.append(url)
+        socket_provider = runtime.current_provider("peer")
+        return socket
+
+    monkeypatch.setattr(network_clients, "external_websocket_connect", connect)
+    secrets = InMemorySecretStore()
+    secrets.set("elevenlabs_scribe_api_key", "controlled")
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            peer_stt=replace(settings.intent.peer_stt, provider="elevenlabs_scribe"),
+            languages=replace(
+                settings.intent.languages, peer_source_mode="manual", peer_source_language="en"
+            ),
+        ),
+    )
+    runtime_factory = LocalASRProviderRuntimeFactory(
+        SharedSTTProviderFactory(secrets, timeline.clock, 300.0, None),
+        FakeProvisioningPort(),
+        timeline.clock,
+    )
+    callbacks = None
+    evidence = []
+    terminals = []
+
+    async def observe(event):
+        if isinstance(event, STTProviderTurnTerminal):
+            terminals.append(event)
+        elif isinstance(event, STTFinalSpeakerEvidence):
+            evidence.append(event)
+        assert callbacks is not None
+        await callbacks.peer_event_handler(event)
+
+    class RuntimeFactory:
+        def create(self, harness_callbacks):
+            nonlocal callbacks
+            callbacks = harness_callbacks.peer_exception_handler.__self__
+            return runtime_factory.create(replace(harness_callbacks, peer_event_handler=observe))
+
+    backend = ControlledBackend()
+    history = _ConversationObserver()
+    harness = compose_translation_test_harness(
+        local_asr_provider_runtime_factory=RuntimeFactory(),
+        llm=backend,
+        osc=RecordingOscQueue(),
+        clock=timeline.clock,
+        overlay_sink=presenter,
+        runtime_logging=history,
+        source_language="en",
+        target_language="ko",
+        peer_translation_enabled=True,
+    )
+
+    runtime = harness.local_asr_runtime
+    capture = PeerCaptureSessionOwner(
+        admission=FakeAdmission(),
+        target_resolver=FakeTargetResolver(),
+        provider=PeerCaptureProviderAdapter(runtime, harness.peer_owner),
+        clock=timeline.clock,
+        provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
+            config, gpu_device_id="auto", warmup=warmup
+        ),
+        source_factory=lambda *_: FakeSource(),
+        vad_factory=lambda _: object(),
+        run_audio_loop=lambda **_: asyncio.Event().wait(),
+        vad_sink=PeerCaptureVadSinkAdapter(lambda: harness.peer_owner),
+    )
+    assert callbacks is not None
+    callbacks.bind_peer_capture(capture)
+    capture.bind_publication_generation_observer(
+        activated=harness.output_runtime.activate_peer_generation,
+        retired=harness.output_runtime.retire_peer_generation,
+    )
+
+    async def apply_diarization(enabled):
+        stt = settings.intent.stt
+        next_settings = replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                stt=replace(
+                    stt,
+                    elevenlabs_scribe=replace(
+                        stt.elevenlabs_scribe, enable_speaker_diarization=enabled
+                    ),
+                ),
+            ),
+        )
+        config = build_peer_capture_session_config_from_vnext(next_settings)
+        result = await capture.apply_intent(config, enabled=True)
+        assert result.effective_active and result.runtime_signature == config.runtime_signature
+        assert runtime.snapshot.channel_for("peer").speaker_diarization is enabled
+
+    try:
+        await harness.start()
+        await apply_diarization(True)
+        guarded = capture.guard_vad_sink()
+
+        async def drain():
+            assert socket_provider is not None
+            await socket_provider.wait_for_event_ingress_drain()
+
+        def own_turn():
+            ledger = capture.segment_ledger
+            assert ledger is not None
+            return _owned_deepgram_events(ledger, start_sample=(len(terminals) + 1) * 1000)
+
+        async def committed(text, *speakers, partial=False, owned=None):
+            terminal_index = len(terminals)
+            reuse_socket = owned is not None or (
+                not socket.closed and socket_provider is runtime.current_provider("peer")
+            )
+            index = socket.commits if reuse_socket else 0
+            ledger = capture.segment_ledger
+            assert ledger is not None
+            start, chunks, end = own_turn() if owned is None else owned
+            for event in (start, *chunks, end):
+                await guarded.handle_owned_vad_event(event)
+            await wait_until(lambda: socket.commits == index + 1, timeout_s=2)
+            if partial:
+                socket.push("partial_transcript", text=text)
+            socket.push("committed_transcript", text=text, segment_index=index)
+            if speakers:
+                push_diarized(index, speakers)
+            await wait_until(lambda: len(terminals) > terminal_index, timeout_s=2)
+            await drain()
+            terminal = terminals[terminal_index]
+            assert terminal.text == text and terminal.text_authority == "authoritative"
+            if runtime.snapshot.channel_for("peer").speaker_diarization:
+                assert terminal.native_segment.provider_session_id == native_scope
+                assert terminal.native_segment.segment_index == index
+            else:
+                assert terminal.native_segment is None
+                assert terminal.final_speaker_runs == ()
+            assert any(
+                receipt.identity == terminal.identity.segment
+                for receipt in ledger.terminal_receipts
+            )
+            return start.segment.identity.segment_id
+
+        def push_diarized(index, words):
+            socket.push(
+                "diarized_transcript",
+                segment_index=index,
+                text="".join(text for text, _ in words),
+                words=[{"text": text, "speaker_id": speaker} for text, speaker in words],
+            )
+
+        async def diarized(index, *words):
+            original = len(evidence)
+            push_diarized(index, words)
+            await wait_until(lambda: len(evidence) > original, timeout_s=2)
+            await drain()
+            return evidence[-1]
+
+        yield (
+            (
+                harness,
+                backend,
+                presenter,
+                timeline,
+                surface,
+                history,
+                committed,
+                diarized,
+                socket,
+                urls,
+            ),
+            apply_diarization,
+            own_turn,
+        )
+    finally:
+        await capture.close()
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.fixture
+def route(capture_route):
+    return capture_route[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reenable", [False, True])
+async def test_scribe_toggle_rejects_retired_evidence_and_keeps_translation(
+    capture_route, reenable
+):
+    route, apply_diarization, own_turn = capture_route
+    (
+        harness,
+        backend,
+        presenter,
+        timeline,
+        _,
+        history,
+        committed,
+        diarized,
+        first_socket,
+        urls,
+    ) = route
+    await committed("Old head. Old tail.")
+    await _idle(harness)
+    original_blocks = presenter.snapshot().blocks
+    pending = own_turn() if reenable else None
+    await apply_diarization(False)
+    if reenable:
+        await apply_diarization(True)
+
+    assert len(urls) == 1 and not first_socket.closed
+    stale = await diarized(0, ("Old head. ", "speaker-A"), ("Old tail.", "speaker-B"))
+    await _idle(harness)
+    assert presenter.snapshot().blocks == original_blocks
+    assert [call.text for call in backend.calls] == ["Old head. Old tail."]
+    assert stale.revisions[0].native_segment.provider_session_id == "native-scope"
+
+    expected_sources = ["Old head. Old tail."]
+    if pending is not None:
+        await committed("Pending older speech.", owned=pending)
+        await _idle(harness)
+        assert len(urls) == 1 and first_socket.commits == 2
+        assert history.conversation_records[-1].source_text == "Pending older speech."
+        expected_sources.append("Pending older speech.")
+
+    old_commits = first_socket.commits
+    speakers = () if reenable else (("Fresh head. ", "speaker-A"), ("Fresh tail.", "speaker-B"))
+    fresh = await committed("Fresh head. Fresh tail.", *speakers)
+    await _idle(harness)
+
+    assert first_socket.commits == old_commits
+    fresh_option = "true" if reenable else "false"
+    assert [parse_qs(urlsplit(url).query)["diarize"] for url in urls] == [["true"], [fresh_option]]
+    assert parse_qs(urlsplit(urls[-1]).query)["include_timestamps"] == [fresh_option]
+    assert [call.text for call in backend.calls] == [*expected_sources, "Fresh head. Fresh tail."]
+    assert history.conversation_records[-1].source_text == "Fresh head. Fresh tail."
+    if reenable:
+        waiting = presenter.peer_fragment_state(fresh, 0)
+        assert waiting is not None and waiting.pending
+        await timeline.advance(1.01)
+    visible = {block.id: block for block in presenter.snapshot().blocks}
+    block = visible.get(f"peer:{fresh}")
+    assert block is not None
+    assert block.speaker_style == ("gray" if reenable else "gold")
+    assert block.primary_text == "translated:Fresh head. Fresh tail."
+
+
+@pytest.mark.asyncio
+async def test_peer_scribe_factory_commit_progress_late_identity_then_split_and_merge(route):
+    harness, backend, presenter, timeline, _, history, committed, diarized, socket, urls = route
+    first = await committed("Alpha. Beta.")
+    await _idle(harness)
+    first_id = f"peer:{first}"
+    assert [block.primary_text for block in presenter.snapshot().blocks] == [
+        "translated:Alpha. Beta."
+    ]
+    assert presenter.snapshot().blocks[0].speaker_style == "gray"
+    await timeline.advance(0.2)
+    second = await committed("An independent line.")
+    await _idle(harness)
+    second_id = f"peer:{second}"
+    assert len(urls) == 1 and socket.commits == 2
+    options = parse_qs(urlsplit(urls[0]).query)
+    assert options["model_id"] == ["scribe_v3_live"]
+    assert options["language_code"] == ["en"]
+    assert options["diarize"] == options["include_timestamps"] == ["true"]
+    assert options["filter_background_audio"] == ["false"]
+    assert options["commit_strategy"] == ["manual"]
+    stable = presenter.peer_fragment_state(second, 0)
+    retry = presenter.snapshot().native_fresh_render_generations
+    await diarized(1, ("An independent line.", "speaker-2"))
+    await _idle(harness)
+    assert len(backend.calls) == 2
+    assert presenter.peer_fragment_state(second, 0) == stable
+    assert presenter.snapshot().native_fresh_render_generations == retry
+    assert (
+        next(block for block in presenter.snapshot().blocks if block.id == second_id).speaker_style
+        != "gray"
+    )
+    initial_order = presenter.peer_fragment_state(first, 0).registration_order
+    await diarized(0, ("Alpha. ", "speaker-0"), ("Beta.", "speaker-1"))
+    await _idle(harness)
+    blocks = {block.id: block for block in presenter.snapshot().blocks}
+    assert blocks[first_id].primary_text == "translated:Alpha. "
+    assert blocks[first_id].secondary_text == "Alpha."
+    assert presenter.peer_fragment_state(first, 0).registration_order == initial_order
+    assert presenter.peer_fragment_state(first, 0).expires_at == pytest.approx(8.2)
+    assert [call.text for call in backend.calls] == [
+        "Alpha. Beta.",
+        "An independent line.",
+        "Alpha. ",
+        "Beta.",
+    ]
+    assert [entry.text for entry in harness.peer_runtime.translation_history] == [
+        "Alpha. ",
+        "Beta.",
+        "An independent line.",
+    ]
+    assert [record.source_text for record in history.conversation_records] == [
+        "Alpha.",
+        "Beta.",
+        "An independent line.",
+    ]
+    assert presenter.snapshot().blocks[-1].id == second_id
+    socket.push("speakers_merged", from_speaker_id="speaker-1", to_speaker_id="speaker-0")
+    await wait_until(lambda: len(backend.calls) == 5, timeout_s=2)
+    await _idle(harness)
+    assert backend.calls[-1].text == "Alpha. Beta."
+    assert [record.source_text for record in history.conversation_records] == [
+        "Alpha. Beta.",
+        "An independent line.",
+    ]
+    assert [block.id for block in presenter.snapshot().blocks] == [first_id, second_id]
+    assert harness.osc.messages == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["expiry", "clear", "eviction"])
+async def test_dead_scribe_family_split_never_registers_a_new_child(route, retirement):
+    harness, backend, presenter, timeline, surface, _, committed, diarized, _, _ = route
+    old = await committed("Dead one. Dead two.")
+    await idle(harness)
+    assert presenter.peer_fragment_state(old, 0) is not None
+    if retirement == "expiry":
+        await timeline.advance(8.1)
+    elif retirement == "clear":
+        await presenter.clear_for_runtime_detach()
+    else:
+        await committed("Fresh A.")
+        await idle(harness)
+        await committed("Fresh B.")
+        await idle(harness)
+        await timeline.advance(1.01)
+    assert all(block.id != f"peer:{old}" for block in presenter.snapshot().blocks)
+    first_scene = len(surface.snapshots)
+    before = len(backend.calls)
+    await diarized(0, ("Dead one. ", "old-a"), ("Dead two.", "old-b"))
+    await idle(harness)
+    assert len(backend.calls) == before
+    new = await committed("This is current.")
+    await idle(harness)
+    await timeline.advance(1.01)
+    assert any(block.id == f"peer:{new}" for block in presenter.snapshot().blocks)
+    assert all(
+        "Dead" not in block.primary_text and "Dead" not in block.secondary_text
+        for snapshot in surface.snapshots[first_scene:]
+        for block in snapshot.blocks
+    )
+
+
+@pytest.mark.asyncio
+async def test_scribe_repair_that_finishes_after_expiry_cannot_reenter(route):
+    harness, backend, presenter, timeline, surface, _, committed, diarized, _, _ = route
+    old = await committed("Too late. Split tail.")
+    await idle(harness)
+    backend.block = True
+    await diarized(0, ("Too late. ", "old-a"), ("Split tail.", "old-b"))
+    await wait_until(lambda: len(backend.completions) == 2, timeout_s=2)
+    await timeline.advance(8.1)
+    assert all(block.id != f"peer:{old}" for block in presenter.snapshot().blocks)
+    expired_scene = len(surface.snapshots)
+    for completion in reversed(backend.completions):
+        completion.set_result(None)
+    await idle(harness)
+    assert not presenter.snapshot().blocks
+    assert not any(snapshot.blocks for snapshot in surface.snapshots[expired_scene:])
+    backend.block = False
+    ready = await committed("New after old work.")
+    await idle(harness)
+    assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{ready}"]
+
+
+@pytest.mark.asyncio
+async def test_scribe_available_speakers_skip_redundant_whole_source_translation(route):
+    harness, backend, presenter, timeline, _, history, committed, _, _, _ = route
+    backend.translations["A longer first group. "] = "가" * 64
+    await committed(
+        "A longer first group. A different speaker.",
+        ("A longer first group. ", "speaker-A"),
+        ("A different speaker.", "speaker-B"),
+    )
+    await _idle(harness)
+    assert [call.text for call in backend.calls] == [
+        "A longer first group. ",
+        "A different speaker.",
+    ]
+    assert [record.source_text for record in history.conversation_records] == [
+        "A longer first group.",
+        "A different speaker.",
+    ]
+    await timeline.advance(0)
+    first, continuation = presenter.snapshot().blocks
+    assert first.secondary_text == "A longer first group."
+    assert continuation.secondary_text == ""
+    await timeline.advance(1.01)
+    assert all(block.id != first.id for block in presenter.snapshot().blocks)
+    visible = {block.id: block for block in presenter.snapshot().blocks}
+    assert visible[continuation.id].secondary_text == ""
+    assert next(
+        block for block in visible.values() if block.id != continuation.id
+    ).secondary_text == ("A different speaker.")
+
+
+@pytest.mark.asyncio
+async def test_scribe_ready_regroup_tail_keeps_normal_wait_order_and_survives_head_departure(route):
+    harness, backend, presenter, timeline, surface, history, committed, diarized, socket, _ = route
+    head = await committed("First speaker. Later sibling.")
+    await _idle(harness)
+    await committed("Occupies the lower slot.")
+    await _idle(harness)
+    await timeline.advance(0.2)
+    waiter = await committed("Already waiting.")
+    await _idle(harness)
+    old_wait = presenter.peer_fragment_state(waiter, 0)
+    assert old_wait.pending
+    await timeline.advance(0.2)
+    await diarized(0, ("First speaker. ", "a"), ("Later sibling.", "b"))
+    await _idle(harness)
+    records = {record.source_text: record for record in history.conversation_records}
+    from uuid import UUID
+
+    sibling_id = UUID(records["Later sibling."].utterance_id)
+    sibling = presenter.peer_fragment_state(sibling_id, 0)
+    assert sibling.pending and sibling.registration_order > old_wait.registration_order
+    assert presenter.peer_fragment_state(waiter, 0) == old_wait
+    await timeline.advance(0.81)
+    assert all(block.id != f"peer:{head}" for block in presenter.snapshot().blocks)
+    assert any(block.id == f"peer:{waiter}" for block in presenter.snapshot().blocks)
+    assert presenter.peer_fragment_state(sibling_id, 0).pending
+    await timeline.advance(1.01)
+    shown = next(block for block in presenter.snapshot().blocks if block.id == f"peer:{sibling_id}")
+    assert shown.secondary_text == "Later sibling."
+    shown_state = presenter.peer_fragment_state(sibling_id, 0)
+    calls = len(backend.calls)
+    scene_start = len(surface.snapshots)
+    socket.push("speakers_merged", from_speaker_id="b", to_speaker_id="a")
+    await wait_until(lambda: len(surface.snapshots) > scene_start, timeout_s=2)
+    await _idle(harness)
+    assert len(backend.calls) == calls
+    assert presenter.peer_fragment_state(sibling_id, 0) == shown_state
+    assert all(
+        block.id != f"peer:{head}"
+        for snapshot in surface.snapshots[scene_start:]
+        for block in snapshot.blocks
+    )
+
+
+@pytest.mark.asyncio
+async def test_scribe_inflight_identity_styles_the_first_peer_caption(route):
+    harness, backend, _, _, surface, history, committed, diarized, _, _ = route
+    source = "One identified speaker."
+    translated = "translated:One identified speaker."
+    backend.block = True
+    try:
+        turn = await committed(source)
+        await wait_until(lambda: bool(backend.completions), timeout_s=2)
+        await diarized(0, (source, "speaker-A"))
+        assert not backend.completions[0].done()
+    finally:
+        backend.block = False
+        for completion in backend.completions:
+            if not completion.done():
+                completion.set_result(None)
+        await _idle(harness)
+
+    first = next(
+        (
+            block
+            for snapshot in surface.snapshots
+            for block in snapshot.blocks
+            if block.id == f"peer:{turn}"
+        ),
+        None,
+    )
+    assert first is not None, "No caption was delivered for the original Scribe turn"
+    assert first.primary_text == translated
+    assert [call.text for call in backend.calls] == [source]
+    assert [
+        (record.utterance_id, record.source_text, record.accepted)
+        for record in history.conversation_records
+    ] == [(str(turn), source, True)]
+    assert first.speaker_style == "gold"
+
+
+@pytest.mark.asyncio
+async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_results(route):
+    harness, backend, presenter, _, surface, history, committed, diarized, _, _ = route
+    backend.block = True
+    parent = await committed("Initial left. Initial right.")
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    await diarized(0, ("Initial left. ", "speaker-A"), ("Initial right.", "speaker-B"))
+    await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
+    assert not backend.completions[0].done()
+    backend.completions[2].set_result(None)
+    await wait_until(lambda: bool(presenter.snapshot().blocks), timeout_s=2)
+    assert [block.primary_text for block in presenter.snapshot().blocks] == [
+        "translated:Initial right."
+    ]
+    assert not history.conversation_records
+    backend.completions[1].set_result(None)
+    backend.completions[0].set_result(None)
+    await _idle(harness)
+    assert [record.source_text for record in history.conversation_records] == [
+        "Initial left.",
+        "Initial right.",
+    ]
+    assert any(block.id == f"peer:{parent}" for block in presenter.snapshot().blocks)
+    assert all(
+        "Initial left. Initial right." not in block.primary_text
+        for snapshot in surface.snapshots
+        for block in snapshot.blocks
+    )
+
+
+@pytest.mark.asyncio
+async def test_admitted_scribe_split_survives_clean_socket_retirement(route):
+    harness, backend, presenter, timeline, _, history, committed, diarized, socket, urls = route
+    backend.block = True
+    await committed("Accepted head. Accepted tail.")
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    evidence = await diarized(0, ("Accepted head. ", "speaker-A"), ("Accepted tail.", "speaker-B"))
+    await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
+    socket.emit_close()
+    await wait_until(lambda: socket.closed and not evidence.is_current(), timeout_s=2)
+    for completion in backend.completions:
+        completion.set_result(None)
+    await _idle(harness)
+    assert [record.source_text for record in history.conversation_records] == [
+        "Accepted head.",
+        "Accepted tail.",
+    ]
+    assert {block.secondary_text for block in presenter.snapshot().blocks} == {
+        "Accepted head.",
+        "Accepted tail.",
+    }
+    backend.block = False
+    fresh = await committed("Fresh successor.")
+    await _idle(harness)
+    await timeline.advance(1.1)
+    assert len(urls) == 2
+    assert history.conversation_records[-1].source_text == "Fresh successor."
+    assert any(block.id == f"peer:{fresh}" for block in presenter.snapshot().blocks)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("speaker", ["speaker-A", "speaker-B"])
+async def test_scribe_unknown_continuation_tracks_split_tail_boundary(route, monkeypatch, speaker):
+    lines = 3.0
+    monkeypatch.setattr(
+        "puripuly_heart.core.orchestrator.peer_caption.estimate_peer_translation_lines",
+        lambda *_, **__: lines,
+    )
+    harness, backend, _, timeline, _, history, committed, diarized, _, _ = route
+    await committed("The first part, and the second part,")
+    await _idle(harness)
+    await timeline.advance(0.2)
+    unknown = await committed("and an unassigned continuation", partial=True)
+    await _idle(harness)
+    assert history.conversation_records[-1].utterance_id == str(unknown)
+    assert history.conversation_records[-1].source_text == "and an unassigned continuation"
+    await diarized(0, ("The first part, ", "speaker-A"), ("and the second part,", "speaker-B"))
+    await _idle(harness)
+    lines = 2.0
+    await timeline.advance(0.2)
+    successor = await committed("and another part", ("and another part", speaker), partial=True)
+    await _idle(harness)
+    matching = speaker == "speaker-B"
+    expected = "and an unassigned continuation and another part" if matching else "and another part"
+    assert backend.calls[-1].text == expected
+    assert history.conversation_records[-1].source_text == expected
+    assert history.conversation_records[-1].utterance_id == str(unknown if matching else successor)

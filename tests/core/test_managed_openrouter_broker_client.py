@@ -1596,36 +1596,15 @@ async def test_status_managed_operation_uses_issue_source_for_delivery_ack() -> 
 
 
 @pytest.mark.asyncio
-async def test_status_managed_operation_rejects_mismatched_issue_source() -> None:
+@pytest.mark.parametrize(
+    "issue_source",
+    [pytest.param("discord", id="mismatched"), pytest.param("wechat", id="unknown")],
+)
+async def test_status_managed_operation_rejects_invalid_issue_source(issue_source: str) -> None:
     from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="discord"))
-
-    client, _transport = _build_client(handler)
-
-    result = await client.get_managed_operation_status(
-        ManagedOperationStatusRequest(
-            operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            installation_id="install-1",
-            resume_token="token-1",
-            source="qq",
-        )
-    )
-
-    assert result.succeeded is False
-    assert result.operation_status == "CREATE_UNKNOWN"
-    assert result.client_action == "wait"
-    assert result.delivery_ack is None
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_status_managed_operation_rejects_unknown_issue_source() -> None:
-    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="wechat"))
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source=issue_source))
 
     client, _transport = _build_client(handler)
 

@@ -280,7 +280,6 @@ DOMAIN_CODES = (
             "updater_check_failed",
             "ui_task_failed",
             "control_request_failed",
-            "index_fallback_commit_failed",
             "audio_device_enumeration_failed",
             "audio_device_cleanup_failed",
             "localization_resource_failed",
@@ -341,10 +340,6 @@ DOMAIN_CODES = (
             "model_assets.process_exited",
             "model_assets.prefix_failed",
             "model_assets.cleanup_failed",
-            "index_service_unavailable",
-            "index_managed_allowance_unknown",
-            "index_selection_deadline",
-            "index_selection_cleanup_failed",
         }
     )
     | frozenset(TRANSACTION_RESULT_STATUSES)

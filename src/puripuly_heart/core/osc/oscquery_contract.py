@@ -32,7 +32,9 @@ class OscQueryServicePort(Protocol):
 
     async def stop(self) -> None: ...
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None: ...
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None: ...
 
     async def advertise_receiver(
         self,

@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class CallbackOscQueryService(OscQueryServicePort):
-    discover: Callable[[], Awaitable[OscQueryServiceInfo | None]]
+    discover: Callable[[str | None], Awaitable[OscQueryServiceInfo | None]]
     advertise: Callable[[OscQueryAdvertisement], Awaitable[None]]
     unadvertise: Callable[[], Awaitable[None]]
     query: Callable[[OscQueryServiceInfo], Awaitable[Mapping[str, object]]]
@@ -55,8 +55,10 @@ class CallbackOscQueryService(OscQueryServicePort):
         if self.stop_callback is not None:
             await self.stop_callback()
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
-        return await self.discover()
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
+        return await self.discover(preferred_service_id)
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
         await self.advertise(advertisement)
@@ -120,7 +122,6 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                     )
                 )
             self.started = True
-            self._notify_services_changed()
         except BaseException:
             try:
                 await self.stop()
@@ -149,9 +150,10 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         self._loop = None
         self.started = False
 
-    async def discover_vrchat(self) -> OscQueryServiceInfo | None:
-        self.discovery_failure = None
-        self.discovery_observation = "absent"
+    async def discover_vrchat(
+        self, *, preferred_service_id: str | None = None
+    ) -> OscQueryServiceInfo | None:
+        result = None
         candidates = [service for service in self._services.values() if service.is_vrchat]
         if not candidates:
             candidates = [
@@ -159,29 +161,40 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                 for service in self._services.values()
                 if "vrchat" in service.service_id.casefold()
             ]
-        if not candidates:
-            return None
+        observations: list[tuple[OscQueryServiceInfo, OscQueryServiceInfo | Exception]] = []
+        candidates.sort(
+            key=lambda service: (
+                service.service_id != preferred_service_id,
+                service.service_id.casefold(),
+            )
+        )
+        for candidate in candidates:
+            if self._services.get(candidate.service_id) is not candidate:
+                continue
+            try:
+                resolved = await self._resolve_host_info(candidate)
+            except Exception as exc:
+                observations.append((candidate, exc))
+                continue
+            if self._services.get(candidate.service_id) is candidate:
+                if resolved.osc_send_port is not None:
+                    result = resolved
+                    break
+                observations.append((candidate, resolved))
         failures: list[ErrorDiagnostics] = []
         truncated = False
-        for candidate in sorted(candidates, key=lambda service: service.service_id.casefold()):
-            resolved = await self._resolve_host_info(candidate)
-            if resolved is not None and self._services.get(candidate.service_id) is candidate:
-                self.discovery_observation = "available"
-                if failures:
-                    self.discovery_failure = sanitize_diagnostics(
-                        replace(
-                            failures[0],
-                            causes=(*failures[0].causes, *failures[1:]),
-                            causes_truncated=truncated,
-                        )
-                    )
-                    emit_failure(logger, self.discovery_failure, disposition="recovered")
-                return resolved
-            if self.discovery_failure is not None:
+        for candidate, observation in observations:
+            if self._services.get(candidate.service_id) is not candidate:
+                continue
+            if isinstance(observation, Exception):
                 if len(failures) < 8:
-                    failures.append(self.discovery_failure)
+                    failures.append(
+                        self._observation_failure(observation, "host_info", report=False)
+                    )
                 else:
                     truncated = True
+            elif result is None:
+                result = observation
         if failures:
             self.discovery_failure = sanitize_diagnostics(
                 replace(
@@ -190,8 +203,14 @@ class ZeroconfOscQueryService(OscQueryServicePort):
                     causes_truncated=truncated,
                 )
             )
+            self.failures = (*self.failures[-7:], self.discovery_failure)
+        else:
+            self.discovery_failure = None
+        if failures and (result is None or result.osc_send_port is None):
             self.discovery_observation = "unavailable"
-        return None
+        else:
+            self.discovery_observation = "available" if result is not None else "absent"
+        return result
 
     async def advertise_receiver(self, advertisement: OscQueryAdvertisement) -> None:
         if self._zeroconf is None:
@@ -351,25 +370,20 @@ class ZeroconfOscQueryService(OscQueryServicePort):
     async def _resolve_host_info(
         self,
         service: OscQueryServiceInfo,
-    ) -> OscQueryServiceInfo | None:
+    ) -> OscQueryServiceInfo:
         if service.query_port is None:
             return service
-        try:
-            import httpx
+        import httpx
 
-            with suppress_http_client_logs():
-                async with httpx.AsyncClient(timeout=1.5, trust_env=False) as client:
-                    response = await client.get(
-                        f"http://{service.host}:{service.query_port}/?HOST_INFO"
-                    )
-                    response.raise_for_status()
-                    payload = response.json()
-        except Exception as exc:
-            self.discovery_failure = self._observation_failure(exc, "host_info")
-            return None
+        with suppress_http_client_logs():
+            async with httpx.AsyncClient(timeout=1.5, trust_env=False) as client:
+                response = await client.get(
+                    f"http://{service.host}:{service.query_port}/?HOST_INFO"
+                )
+                response.raise_for_status()
+                payload = response.json()
         if not isinstance(payload, Mapping):
-            self.discovery_failure = self._observation_failure(ValueError(), "host_info")
-            return None
+            raise ValueError()
         host = payload.get("OSC_IP")
         resolved_host = host.strip() if isinstance(host, str) and host.strip() else service.host
         resolved_port = _mapping_port(payload, "OSC_PORT") or service.osc_send_port
@@ -379,7 +393,9 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             osc_send_port=resolved_port,
         )
 
-    def _observation_failure(self, exc: Exception, operation: str) -> ErrorDiagnostics:
+    def _observation_failure(
+        self, exc: Exception, operation: str, *, report: bool = True
+    ) -> ErrorDiagnostics:
         diagnostics = exception_diagnostics(
             exc,
             component="osc_control",
@@ -388,8 +404,9 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             category="network",
             fields={"observation_succeeded": False},
         )
-        emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
-        self.failures = (*self.failures[-7:], diagnostics)
+        if report:
+            emit_failure(logger, diagnostics, severity="warning", disposition="degraded")
+            self.failures = (*self.failures[-7:], diagnostics)
         return diagnostics
 
     def _service_state_changed(
@@ -429,21 +446,31 @@ class ZeroconfOscQueryService(OscQueryServicePort):
         removed: bool = True,
     ) -> None:
         key = _base_service_name(name, service_type)
-        if info is None and not removed:
-            return
+        previous = self._services.get(key)
+        raw = self._raw_services.get(key)
+        previous_info = raw.get(service_type) if raw is not None else None
         if info is None:
-            raw = self._raw_services.get(key)
-            if raw is not None:
-                raw.pop(service_type, None)
-                if not raw:
-                    self._raw_services.pop(key, None)
-                    self._services.pop(key, None)
-                else:
-                    self._services[key] = self._merge_service_info(key, raw)
+            if not removed or raw is None:
+                return
+            raw.pop(service_type, None)
+            if not raw:
+                self._raw_services.pop(key, None)
         else:
-            self._raw_services.setdefault(key, {})[service_type] = info
-            self._services[key] = self._merge_service_info(key, self._raw_services[key])
-        self._notify_services_changed()
+            raw = self._raw_services.setdefault(key, {})
+            raw[service_type] = info
+        current = self._merge_service_info(key, raw) if raw else None
+        if current == previous:
+            previous_address = _service_properties(previous_info).get("OSC_IP")
+            if previous_address == _service_properties(info).get("OSC_IP"):
+                return
+        if current is None:
+            self._services.pop(key, None)
+        else:
+            self._services[key] = current
+        if (previous is not None and previous.is_vrchat) or (
+            current is not None and current.is_vrchat
+        ):
+            self._notify_services_changed()
 
     def _merge_service_info(
         self,
@@ -481,7 +508,10 @@ class ZeroconfOscQueryService(OscQueryServicePort):
             if service.query_port is None:
                 self._forget_service(service_id)
                 continue
-            if await self._resolve_host_info(service) is None:
+            try:
+                await self._resolve_host_info(service)
+            except Exception as exc:
+                self._observation_failure(exc, "host_info")
                 self._forget_service(service_id)
 
     def _forget_service(self, service_id: str) -> None:

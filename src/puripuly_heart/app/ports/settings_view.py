@@ -104,6 +104,7 @@ class ProviderSettingsSnapshot:
     peer_stt_provider: STTProviderName
     cloud_free_tier_providers: tuple[STTProviderName, ...]
     soniox_speaker_diarization_enabled: bool
+    scribe_speaker_diarization_enabled: bool
     llm_provider: LLMProviderName
     translation: TranslationSelectionSnapshot
     stt_gpu_device_id: str
@@ -369,6 +370,11 @@ class SonioxSpeakerDiarizationEdit:
 
 
 @dataclass(frozen=True, slots=True)
+class ScribeSpeakerDiarizationEdit:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PeerSttProviderEdit:
     provider: STTProviderName
 
@@ -448,6 +454,7 @@ ProviderSettingsEdit: TypeAlias = (
     SelfSttProviderEdit
     | CloudFreeTierProvidersEdit
     | SonioxSpeakerDiarizationEdit
+    | ScribeSpeakerDiarizationEdit
     | PeerSttProviderEdit
     | SttGpuDeviceEdit
     | LlmGpuDeviceEdit
@@ -493,6 +500,7 @@ __all__ = [
     "AudioSettingsIntent",
     "ChatboxSourceSettingsIntent",
     "CloudFreeTierProvidersEdit",
+    "ScribeSpeakerDiarizationEdit",
     "SonioxSpeakerDiarizationEdit",
     "ClipboardSettingsIntent",
     "CustomSttEndpointEdit",

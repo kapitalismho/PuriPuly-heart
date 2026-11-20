@@ -292,7 +292,7 @@ def log_qq_auth(
     )
     text = f"[QQAuth] {event} stage={stage} code={code} category={category}"
     text += "".join(f" {key}={value}" for key, value in sorted(metadata.items()))
-    from puripuly_heart.core.runtime_logging import emit_basic_log
+    from puripuly_heart.core.runtime.logging import emit_basic_log
 
     emit_basic_log(logger, text, level=level)
 

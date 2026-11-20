@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-import puripuly_heart.core.language as language_module
 from puripuly_heart.core.language import (
     SUPPORTED_LANGUAGES,
     get_all_language_options,
     get_deepgram_language,
     get_language_info,
     get_llm_language_name,
+    get_local_qwen_language_hint,
     get_qwen3_asr_language,
     get_soniox_language_hints,
     get_stt_compatibility_warning,
@@ -21,10 +21,24 @@ from puripuly_heart.core.language import (
 )
 
 
-def test_get_language_info_handles_exact_and_regional_codes() -> None:
-    assert get_language_info("ko").name == "Korean"
-    assert get_language_info("ko-KR").code == "ko"
-    assert get_language_info("zh-CN").name == "Chinese (Simplified)"
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("en", ("en", "English")),
+        ("ko", ("ko", "Korean")),
+        ("ko-KR", ("ko", "Korean")),
+        ("zh-CN", ("zh-CN", "Chinese (Simplified)")),
+    ],
+)
+def test_get_language_info_handles_exact_and_regional_codes(
+    code: str, expected: tuple[str, str]
+) -> None:
+    info = get_language_info(code)
+    assert info is not None
+    assert (info.code, info.name) == expected
+
+
+def test_get_language_info_rejects_unknown_code() -> None:
     assert get_language_info("xx") is None
 
 
@@ -133,13 +147,11 @@ def test_gemini_transcribe_hint_mapping_drops_unsupported_dedupes_and_limits() -
 
 
 def test_local_qwen_language_hint_normalization_is_conservative() -> None:
-    assert hasattr(language_module, "get_local_qwen_language_hint")
-
-    assert language_module.get_local_qwen_language_hint("ko-KR") == "ko"
-    assert language_module.get_local_qwen_language_hint("zh-TW") == "zh"
-    assert language_module.get_local_qwen_language_hint("en") == "en"
-    assert language_module.get_local_qwen_language_hint("ar") is None
-    assert language_module.get_local_qwen_language_hint("xx") is None
+    assert get_local_qwen_language_hint("ko-KR") == "ko"
+    assert get_local_qwen_language_hint("zh-TW") == "zh"
+    assert get_local_qwen_language_hint("en") == "en"
+    assert get_local_qwen_language_hint("ar") is None
+    assert get_local_qwen_language_hint("xx") is None
 
 
 def test_get_all_language_options_sorted_by_name() -> None:
@@ -185,11 +197,3 @@ def test_every_selectable_language_has_a_suggesting_stt_provider() -> None:
     ]
 
     assert uncovered == []
-
-
-@pytest.mark.parametrize("code", ["en", "ko", "zh-CN"])
-def test_get_language_info_returns_supported(code: str) -> None:
-    info = get_language_info(code)
-    assert info is not None
-    assert info.code
-    assert info.name

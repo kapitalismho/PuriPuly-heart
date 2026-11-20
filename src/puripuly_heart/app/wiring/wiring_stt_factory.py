@@ -275,7 +275,6 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         gemini_transcribe_model=intent.stt.gemini_transcribe.model,
         gemini_transcribe_language_codes=gemini_transcribe_language_hints,
         gemini_transcribe_auto_language=False,
-        elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
         elevenlabs_scribe_language_code=elevenlabs_scribe_language,
         elevenlabs_scribe_auto_language=False,
         qwen_region=intent.translation.qwen.region,
@@ -399,9 +398,11 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         gemini_transcribe_model=intent.stt.gemini_transcribe.model,
         gemini_transcribe_language_codes=gemini_transcribe_language_hints,
         gemini_transcribe_auto_language=automatic_gemini,
-        elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
         elevenlabs_scribe_language_code=elevenlabs_scribe_language,
         elevenlabs_scribe_auto_language=automatic_scribe,
+        elevenlabs_scribe_enable_speaker_diarization=(
+            intent.stt.elevenlabs_scribe.enable_speaker_diarization
+        ),
         qwen_region=intent.translation.qwen.region,
         qwen_connection=(
             resolve_alibaba_connection(
@@ -972,7 +973,6 @@ def _create_rolling_stt_backend(
     gemini_model = (
         str(config.provider_options.get("gemini_model") or "") or "gemini-3.5-transcribe-live"
     )
-    scribe_model = str(config.provider_options.get("scribe_model") or "") or "scribe_v2_realtime"
     deepgram_model = str(config.provider_options.get("deepgram_model") or "") or "nova-3"
     rolling_option_codes = config.provider_options.get("language_codes")
     if (
@@ -1034,7 +1034,6 @@ def _create_rolling_stt_backend(
 
         return ElevenLabsScribeSTTBackend(
             api_key=api_key,
-            model=scribe_model,
             language_code=scribe_language_code_value,
             keyterms=scribe_keyterms(keyterms),
         )
@@ -1208,10 +1207,10 @@ def create_stt_backend_from_resolved_config(
         )
         return ElevenLabsScribeSTTBackend(
             api_key=api_key,
-            model=config.model or "scribe_v2_realtime",
             language_code=language_code,
             keyterms=scribe_keyterms(keyterms),
             sample_rate_hz=config.sample_rate_hz,
+            diarize=config.provider_options.get("enable_speaker_diarization") is True,
         )
 
     if config.provider == STT_PROVIDER_QWEN_AUDIO:
@@ -1436,7 +1435,7 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         resolved.provider_options.get("keepalive_interval_s"),
         resolved.provider_options.get("trailing_silence_ms"),
         resolved.provider_options.get("enable_language_identification", False),
-        resolved.provider_options.get("enable_speaker_diarization", True),
+        resolved.provider_options.get("enable_speaker_diarization", False),
         resolved.provider_options.get("language_hints"),
         resolved.provider_options.get("language_codes"),
         resolved.provider_options.get("language_code"),

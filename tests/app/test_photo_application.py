@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from unittest.mock import AsyncMock
 
@@ -9,6 +10,7 @@ import pytest
 from puripuly_heart.app.services import photo_application
 from puripuly_heart.app.services.photo_application import PhotoApplicationOwner
 from puripuly_heart.core.photo.capture import PhotoCapture, PhotoCaptureWatcher
+from puripuly_heart.core.photo.directory_notifications import WindowsDirectoryNotifications
 from puripuly_heart.core.photo.image import PreparedPhoto
 from puripuly_heart.core.photo.lifecycle import PhotoRoute
 from puripuly_heart.core.photo.protocol import (
@@ -16,6 +18,8 @@ from puripuly_heart.core.photo.protocol import (
     PhotoStreamCompleted,
     PhotoTextDelta,
 )
+from tests.core.test_photo_capture import Notifications
+from tests.core.test_photo_native_process import png
 
 
 async def test_native_prepare_timings_keep_identity_and_ignore_invalid_values(
@@ -185,12 +189,199 @@ def make_owner(tmp_path, watcher, *, enabled=lambda: True, discard=None):
     return owner, resolve, observations
 
 
+@pytest.mark.parametrize(
+    "delivery",
+    [
+        "coalesced",
+        "rescan",
+        "separate",
+        "two-photos-retiring",
+        "two-photos-successor",
+        "late-retiring",
+        "photo-folder",
+        pytest.param(
+            "native",
+            marks=pytest.mark.skipif(os.name != "nt", reason="Requires Windows notifications"),
+        ),
+    ],
+)
+async def test_camera_log_rotation_offers_only_the_newest_fresh_photo(
+    tmp_path, monkeypatch, delivery
+):
+    photos = tmp_path / "photos"
+    logs = tmp_path / "logs"
+    photos.mkdir()
+    logs.mkdir()
+    retiring = logs / "output_log_a.txt"
+    successor = logs / "output_log_b.txt"
+    startup = tmp_path / "startup.png"
+    image = png(32, 32)
+
+    def set_later_mtime(path, earlier):
+        newer = earlier.stat().st_mtime_ns + 1_000_000_000
+        os.utime(path, ns=(newer, newer))
+
+    startup.write_bytes(image)
+    retiring.write_text(f"[VRC Camera] Took screenshot to: {startup}\n", encoding="utf-8")
+    if delivery == "native":
+        source = WindowsDirectoryNotifications()
+        drain = asyncio.Event()
+        wait_changes = source.wait_changes
+
+        async def wait_for_batch():
+            await drain.wait()
+            return await wait_changes()
+
+        def batch_ready():
+            with source._lock:
+                return retiring in source._paths and successor in source._paths
+
+        monkeypatch.setattr(source, "wait_changes", wait_for_batch)
+    else:
+        source = Notifications()
+    watcher = PhotoCaptureWatcher(photos, logs, notification_source=source)
+    owner, _, observations = make_owner(tmp_path, watcher)
+    offers = []
+    duplicate = asyncio.Event()
+
+    def record_offer():
+        offers.append(owner.lifecycle.snapshot["photo"])
+        if len(offers) > 1:
+            duplicate.set()
+
+    owner.supervisor.start.side_effect = record_offer
+    await owner.start()
+    try:
+        fresh = tmp_path / "fresh.png"
+        competing = (photos if delivery == "photo-folder" else tmp_path) / "competing.png"
+        if delivery == "two-photos-retiring":
+            competing.write_bytes(image)
+        if delivery == "late-retiring":
+            staged = tmp_path / "staged.png"
+            staged.write_bytes(image)
+            await asyncio.sleep(0.02)
+        else:
+            fresh.write_bytes(image)
+        if delivery == "two-photos-retiring":
+            set_later_mtime(fresh, competing)
+        with retiring.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {fresh}\n")
+        if delivery == "separate":
+            source.emit(retiring)
+            await eventually(lambda: offers)
+
+        successor_contents = "session started\n"
+        successor_wins = delivery in {"two-photos-successor", "late-retiring", "photo-folder"}
+        if successor_wins:
+            competing.write_bytes(image)
+            set_later_mtime(competing, staged if delivery == "late-retiring" else fresh)
+        if delivery.startswith("two-photos") or delivery == "late-retiring":
+            successor_contents += f"[VRC Camera] Took screenshot to: {competing}\n"
+        successor.write_text(successor_contents, encoding="utf-8")
+        set_later_mtime(successor, retiring)
+        if delivery == "native":
+            await eventually(batch_ready)
+            drain.set()
+        elif delivery == "rescan":
+            source.emit(rescan=True)
+        elif delivery == "separate":
+            source.emit(successor, created=(successor,))
+        elif delivery == "photo-folder":
+            source.emit(retiring, successor, competing, created=(successor, competing))
+        else:
+            source.emit(retiring, successor, created=(successor,))
+
+        await eventually(lambda: offers)
+        expected = competing if successor_wins else fresh
+        assert offers[0]["path"] == str(expected.resolve())
+        assert offers[0]["offer_open"]
+        assert owner.lifecycle.request_starts == 0
+
+        if delivery != "native":
+            if delivery == "late-retiring":
+                staged.rename(fresh)
+            with retiring.open("a", encoding="utf-8") as log:
+                log.write(f"[VRC Camera] Took screenshot to: {expected}\n")
+            set_later_mtime(retiring, successor)
+            source.waiting.clear()
+            source.emit(retiring, successor)
+            await eventually(source.waiting.is_set)
+            source.waiting.clear()
+            source.emit(rescan=True)
+            await eventually(source.waiting.is_set)
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(duplicate.wait(), 0.1)
+        assert not any(stage == "capture_unavailable" for stage, _ in observations)
+    finally:
+        await owner.close()
+
+
+async def test_delayed_retiring_photo_cannot_overwrite_newest_queued_offer(tmp_path):
+    photos = tmp_path / "photos"
+    logs = tmp_path / "logs"
+    photos.mkdir()
+    logs.mkdir()
+    retiring = logs / "output_log_a.txt"
+    successor = logs / "output_log_b.txt"
+    retiring.write_text("session started\n", encoding="utf-8")
+    source = Notifications()
+    watcher = PhotoCaptureWatcher(photos, logs, notification_source=source)
+    owner, resolve, _ = make_owner(tmp_path, watcher)
+    resolving = asyncio.Event()
+    resume = asyncio.Event()
+    offers = []
+    owner.supervisor.start.side_effect = lambda: offers.append(owner.lifecycle.snapshot["photo"])
+
+    async def resolve_when_resumed():
+        resolving.set()
+        await resume.wait()
+        return resolve.return_value
+
+    await owner.start()
+    try:
+        resolve.side_effect = resolve_when_resumed
+        image = png(32, 32)
+        previous = photos / "previous.png"
+        previous.write_bytes(image)
+        source.emit(previous, created=(previous,))
+        await eventually(resolving.is_set)
+
+        staged = tmp_path / "staged.png"
+        delayed = tmp_path / "delayed.png"
+        newest = tmp_path / "newest.png"
+        staged.write_bytes(image)
+        with retiring.open("a", encoding="utf-8") as log:
+            log.write(f"[VRC Camera] Took screenshot to: {delayed}\n")
+        await asyncio.sleep(0.02)
+        newest.write_bytes(image)
+        successor.write_text(f"[VRC Camera] Took screenshot to: {newest}\n", encoding="utf-8")
+        stamp = retiring.stat().st_mtime_ns + 1_000_000_000
+        os.utime(successor, ns=(stamp, stamp))
+        source.waiting.clear()
+        source.emit(retiring, successor, created=(successor,))
+        await eventually(source.waiting.is_set)
+        assert delayed in watcher._pending_paths
+
+        staged.rename(delayed)
+        await eventually(lambda: not watcher._pending_paths)
+        source.waiting.clear()
+        source.emit()
+        await eventually(source.waiting.is_set)
+        resume.set()
+
+        await eventually(lambda: len(offers) >= 2)
+        assert [offer["path"] for offer in offers] == [str(previous), str(newest)]
+        assert offers[-1]["offer_open"]
+    finally:
+        await owner.close()
+
+
 def captured(tmp_path, name="capture.png", *, observed=None):
     return PhotoCapture(
         tmp_path / name,
         7,
         (1, 2),
-        1234,
+        1_234_000_000,
         time.monotonic() if observed is None else observed,
     )
 
@@ -245,14 +436,17 @@ async def test_disabled_owner_never_observes_captures_and_resume_skips_disabled_
         assert owner.lifecycle.snapshot["photo"]["path"].endswith("enabled.png")
         state["enabled"] = False
         owner.notify_policy_changed()
-        assert owner._control(
-            {
-                "type": "photo_pull",
-                "photo_id": owner.lifecycle.snapshot["photo"]["photo_id"],
-                "event_id": "disabled-pull",
-            },
-            0,
-        ) is None
+        assert (
+            owner._control(
+                {
+                    "type": "photo_pull",
+                    "photo_id": owner.lifecycle.snapshot["photo"]["photo_id"],
+                    "event_id": "disabled-pull",
+                },
+                0,
+            )
+            is None
+        )
         assert not owner.lifecycle.snapshot["photo"]["visible"]
         await owner.wait_policy_applied()
         assert not watcher.active
@@ -318,9 +512,7 @@ async def test_idle_and_lifecycle_output_do_not_repeat_policy_or_request_work(tm
         await eventually(lambda: owner.supervisor.start.await_count == 1)
         photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
         assert owner.lifecycle.pull(photo_id, "pull")
-        await eventually(
-            lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed"
-        )
+        await eventually(lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed")
         resolutions = resolve.await_count
         starts = owner.lifecycle.request_starts
         native_starts = owner.supervisor.start.await_count
@@ -385,9 +577,7 @@ async def test_offer_expires_and_retention_cleans_up_without_policy_notification
         )
         photo_id = owner.lifecycle.snapshot["photo"]["photo_id"]
         assert owner.lifecycle.pull(photo_id, "translate")
-        await eventually(
-            lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed"
-        )
+        await eventually(lambda: owner.lifecycle.snapshot["photo"]["phase"] == "completed")
         retained = owner.lifecycle._current
         owner.lifecycle._clock = lambda: retained.capture.observed_monotonic + 599.9
         owner.lifecycle.hidden(photo_id)

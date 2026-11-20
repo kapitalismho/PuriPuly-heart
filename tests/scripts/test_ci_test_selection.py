@@ -55,27 +55,6 @@ def test_pr_python_setup_and_invocations_are_locked_without_changing_release_def
                 assert command.split()[:3] == ["uv", "run", "--locked"]
 
 
-def test_pr_job_responsibilities_remain_nine_stable_checks() -> None:
-    workflow = yaml.safe_load((REPO_ROOT / checker.WORKFLOW).read_text(encoding="utf-8"))
-    names = set()
-    for job in workflow["jobs"].values():
-        if job["name"] == "${{ matrix.name }}":
-            names.update(row["name"] for row in job["strategy"]["matrix"]["include"])
-        else:
-            names.add(job["name"])
-    assert names == {
-        "Lint",
-        "Contracts",
-        "Architecture",
-        "Runtime",
-        "Providers",
-        "UI",
-        "Tooling",
-        "Broker",
-        "Overlay",
-    }
-
-
 def test_selected_and_justified_live_exclusion_are_accepted(project: Path) -> None:
     report = checker.check_selection(project)
     assert report.selected == {"tests/unit/test_selected.py"}

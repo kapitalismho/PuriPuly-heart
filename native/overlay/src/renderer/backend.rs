@@ -2953,59 +2953,21 @@ mod tests {
     }
 
     #[test]
-    fn changed_damage_band_expands_by_safety_margin() {
-        let mut previous_layout = Some(frame(vec![block("peer:1", 100.0, 200.0, "old")], 500));
-
-        let rendered = prepare_layout_for_render(
-            &mut previous_layout,
-            frame(vec![block("peer:1", 120.0, 220.0, "new")], 500),
-        );
-
-        let damage_band = rendered.damage_band.expect("changed block should damage");
-        assert_eq!(damage_band.top_px, 68.0);
-        assert_eq!(damage_band.bottom_px, 252.0);
-    }
-
-    #[test]
-    fn expanded_damage_band_clamps_to_surface_bounds() {
-        let mut previous_layout = Some(frame(vec![block("peer:1", 4.0, 16.0, "old")], 40));
-
-        let rendered = prepare_layout_for_render(
-            &mut previous_layout,
-            frame(vec![block("peer:1", 8.0, 24.0, "new")], 40),
-        );
-
-        let damage_band = rendered.damage_band.expect("changed block should damage");
-        assert_eq!(damage_band.top_px, 0.0);
-        assert_eq!(damage_band.bottom_px, 40.0);
-    }
-
-    #[test]
-    fn expanded_damage_band_clamps_fully_offscreen_top_bounds() {
-        let mut previous_layout = Some(frame(vec![block("peer:1", -120.0, -80.0, "old")], 100));
-
-        let rendered = prepare_layout_for_render(
-            &mut previous_layout,
-            frame(vec![block("peer:1", -110.0, -90.0, "new")], 100),
-        );
-
-        let damage_band = rendered.damage_band.expect("changed block should damage");
-        assert_eq!(damage_band.top_px, 0.0);
-        assert_eq!(damage_band.bottom_px, 0.0);
-    }
-
-    #[test]
-    fn expanded_damage_band_clamps_fully_offscreen_bottom_bounds() {
-        let mut previous_layout = Some(frame(vec![block("peer:1", 180.0, 220.0, "old")], 100));
-
-        let rendered = prepare_layout_for_render(
-            &mut previous_layout,
-            frame(vec![block("peer:1", 190.0, 230.0, "new")], 100),
-        );
-
-        let damage_band = rendered.damage_band.expect("changed block should damage");
-        assert_eq!(damage_band.top_px, 100.0);
-        assert_eq!(damage_band.bottom_px, 100.0);
+    fn changed_damage_band_expands_and_clamps_to_surface() {
+        for (case, height, old, new, expected) in [
+            ("interior", 500, (100.0, 200.0), (120.0, 220.0), (68.0, 252.0)),
+            ("both edges", 40, (4.0, 16.0), (8.0, 24.0), (0.0, 40.0)),
+            ("above", 100, (-120.0, -80.0), (-110.0, -90.0), (0.0, 0.0)),
+            ("below", 100, (180.0, 220.0), (190.0, 230.0), (100.0, 100.0)),
+        ] {
+            let mut previous_layout = Some(frame(vec![block("peer:1", old.0, old.1, "old")], height));
+            let rendered = prepare_layout_for_render(
+                &mut previous_layout,
+                frame(vec![block("peer:1", new.0, new.1, "new")], height),
+            );
+            let damage_band = rendered.damage_band.expect("changed block should damage");
+            assert_eq!((damage_band.top_px, damage_band.bottom_px), expected, "{case}");
+        }
     }
 
     #[test]

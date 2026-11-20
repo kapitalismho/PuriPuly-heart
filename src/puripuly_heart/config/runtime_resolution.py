@@ -24,7 +24,10 @@ from puripuly_heart.config.llm_profiles import (
     normalize_legacy_openrouter_model,
     openrouter_alias_for_fields,
 )
-from puripuly_heart.config.provider_values import normalize_stt_provider
+from puripuly_heart.config.provider_values import (
+    ELEVENLABS_SCRIBE_STT_MODEL,
+    normalize_stt_provider,
+)
 from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_MANAGED,
     CREDENTIAL_SOURCE_NONE,
@@ -297,7 +300,6 @@ STT_DEFAULT_LOW_LATENCY_SPEC_RETRY_MAX: Final = 10
 DEEPGRAM_STT_MODEL_NOVA_3: Final = "nova-3"
 GEMINI_TRANSCRIBE_STT_MODEL: Final = "gemini-3.5-transcribe-live"
 GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS: Final = 1000
-ELEVENLABS_SCRIBE_STT_MODEL: Final = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS: Final = 50
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS: Final = 20
 QWEN_AUDIO_STT_MODEL: Final = "qwen-audio-3.1-asr-flash-streaming"
@@ -742,9 +744,9 @@ class STTRuntimeIntent:
     gemini_transcribe_model: str = GEMINI_TRANSCRIBE_STT_MODEL
     gemini_transcribe_language_codes: tuple[str, ...] | None = None
     gemini_transcribe_auto_language: bool = False
-    elevenlabs_scribe_model: str = ELEVENLABS_SCRIBE_STT_MODEL
     elevenlabs_scribe_language_code: str | None = None
     elevenlabs_scribe_auto_language: bool = False
+    elevenlabs_scribe_enable_speaker_diarization: bool = False
     qwen_region: str = QWEN_REGION_BEIJING
     qwen_connection: AlibabaConnection | None = None
     soniox_model: str = SONIOX_STT_MODEL_RT_V6
@@ -752,7 +754,7 @@ class STTRuntimeIntent:
     soniox_keepalive_interval_s: float = SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S
     soniox_trailing_silence_ms: int = SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS
     soniox_enable_language_identification: bool = False
-    soniox_enable_speaker_diarization: bool = True
+    soniox_enable_speaker_diarization: bool = False
     soniox_language_hints: tuple[str, ...] | None = None
     soniox_language_hints_strict: bool = False
     qwen_audio_language_hints: tuple[str, ...] | None = None
@@ -1287,7 +1289,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
         provider_options = {
             "mode": "rolling_free",
             "gemini_model": intent.gemini_transcribe_model,
-            "scribe_model": intent.elevenlabs_scribe_model,
+            "scribe_model": ELEVENLABS_SCRIBE_STT_MODEL,
             "deepgram_model": intent.deepgram_model,
             "language_codes": intent.gemini_transcribe_language_codes,
             "members": intent.rolling_members,
@@ -1321,7 +1323,7 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 "auto_language": False,
             }
     elif provider == STT_PROVIDER_ELEVENLABS_SCRIBE:
-        model = intent.elevenlabs_scribe_model
+        model = ELEVENLABS_SCRIBE_STT_MODEL
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE, CREDENTIAL_REF_ELEVENLABS_SCRIBE_STT
         )
@@ -1335,6 +1337,13 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 "language_code": intent.elevenlabs_scribe_language_code,
                 "auto_language": False,
             }
+        provider_options = {
+            **provider_options,
+            "enable_speaker_diarization": (
+                intent.channel == RUNTIME_CHANNEL_PEER
+                and intent.elevenlabs_scribe_enable_speaker_diarization
+            ),
+        }
     elif provider == STT_PROVIDER_QWEN_AUDIO:
         model = QWEN_AUDIO_STT_MODEL
         connection = _qwen_connection(intent.qwen_region, intent.qwen_connection)

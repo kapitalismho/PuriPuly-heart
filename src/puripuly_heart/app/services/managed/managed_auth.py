@@ -80,6 +80,20 @@ QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY = {
 }
 
 
+MANAGED_TRIAL_STATES = frozenset(
+    {
+        "not_claimed",
+        "blocked_by_other_sign_in",
+        "sign_in_pending",
+        "active",
+        "exhausted",
+        "claimed",
+        "claimed_without_key",
+        "unknown",
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ManagedAuthState:
     settings_available: bool
@@ -89,6 +103,7 @@ class ManagedAuthState:
     release_service_available: bool
     runtime_available: bool
     ingress_frozen: bool
+    trial: str = "unknown"
 
 
 @dataclass(frozen=True, slots=True)

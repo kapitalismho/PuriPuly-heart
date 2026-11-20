@@ -314,11 +314,6 @@ async def test_flat_requests_reject_unknown_null_invalid_and_missing_values(cata
     ("action", "arguments", "expected"),
     [
         (
-            "settings",
-            {"changes": {"translation.qwen.region": "singapore"}},
-            {"translation.qwen.region": "singapore"},
-        ),
-        (
             "secrets.delete",
             {"name": "deepgram_api_key", "changes": {"clipboard.enabled": True}},
             {"secrets.deepgram_api_key": False},

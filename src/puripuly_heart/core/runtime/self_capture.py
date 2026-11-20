@@ -29,7 +29,10 @@ from puripuly_heart.core.diagnostics import (
     exception_diagnostics,
 )
 from puripuly_heart.core.error_messages import stt_failure_report
-from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
+    ProviderRuntimeAttachment,
+    ProviderRuntimeBuildRequest,
+)
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
@@ -586,6 +589,7 @@ class SelfCaptureSessionOwner:
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
+        self._provider_activation: object | None = None
         self._pending_provider_recoveries: dict[
             SelfCaptureTerminalFailureHandler,
             tuple[tuple[object, ...], object, Exception | None],
@@ -699,12 +703,7 @@ class SelfCaptureSessionOwner:
         return (
             self.is_current_generation(stream.activation_generation)
             and self._current_stream_capture_epoch == stream.capture_epoch
-            and stream.settings_scope
-            == (
-                settings.provider_id,
-                settings.provider_signature,
-                settings.runtime_signature,
-            )
+            and stream.settings_scope == settings.recognition_scope
         )
 
     def invalidate_intent(self) -> SelfCaptureSessionSnapshot:
@@ -1001,10 +1000,7 @@ class SelfCaptureSessionOwner:
                     result = await self._provider.replace(
                         self._provider_build_request(config, False, generation),
                         start=False,
-                        on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
-                            exc,
-                            attachment_token=attachment_token,
-                        ),
+                        on_terminal_failure=self._provider_failure_handler(attachment_token),
                     )
                 except asyncio.CancelledError:
                     raise
@@ -1099,12 +1095,7 @@ class SelfCaptureSessionOwner:
             raise RuntimeError("SelfCaptureSessionOwner is closed")
         attachment_token = object()
 
-        async def on_terminal_failure(exc: Exception) -> None:
-            await self._on_terminal_provider_failure(
-                exc,
-                attachment_token=attachment_token,
-            )
-
+        on_terminal_failure = self._provider_failure_handler(attachment_token)
         self._pending_provider_recoveries[on_terminal_failure] = (
             config.provider_signature,
             attachment_token,
@@ -1316,10 +1307,7 @@ class SelfCaptureSessionOwner:
                         config, config.local_cpu or config.local_gpu, generation
                     ),
                     start=False,
-                    on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
-                        exc,
-                        attachment_token=attachment_token,
-                    ),
+                    on_terminal_failure=self._provider_failure_handler(attachment_token),
                 )
             except asyncio.CancelledError:
                 raise
@@ -1466,10 +1454,7 @@ class SelfCaptureSessionOwner:
             result = await self._provider.handoff(
                 self._provider_build_request(config, True, generation),
                 start=True,
-                on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
-                    exc,
-                    attachment_token=attachment_token,
-                ),
+                on_terminal_failure=self._provider_failure_handler(attachment_token),
             )
             result_status = result.status
         except asyncio.CancelledError:
@@ -1497,6 +1482,7 @@ class SelfCaptureSessionOwner:
             return
         if result_status is SelfCaptureProviderMutationStatus.APPLIED:
             self._config = config
+            self._commit_provider_attachment(attachment_token)
             dispatch = self._vad_dispatch
             if dispatch is not None:
                 dispatch.ledger.rebind(
@@ -1505,7 +1491,6 @@ class SelfCaptureSessionOwner:
                 )
             self._reconfigure_vad(config)
             self._provider_signature = config.provider_signature
-            self._commit_provider_attachment(attachment_token)
             self._provider_status = SelfCaptureProviderStatus.READY
             self._failure_reason = None
             self._emit(SelfCaptureDiagnosticEvent.PROVIDER_CHANGED, generation=generation)
@@ -1643,6 +1628,12 @@ class SelfCaptureSessionOwner:
             )
         else:
             self._primary_failure = (self._generation, diagnostics)
+
+    def _provider_failure_handler(self, attachment_token: object) -> ProviderRuntimeAttachment:
+        return ProviderRuntimeAttachment(
+            attachment_token,
+            lambda exc: self._on_terminal_provider_failure(exc, attachment_token=attachment_token),
+        )
 
     async def _on_terminal_provider_failure(
         self,
@@ -1887,6 +1878,7 @@ class SelfCaptureSessionOwner:
                 self._provider_status = SelfCaptureProviderStatus.DETACHED
                 self._retire_provider_attachment()
                 if release_mode == "abort":
+                    self._provider_activation = None
                     self._provider_signature = None
         if not preserve_intent:
             self._desired_active = False
@@ -1911,8 +1903,7 @@ class SelfCaptureSessionOwner:
         self._emit(SelfCaptureDiagnosticEvent.SESSION_CHANGED, generation=generation)
         self._notify_state_changed()
 
-    @staticmethod
-    def _segment_settings(config: SelfCaptureSessionConfig) -> AudioSegmentSettingsSnapshot:
+    def _segment_settings(self, config: SelfCaptureSessionConfig) -> AudioSegmentSettingsSnapshot:
         return AudioSegmentSettingsSnapshot(
             provider_id=config.provider_id,
             provider_signature=config.provider_signature,
@@ -1925,6 +1916,7 @@ class SelfCaptureSessionOwner:
             vad_exit_threshold=vad_exit_threshold(config.vad_speech_threshold),
             vad_hangover_ms=config.vad_hangover_ms,
             vad_pre_roll_ms=config.ring_buffer_ms,
+            provider_activation=self._provider_activation,
         )
 
     async def _release_provider(
@@ -1943,6 +1935,7 @@ class SelfCaptureSessionOwner:
             self._provider_status = SelfCaptureProviderStatus.DETACHED
             self._retire_provider_attachment()
             if mode == "abort":
+                self._provider_activation = None
                 self._provider_signature = None
 
     def _commit_provider_attachment(
@@ -1952,6 +1945,8 @@ class SelfCaptureSessionOwner:
         recovery_handler: SelfCaptureTerminalFailureHandler | None = None,
     ) -> None:
         self._provider_attachment_token = attachment_token
+        if attachment_token is not None:
+            self._provider_activation = attachment_token
         if recovery_handler is None:
             self._pending_provider_recoveries.clear()
         else:

@@ -311,7 +311,7 @@ def test_settings_modal_multi_select_toggles_without_closing() -> None:
         title="Cloud Free Tier",
         options=[
             OptionItem(value="gemini_transcribe", label="Gemini 3.5 Transcribe"),
-            OptionItem(value="elevenlabs_scribe", label="ElevenLabs Scribe v2"),
+            OptionItem(value="elevenlabs_scribe", label="ElevenLabs Scribe"),
             OptionItem(value="deepgram", label="Deepgram"),
         ],
         on_select=lambda _value: None,
@@ -1043,12 +1043,3 @@ async def _record_async_call(
     value: str | None = None,
 ) -> None:
     calls.append((action, value))
-
-
-@pytest.mark.asyncio
-async def test_peer_chatbox_deny_still_holds() -> None:
-    from tests.core.test_peer_channel_routing import (
-        test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sent_to_chatbox,
-    )
-
-    await test_peer_desktop_transcripts_are_routed_to_peer_runtime_and_never_sent_to_chatbox()

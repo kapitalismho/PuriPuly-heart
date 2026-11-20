@@ -473,11 +473,8 @@ async def owner_smoke(channel, monkeypatch):
         else:
             ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("soniox"))
             controls = harness.self_owner.handle_vad_event
-        engine.accepted_settings_scope = (
-            ledger.settings.provider_id,
-            ledger.settings.provider_signature,
-            ledger.settings.runtime_signature,
-        )
+        engine.accepted_settings_scope = ledger.settings.provider_configuration_scope
+        engine.provider_activation = ledger.settings.provider_activation
 
         async def observe(event):
             if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):

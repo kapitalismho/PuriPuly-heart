@@ -237,6 +237,65 @@ async def test_photo_settings_change_through_the_normal_approval_card(catalog):
 
 
 @pytest.mark.asyncio
+async def test_settings_proposal_ignores_a_report_summary(catalog):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        proposed = await tools.execute(
+            "manage_proposal",
+            {
+                "action": "settings",
+                "changes": {"photo.route": "gemini"},
+                "summary": "Synthetic model-written summary",
+            },
+        )
+        assert proposed["status"] == "needs_confirmation"
+        assert "Synthetic model-written summary" not in json.dumps(proposed)
+        assert "Synthetic model-written summary" not in json.dumps(tools.confirmation_display)
+        await tools.confirm(proposed["confirmation"]["id"], True)
+        assert control.submissions[0]["changes"] == {"photo.route": "gemini"}
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("arguments", "explanation"),
+    [
+        (
+            {"action": "settings", "changes": {"languages.source": "en"}},
+            "nest it as changes.languages: {source: ...}",
+        ),
+        (
+            {"action": "settings", "changes": {"photo.route": "gemini"}, "provider": "discord"},
+            "remove provider",
+        ),
+        (
+            {"action": "settings", "changes": {"languages": {"source": None}}},
+            "omit changes.languages.source instead of sending null",
+        ),
+        (
+            {"action": "settings", "changes": {"photo.route": "openai-api"}},
+            "changes.photo.route has an unsupported value",
+        ),
+        ({"action": "report"}, "add summary"),
+    ],
+)
+async def test_rejected_proposal_names_what_to_fix(catalog, arguments, explanation):
+    control = Control(catalog)
+    tools, _actions, _events = adapter(control)
+    try:
+        rejected = await tools.execute("manage_proposal", arguments)
+        assert rejected["status"] == "rejected"
+        assert rejected["error"]["code"] == "invalid_arguments"
+        assert explanation in rejected["error"]["explanation"]
+        assert tools.confirmation is None
+        assert not control.submissions
+    finally:
+        await tools.close()
+
+
+@pytest.mark.asyncio
 async def test_actual_receipt_approved_revert_and_following_navigation(catalog):
     control = Control(catalog)
     tools, actions, events = adapter(control)
@@ -1305,7 +1364,7 @@ async def test_composed_agent_retry_preserves_unsupported_mode_and_destinations(
 
 
 @pytest.mark.asyncio
-async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp_target(
+async def test_composed_agent_retry_applies_local_target_and_retains_failed_candidate(
     composed_osc_agent, monkeypatch
 ):
     from pythonosc.osc_message import OscMessage
@@ -1322,7 +1381,7 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
     receiver.setblocking(False)
     target_port = receiver.getsockname()[1]
 
-    async def http_request(reader, writer):
+    async def http_request(reader, writer, *, fail=False):
         task = asyncio.current_task()
         handlers.add(task)
         try:
@@ -1330,15 +1389,19 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
             target = request.split(b" ", 2)[1]
             requests.append(target)
             if target == b"/?HOST_INFO":
-                entered.set()
-                await release.wait()
-                payload = {"OSC_IP": "127.0.0.1", "OSC_PORT": target_port}
+                if fail:
+                    payload = {}
+                else:
+                    entered.set()
+                    await release.wait()
+                    payload = {"OSC_IP": "127.0.0.1", "OSC_PORT": target_port}
             else:
                 assert target == b"/avatar"
                 payload = {}
             body = json.dumps(payload).encode("utf-8")
             writer.write(
-                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                (b"HTTP/1.1 503 Service Unavailable" if fail else b"HTTP/1.1 200 OK")
+                + b"\r\nContent-Type: application/json\r\nContent-Length: "
                 + str(len(body)).encode("ascii")
                 + b"\r\nConnection: close\r\n\r\n"
                 + body
@@ -1350,15 +1413,31 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
             handlers.discard(task)
 
     server = await asyncio.start_server(http_request, "127.0.0.1", 0)
-    discovery = ZeroconfOscQueryService()
+    failed_server = await asyncio.start_server(
+        lambda reader, writer: http_request(reader, writer, fail=True), "127.0.0.1", 0
+    )
+
+    class LocalDiscovery(ZeroconfOscQueryService):
+        async def start(self, services_changed=None):
+            self.started = True
+
+        async def advertise_receiver(self, advertisement):
+            self.advertisement = advertisement
+
+    discovery = LocalDiscovery()
+    discovery._services["a-failed-VRChat"] = OscQueryServiceInfo(
+        service_id="a-failed-VRChat",
+        host="127.0.0.1",
+        query_port=failed_server.sockets[0].getsockname()[1],
+        is_vrchat=True,
+    )
     discovery._services["controlled-VRChat"] = OscQueryServiceInfo(
         service_id="controlled-VRChat",
         host="127.0.0.1",
         query_port=server.sockets[0].getsockname()[1],
         is_vrchat=True,
     )
-    monkeypatch.setattr(fixture.service, "discover_vrchat", discovery.discover_vrchat)
-    monkeypatch.setattr(fixture.service, "query_avatar", discovery.query_avatar)
+    monkeypatch.setattr(fixture.owner.query_runtime, "service", discovery)
 
     class IsolatedUdpSender(VrchatOscUdpSender):
         def set_destination(self, host, port):
@@ -1386,7 +1465,17 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
         assert result["receipt"]["output"]["remote_delivery"] == "unacknowledged"
         assert sender.host == "127.0.0.1" and sender.port == target_port
         assert fixture.owner.output_snapshot()["effective_send_port"] == target_port
-        assert b"/?HOST_INFO" in requests
+        assert requests[:2] == [b"/?HOST_INFO", b"/?HOST_INFO"]
+        output = (await fixture.app.control().query("osc.status", {}))["output"]
+        failure = output["discovery_diagnostics"]
+        assert failure["status_code"] == 503
+        history = await fixture.app.control().query(
+            "diagnostics.history", {"operation_id": result["receipt"]["operation_id"]}
+        )
+        (record,) = [item for item in history["records"] if item["operation"] == "host_info"]
+        assert record["diagnostic_id"] == failure["diagnostic_id"]
+        assert record["severity"] == "info"
+        assert record["disposition"] == "recovered"
         sender.send_message("/diagnostics/synthetic_route", 332)
         packet, _address = await asyncio.wait_for(
             asyncio.get_running_loop().sock_recvfrom(receiver, 4096), 1
@@ -1402,6 +1491,8 @@ async def test_composed_agent_retry_resolves_local_host_info_before_applying_udp
         await asyncio.gather(task, return_exceptions=True)
         server.close()
         await server.wait_closed()
+        failed_server.close()
+        await failed_server.wait_closed()
         if handlers:
             await asyncio.gather(*tuple(handlers))
         sender.close()

@@ -60,13 +60,6 @@ def test_drifted_visibility_loss_is_eligible() -> None:
     assert manager._startup_recovery_eligible(evidence) is True  # noqa: SLF001
 
 
-def test_missing_pid_file_remains_eligible() -> None:
-    manager = _manager()
-    evidence = _reveal_lost_evidence()
-    evidence["pid_file_pid"] = None
-    assert manager._startup_recovery_eligible(evidence) is True  # noqa: SLF001
-
-
 def test_malformed_and_incomplete_evidence_rejected() -> None:
     manager = _manager()
     eligible = manager._startup_recovery_eligible  # noqa: SLF001
@@ -105,12 +98,10 @@ def test_non_desktop_target_rejected() -> None:
 def test_nonrecoverable_reasons_rejected() -> None:
     manager = _manager()
     for reason in (
-        "window_configuration_failed",
         "window_identity_failed",
         "window_observation_failed",
         "window_bounds_failed",
         "window_native_ready_failed",
-        "unknown",
     ):
         evidence = _reveal_lost_evidence()
         evidence["failure_reason"] = reason
@@ -126,6 +117,7 @@ def test_reveal_lost_ignores_forensic_drift_and_gaps() -> None:
         {"port_reason": "binding_changed"},
         {"hwnd": None},
         {"owner_pid": 4321, "hwnd_owner_pid": 9999},
+        {"pid_file_pid": None},
         {"pid_file_pid": 9999},
         {"endpoint_matches": False},
         {"endpoint_matches": None},

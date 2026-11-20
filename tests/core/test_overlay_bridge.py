@@ -847,6 +847,62 @@ async def test_overlay_bridge_revalidates_successor_age_after_stalled_send() -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("source_closed", [False, True])
+async def test_delayed_renderer_replays_long_self_caption_only_while_unexpired(
+    source_closed: bool,
+) -> None:
+    clock = FakeClock()
+    bridge = OverlayBridge(
+        session_token="expected-token", overlay_instance_id="overlay-test", clock=clock
+    )
+    expiry_waiting = asyncio.Event()
+
+    async def hold_timer(_delay: float) -> None:
+        expiry_waiting.set()
+        await asyncio.Future()
+
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, bridge=bridge, sleep=hold_timer
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    uid = uuid4()
+
+    async def publish(revision: int, *, closed: bool) -> None:
+        receipt = await presenter.emit(
+            adapter.self_active_update(
+                utterance_id=uid,
+                occupant_key=f"self:{uid}",
+                text="A complete sentence.",
+                secondary_text="A translation.",
+                caption_source_closed=closed,
+                caption_complete=False,
+                caption_revision=revision,
+            )
+        )
+        assert receipt.outcome == "applied"
+        assert [block.id for block in presenter.snapshot().blocks] == [f"self:{uid}"]
+
+    await bridge.start()
+    try:
+        await publish(1, closed=False)
+        clock.advance(9)
+        if source_closed:
+            await publish(2, closed=True)
+            await asyncio.wait_for(expiry_waiting.wait(), timeout=1.0)
+        clock.advance(9)
+        async with connect(bridge.url, ping_interval=None, compression=None) as ws:
+            await ws.send(_native_auth())
+            message = json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0))
+            assert message["type"] == "snapshot"
+            assert [block["primary_text"] for block in message["payload"]["blocks"]] == (
+                [] if source_closed else ["A complete sentence."]
+            )
+    finally:
+        await presenter.close()
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("expired", [False, True])
 async def test_overlay_bridge_delayed_authentication_replays_only_latest_valid_scene(
     expired: bool,

@@ -54,6 +54,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenBeijingApiHostEdit,
     QwenRegionEdit,
     QwenSingaporeApiHostEdit,
+    ScribeSpeakerDiarizationEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SonioxSpeakerDiarizationEdit,
@@ -69,6 +70,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import canonical
 from puripuly_heart.app.services.capture.peer_capture_target_application import (
     PeerCaptureTargetUnavailable,
 )
+from puripuly_heart.app.services.managed.managed_auth import MANAGED_TRIAL_STATES
 from puripuly_heart.app.services.recognition_probe import (
     RECOGNITION_PROBE_METADATA,
     run_recognition_probe,
@@ -116,7 +118,6 @@ from puripuly_heart.core.messages import (
 )
 
 if TYPE_CHECKING:
-    from puripuly_heart.app.ports.ui_application import TranslationEnablePreparation
     from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 
 TERMINAL = frozenset(
@@ -297,6 +298,7 @@ PROVIDER_EDITS = {
     "stt.custom.endpoint": CustomSttEndpointEdit,
     "stt.custom.model": CustomSttModelEdit,
     "stt.custom.extra_json": CustomSttExtraEdit,
+    "stt.elevenlabs_scribe.enable_speaker_diarization": ScribeSpeakerDiarizationEdit,
     "stt.soniox.enable_speaker_diarization": SonioxSpeakerDiarizationEdit,
     "prompts.system_prompt_override": SystemPromptEdit,
 }
@@ -334,6 +336,7 @@ BOOLEAN_FIELDS = frozenset(
         "overlay.translation.enabled",
         "overlay.peer_original.enabled",
         "overlay.swap_caption_languages",
+        "stt.elevenlabs_scribe.enable_speaker_diarization",
         "stt.soniox.enable_speaker_diarization",
         "telemetry.enabled",
     }
@@ -480,6 +483,8 @@ def _accounts_status(application: object, retain: Callable[..., dict]) -> dict:
             }
             provider = source.get("provider")
             managed["provider"] = provider if provider in ("qq", "discord") else None
+            trial = source.get("trial")
+            managed["trial"] = trial if trial in MANAGED_TRIAL_STATES else "unknown"
             budget = source.get("budget")
             budget = budget if isinstance(budget, Mapping) else {}
             availability = budget.get("availability")
@@ -704,7 +709,6 @@ class ApplicationControlOwner:
     localize: Callable[[str], str]
     gemma_selection: Callable[[AppSettingsVNext], ManagedGemmaTranslationSelection]
     instance_id: str | None = None
-    selection_committed: Callable[[AppSettingsVNext], None] | None = None
     recognition_probe_request: (
         Callable[[AppSettingsVNext, str], ProviderRuntimeBuildRequest] | None
     ) = None
@@ -904,8 +908,6 @@ class ApplicationControlOwner:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     def _publish_committed(self, canonical: object) -> None:
-        if self.selection_committed is not None:
-            self.selection_committed(canonical)
         fingerprint = hashlib.sha256(
             json.dumps(canonical_snapshot_values(canonical), sort_keys=True, default=str).encode()
         ).hexdigest()
@@ -2065,17 +2067,6 @@ class ApplicationControlOwner:
         data["secondary_truncated"] = data["secondary_omitted_count"] > 0
         return data
 
-    def _fail_translation_preparation(self, operation: _Operation) -> None:
-        if not self._open or operation.interrupt_requested:
-            raise asyncio.CancelledError
-        state = self.application.state()
-        operation.receipt.update(
-            status="degraded",
-            reason="translation_preparation_failed",
-            translation_enabled=state.translation_enabled,
-            runtime_ready=state.translation_runtime_ready,
-        )
-
     async def _execute_owned(
         self, command: str, arguments: dict, expected_revision: int | None, operation_id: str
     ) -> None:
@@ -2087,20 +2078,6 @@ class ApplicationControlOwner:
             if operation.interrupt_requested:
                 raise asyncio.CancelledError
             operation.receipt["status"] = "running"
-            translation_enable = (
-                command == "translation.set"
-                and len(arguments) == 1
-                and arguments.get("enabled") is True
-            )
-            preparation = None
-            if translation_enable:
-                if not self._open:
-                    raise asyncio.CancelledError
-                preparation = await self.application.prepare_translation_enable()
-                if preparation is not None and not preparation.ready:
-                    self._fail_translation_preparation(operation)
-                    completed = True
-                    return
             changes = arguments.get("changes", arguments) if command == "settings.apply" else None
             safe_capture_off = command == "capture.set" and arguments.get("enabled") is False
             safe_locale = (
@@ -2131,160 +2108,114 @@ class ApplicationControlOwner:
                 acquired = True
             with self.results.capture(revision=self._current_revision) as captured:
                 deferred = None
-                while True:
-                    refresh_preparation = False
-                    mutation_lock = (
-                        self.runtime_toggle_lock(operation.runtime_toggle)
-                        if operation.runtime_toggle is not None
-                        else asyncio.Lock() if independent_stop else self._lock
-                    )
-                    async with mutation_lock:
-                        if not self._open and command != "app.stop":
-                            raise asyncio.CancelledError
-                        if not independent_stop and operation.runtime_toggle is None:
-                            self._lock_owner = asyncio.current_task()
-                        revision = self._current_revision()
-                        if expected_revision is not None and expected_revision != revision:
-                            operation.receipt.update(
-                                status="rejected",
-                                error={"code": "revision_conflict", "current_revision": revision},
-                            )
-                        elif operation.runtime_toggle is not None and (
-                            not self.runtime_toggle_is_current(operation.runtime_toggle)
-                        ):
-                            raise asyncio.CancelledError
-                        elif translation_enable and (
-                            self.application.translation_preparation_needs_refresh(preparation)
-                        ):
-                            refresh_preparation = True
-                        elif command == "models.install":
-                            _validate_command_args(
-                                command, arguments, locale_choices=self.locale_choices
-                            )
-                            if self.provisioning() is None:
-                                result = {
-                                    "status": "failed",
-                                    "error": {"code": "model_owner_unavailable"},
-                                }
-                            else:
-                                deferred = (
-                                    "install",
-                                    self._start_model_install(arguments, operation_id),
-                                )
-                        elif command == "audio.diagnose":
-                            _validate_command_args(
-                                command, arguments, locale_choices=self.locale_choices
-                            )
-                            deferred = ("audio_diagnose", None)
-                        elif command == "translation.probe":
-                            _validate_command_args(
-                                command, arguments, locale_choices=self.locale_choices
-                            )
-                            channel = arguments.get("channel", "self")
-                            configuration = getattr(
-                                self.pipeline, "translation_runtime_configuration", None
-                            )
-                            if configuration is not None:
-                                languages = configuration.snapshot().value
-                                if channel == "peer":
-                                    source_language = (
-                                        languages.peer_source_language or languages.source_language
-                                    )
-                                    target_languages = (
-                                        languages.peer_target_language or languages.target_language,
-                                    )
-                                else:
-                                    source_language = languages.source_language
-                                    target_languages = languages.self_target_languages
-                            else:
-                                canonical = self.application.compatibility_settings()
-                                languages = canonical.intent.languages if canonical else None
-                                if channel == "peer":
-                                    source_language = (
-                                        languages.effective_peer_source if languages else None
-                                    )
-                                    target_languages = (
-                                        (languages.effective_peer_target,) if languages else ()
-                                    )
-                                else:
-                                    source_language = (
-                                        languages.source_language if languages else None
-                                    )
-                                    target_languages = (
-                                        tuple(
-                                            language
-                                            for language in (
-                                                languages.target_language,
-                                                languages.secondary_target_language,
-                                            )
-                                            if language
-                                        )
-                                        if languages
-                                        else ()
-                                    )
-                            operation.receipt.update(
-                                translation_probe_direction(source_language, target_languages)
-                            )
-                            deferred = ("probe", (source_language, target_languages, channel))
-                        elif command == "recognition.probe":
-                            _validate_command_args(
-                                command, arguments, locale_choices=self.locale_choices
-                            )
-                            deferred = ("recognition_probe", arguments["channel"])
-                        elif command == "text.submit":
-                            _validate_command_args(
-                                command, arguments, locale_choices=self.locale_choices
-                            )
-                            if (
-                                not isinstance(arguments["text"], str)
-                                or not arguments["text"].strip()
-                            ):
-                                raise InvalidArgumentsError("text must be non-empty")
-                            deferred = ("text", arguments["text"])
-                        elif operation.runtime_toggle is not None:
-                            result = await self.run_runtime_toggle(
-                                operation.runtime_toggle,
-                                lambda: (
-                                    self._dispatch(
-                                        command,
-                                        arguments,
-                                        operation_id=operation_id,
-                                        translation_preparation=preparation,
-                                    )
-                                    if preparation is not None
-                                    else self._dispatch(
-                                        command, arguments, operation_id=operation_id
-                                    )
-                                ),
-                            )
-                        elif preparation is not None:
-                            result = await self._dispatch(
-                                command,
-                                arguments,
-                                operation_id=operation_id,
-                                translation_preparation=preparation,
-                            )
+                mutation_lock = (
+                    self.runtime_toggle_lock(operation.runtime_toggle)
+                    if operation.runtime_toggle is not None
+                    else asyncio.Lock() if independent_stop else self._lock
+                )
+                async with mutation_lock:
+                    if not self._open and command != "app.stop":
+                        raise asyncio.CancelledError
+                    if not independent_stop and operation.runtime_toggle is None:
+                        self._lock_owner = asyncio.current_task()
+                    revision = self._current_revision()
+                    if expected_revision is not None and expected_revision != revision:
+                        operation.receipt.update(
+                            status="rejected",
+                            error={"code": "revision_conflict", "current_revision": revision},
+                        )
+                    elif operation.runtime_toggle is not None and (
+                        not self.runtime_toggle_is_current(operation.runtime_toggle)
+                    ):
+                        raise asyncio.CancelledError
+                    elif command == "models.install":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        if self.provisioning() is None:
+                            result = {
+                                "status": "failed",
+                                "error": {"code": "model_owner_unavailable"},
+                            }
                         else:
-                            result = await self._dispatch(
-                                command, arguments, operation_id=operation_id
+                            deferred = (
+                                "install",
+                                self._start_model_install(arguments, operation_id),
                             )
-                        if self._lock_owner is asyncio.current_task():
-                            self._lock_owner = None
-                    if not refresh_preparation:
-                        break
-                    if acquired:
-                        resource_lock.release()
-                        acquired = False
-                    preparation = await self.application.prepare_translation_enable(
-                        preparation.intent_revision if preparation is not None else None
-                    )
-                    if preparation is not None and not preparation.ready:
-                        self._fail_translation_preparation(operation)
-                        completed = True
-                        return
-                    if resource_lock is not None:
-                        await resource_lock.acquire()
-                        acquired = True
+                    elif command == "audio.diagnose":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        deferred = ("audio_diagnose", None)
+                    elif command == "translation.probe":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        channel = arguments.get("channel", "self")
+                        configuration = getattr(
+                            self.pipeline, "translation_runtime_configuration", None
+                        )
+                        if configuration is not None:
+                            languages = configuration.snapshot().value
+                            if channel == "peer":
+                                source_language = (
+                                    languages.peer_source_language or languages.source_language
+                                )
+                                target_languages = (
+                                    languages.peer_target_language or languages.target_language,
+                                )
+                            else:
+                                source_language = languages.source_language
+                                target_languages = languages.self_target_languages
+                        else:
+                            canonical = self.application.compatibility_settings()
+                            languages = canonical.intent.languages if canonical else None
+                            if channel == "peer":
+                                source_language = (
+                                    languages.effective_peer_source if languages else None
+                                )
+                                target_languages = (
+                                    (languages.effective_peer_target,) if languages else ()
+                                )
+                            else:
+                                source_language = languages.source_language if languages else None
+                                target_languages = (
+                                    tuple(
+                                        language
+                                        for language in (
+                                            languages.target_language,
+                                            languages.secondary_target_language,
+                                        )
+                                        if language
+                                    )
+                                    if languages
+                                    else ()
+                                )
+                        operation.receipt.update(
+                            translation_probe_direction(source_language, target_languages)
+                        )
+                        deferred = ("probe", (source_language, target_languages, channel))
+                    elif command == "recognition.probe":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        deferred = ("recognition_probe", arguments["channel"])
+                    elif command == "text.submit":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        if not isinstance(arguments["text"], str) or not arguments["text"].strip():
+                            raise InvalidArgumentsError("text must be non-empty")
+                        deferred = ("text", arguments["text"])
+                    elif operation.runtime_toggle is not None:
+                        result = await self.run_runtime_toggle(
+                            operation.runtime_toggle,
+                            lambda: self._dispatch(command, arguments, operation_id=operation_id),
+                        )
+                    else:
+                        result = await self._dispatch(command, arguments, operation_id=operation_id)
+                    if self._lock_owner is asyncio.current_task():
+                        self._lock_owner = None
                 if operation.receipt["status"] != "rejected":
                     if deferred is not None:
                         if not self._open:
@@ -2363,14 +2294,16 @@ class ApplicationControlOwner:
                     if isinstance(result, dict):
                         result = _json(
                             result,
-                            diagnostic_projector=lambda diagnostic, disposition: self._retain_diagnostic(
-                                replace(
-                                    diagnostic,
-                                    operation_id=diagnostic.operation_id or operation_id,
-                                    request_id=diagnostic.request_id
-                                    or operation.receipt["request_id"],
-                                ),
-                                disposition=disposition,
+                            diagnostic_projector=lambda diagnostic, disposition: (
+                                self._retain_diagnostic(
+                                    replace(
+                                        diagnostic,
+                                        operation_id=diagnostic.operation_id or operation_id,
+                                        request_id=diagnostic.request_id
+                                        or operation.receipt["request_id"],
+                                    ),
+                                    disposition=disposition,
+                                )
                             ),
                             diagnostic_disposition=(
                                 status
@@ -2656,7 +2589,6 @@ class ApplicationControlOwner:
         args: dict,
         *,
         operation_id: str,
-        translation_preparation: TranslationEnablePreparation | None = None,
     ) -> object:
         app = self.application
         _validate_command_args(command, args, locale_choices=self.locale_choices)
@@ -2742,12 +2674,7 @@ class ApplicationControlOwner:
                     continue
         if command == "translation.set":
             enabled = _boolean(args, "enabled")
-            if translation_preparation is None:
-                await app.set_translation_enabled(enabled, allow_authorization=False)
-            else:
-                await app.set_translation_enabled(
-                    enabled, allow_authorization=False, preparation=translation_preparation
-                )
+            await app.set_translation_enabled(enabled, allow_authorization=False)
             state = app.state()
             matched = state.translation_enabled == enabled and (
                 not enabled or state.translation_runtime_ready is True

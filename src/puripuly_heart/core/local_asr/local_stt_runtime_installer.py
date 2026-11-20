@@ -28,7 +28,7 @@ from puripuly_heart.core.model_download_sources import (
     HF_MIRROR_ENDPOINT,
     model_download_source_candidates,
 )
-from puripuly_heart.core.runtime_logging import emit_basic_log
+from puripuly_heart.core.runtime.logging import emit_basic_log
 
 from .local_stt_assets import (
     GRANITE_MODEL_ID,
