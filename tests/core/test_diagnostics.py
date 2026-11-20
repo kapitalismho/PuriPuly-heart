@@ -126,6 +126,10 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
     ]
     assert history.query({"diagnostic_id": causes[0].diagnostic_id})["lookup"] == "not_retained"
     assert history.query({"diagnostic_id": causes[-1].diagnostic_id})["records"] == [replay]
+    filters = {"diagnostic_id": replay["diagnostic_id"], "operation_id": operation}
+    assert history.query({**filters, "after": 4})["records"] == [replay]
+    assert history.query({**filters, "after": 5})["lookup"] == "not_retained"
+    assert history.query({**filters, "operation_id": uuid4().hex})["records"] == []
     assert history.query({"after": 99})["lookup"] == "invalid_cursor"
     other = DiagnosticHistory()
     other.bind_instance(str(uuid4()))

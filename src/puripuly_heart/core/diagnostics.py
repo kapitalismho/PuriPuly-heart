@@ -1860,20 +1860,27 @@ class DiagnosticHistory:
             )
             foreign = arguments.get("instance_id", self.instance_id) != self.instance_id
             invalid = after > self.sequence
-            matched = (
-                []
-                if foreign or invalid
-                else [
-                    record
-                    for record, _ in self.records.values()
-                    if record["diagnostic_sequence"] > after
-                    and all(
-                        record.get(key) == arguments[key]
-                        for key in ("operation_id", "diagnostic_id")
-                        if key in arguments
+            diagnostic_id = arguments.get("diagnostic_id")
+            operation_id = arguments.get("operation_id")
+            if foreign or invalid or after == self.sequence:
+                matched = []
+            else:
+                if diagnostic_id is None:
+                    candidates = self.records.values()
+                else:
+                    candidate = self.records.get(diagnostic_id)
+                    candidates = (candidate,) if candidate is not None else ()
+                matched = list(
+                    islice(
+                        (
+                            record
+                            for record, _ in candidates
+                            if record["diagnostic_sequence"] > after
+                            and (operation_id is None or record["operation_id"] == operation_id)
+                        ),
+                        limit + 1,
                     )
-                ]
-            )
+                )
             selected = matched[:limit]
             result = {
                 "schema_version": DIAGNOSTIC_SCHEMA_VERSION,
