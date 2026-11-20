@@ -152,26 +152,33 @@ class ConversationHistoryModel:
                 ),
             )
             return
-        index = next(
-            (
-                index + 1
-                for index, previous in enumerate(self._records)
-                if previous.channel == "peer" and previous.utterance_id == record.peer_history_after
-            ),
-            len(self._records),
-        )
-        self._records.insert(index, record)
+        if record.peer_history_after is None:
+            self._records.append(record)
+        else:
+            index = next(
+                (
+                    index + 1
+                    for index, previous in enumerate(self._records)
+                    if previous.channel == "peer"
+                    and previous.utterance_id == record.peer_history_after
+                ),
+                len(self._records),
+            )
+            self._records.insert(index, record)
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
 
     def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
         utterance_id = str(snapshot.utterance_id)
-        existing = [
-            record
-            for record in self._records
-            if record.channel == "self"
-            and (record.parent_utterance_id or record.utterance_id) == utterance_id
-        ]
+        indices = []
+        existing = []
+        for index, record in enumerate(self._records):
+            if (
+                record.channel == "self"
+                and (record.parent_utterance_id or record.utterance_id) == utterance_id
+            ):
+                indices.append(index)
+                existing.append(record)
         managed = next((record for record in existing if record.turn_generation is not None), None)
         if managed is not None and (
             snapshot.turn_generation != managed.turn_generation
@@ -226,12 +233,6 @@ class ConversationHistoryModel:
                     parent_utterance_id=utterance_id,
                 )
             )
-        indices = [
-            index
-            for index, record in enumerate(self._records)
-            if record.channel == "self"
-            and (record.parent_utterance_id or record.utterance_id) == utterance_id
-        ]
         insertion = indices[0] if indices else len(self._records)
         for index in reversed(indices):
             del self._records[index]
