@@ -646,11 +646,21 @@ class PeerAudioSegmentLedger:
     def contains_segment(self, segment_id: UUID) -> bool:
         return segment_id in self._segments or segment_id in self._retired_receipts
 
-    def is_segment_terminal(self, segment_id: UUID) -> bool:
-        if segment_id in self._retired_receipts:
-            return True
+    def segment_snapshot(self, segment_id: UUID) -> AudioSegmentSnapshot | None:
         segment = self._segments.get(segment_id)
-        return segment is not None and segment.terminal is not None
+        if segment is not None:
+            if segment.terminal is None:
+                return self._snapshot(segment)
+            return segment.terminal.segment
+        receipt = self._retired_receipts.get(segment_id)
+        return receipt.segment if receipt is not None else None
+
+    def terminal_receipt(self, segment_id: UUID) -> AudioSegmentTerminalReceipt | None:
+        segment = self._segments.get(segment_id)
+        return segment.terminal if segment is not None else self._retired_receipts.get(segment_id)
+
+    def is_segment_terminal(self, segment_id: UUID) -> bool:
+        return self.terminal_receipt(segment_id) is not None
 
     def _terminalize_sealed(
         self,

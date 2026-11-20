@@ -948,20 +948,9 @@ class PeerCaptureSessionOwner:
         )
         if ledger is None:
             return ()
-        snapshot = next(
-            (item for item in ledger.snapshots if item.identity.segment_id == identity.segment_id),
-            None,
-        )
-        existing_receipt = next(
-            (
-                receipt
-                for receipt in ledger.terminal_receipts
-                if receipt.identity.segment_id == identity.segment_id
-            ),
-            None,
-        )
-        if existing_receipt is not None:
+        if ledger.is_segment_terminal(identity.segment_id):
             return ()
+        snapshot = ledger.segment_snapshot(identity.segment_id)
         if snapshot is None or snapshot.identity != identity:
             return ()
         self._provider_terminal_events[identity.segment_id] = terminal
@@ -994,11 +983,8 @@ class PeerCaptureSessionOwner:
     ) -> tuple[tuple[AudioSegmentTerminalReceipt, STTProviderTurnTerminal], ...]:
         segment = terminal.identity.segment
         for ledger in reversed(self._segment_ledgers):
-            if not ledger.contains_segment(segment.segment_id):
-                continue
-            if not any(item.identity == segment for item in ledger.snapshots) and not any(
-                receipt.identity == segment for receipt in ledger.terminal_receipts
-            ):
+            snapshot = ledger.segment_snapshot(segment.segment_id)
+            if snapshot is None or snapshot.identity != segment:
                 continue
             if terminal.outcome == "submitted":
                 ledger.terminalize(
@@ -2551,12 +2537,9 @@ class PeerCaptureSessionOwner:
 
     def _effective_segment_settings(self) -> AudioSegmentSettingsSnapshot | None:
         ledger = self._segment_ledger
-        if ledger is None:
+        if ledger is None or ledger.current_open_segment_id is None:
             return None
-        open_segment = next(
-            (snapshot for snapshot in ledger.snapshots if snapshot.state == "open"),
-            None,
-        )
+        open_segment = ledger.segment_snapshot(ledger.current_open_segment_id)
         return open_segment.settings if open_segment is not None else None
 
     def _effective_delivery_profile(self) -> str | None:
