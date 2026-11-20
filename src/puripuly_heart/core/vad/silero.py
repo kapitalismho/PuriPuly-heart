@@ -20,9 +20,9 @@ class SileroVadOnnx:
     _output_names: tuple[str, ...] = field(init=False, default=())
     _state: dict[str, np.ndarray] = field(init=False, default_factory=dict)
     _initial_state: dict[str, np.ndarray] = field(init=False, default_factory=dict)
-    _context: np.ndarray = field(init=False, repr=False)
+    _audio_input: np.ndarray | None = field(init=False, default=None, repr=False)
+    _sample_rate_input: np.ndarray | None = field(init=False, default=None, repr=False)
     _last_sr: int = field(init=False, default=0)
-    _last_batch_size: int = field(init=False, default=0)
 
     def __post_init__(self) -> None:
         if not self.model_path.exists():
@@ -45,9 +45,9 @@ class SileroVadOnnx:
 
     def reset(self) -> None:
         self._state = {name: value.copy() for name, value in self._initial_state.items()}
-        self._context = np.zeros((0,), dtype=np.float32)
+        self._audio_input = None
+        self._sample_rate_input = None
         self._last_sr = 0
-        self._last_batch_size = 0
 
     def speech_probability(self, samples: np.ndarray, *, sample_rate_hz: int) -> float:
         if sample_rate_hz not in (8000, 16000):
@@ -61,10 +61,6 @@ class SileroVadOnnx:
         else:
             raise ValueError(f"Too many dimensions for input audio chunk {chunk.ndim}")
 
-        batch_size = int(batch_chunk.shape[0])
-        if batch_size != 1:
-            raise ValueError("Silero VAD wrapper supports only batch size 1")
-
         expected_chunk_samples = self._chunk_samples_for(sample_rate_hz)
         if batch_chunk.shape[-1] != expected_chunk_samples:
             raise ValueError(
@@ -76,19 +72,20 @@ class SileroVadOnnx:
         context_samples = self._context_samples_for(sample_rate_hz)
         if self._last_sr and self._last_sr != sample_rate_hz:
             self.reset()
-        if self._last_batch_size and self._last_batch_size != batch_size:
-            self.reset()
-        if self._context.size == 0:
-            self._context = np.zeros((batch_size, context_samples), dtype=np.float32)
-
-        audio_input = np.concatenate([self._context, batch_chunk], axis=1)
-
+        if self._audio_input is None:
+            self._audio_input = np.empty((1, context_samples + expected_chunk_samples), np.float32)
+            self._audio_input[:, :context_samples] = 0.0
+            if self._sr_input_name is not None:
+                self._sample_rate_input = np.asarray(
+                    sample_rate_hz if self._sr_input_is_scalar else [sample_rate_hz],
+                    dtype=np.int64,
+                )
+            self._last_sr = sample_rate_hz
+        audio_input = self._audio_input
+        audio_input[:, context_samples:] = batch_chunk
         feed: dict[str, Any] = {self._audio_input_name: audio_input}
         if self._sr_input_name is not None:
-            if self._sr_input_is_scalar:
-                feed[self._sr_input_name] = np.asarray(sample_rate_hz, dtype=np.int64)
-            else:
-                feed[self._sr_input_name] = np.asarray([sample_rate_hz], dtype=np.int64)
+            feed[self._sr_input_name] = self._sample_rate_input
         for name in self._state_input_names:
             feed[name] = self._state[name]
 
@@ -102,9 +99,7 @@ class SileroVadOnnx:
             if output_name in by_name:
                 self._state[input_name] = np.asarray(by_name[output_name], dtype=np.float32)
 
-        self._context = np.asarray(audio_input[:, -context_samples:], dtype=np.float32)
-        self._last_sr = sample_rate_hz
-        self._last_batch_size = batch_size
+        audio_input[:, :context_samples] = audio_input[:, -context_samples:]
 
         return prob
 
