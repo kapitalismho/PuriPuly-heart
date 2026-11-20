@@ -435,8 +435,20 @@ class TestContextSerializationContract:
             timestamp=100.0,
         )
 
-        first = ContextResolver(clock=FakeClock(initial_time=105.0)).format_entries([entry])
-        second = ContextResolver(clock=FakeClock(initial_time=115.0)).format_entries([entry])
+        runtime = ChannelRuntime(channel="self", translation_history=[entry])
+        other = ChannelRuntime(channel="peer")
+        clock = FakeClock(initial_time=105.0)
+        resolver = ContextResolver(clock=clock)
+
+        def selected_context() -> str:
+            context, _ = resolver.resolve_for_request(
+                runtime=runtime, other_runtime=other, source_language="en", target_language="ko"
+            )
+            return context
+
+        first = selected_context()
+        clock.advance(10)
+        second = selected_context()
 
         assert first == '- [self] "hello"'
         assert second == '- [self] "hello"'

@@ -51,8 +51,9 @@ class ContextResolver:
             max_entries=configuration.context_max_entries,
         )
 
-    def format_entries(self, entries: list[ContextEntry]) -> str:
-        return self._format_entries(entries)
+    @staticmethod
+    def frozen_peer_context(texts: tuple[str, ...]) -> tuple[tuple[str, ...], str, ContextMode]:
+        return texts, "\n".join(_format_context_line("peer", text) for text in texts), "integrated"
 
     def resolve_for_request(
         self,
@@ -100,19 +101,10 @@ class ContextResolver:
         texts = tuple(entry.text for _, entry in integrated_entries)
         return texts, self.format_integrated(integrated_entries), "integrated"
 
-    def _format_entries(self, entries: list[ContextEntry]) -> str:
-        if not entries:
-            return ""
-        return "\n".join(self._format_entry(entry) for entry in entries)
-
-    def _format_entry(self, entry: ContextEntry) -> str:
-        label = "peer" if entry.channel == "peer" else "self"
-        return f'- [{label}] "{entry.text}"'
-
     def format_integrated(self, entries: list[tuple[ChannelRuntime, ContextEntry]]) -> str:
         if not entries:
             return ""
-        return "\n".join(self._format_entry(entry) for _, entry in entries)
+        return "\n".join(_format_context_line(entry.channel, entry.text) for _, entry in entries)
 
     def _get_integrated_entries(
         self,
@@ -151,3 +143,7 @@ class ContextResolver:
         if max_entries > 0:
             return combined[-max_entries:]
         return combined
+
+
+def _format_context_line(channel: str, text: str) -> str:
+    return f'- [{channel}] "{text}"'
