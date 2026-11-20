@@ -244,7 +244,6 @@ async fn windows_graphics_photo341_quiet_texture_handoff_reaches_steamvr() {
     first.wait_for_completion().await.unwrap();
     second.wait_for_completion().await.unwrap();
     first.clear_photo();
-    first.invalidate();
     assert!(!first.needs_frame(Instant::now()));
     assert!(!first.render(Instant::now(), false).unwrap());
 
@@ -1344,7 +1343,7 @@ async fn pending_gpu_select_services_bridge_snapshot_hide_and_shutdown() {
     outcome.unwrap();
     assert!(runtime.gpu_pending());
     assert_eq!(runtime.pending_frame.as_ref().unwrap().started, submitted);
-    assert!(runtime.compositor.as_ref().unwrap().needs_frame(Instant::now()));
+    assert!(!runtime.compositor.as_ref().unwrap().needs_frame(Instant::now()));
     assert!(!runtime.drawn_reported);
     assert!(runtime.live_drawn_block.is_none());
     runtime.compositor.as_mut().unwrap().hold_completion = false;

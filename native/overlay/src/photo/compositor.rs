@@ -464,10 +464,6 @@ impl PhotoCompositor {
         self.fade_until = None;
     }
 
-    pub fn invalidate(&mut self) {
-        self.dirty = self.original.is_some();
-    }
-
     pub fn set_font(&mut self, font: super::image::PhotoFont) {
         self.font = Some(font);
     }
