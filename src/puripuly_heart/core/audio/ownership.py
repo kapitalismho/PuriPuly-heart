@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from operator import itemgetter
 from typing import Literal
 from uuid import UUID
 
@@ -602,39 +604,28 @@ class PeerAudioSegmentLedger:
             end = item.normalized_end_sample
             if start is None or end is None or end <= start:
                 continue
-            remaining = [(start, end)]
             prior = self._claimed_ranges.setdefault(item.capture_epoch, [])
-            for prior_start, prior_end in prior:
-                next_remaining: list[tuple[int, int]] = []
-                for current_start, current_end in remaining:
-                    if prior_end <= current_start or prior_start >= current_end:
-                        next_remaining.append((current_start, current_end))
-                        continue
-                    if current_start < prior_start:
-                        next_remaining.append((current_start, prior_start))
-                    if prior_end < current_end:
-                        next_remaining.append((prior_end, current_end))
-                remaining = next_remaining
-            for current_start, current_end in remaining:
-                sliced = item.slice_normalized(current_start, current_end)
-                claimed.append(sliced)
-                prior.append((current_start, current_end))
-            prior.sort()
-            merged = self._merge_intervals(prior)
-            self._claimed_ranges[item.capture_epoch] = merged[
-                -self._MAX_CLAIM_INTERVALS_PER_EPOCH :
-            ]
-        return claimed
+            first = bisect_left(prior, start, key=itemgetter(1))
+            stop = first
+            cursor = start
+            while stop < len(prior):
+                prior_start, prior_end = prior[stop]
+                if prior_start > end:
+                    break
+                if cursor < prior_start:
+                    claimed.append(item.slice_normalized(cursor, prior_start))
+                cursor = max(cursor, prior_end)
+                stop += 1
+            if cursor < end:
+                claimed.append(item.slice_normalized(cursor, end))
 
-    @staticmethod
-    def _merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
-        merged: list[tuple[int, int]] = []
-        for start, end in intervals:
-            if not merged or start > merged[-1][1]:
-                merged.append((start, end))
+            if first == stop:
+                prior.insert(first, (start, end))
+                if len(prior) > self._MAX_CLAIM_INTERVALS_PER_EPOCH:
+                    del prior[0]
             else:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        return merged
+                prior[first:stop] = [(min(start, prior[first][0]), max(end, prior[stop - 1][1]))]
+        return claimed
 
     @staticmethod
     def _capture_epoch(ranges: tuple[AudioCaptureSpan, ...]) -> int:
