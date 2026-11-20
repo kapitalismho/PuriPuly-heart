@@ -39,6 +39,8 @@ class ConversationRecord:
     accepted: bool = True
     parent_utterance_id: str | None = None
     peer_caption_revision: int = 0
+    peer_history_after: str | None = None
+    peer_history_removals: tuple[str, ...] = ()
 
 
 class ConversationHistoryModel:
@@ -117,6 +119,13 @@ class ConversationHistoryModel:
         self._peer_revisions.move_to_end(unit_id)
         while len(self._peer_revisions) > 2 * (self._max_entries + self._cleanup_batch):
             self._peer_revisions.popitem(last=False)
+        if record.peer_history_removals:
+            retired = set(record.peer_history_removals) - {unit_id}
+            self._records[:] = [
+                previous
+                for previous in self._records
+                if previous.channel != "peer" or previous.utterance_id not in retired
+            ]
         for index, previous in enumerate(self._records):
             if previous.channel != "peer" or previous.utterance_id != unit_id:
                 continue
@@ -143,7 +152,15 @@ class ConversationHistoryModel:
                 ),
             )
             return
-        self._records.append(record)
+        index = next(
+            (
+                index + 1
+                for index, previous in enumerate(self._records)
+                if previous.channel == "peer" and previous.utterance_id == record.peer_history_after
+            ),
+            len(self._records),
+        )
+        self._records.insert(index, record)
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
 
@@ -246,6 +263,8 @@ class ConversationHistory:
     def observe_conversation(self, record: ConversationObservation) -> None:
         metadata = record.metadata
         revision = metadata.get("peer_caption_revision")
+        history_after = metadata.get("peer_history_after")
+        history_removals = metadata.get("peer_history_removals")
         self.append_conversation_record(
             source=str(
                 metadata.get("source") or ("Listen" if record.speaker_channel == "peer" else "Mic")
@@ -262,6 +281,10 @@ class ConversationHistory:
             origin_wall_clock_ms=metadata.get("origin_wall_clock_ms"),
             turn_kind=metadata.get("turn_kind"),
             peer_caption_revision=revision if isinstance(revision, int) and revision > 0 else 0,
+            peer_history_after=history_after if isinstance(history_after, str) else None,
+            peer_history_removals=(
+                tuple(history_removals.split(",")) if isinstance(history_removals, str) else ()
+            ),
         )
 
     def append_conversation_record(
@@ -280,6 +303,8 @@ class ConversationHistory:
         turn_kind: str | None = None,
         parent_utterance_id: str | None = None,
         peer_caption_revision: int = 0,
+        peer_history_after: str | None = None,
+        peer_history_removals: tuple[str, ...] = (),
     ) -> None:
         cleaned_source = source_text.strip() if isinstance(source_text, str) else None
         cleaned_translation = translated_text.strip() if isinstance(translated_text, str) else None
@@ -300,6 +325,8 @@ class ConversationHistory:
                 turn_kind=turn_kind,
                 parent_utterance_id=parent_utterance_id,
                 peer_caption_revision=peer_caption_revision,
+                peer_history_after=peer_history_after,
+                peer_history_removals=peer_history_removals,
             )
         )
 

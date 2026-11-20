@@ -376,6 +376,9 @@ export const appTools = [
               },
               "minItems": 1
             },
+            "stt.elevenlabs_scribe.enable_speaker_diarization": {
+              "type": "boolean"
+            },
             "stt.gpu_device_id": {
               "type": "string"
             },

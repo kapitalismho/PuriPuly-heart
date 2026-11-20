@@ -864,7 +864,7 @@ async def test_peer_settings_apply_routes_next_turn_without_toggling_listen(
                 stt=replace(
                     next_settings.intent.stt,
                     soniox=replace(
-                        next_settings.intent.stt.soniox, enable_speaker_diarization=False
+                        next_settings.intent.stt.soniox, enable_speaker_diarization=True
                     ),
                 ),
             ),

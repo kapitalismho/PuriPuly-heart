@@ -54,6 +54,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenBeijingApiHostEdit,
     QwenRegionEdit,
     QwenSingaporeApiHostEdit,
+    ScribeSpeakerDiarizationEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
     SonioxSpeakerDiarizationEdit,
@@ -297,6 +298,7 @@ PROVIDER_EDITS = {
     "stt.custom.endpoint": CustomSttEndpointEdit,
     "stt.custom.model": CustomSttModelEdit,
     "stt.custom.extra_json": CustomSttExtraEdit,
+    "stt.elevenlabs_scribe.enable_speaker_diarization": ScribeSpeakerDiarizationEdit,
     "stt.soniox.enable_speaker_diarization": SonioxSpeakerDiarizationEdit,
     "prompts.system_prompt_override": SystemPromptEdit,
 }
@@ -334,6 +336,7 @@ BOOLEAN_FIELDS = frozenset(
         "overlay.translation.enabled",
         "overlay.peer_original.enabled",
         "overlay.swap_caption_languages",
+        "stt.elevenlabs_scribe.enable_speaker_diarization",
         "stt.soniox.enable_speaker_diarization",
         "telemetry.enabled",
     }

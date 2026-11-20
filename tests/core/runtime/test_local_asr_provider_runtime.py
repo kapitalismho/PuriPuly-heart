@@ -1547,8 +1547,9 @@ async def test_close_failure_is_retryable_without_reopening_ingress() -> None:
 
 
 class FakeScopedProvider:
-    def __init__(self, scope: tuple[object, ...]) -> None:
+    def __init__(self, scope: tuple[object, ...], *, activation: object | None = None) -> None:
         self.scoped_settings_scope = scope
+        self.provider_activation = activation
         self.retain_for_scoped_dispatch = False
         self.is_at_utterance_boundary = True
         self.events: list[OwnedVadEvent] = []
@@ -1594,7 +1595,9 @@ class FakeScopedProvider:
         self.close_backend_calls += 1
 
 
-def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
+def _owned_event(
+    scope: tuple[object, ...], order: int, *, activation: object | None = None
+) -> OwnedVadEvent:
     provider_id, provider_signature, runtime_signature = scope
     settings = AudioSegmentSettingsSnapshot(
         provider_id=str(provider_id),
@@ -1607,6 +1610,7 @@ def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
         vad_speech_threshold=0.5,
         vad_hangover_ms=800,
         vad_pre_roll_ms=320,
+        provider_activation=activation,
     )
     segment = AudioSegmentSnapshot(
         identity=AudioSegmentIdentity(
@@ -1662,17 +1666,22 @@ async def test_peer_handoff_waits_for_and_accepts_peer_boundary_commit() -> None
 
 
 @pytest.mark.asyncio
-async def test_owned_vad_routing_preserves_old_configuration_until_ordered_handoff() -> None:
+@pytest.mark.parametrize("equal_configuration", [False, True])
+async def test_owned_vad_routing_preserves_old_ownership_until_ordered_handoff(
+    equal_configuration: bool,
+) -> None:
     owner, _provisioning, _gpu_factory, _provider_factory = _owner()
     old_scope = ("deepgram", ("old",), ("old-runtime",))
-    new_scope = ("deepgram", ("new",), ("new-runtime",))
-    old = FakeScopedProvider(old_scope)
-    new = FakeScopedProvider(new_scope)
+    new_scope = old_scope if equal_configuration else ("deepgram", ("new",), ("new-runtime",))
+    old_activation = object() if equal_configuration else None
+    new_activation = object() if equal_configuration else None
+    old = FakeScopedProvider(old_scope, activation=old_activation)
+    new = FakeScopedProvider(new_scope, activation=new_activation)
     await owner.start()
     await owner.handoff_prebuilt_provider("peer", old, start=True)
-    first_old = _owned_event(old_scope, 1)
-    queued_old = _owned_event(old_scope, 2)
-    first_new = _owned_event(new_scope, 3)
+    first_old = _owned_event(old_scope, 1, activation=old_activation)
+    queued_old = _owned_event(old_scope, 2, activation=old_activation)
+    first_new = _owned_event(new_scope, 3, activation=new_activation)
 
     with pytest.raises(RuntimeError, match="no self provider"):
         await owner.handle_owned_vad_event("self", first_old)

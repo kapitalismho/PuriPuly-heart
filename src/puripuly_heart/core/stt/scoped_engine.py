@@ -29,7 +29,9 @@ from puripuly_heart.core.network_diagnostics import (
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
     STTChannelAvailability,
+    STTFinalSpeakerEvidence,
     STTIndependentRecognitionSession,
+    STTNativeSegmentRef,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -252,6 +254,7 @@ class ScopedRecognitionEngine:
     session_lifetime_enabled: bool = True
     probe_session_factory: STTProbeSessionFactory | None = None
     probe_settings: AudioSegmentSettingsSnapshot | None = None
+    provider_activation: object | None = field(init=False, default=None, repr=False)
     probe_sessions: list[STTScopedTurnSession] = field(init=False, default_factory=list, repr=False)
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
@@ -334,6 +337,9 @@ class ScopedRecognitionEngine:
         init=False,
         default_factory=deque,
         repr=False,
+    )
+    _speaker_commits: OrderedDict[STTProviderTurnIdentity, tuple[STTNativeSegmentRef, str]] = field(
+        init=False, default_factory=OrderedDict, repr=False
     )
     _terminal_failure_notified: bool = field(init=False, default=False, repr=False)
     _episode_failures: int = field(init=False, default=0, repr=False)
@@ -1477,7 +1483,10 @@ class ScopedRecognitionEngine:
         authority_generation: int,
     ) -> None:
         scope = self._settings_scope(settings)
-        if self.accepted_settings_scope is not None and scope != self.accepted_settings_scope:
+        if (
+            self.accepted_settings_scope is not None
+            and settings.provider_configuration_scope != self.accepted_settings_scope
+        ):
             raise PermanentSTTScopedSessionError("provider_configuration_scope_mismatch")
         if self._terminal_failure_notified:
             raise PermanentSTTScopedSessionError("provider_recovery_exhausted")
@@ -1953,6 +1962,9 @@ class ScopedRecognitionEngine:
                             if epoch_id == self._provider_epoch_id and not self._turns:
                                 self._retire_current_session()
                     return
+                if isinstance(event, STTFinalSpeakerEvidence):
+                    await self._accept_speaker_evidence(event, epoch_id)
+                    continue
                 turn = self._turns.get(event.identity)
                 if turn is None:
                     continue
@@ -2291,6 +2303,53 @@ class ScopedRecognitionEngine:
             )
         )
 
+    async def _accept_speaker_evidence(self, event: STTFinalSpeakerEvidence, epoch_id: str) -> None:
+        if (
+            self.channel != "peer"
+            or epoch_id != self._provider_epoch_id
+            or event.provider_epoch_id != epoch_id
+            or self._session_retirement_requested
+            or (event.is_current is not None and not event.is_current())
+        ):
+            return
+        revisions = tuple(
+            item
+            for item in event.revisions
+            if item.identity.provider_epoch_id == epoch_id
+            and self._speaker_commits.get(item.identity)
+            == (item.native_segment, "".join(run.text for run in item.final_speaker_runs))
+            and all(
+                run.session_scope == item.native_segment.provider_session_id
+                and run.source == "elevenlabs_scribe"
+                for run in item.final_speaker_runs
+            )
+        )
+        merge = event.speaker_merge
+        if merge is not None and not any(
+            identity.provider_epoch_id == epoch_id
+            and segment.provider_session_id == merge.provider_session_id
+            for identity, (segment, _text) in self._speaker_commits.items()
+        ):
+            merge = None
+        if not revisions and merge is None:
+            return
+        generation = self._delivery_generation
+        upstream = event.is_current
+        await self._emit(
+            replace(
+                event,
+                revisions=revisions,
+                speaker_merge=merge,
+                is_current=lambda: (
+                    generation == self._delivery_generation
+                    and epoch_id == self._provider_epoch_id
+                    and not self._session_retirement_requested
+                    and not self._closed
+                    and (upstream is None or upstream())
+                ),
+            )
+        )
+
     async def _drain_completed_turns(self) -> None:
         async with self._terminal_drain_lock:
             while self._turn_order:
@@ -2595,6 +2654,18 @@ class ScopedRecognitionEngine:
                 ),
                 int(turn.watchdogs.final_timeout_s * 1000),
             )
+            if (
+                self.channel == "peer"
+                and isinstance(terminal, STTProviderTurnTerminal)
+                and terminal.outcome == "final"
+                and terminal.text_authority == "authoritative"
+                and terminal.native_segment is not None
+                and terminal.identity.provider_epoch_id == self._provider_epoch_id
+                and (terminal.is_current is None or terminal.is_current())
+            ):
+                self._speaker_commits[terminal.identity] = (terminal.native_segment, terminal.text)
+                if len(self._speaker_commits) > 32:
+                    self._speaker_commits.popitem(last=False)
             await self._emit(terminal)
             if (
                 terminal.channel_availability is STTChannelAvailability.UNAVAILABLE
@@ -3459,11 +3530,7 @@ class ScopedRecognitionEngine:
 
     @staticmethod
     def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:
-        return (
-            settings.provider_id,
-            settings.provider_signature,
-            settings.runtime_signature,
-        )
+        return settings.recognition_scope
 
     @staticmethod
     def _consume_task_result(task: asyncio.Future[object]) -> None:

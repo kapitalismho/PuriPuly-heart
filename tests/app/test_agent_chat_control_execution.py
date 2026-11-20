@@ -440,29 +440,40 @@ async def test_production_tools_apply_notice_and_speaker_with_terminal_effective
         owner = app.agent_chat()
         context = await collect_agent_context(control, activity=AgentActivity())
         owner._tools.observe_context(context)
+        speaker_changes = {
+            "stt.elevenlabs_scribe.enable_speaker_diarization": True,
+            "stt.soniox.enable_speaker_diarization": True,
+        }
         offered = await owner._tools.execute(
             "manage_proposal",
             {
                 "action": "settings",
-                "changes": {
-                    "chatbox.activation_notice.enabled": False,
-                    "stt.soniox.enable_speaker_diarization": False,
-                },
+                "changes": {**speaker_changes, "chatbox.activation_notice.enabled": False},
             },
         )
         assert offered["status"] == "needs_confirmation"
+        assert offered["confirmation"]["changes"] == speaker_changes
+        before = (await control.query("settings.current", {}))["settings"]["intent"]
+        assert before["stt"]["elevenlabs_scribe"]["enable_speaker_diarization"] is False
+        assert before["stt"]["soniox"]["enable_speaker_diarization"] is False
         completed = await owner.confirm(offered["confirmation"]["id"], True)
         assert completed["status"] == "applied" and completed["receipt"]["terminal"] is True
         current = (await control.query("settings.current", {}))["settings"]["intent"]
+        assert current["stt"]["elevenlabs_scribe"]["enable_speaker_diarization"] is True
+        assert current["stt"]["soniox"]["enable_speaker_diarization"] is True
+        notice = completed["confirmation"]
+        completed = await owner.confirm(notice["id"], True)
+        assert completed["status"] == "applied" and completed["receipt"]["terminal"] is True
+        current = (await control.query("settings.current", {}))["settings"]["intent"]
         assert current["osc"]["activation_notice_enabled"] is False
-        assert current["stt"]["soniox"]["enable_speaker_diarization"] is False
         provider = await control.query("providers.status", {})
         assert not provider["channels"]["self"]["effective_active"]
     finally:
         await app.stop()
     saved = json.loads(path.read_text(encoding="utf-8"))["intent"]
     assert saved["osc"]["activation_notice_enabled"] is False
-    assert saved["stt"]["soniox"]["enable_speaker_diarization"] is False
+    assert saved["stt"]["elevenlabs_scribe"]["enable_speaker_diarization"] is True
+    assert saved["stt"]["soniox"]["enable_speaker_diarization"] is True
 
 
 @pytest.mark.asyncio

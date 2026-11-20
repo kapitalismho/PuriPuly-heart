@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from uuid import uuid4
 
 import numpy as np
+from websockets.exceptions import ConnectionClosedOK
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
@@ -18,7 +20,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.deepgram import _DeepgramSDKSession
-from puripuly_heart.providers.stt.elevenlabs_scribe import _ElevenLabsScribeSession
+from puripuly_heart.providers.stt.elevenlabs_scribe import ElevenLabsScribeSTTBackend
 from puripuly_heart.providers.stt.gemini_transcribe import _GeminiTranscribeLiveSession
 from puripuly_heart.providers.stt.soniox import _SonioxSession
 
@@ -224,8 +226,8 @@ def _soniox_session(*, order: int = 1, epoch: str | None = None):
     return session, ws
 
 
-class _FakeScribeConnection:
-    def __init__(self) -> None:
+class FakeScribeWebSocket:
+    def __init__(self, session_id: str | None = "scribe-native") -> None:
         self.sent: list[dict] = []
         self.send_gate = asyncio.Event()
         self.send_gate.set()
@@ -233,34 +235,54 @@ class _FakeScribeConnection:
         self.commit_gate.set()
         self.commits = 0
         self.closed = False
+        self.close_count = 0
+        self.incoming: asyncio.Queue[str | Exception] = asyncio.Queue()
+        if session_id is not None:
+            self.push("session_started", session_id=session_id)
 
-    async def send(self, payload: dict) -> None:
-        self.sent.append(payload)
-        await self.send_gate.wait()
+    async def send(self, payload: str) -> None:
+        event = json.loads(payload)
+        self.sent.append(event)
+        if event["commit"]:
+            self.commits += 1
+            await self.commit_gate.wait()
+        else:
+            await self.send_gate.wait()
 
-    async def commit(self) -> None:
-        self.commits += 1
-        await self.commit_gate.wait()
+    async def recv(self) -> str:
+        value = await self.incoming.get()
+        if isinstance(value, Exception):
+            raise value
+        return value
 
     async def close(self) -> None:
         self.closed = True
+        self.close_count += 1
+
+    def push(self, message_type: str, **fields) -> None:
+        self.incoming.put_nowait(json.dumps(dict(message_type=message_type, **fields)))
+
+    def emit(self, event: str, payload: dict) -> None:
+        self.incoming.put_nowait(json.dumps({**payload, "message_type": event}))
+
+    def emit_close(self) -> None:
+        self.incoming.put_nowait(ConnectionClosedOK(None, None))
+
+    async def connect(self, url, *, additional_headers):
+        return self
 
 
-def _scribe_session(*, order: int = 1, epoch: str | None = None):
-    connection = _FakeScribeConnection()
-    session = _ElevenLabsScribeSession(
-        api_key="k",
-        language_code="en",
-        keyterms=(),
-        model="model",
-        sample_rate_hz=16000,
-        connect_timeout_s=10.0,
+async def _scribe_session(*, order: int = 1, epoch: str | None = None):
+    connection = FakeScribeWebSocket()
+    backend = ElevenLabsScribeSTTBackend(
+        api_key="k", language_code="en", websocket_factory=connection.connect
+    )
+    session = await backend.open_session(
         projection=STTSessionProjection(
             mode="scoped",
             provider_epoch_id=epoch or f"epoch-{order}",
         ),
     )
-    session._connection = connection
     return session, connection
 
 

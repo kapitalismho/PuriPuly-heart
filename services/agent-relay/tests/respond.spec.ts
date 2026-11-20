@@ -103,6 +103,39 @@ describe('authenticated agent relay', () => {
     }
   });
 
+  it('sends a protocol 7 settings proposal schema for both speaker recognition flags', async () => {
+    const changes = {
+      'stt.elevenlabs_scribe.enable_speaker_diarization': true,
+      'stt.soniox.enable_speaker_diarization': true,
+    };
+    const returned = {
+      ...upstreamResponse(),
+      output: [{ type: 'function_call', status: 'completed', call_id: 'speaker-recognition',
+        name: 'manage_proposal', arguments: JSON.stringify({ action: 'settings', changes }) }],
+    };
+    const fetch = mockUpstream(returned);
+    const response = await relay.fetch(request({
+      ...body,
+      input: [body.input[0], { role: 'user', content: 'Enable speaker recognition.' }],
+    }), env);
+
+    expect(await relayEvents(response)).toEqual([{ type: 'completed', response: returned }]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(fetch.mock.calls[0][1]?.body as string);
+    expect(sent.tool_choice).toBe('auto');
+    const proposal = sent.tools.find((tool: { name: string }) => tool.name === 'manage_proposal');
+    expect(proposal.parameters.properties.action.enum).toContain('settings');
+    expect(proposal.parameters.properties.changes).toMatchObject({
+      type: 'object',
+      required: [],
+      additionalProperties: false,
+      properties: {
+        'stt.elevenlabs_scribe.enable_speaker_diarization': { type: 'boolean' },
+        'stt.soniox.enable_speaker_diarization': { type: 'boolean' },
+      },
+    });
+  });
+
   it('starts stopped and accepts authenticated external requests only after opt-in', async () => {
     const fetch = mockUpstream();
     for (const enabled of [undefined, 'false', 'TRUE', '1']) {

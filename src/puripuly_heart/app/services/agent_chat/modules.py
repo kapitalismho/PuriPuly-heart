@@ -43,6 +43,7 @@ MODULE_FIELDS = {
         "stt.provider",
         "peer_stt.provider",
         "stt.cloud_free_tier_providers",
+        "stt.elevenlabs_scribe.enable_speaker_diarization",
         "stt.soniox.enable_speaker_diarization",
         "stt.gpu_device_id",
         "stt.custom.endpoint",

@@ -164,7 +164,7 @@ class SettingsApiSlotProvider(Protocol):
 
     def cloud_free_tier_control(self) -> ft.Control: ...
 
-    def soniox_speaker_diarization_control(self) -> ft.Control: ...
+    def speaker_diarization_control(self) -> ft.Control: ...
 
     def gpu_device_control(self) -> ft.Control: ...
 
@@ -188,7 +188,7 @@ class SettingsApiSurfaceSlots:
     translation_provider: ft.Control
     translation_connection: ft.Control
     cloud_free_tier: ft.Control
-    soniox_speaker_diarization: ft.Control
+    speaker_diarization: ft.Control
     gpu_device: ft.Control
     gpu_llm: ft.Control
     model_assets: ft.Control
@@ -212,7 +212,7 @@ class SettingsApiSurfaceSlots:
             translation_provider=provider.translation_provider_control(),
             translation_connection=provider.translation_connection_control(),
             cloud_free_tier=provider.cloud_free_tier_control(),
-            soniox_speaker_diarization=provider.soniox_speaker_diarization_control(),
+            speaker_diarization=provider.speaker_diarization_control(),
             gpu_device=provider.gpu_device_control(),
             gpu_llm=provider.gpu_llm_control(),
             model_assets=provider.model_assets_control(),

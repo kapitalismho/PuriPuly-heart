@@ -1396,6 +1396,7 @@ async def test_production_self_adapter_routes_exact_pressure_terminals_and_prese
     capture, _, provider, sources, _, _ = build_owner(sink=adapter)
     await capture.apply_intent(config(), enabled=True)
     guarded = capture.guard_vad_sink()
+    engine.provider_activation = guarded.ledger.settings.provider_activation
     assert guarded.max_wholly_unsent_segments == 8
     assert guarded.wholly_unsent_ttl_s == 12.0
     guarded.wholly_unsent_ttl_s = 0.05

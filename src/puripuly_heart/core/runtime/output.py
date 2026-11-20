@@ -49,6 +49,8 @@ from puripuly_heart.core.overlay.sink import (
     OverlaySink,
     PeerCaptionAdmissionPort,
     PeerCaptionLayoutPort,
+    PeerCaptionLineage,
+    PeerCaptionLineagePort,
     SelfActiveUpdate,
     TranslationFinal,
     TranslationStreamUpdate,
@@ -581,6 +583,26 @@ class OutputRuntime:
             and source_order is not None
             and publication_generation == self._peer_generation
         )
+
+    def open_peer_caption_lineage(self) -> PeerCaptionLineage | None:
+        sink = self.overlay_sink
+        return (
+            sink.open_peer_caption_lineage() if isinstance(sink, PeerCaptionLineagePort) else None
+        )
+
+    def peer_caption_lineage_is_live(self, lineage: PeerCaptionLineage) -> bool:
+        sink = self.overlay_sink
+        return isinstance(sink, PeerCaptionLineagePort) and sink.peer_caption_lineage_is_live(
+            lineage
+        )
+
+    def peer_caption_lineage_members_are_live(
+        self, lineage: PeerCaptionLineage, members: tuple[UUID, ...]
+    ) -> bool:
+        sink = self.overlay_sink
+        return isinstance(
+            sink, PeerCaptionLineagePort
+        ) and sink.peer_caption_lineage_members_are_live(lineage, members)
 
     def register_peer_caption_identity(
         self, utterance_id: UUID, publication_generation: int, source_order: int
@@ -1620,6 +1642,17 @@ class OutputRuntime:
             generation, order = identity
             if generation != self._peer_generation:
                 return self._overlay_failure_result(event, "publication_generation_retired")
+            if (
+                isinstance(event, TranslationStreamUpdate)
+                and event.peer_lineage_revision is not None
+            ):
+                update = event.peer_lineage_revision
+                if (
+                    update.is_current is not None and not update.is_current()
+                ) or not self.peer_caption_lineage_members_are_live(
+                    update.lineage, update.required_members
+                ):
+                    return self._overlay_failure_result(event, "peer_caption_lineage_retired")
             if order < self._latest_peer_source_order and not (
                 isinstance(event, TranslationStreamUpdate)
                 and event.peer_caption_revision > 0
@@ -1672,7 +1705,14 @@ class OutputRuntime:
                 )
             if destination_batch is None:
                 raise RuntimeError("overlay batch admission did not produce an owner")
-            if isinstance(event, TranslationStreamUpdate) and event.peer_caption_revision > 0:
+            if (
+                isinstance(event, TranslationStreamUpdate)
+                and event.peer_caption_revision > 0
+                and (
+                    event.peer_lineage_revision is None
+                    or not event.peer_lineage_revision.attribution_only
+                )
+            ):
                 self._supersede_peer_previews((parent_id, *event.peer_superseded_unit_ids), event)
             self._remember_peer_identity(parent_id, generation, order)
             self._latest_peer_source_order = max(self._latest_peer_source_order, order)

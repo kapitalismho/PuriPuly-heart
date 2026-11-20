@@ -21,6 +21,7 @@ from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
 from puripuly_heart.core.stt.backend import (
+    STTFinalSpeakerEvidence,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnTerminal,
@@ -257,6 +258,30 @@ class TranslationChannelOwnerCallbacks:
                 for receipt, terminal in admissions:
                     await peer.handle_provider_turn_terminal(receipt, terminal)
             return
+        if isinstance(event, STTFinalSpeakerEvidence):
+            async with self._recognition_locks["peer"]:
+                event = scoped_event_for_delivery(event)
+                if event is None:
+                    return
+                capture = self._require_peer_capture()
+                revisions = tuple(
+                    item
+                    for item in event.revisions
+                    if capture.is_current_recognition_stream(
+                        RecognitionStreamIdentity(
+                            "peer",
+                            item.identity.segment.activation_generation,
+                            item.identity.segment.capture_epoch,
+                            item.identity.provider_epoch_id,
+                            item.identity.settings_scope,
+                        )
+                    )
+                )
+                if revisions:
+                    await self._require_peer().handle_speaker_evidence(
+                        revisions, is_current=event.is_current, speaker_merge=event.speaker_merge
+                    )
+            return
         if isinstance(event, STTRecognitionUnitTerminal):
             await self._admit_recognition_unit(event, channel="peer")
             return
@@ -283,6 +308,8 @@ class TranslationChannelOwnerCallbacks:
         await self._require_peer().handle_stt_event(event)
 
     async def retired_event_handler(self, event: object) -> None:
+        if isinstance(event, STTFinalSpeakerEvidence):
+            return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel == "self":
                 if self._self_capture is not None:

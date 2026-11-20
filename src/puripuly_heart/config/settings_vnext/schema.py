@@ -14,6 +14,7 @@ from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HO
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.prompts import normalize_system_prompt_override
 from puripuly_heart.config.provider_values import (
+    ELEVENLABS_SCRIBE_STT_MODEL,
     normalize_cloud_free_tier_providers,
     normalize_stt_provider,
 )
@@ -23,7 +24,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 55
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 57
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -363,7 +364,12 @@ class GeminiTranscribeSTTIntent:
 
 @dataclass(frozen=True, slots=True)
 class ElevenLabsScribeSTTIntent:
-    model: str = "scribe_v2_realtime"
+    model: str = ELEVENLABS_SCRIBE_STT_MODEL
+    enable_speaker_diarization: bool = False
+
+    def __post_init__(self) -> None:
+        if self.model != ELEVENLABS_SCRIBE_STT_MODEL:
+            raise ValueError("Unsupported Scribe model")
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,7 +378,7 @@ class SonioxSTTIntent:
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
-    enable_speaker_diarization: bool = True
+    enable_speaker_diarization: bool = False
 
     def __post_init__(self) -> None:
         if self.model == "stt-rt-v5":

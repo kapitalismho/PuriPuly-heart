@@ -150,6 +150,20 @@ class SelfActiveClear(OverlayEvent):
             raise ValueError("SelfActiveClear requires channel='self'")
 
 
+@dataclass(slots=True, eq=False)
+class PeerCaptionLineage:
+    scene: object
+    admitted_members: set[UUID] = field(default_factory=set)
+
+
+@dataclass(frozen=True, slots=True)
+class PeerCaptionRevision:
+    lineage: PeerCaptionLineage
+    required_members: tuple[UUID, ...] = ()
+    attribution_only: bool = False
+    is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TranslationStreamUpdate(OverlayEvent):
     text: str
@@ -160,6 +174,7 @@ class TranslationStreamUpdate(OverlayEvent):
     source_text: str = ""
     peer_caption_revision: int = 0
     peer_superseded_unit_ids: tuple[UUID, ...] = ()
+    peer_lineage_revision: PeerCaptionRevision | None = field(default=None, compare=False)
 
     EVENT_TYPE: ClassVar[str] = "translation_stream_update"
 
@@ -216,6 +231,17 @@ class PeerCaptionAdmissionPort(Protocol):
     def retire_peer_generation(self, publication_generation: int) -> None: ...
 
     def refresh_peer_caption_currentness(self) -> None: ...
+
+
+@runtime_checkable
+class PeerCaptionLineagePort(Protocol):
+    def open_peer_caption_lineage(self) -> PeerCaptionLineage: ...
+
+    def peer_caption_lineage_is_live(self, lineage: PeerCaptionLineage) -> bool: ...
+
+    def peer_caption_lineage_members_are_live(
+        self, lineage: PeerCaptionLineage, members: tuple[UUID, ...]
+    ) -> bool: ...
 
 
 @runtime_checkable
