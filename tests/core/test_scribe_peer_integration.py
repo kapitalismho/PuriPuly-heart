@@ -519,6 +519,43 @@ async def test_scribe_ready_regroup_tail_keeps_normal_wait_order_and_survives_he
 
 
 @pytest.mark.asyncio
+async def test_scribe_inflight_identity_styles_the_first_peer_caption(route):
+    harness, backend, _, _, surface, history, committed, diarized, _, _ = route
+    source = "One identified speaker."
+    translated = "translated:One identified speaker."
+    backend.block = True
+    try:
+        turn = await committed(source)
+        await wait_until(lambda: bool(backend.completions), timeout_s=2)
+        await diarized(0, (source, "speaker-A"))
+        assert not backend.completions[0].done()
+    finally:
+        backend.block = False
+        for completion in backend.completions:
+            if not completion.done():
+                completion.set_result(None)
+        await _idle(harness)
+
+    first = next(
+        (
+            block
+            for snapshot in surface.snapshots
+            for block in snapshot.blocks
+            if block.id == f"peer:{turn}"
+        ),
+        None,
+    )
+    assert first is not None, "No caption was delivered for the original Scribe turn"
+    assert first.primary_text == translated
+    assert [call.text for call in backend.calls] == [source]
+    assert [
+        (record.utterance_id, record.source_text, record.accepted)
+        for record in history.conversation_records
+    ] == [(str(turn), source, True)]
+    assert first.speaker_style == "gold"
+
+
+@pytest.mark.asyncio
 async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_results(route):
     harness, backend, presenter, _, surface, history, committed, diarized, _, _ = route
     backend.block = True
