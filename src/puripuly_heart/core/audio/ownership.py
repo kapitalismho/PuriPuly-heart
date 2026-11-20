@@ -230,9 +230,10 @@ class _MutableSegment:
     settings: AudioSegmentSettingsSnapshot
     opened_at_monotonic_s: float
     genuine_onset: bool
+    context_ranges: tuple[AudioCaptureSpan, ...]
+    prefix_context_sample_count: int
     content_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     failed_ranges: list[AudioCaptureSpan] = field(default_factory=list)
-    context_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     synthetic_context_sample_count: int = 0
     sealed_at_monotonic_s: float | None = None
     seal_reason: str | None = None
@@ -382,11 +383,14 @@ class PeerAudioSegmentLedger:
                     fallback=now_monotonic_s,
                 ),
                 genuine_onset=event.genuine_onset,
+                context_ranges=tuple(event.pre_roll_capture),
+                prefix_context_sample_count=sum(
+                    span.normalized_sample_count for span in event.pre_roll_capture
+                ),
             )
             self._segments[event.utterance_id] = segment
             self._segment_ids_by_order[identity.segment_order] = event.utterance_id
             self._open_segment_id = event.utterance_id
-            segment.context_ranges.extend(event.pre_roll_capture)
             self._append_content(segment, event.chunk_capture, int(event.chunk.size))
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
 
@@ -719,12 +723,10 @@ class PeerAudioSegmentLedger:
         terminal: bool = False,
     ) -> AudioSegmentSnapshot:
         content_ranges = tuple(segment.content_ranges)
-        context_ranges = tuple(segment.context_ranges)
         failed_ranges = tuple(segment.failed_ranges)
         content_sample_count = sum(item.normalized_sample_count for item in content_ranges)
         failed_normalized_sample_count = sum(item.normalized_sample_count for item in failed_ranges)
         failed_source_sample_count = sum(item.source_sample_count for item in failed_ranges)
-        prefix_context_sample_count = sum(item.normalized_sample_count for item in context_ranges)
         if terminal or segment.terminal is not None:
             state: Literal["open", "sealed", "terminal"] = "terminal"
         elif segment.sealed_at_monotonic_s is not None:
@@ -736,14 +738,14 @@ class PeerAudioSegmentLedger:
             settings=segment.settings,
             content_ranges=content_ranges,
             failed_ranges=failed_ranges,
-            context_ranges=context_ranges,
+            context_ranges=segment.context_ranges,
             content_sample_count=content_sample_count,
             failed_normalized_sample_count=failed_normalized_sample_count,
             failed_source_sample_count=failed_source_sample_count,
             context_sample_count=(
-                prefix_context_sample_count + segment.synthetic_context_sample_count
+                segment.prefix_context_sample_count + segment.synthetic_context_sample_count
             ),
-            prefix_context_sample_count=prefix_context_sample_count,
+            prefix_context_sample_count=segment.prefix_context_sample_count,
             synthetic_context_sample_count=segment.synthetic_context_sample_count,
             genuine_onset=segment.genuine_onset,
             state=state,
