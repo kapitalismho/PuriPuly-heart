@@ -391,13 +391,13 @@ def create_peer_capture_source_adapter(
     )
     from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
     from puripuly_heart.core.audio.desktop_source import DesktopLoopbackAudioSource
-    from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
+    from puripuly_heart.core.audio.process_identity import SystemProcessIdentityWatcher
     from puripuly_heart.core.audio.process_source import ProcessAudioCaptureSource
 
     return PeerCaptureSourceAdapter(
         loopback_source_factory=DesktopLoopbackAudioSource,
         process_source_factory=ProcessAudioCaptureSource,
-        process_watcher_factory=PsutilProcessIdentityWatcher,
+        process_watcher_factory=SystemProcessIdentityWatcher,
         pipeline_factory=DesktopPeerPipeline,
         log_diagnostic=log_diagnostic,
         wrap_source=wrap_source,

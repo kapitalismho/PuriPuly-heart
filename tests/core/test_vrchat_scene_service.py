@@ -10,11 +10,14 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.config.process_capture_resolution import ProcessSnapshot
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 
 _USER_A = "usr_11111111-1111-4111-8111-111111111111"
 _USER_B = "usr_22222222-2222-4222-8222-222222222222"
 _USER_C = "usr_33333333-3333-4333-8333-333333333333"
+
+_WatchTerminal = Callable[[str, ErrorDiagnostics | None], None]
 
 
 def _line(payload: str) -> str:
@@ -78,13 +81,13 @@ class FakeWatcherFactory:
         self.terminals: list[Callable[[], None]] = []
         self.handles: list[FakeWatchHandle] = []
 
-    def watch(self, identity: object, on_terminal: Callable[[], None]) -> FakeWatchHandle:
+    def watch(self, identity: object, on_terminal: _WatchTerminal) -> FakeWatchHandle:
         handle = FakeWatchHandle()
         self.handles.append(handle)
 
         def terminal() -> None:
             self.snapshots.items = ()
-            on_terminal()
+            on_terminal("target_exited", None)
 
         self.terminals.append(terminal)
         return handle
@@ -776,10 +779,10 @@ class PinnedWatcherFactory:
         self.identity_verified = identity_verified
         self.alive = alive
         self.raise_on_watch = raise_on_watch
-        self.terminals: list[Callable[[], None]] = []
+        self.terminals: list[_WatchTerminal] = []
         self.handles: list[PinnedWatchHandle] = []
 
-    def watch(self, identity: object, on_terminal: Callable[[], None]) -> PinnedWatchHandle:
+    def watch(self, identity: object, on_terminal: _WatchTerminal) -> PinnedWatchHandle:
         if self.raise_on_watch:
             raise RuntimeError("watch registration failed")
         handle = PinnedWatchHandle(identity_verified=self.identity_verified, alive=self.alive)
@@ -883,7 +886,7 @@ async def test_terminal_resumes_discovery_and_reused_pid_restart_rebuilds(
         for _ in range(5):
             await service._poll_once(service._generation)
         snapshots.items = ()
-        watcher.terminals[-1]()
+        watcher.terminals[-1]("target_exited", None)
         await _wait_for_status(service, "unavailable")
         snapshots.calls = 0
         new_start = time.time()

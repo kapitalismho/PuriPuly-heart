@@ -604,7 +604,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
     from puripuly_heart.config.settings_vnext.schema import (
         ProcessCaptureTargetIntent as ProcessCaptureSelection,
     )
-    from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
+    from puripuly_heart.core.audio.process_identity import SystemProcessIdentityWatcher
     from puripuly_heart.core.audio.process_source import (
         ProcessAudioCaptureSource,
         ProcTapProcessAudioCaptureFactory,
@@ -772,7 +772,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         return ObservedSource(
             ProcessAudioCaptureSource(
                 identity=identity,
-                watcher=PsutilProcessIdentityWatcher(),
+                watcher=SystemProcessIdentityWatcher(),
                 capture_factory=observed_capture_factory,
             ),
             identity.pid,

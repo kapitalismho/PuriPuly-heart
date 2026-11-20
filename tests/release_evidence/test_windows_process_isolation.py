@@ -510,7 +510,7 @@ def synthetic_native_capture(monkeypatch) -> SimpleNamespace:
     )
     monkeypatch.setattr(process_source, "ProcTapProcessAudioCaptureFactory", CaptureFactory)
     monkeypatch.setattr(process_source, "verify_proctap_process_specific", lambda _capture: True)
-    monkeypatch.setattr(process_identity, "PsutilProcessIdentityWatcher", Watcher)
+    monkeypatch.setattr(process_identity, "SystemProcessIdentityWatcher", Watcher)
     monkeypatch.setattr(psutil, "Process", lambda pid: state.processes[pid])
     monkeypatch.setattr(isolation, "_start_emitter", lambda role, _directory: Emitter(role))
     monkeypatch.setattr(isolation, "classify_native_capability", lambda: None)

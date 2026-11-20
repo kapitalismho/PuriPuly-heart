@@ -14,7 +14,7 @@ from puripuly_heart.config.process_capture_resolution import (
 )
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
 from puripuly_heart.core.audio.process_identity import (
-    PsutilProcessIdentityWatcher,
+    SystemProcessIdentityWatcher,
     default_current_user_process_snapshots,
 )
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
@@ -76,8 +76,8 @@ class VrchatSceneService(SceneSnapshotProvider):
     snapshots: CurrentUserProcessSnapshotPort = field(
         default_factory=default_current_user_process_snapshots
     )
-    watcher_factory: PsutilProcessIdentityWatcher = field(
-        default_factory=PsutilProcessIdentityWatcher
+    watcher_factory: SystemProcessIdentityWatcher = field(
+        default_factory=SystemProcessIdentityWatcher
     )
     log_directory: Path = field(default_factory=default_vrchat_log_directory)
     poll_interval_s: float = _DEFAULT_POLL_INTERVAL_S
@@ -293,7 +293,9 @@ class VrchatSceneService(SceneSnapshotProvider):
         try:
             self._watch = self.watcher_factory.watch(
                 identity,
-                lambda: loop.call_soon_threadsafe(self._handle_terminal, generation, instance_id),
+                lambda _reason, _diagnostics: loop.call_soon_threadsafe(
+                    self._handle_terminal, generation, instance_id
+                ),
             )
         except Exception as exc:
             self._watch = None
