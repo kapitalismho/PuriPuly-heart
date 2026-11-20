@@ -55,13 +55,15 @@ _MEL_FILTERS = _build_mel_filters()
 
 def _power_spectrogram(audio: np.ndarray) -> np.ndarray:
     padded = np.pad(
-        np.asarray(audio, dtype=np.float64),
+        audio,
         (_N_FFT // 2, _N_FFT // 2),
         mode="reflect",
     )
     windows = sliding_window_view(padded, _N_FFT)[::_HOP_LENGTH]
-    spectrum = np.fft.rfft(windows * _HANN_WINDOW.astype(np.float64), axis=-1)
-    return (np.abs(spectrum) ** 2).T
+    spectrum = np.fft.rfft(windows * _HANN_WINDOW, axis=-1)
+    power = np.abs(spectrum)
+    np.square(power, out=power)
+    return power.T
 
 
 def compute_whisper_log_mel_features(audio: np.ndarray) -> np.ndarray:
