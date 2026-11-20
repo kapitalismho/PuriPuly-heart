@@ -121,9 +121,18 @@ fn quiet_tail_profiles_have_exact_walls_and_opportunity_maxima() {
 }
 
 #[test]
-fn quiet_tail_environment_profiles_resolve_strictly() {
+fn quiet_tail_requires_the_cached_handoff_experiment() {
     assert_eq!(
-        resolve_quiet_tail_profile(None).unwrap(),
+        resolve_quiet_tail_profile(HandoffExperiment::Off, None).unwrap(),
+        QuietTailProfile::NoRetry
+    );
+    assert_eq!(
+        resolve_quiet_tail_profile(HandoffExperiment::Off, Some(std::ffi::OsStr::new("p05"))).unwrap(),
+        QuietTailProfile::NoRetry
+    );
+    let experiment = HandoffExperiment::CachedFrameRehandoff;
+    assert_eq!(
+        resolve_quiet_tail_profile(experiment, None).unwrap(),
         QuietTailProfile::P05
     );
     for (value, profile) in [
@@ -135,11 +144,11 @@ fn quiet_tail_environment_profiles_resolve_strictly() {
         ("one_retry", QuietTailProfile::OneRetry),
     ] {
         assert_eq!(
-            resolve_quiet_tail_profile(Some(std::ffi::OsStr::new(value))).unwrap(),
+            resolve_quiet_tail_profile(experiment, Some(std::ffi::OsStr::new(value))).unwrap(),
             profile
         );
     }
-    let error = resolve_quiet_tail_profile(Some(std::ffi::OsStr::new("P20"))).unwrap_err();
+    let error = resolve_quiet_tail_profile(experiment, Some(std::ffi::OsStr::new("P20"))).unwrap_err();
     assert!(matches!(error, StartupError::Manifest(_)));
     assert!(!error.to_string().contains("P20"));
 }
@@ -184,7 +193,11 @@ fn non_unicode_quiet_tail_environment_value_fails_without_value_disclosure() {
     use std::os::windows::ffi::OsStringExt;
 
     let value = std::ffi::OsString::from_wide(&[0xd800]);
-    let error = resolve_quiet_tail_profile(Some(value.as_os_str())).unwrap_err();
+    let error = resolve_quiet_tail_profile(
+        HandoffExperiment::CachedFrameRehandoff,
+        Some(value.as_os_str()),
+    )
+    .unwrap_err();
     assert!(matches!(error, StartupError::Manifest(_)));
     assert_eq!(error.failure_reason(), "manifest_invalid");
     assert_eq!(
@@ -251,6 +264,10 @@ fn cli_reports_invalid_quiet_tail_profile_as_structured_manifest_error() {
     .unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_PuriPulyHeartOverlay"))
         .args(["--config", path.to_str().unwrap()])
+        .env(
+            "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT",
+            "cached_frame_rehandoff",
+        )
         .env(
             "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE",
             "invalid-secret-value",
@@ -2349,7 +2366,7 @@ async fn runtime_correlates_allowlisted_presentation_stages_without_payload_data
     assert!(records[1].cpu_render_us.is_some());
     assert!(records[2].readiness_us.is_some());
     assert!(records[4].submission_return_us.is_some());
-    assert_eq!(records[4].retry_profile, "p05");
+    assert_eq!(records[4].retry_profile, "no_retry");
     assert!(!records[4].candidate_build_identity.is_empty());
     assert!(records[4].candidate_build_identity.len() <= 64);
     assert_eq!(records[4].environment_identity, "not_recorded");
@@ -4909,16 +4926,18 @@ async fn production_owner_empty_scene_stays_settled_during_silent_input() {
 }
 
 #[tokio::test]
-async fn production_owner_stable_visible_silence_does_not_arm_due_deadline() {
+async fn production_owner_submits_new_text_after_idle_without_periodic_redraw() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
         let snapshot = json!({
             "revision": 1,
+            "native_fresh_render_generations": {"self": 1},
             "blocks": [block("self:stable", "self", "stable", "", true)]
         });
         ws.send(Message::Text(
@@ -4930,6 +4949,23 @@ async fn production_owner_stable_visible_silence_does_not_arm_due_deadline() {
         .unwrap();
         wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(3200)).await;
+        assert_eq!(
+            server_state.operations.lock().unwrap().as_slice(),
+            ["submit:text", "show"]
+        );
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{
+                "revision": 2,
+                "native_fresh_render_generations": {"self": 2},
+                "blocks": [block("self:stable", "self", "new after idle", "", true)]
+            }}).to_string().into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_test_progress("new caption after idle", || {
+            server_state.operations.lock().unwrap().len() == 3
+        })
+        .await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
@@ -4956,9 +4992,14 @@ async fn production_owner_stable_visible_silence_does_not_arm_due_deadline() {
         .await
         .unwrap();
     assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    assert!(owner.fresh_retry_audit_for_test().is_empty());
+    assert_eq!(
+        owner.runtime().presentation_diagnostics().render_count_for_test(),
+        2
+    );
     assert_eq!(
         state.operations.lock().unwrap().as_slice(),
-        ["submit:text", "show", "hide"]
+        ["submit:text", "show", "submit:text", "hide"]
     );
     server.await.unwrap();
 }
@@ -5030,7 +5071,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new(
+    let mut owner = NativePresentationOwner::new_with_profile(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
         OwnedSubmitterProbe {
@@ -5039,6 +5080,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
             fail_on_submission: None,
             submit_delay: Duration::ZERO,
         },
+        QuietTailProfile::P05,
     );
     owner.set_handoff_experiment_for_test(HandoffExperiment::CachedFrameRehandoff);
     owner
@@ -5697,7 +5739,7 @@ async fn exercise_readiness_no_progress_churn(self_scene: bool) {
         submit_delay: Duration::ZERO,
     };
     let mut owner = if self_scene {
-        NativePresentationOwner::new(snapshot, renderer, submitter)
+        NativePresentationOwner::new_with_profile(snapshot, renderer, submitter, QuietTailProfile::P05)
     } else {
         NativePresentationOwner::new_with_retry_policy_for_test(
             snapshot,
@@ -6261,7 +6303,7 @@ async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
-    let mut owner = NativePresentationOwner::new(
+    let mut owner = NativePresentationOwner::new_with_profile(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
         PoseRecoverySubmitter {
@@ -6269,6 +6311,7 @@ async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream
             pose_available_at: std::time::Instant::now(),
             visible: false,
         },
+        QuietTailProfile::P05,
     );
     owner
         .run(
@@ -6378,7 +6421,7 @@ async fn exercise_scene_schedule(
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
-    let mut owner = NativePresentationOwner::new(
+    let mut owner = NativePresentationOwner::new_with_profile(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
         PoseRecoverySubmitter {
@@ -6386,6 +6429,7 @@ async fn exercise_scene_schedule(
             pose_available_at: Instant::now(),
             visible: false,
         },
+        QuietTailProfile::P05,
     );
     owner
         .run(&mut bridge, &test_logger(label).await)
@@ -6744,7 +6788,7 @@ async fn submission_return_after_native_wall_is_expired_not_credited() {
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new(
+    let mut owner = NativePresentationOwner::new_with_profile(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
         OwnedSubmitterProbe {
@@ -6753,6 +6797,7 @@ async fn submission_return_after_native_wall_is_expired_not_credited() {
             fail_on_submission: None,
             submit_delay: Duration::from_millis(550),
         },
+        QuietTailProfile::P05,
     );
     owner
         .run(&mut bridge, &test_logger("late-submission-return").await)

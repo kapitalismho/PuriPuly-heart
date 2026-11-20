@@ -55,7 +55,7 @@ class _FakeRunner:
     def __init__(self, process: _FakeManagedProcess) -> None:
         self._process = process
 
-    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+    def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
         _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:

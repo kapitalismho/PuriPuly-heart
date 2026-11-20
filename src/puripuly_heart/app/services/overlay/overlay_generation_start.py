@@ -146,7 +146,6 @@ class OverlayGenerationStartOwner:
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
             effects.set_target(request.target)
-            native_retry_enabled = not request.desktop
             if presenter is None:
                 presenter = OverlayPresenter(
                     calibration=effects.calibration_snapshot(),
@@ -154,7 +153,6 @@ class OverlayGenerationStartOwner:
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
                     task_factory=runtime.create_child_task,
-                    native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
                 )
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
@@ -164,7 +162,7 @@ class OverlayGenerationStartOwner:
                 show_translation=request.config.show_translation,
                 show_peer_original=request.config.show_peer_original,
             )
-            await presenter.begin_native_retry_epoch(enabled=native_retry_enabled)
+            await presenter.begin_runtime_epoch()
             bridge = OverlayBridge(
                 session_token=self.session_token_factory(),
                 initial_snapshot=presenter.snapshot(),

@@ -40,8 +40,8 @@ class FakePresenter:
         self.events.append(f"presenter:translation_enabled:{next_enabled}")
         self.translation_enabled = next_enabled
 
-    async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
-        self.events.append(f"presenter:native_retry_epoch:{enabled}")
+    async def begin_runtime_epoch(self, *, diagnostic_retry: bool = False) -> None:
+        self.events.append(f"presenter:runtime_epoch:{diagnostic_retry}")
         if isinstance(self.snapshot_value, dict):
             self.snapshot_value = {
                 key: value
@@ -321,16 +321,15 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     assert FakePresenter.events.index("bridge:start") < FakePresenter.events.index("sink:replace")
     assert FakePresenter.events.index("sink:replace") < FakePresenter.events.index("manager:create")
     assert FakePresenter.events.index("manager:start") < FakePresenter.events.index("connected")
+    assert "presenter:runtime_epoch:False" in FakePresenter.events
 
     if desktop:
         assert runtime.renderer_events is not None
         assert harness.renderer_calls == ["overlay-instance"]
         assert FakeBridge.instances[0].initial_controls[-1]["mode"] == "locked"
-        assert "presenter:native_retry_epoch:False" in FakePresenter.events
     else:
         assert runtime.renderer_events is None
         assert harness.renderer_calls == []
-        assert "presenter:native_retry_epoch:True" in FakePresenter.events
 
 
 @pytest.mark.asyncio
@@ -494,7 +493,7 @@ async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> 
     await asyncio.sleep(0)
 
     assert status == "connected"
-    assert "presenter:native_retry_epoch:True" in FakePresenter.events
+    assert "presenter:runtime_epoch:False" in FakePresenter.events
     assert FakeBridge.instances[0].session_token == "new-session"
     assert FakeBridge.instances[0].current_snapshot == {"text": "keep this caption"}
     assert runtime.overlay_instance_id == "overlay-recovered"

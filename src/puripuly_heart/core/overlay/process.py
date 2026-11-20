@@ -141,7 +141,7 @@ class OverlayProcessManager:
     locale: str = "en"
     log_dir: str = "logs"
     log_level: str = "INFO"
-    quiet_tail_profile: str = "p05"
+    quiet_tail_profile: str | None = None
     handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
     renderer_events: asyncio.Queue[dict[str, object]] | None = None
     overlay_instance_id: str = field(default_factory=lambda: f"overlay-{uuid4()}")
@@ -574,7 +574,11 @@ class OverlayProcessManager:
         )
         self._record_process(
             "runtime_configuration",
-            quiet_tail_profile=self.quiet_tail_profile,
+            quiet_tail_profile=(
+                "no_retry"
+                if self.handoff_experiment == HANDOFF_EXPERIMENT_OFF
+                else self.quiet_tail_profile
+            ),
             handoff_experiment=self.handoff_experiment,
             experiment_only=self.handoff_experiment != HANDOFF_EXPERIMENT_OFF,
         )

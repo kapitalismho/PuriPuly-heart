@@ -845,7 +845,7 @@ async def test_owned_monitor_recovers_with_presenter_and_original_expiration(
         assert replacement is not runtime
         assert replacement.presenter is presenter
         owner.clock.advance(elapsed)
-        await presenter.begin_native_retry_epoch(enabled=True)
+        await presenter.begin_runtime_epoch()
         self.mark_connected()
         connected.set()
 
@@ -992,7 +992,7 @@ async def test_desktop_fallback_starts_while_retired_vr_cleanup_is_blocked(
 
     async def start_desktop(self, runtime) -> None:
         assert self.active_target == "desktop"
-        await presenter.begin_native_retry_epoch(enabled=False)
+        await presenter.begin_runtime_epoch()
         await replace_sink(runtime.presenter)
         self.mark_connected()
         connected.set()

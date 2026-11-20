@@ -56,7 +56,7 @@ def _process_event(payload: dict[str, object]) -> OverlayProcessEvent:
 
 
 @pytest.mark.asyncio
-async def test_default_runner_passes_p05_product_default_in_child_env_without_mutating_parent(
+async def test_default_runner_strips_inherited_retry_options_without_mutating_parent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -68,7 +68,7 @@ async def test_default_runner_passes_p05_product_default_in_child_env_without_mu
         return SimpleNamespace(stdout=None, stderr=None)
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
-    monkeypatch.delenv(process_module.QUIET_TAIL_PROFILE_ENV, raising=False)
+    monkeypatch.setenv(process_module.QUIET_TAIL_PROFILE_ENV, "p05")
     monkeypatch.setenv(
         process_module.HANDOFF_EXPERIMENT_ENV,
         process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
@@ -77,13 +77,17 @@ async def test_default_runner_passes_p05_product_default_in_child_env_without_mu
     await runner.spawn(tmp_path / "overlay.exe", tmp_path / "manifest.json")
     child_env = captured["env"]
     assert isinstance(child_env, dict)
-    assert child_env[process_module.QUIET_TAIL_PROFILE_ENV] == "p05"
-    assert child_env[process_module.HANDOFF_EXPERIMENT_ENV] == process_module.HANDOFF_EXPERIMENT_OFF
-    assert process_module.QUIET_TAIL_PROFILE_ENV not in os.environ
+    assert process_module.QUIET_TAIL_PROFILE_ENV not in child_env
+    assert process_module.HANDOFF_EXPERIMENT_ENV not in child_env
+    assert os.environ[process_module.QUIET_TAIL_PROFILE_ENV] == "p05"
+    assert (
+        os.environ[process_module.HANDOFF_EXPERIMENT_ENV]
+        == process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF
+    )
 
 
 @pytest.mark.asyncio
-async def test_default_runner_passes_explicit_p20_in_child_env(
+async def test_default_runner_passes_explicit_profile_for_cached_handoff(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -94,7 +98,10 @@ async def test_default_runner_passes_explicit_p20_in_child_env(
         return SimpleNamespace(stdout=None, stderr=None)
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
-    runner = DefaultOverlayProcessRunner(quiet_tail_profile="p20")
+    runner = DefaultOverlayProcessRunner(
+        quiet_tail_profile="p20",
+        handoff_experiment=process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+    )
     await runner.spawn(tmp_path / "overlay.exe", tmp_path / "manifest.json")
     child_env = captured["env"]
     assert isinstance(child_env, dict)
@@ -120,6 +127,7 @@ async def test_default_runner_propagates_explicit_cached_frame_arm(
 
     child_env = captured["env"]
     assert isinstance(child_env, dict)
+    assert process_module.QUIET_TAIL_PROFILE_ENV not in child_env
     assert (
         child_env[process_module.HANDOFF_EXPERIMENT_ENV]
         == process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF
@@ -493,7 +501,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             self.managed: _AsyncioOverlayProcess | None = None
             self.overlay_instance_id = "overlay-test"
 
-        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -625,7 +633,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         def __init__(self) -> None:
             self.managed: _AsyncioOverlayProcess | None = None
 
-        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -695,7 +703,7 @@ class FakeProcessRunner:
     last_process: FakeOverlayManagedProcess | None = None
     overlay_instance_id: str = "overlay-test"
 
-    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+    def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
         _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -727,7 +735,7 @@ class FakeProcessRunner:
 
 @dataclass(slots=True)
 class MissingExecutableRunner:
-    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+    def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
         _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -1666,7 +1674,7 @@ async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_
             self.spawn_calls = 0
             self.last_process: FakeOverlayManagedProcess | None = None
 
-        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:

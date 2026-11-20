@@ -693,7 +693,7 @@ async def test_preserved_presenter_rearms_original_expiration_deadline_in_new_ru
     clock.advance(1.0)
     new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     new_runtime.adopt_presenter(presenter)
-    await presenter.begin_native_retry_epoch(enabled=True)
+    await presenter.begin_runtime_epoch()
     await asyncio.sleep(0)
 
     assert sleep_calls == [8.0, 7.0]
@@ -748,7 +748,7 @@ async def test_preserved_presenter_drops_expired_caption_before_fresh_epoch_repl
     clock.advance(31.0)
     new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     new_runtime.adopt_presenter(presenter)
-    await presenter.begin_native_retry_epoch(enabled=True)
+    await presenter.begin_runtime_epoch()
 
     assert presenter.snapshot().blocks == []
     assert presenter.snapshot().native_fresh_render_targets is None

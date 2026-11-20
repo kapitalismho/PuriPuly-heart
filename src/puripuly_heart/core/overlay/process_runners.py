@@ -48,7 +48,7 @@ class OverlayProcessRunner(Protocol):
     def configure_runtime(
         self,
         *,
-        quiet_tail_profile: str,
+        quiet_tail_profile: str | None,
         handoff_experiment: str,
     ) -> None: ...
 
@@ -64,13 +64,13 @@ class OverlayProcessRunner(Protocol):
 class DefaultOverlayProcessRunner:
     executable_path: Path | None = None
     task_factory: Any | None = None
-    quiet_tail_profile: str = "p05"
+    quiet_tail_profile: str | None = None
     handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
 
     def configure_runtime(
         self,
         *,
-        quiet_tail_profile: str,
+        quiet_tail_profile: str | None,
         handoff_experiment: str,
     ) -> None:
         self.quiet_tail_profile = quiet_tail_profile
@@ -105,8 +105,13 @@ class DefaultOverlayProcessRunner:
         else:
             command = (str(executable_path), "--config", str(manifest_path))
         child_env = os.environ.copy()
-        child_env[QUIET_TAIL_PROFILE_ENV] = self.quiet_tail_profile
-        child_env[HANDOFF_EXPERIMENT_ENV] = normalize_handoff_experiment(self.handoff_experiment)
+        child_env.pop(QUIET_TAIL_PROFILE_ENV, None)
+        child_env.pop(HANDOFF_EXPERIMENT_ENV, None)
+        experiment = normalize_handoff_experiment(self.handoff_experiment)
+        if experiment != HANDOFF_EXPERIMENT_OFF:
+            child_env[HANDOFF_EXPERIMENT_ENV] = experiment
+            if self.quiet_tail_profile is not None:
+                child_env[QUIET_TAIL_PROFILE_ENV] = self.quiet_tail_profile
         process = await asyncio.create_subprocess_exec(
             *command,
             stdout=asyncio.subprocess.PIPE,
@@ -283,7 +288,7 @@ class DesktopFletOverlayRunner:
     def configure_runtime(
         self,
         *,
-        quiet_tail_profile: str,
+        quiet_tail_profile: str | None,
         handoff_experiment: str,
     ) -> None:
         _ = quiet_tail_profile

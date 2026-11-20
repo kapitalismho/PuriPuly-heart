@@ -38,7 +38,7 @@ pub enum QuietTailProfile {
 
 impl Default for QuietTailProfile {
     fn default() -> Self {
-        Self::P05
+        Self::NoRetry
     }
 }
 
@@ -94,13 +94,22 @@ pub struct OverlayManifest {
     pub locale: String,
 }
 
-pub fn resolve_quiet_tail_profile_from_env() -> Result<QuietTailProfile, StartupError> {
-    resolve_quiet_tail_profile(std::env::var_os(QUIET_TAIL_PROFILE_ENV).as_deref())
+pub fn resolve_quiet_tail_profile_from_env(
+    experiment: HandoffExperiment,
+) -> Result<QuietTailProfile, StartupError> {
+    let value = (experiment == HandoffExperiment::CachedFrameRehandoff)
+        .then(|| std::env::var_os(QUIET_TAIL_PROFILE_ENV))
+        .flatten();
+    resolve_quiet_tail_profile(experiment, value.as_deref())
 }
 
 pub fn resolve_quiet_tail_profile(
+    experiment: HandoffExperiment,
     value: Option<&std::ffi::OsStr>,
 ) -> Result<QuietTailProfile, StartupError> {
+    if experiment == HandoffExperiment::Off {
+        return Ok(QuietTailProfile::default());
+    }
     let Some(value) = value else {
         return Ok(QuietTailProfile::P05);
     };

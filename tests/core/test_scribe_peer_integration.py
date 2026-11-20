@@ -59,7 +59,7 @@ async def capture_route(monkeypatch):
     timeline = Timeline()
     surface = Surface()
     presenter = presenter_for(timeline, surface)
-    await presenter.begin_native_retry_epoch(enabled=True)
+    await presenter.begin_runtime_epoch(diagnostic_retry=True)
     socket = FakeScribeWebSocket("native-scope")
     native_scope = "native-scope"
     socket_provider = None

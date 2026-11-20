@@ -161,7 +161,7 @@ impl RetryEpisodes {
             self_ended_episode: None,
             peer_ended_episode: None,
             audit_started_at: Instant::now(),
-            audit: VecDeque::with_capacity(RETRY_AUDIT_CAPACITY),
+            audit: VecDeque::new(),
             audit_dropped: 0,
             next_audit_sequence: 1,
         }

@@ -1375,7 +1375,6 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     retry_receiver: mpsc::Receiver<()>,
     retry_policy: NativeFreshRetryPolicy,
     retry_episodes: RetryEpisodes,
-    retry_profile: &'static str,
     successful_attempt_audit: VecDeque<PresentationCorrelation>,
     readiness_timeouts_since_success: u32,
     readiness_no_progress_timeout: Duration,
@@ -1393,20 +1392,30 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         renderer: CaptionRenderer,
         openvr: S,
     ) -> Self {
+        Self::new_with_profile(snapshot, renderer, openvr, QuietTailProfile::default())
+    }
+
+    pub fn new_with_profile(
+        snapshot: OverlayPresentationSnapshot,
+        renderer: CaptionRenderer,
+        openvr: S,
+        profile: QuietTailProfile,
+    ) -> Self {
         let (retry_sender, retry_receiver) = mpsc::channel(1);
+        let mut runtime = PresentationRuntime::new(snapshot);
+        runtime.configure_retry_profile(profile.id());
         Self {
-            runtime: PresentationRuntime::new(snapshot),
+            runtime,
             renderer: Some(renderer),
             openvr: Some(openvr),
             retry_sender: Some(retry_sender),
             retry_receiver,
             retry_policy: NativeFreshRetryPolicy::new(
                 NATIVE_FRESH_RETRY_CADENCE,
-                NATIVE_FRESH_RETRY_DEADLINE,
-                NATIVE_FRESH_RETRY_MAX_COMPLETED,
+                profile.scheduling_wall(),
+                profile.max_final_opportunities(),
             ),
             retry_episodes: RetryEpisodes::new(),
-            retry_profile: "p05",
             successful_attempt_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
             readiness_timeouts_since_success: 0,
             readiness_no_progress_timeout: NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
@@ -1419,25 +1428,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         }
     }
 
-    pub fn new_with_profile(
+    fn new_with_profile_and_experiment(
         snapshot: OverlayPresentationSnapshot,
         renderer: CaptionRenderer,
         openvr: S,
-        profile: crate::manifest::QuietTailProfile,
-    ) -> Self {
-        let mut owner = Self::new(snapshot, renderer, openvr);
-        owner.retry_policy.max_completed = profile.max_final_opportunities();
-        owner.retry_policy.deadline = profile.scheduling_wall();
-        owner.retry_profile = profile.id();
-        owner.runtime.configure_retry_profile(profile.id());
-        owner
-    }
-
-    pub fn new_with_profile_and_experiment(
-        snapshot: OverlayPresentationSnapshot,
-        renderer: CaptionRenderer,
-        openvr: S,
-        profile: crate::manifest::QuietTailProfile,
+        profile: QuietTailProfile,
         experiment: HandoffExperiment,
     ) -> Self {
         let mut owner = Self::new_with_profile(snapshot, renderer, openvr, profile);
@@ -1722,6 +1717,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         &mut self,
         _logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
+        if self.retry_policy.max_completed == 0 {
+            return Ok(());
+        }
         for channel in [FreshRetryChannel::SelfChannel, FreshRetryChannel::Peer] {
             let current_cause = self
                 .retry_episodes
@@ -2684,7 +2682,8 @@ fn startup_error_from_preflight(error: OpenVrStartupPreflightError) -> StartupEr
 }
 
 pub async fn run_with_manifest(manifest: OverlayManifest) -> i32 {
-    run_with_manifest_and_profile(manifest, QuietTailProfile::P05, HandoffExperiment::Off).await
+    run_with_manifest_and_profile(manifest, QuietTailProfile::default(), HandoffExperiment::Off)
+        .await
 }
 
 async fn run_with_manifest_and_profile(
@@ -2819,8 +2818,8 @@ pub async fn run_cli(args: &[String]) -> i32 {
         }
     };
 
-    let quiet_tail_profile = match resolve_quiet_tail_profile_from_env() {
-        Ok(profile) => profile,
+    let handoff_experiment = match resolve_handoff_experiment_from_env() {
+        Ok(experiment) => experiment,
         Err(error) => {
             eprintln!(
                 "[overlay][ERROR] startup_failure reason={}",
@@ -2830,8 +2829,8 @@ pub async fn run_cli(args: &[String]) -> i32 {
             return error.exit_code();
         }
     };
-    let handoff_experiment = match resolve_handoff_experiment_from_env() {
-        Ok(experiment) => experiment,
+    let quiet_tail_profile = match resolve_quiet_tail_profile_from_env(handoff_experiment) {
+        Ok(profile) => profile,
         Err(error) => {
             eprintln!(
                 "[overlay][ERROR] startup_failure reason={}",
@@ -2962,7 +2961,9 @@ mod tests {
     };
     use crate::bridge::{BridgeClient, BridgeIncoming};
     use crate::logging::OverlayLogger;
-    use crate::manifest::{HandoffExperiment, OverlayManifest, EXPECTED_CONTRACT_VERSION};
+    use crate::manifest::{
+        HandoffExperiment, OverlayManifest, QuietTailProfile, EXPECTED_CONTRACT_VERSION,
+    };
 
     #[test]
     fn runtime_and_startup_failure_reasons_preserve_first_distinct_cause() {
@@ -3248,10 +3249,11 @@ mod tests {
         }
 
         let logger = OverlayLogger::open(std::env::temp_dir()).await.unwrap();
-        let mut owner = NativePresentationOwner::new(
+        let mut owner = NativePresentationOwner::new_with_profile(
             snapshot(1, 1, "stream", 7),
             CaptionRenderer::new_for_test().unwrap(),
             FakeOpenVr::default(),
+            QuietTailProfile::P05,
         );
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
         let first_schedule = owner
@@ -3379,10 +3381,11 @@ mod tests {
             serde_json::from_slice(&output.stdout).unwrap();
         let logger = OverlayLogger::open(std::env::temp_dir()).await.unwrap();
         let channel = FreshRetryChannel::SelfChannel;
-        let mut owner = NativePresentationOwner::new(
+        let mut owner = NativePresentationOwner::new_with_profile(
             snapshots[0].clone(),
             CaptionRenderer::new_for_test().unwrap(),
             FakeOpenVr::default(),
+            QuietTailProfile::P05,
         );
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
         let first = owner.retry_episodes.schedule(channel).unwrap().clone();
