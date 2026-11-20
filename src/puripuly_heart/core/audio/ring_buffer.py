@@ -60,10 +60,7 @@ class RingBufferF32:
         if count == 0:
             return np.zeros((0,), dtype=np.float32)
 
-        if start < self._write_pos or self._filled is False:
-            return self._buffer[start : start + count].copy()
-
-        tail = self._buffer[start:].copy()
-        head_len = count - tail.size
-        head = self._buffer[:head_len].copy()
-        return np.concatenate([tail, head])
+        end = start + count
+        if end <= self.capacity_samples:
+            return self._buffer[start:end].copy()
+        return np.concatenate((self._buffer[start:], self._buffer[: self._write_pos]))
