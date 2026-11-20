@@ -430,6 +430,12 @@ impl PhotoCompositor {
         }
     }
 
+    #[cfg(test)]
+    pub(super) fn hold_next_frame(&mut self) {
+        self.dirty = true;
+        self.hold_completion = true;
+    }
+
     pub fn clear_attempt(&mut self) {
         self.blocks.clear();
         self.completed_text = None;

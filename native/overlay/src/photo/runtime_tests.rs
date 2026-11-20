@@ -652,11 +652,7 @@ impl PhotoRuntime {
         grant(&mut runtime, &mut bridge, &mut socket, &photo.photo_id, 1, 1).await;
         assert_pulses(&[(2, 0, 900)]);
         let presented = runtime.texture.as_ref().unwrap().pointer();
-        {
-            let compositor = runtime.compositor.as_mut().unwrap();
-            compositor.invalidate();
-            compositor.hold_completion = true;
-        }
+        runtime.compositor.as_mut().unwrap().hold_next_frame();
         runtime.render_frame(&mut bridge).await.unwrap();
         assert!(runtime.gpu_pending());
         assert_eq!(runtime.texture.as_ref().unwrap().pointer(), presented);
@@ -827,8 +823,7 @@ impl PhotoRuntime {
         if let Backend::OpenVr(surfaces) = &runtime.backend {
             assert_eq!(surfaces.photo.as_ref().unwrap().observed_overlay_visible(), Some(true));
         }
-        runtime.compositor.as_mut().unwrap().invalidate();
-        runtime.compositor.as_mut().unwrap().hold_completion = true;
+        runtime.compositor.as_mut().unwrap().hold_next_frame();
         runtime.render_frame(&mut bridge).await.unwrap();
         let preview_pending = runtime.pending_frame.as_ref().unwrap().started;
         let preview_epoch = runtime.frame_epoch;
