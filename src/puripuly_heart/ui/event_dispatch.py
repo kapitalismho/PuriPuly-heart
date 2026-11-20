@@ -347,12 +347,14 @@ class UIEventBridge:
             return bool(self._is_translation_enabled_callback())
         return False
 
-    def _projection_context(self) -> EventProjectionContext:
+    def _projection_context(
+        self, *, include_translation_enabled: bool = False
+    ) -> EventProjectionContext:
         source_lang, target_lang = self._get_language_codes()
         return EventProjectionContext(
             source_language=source_lang,
             target_language=target_lang,
-            translation_enabled=self._translation_enabled(),
+            translation_enabled=include_translation_enabled and self._translation_enabled(),
         )
 
     def _emit_dashboard_translation_applied_diagnostic(
@@ -456,7 +458,7 @@ class UIEventBridge:
             return
 
         if mapped.kind == "self_turn":
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(mapped, EventProjectionContext())
             snapshot = projection.self_turn
             if snapshot is None:
                 return
@@ -540,7 +542,9 @@ class UIEventBridge:
             return
 
         if mapped.kind == "osc" and isinstance(mapped.payload, OSCMessage):
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(
+                mapped, self._projection_context(include_translation_enabled=True)
+            )
             self.history_destination.append_entry(
                 "VRChat",
                 mapped.payload.text,
