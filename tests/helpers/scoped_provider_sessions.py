@@ -240,7 +240,7 @@ class FakeScribeWebSocket:
         if session_id is not None:
             self.push("session_started", session_id=session_id)
 
-    async def send(self, payload: str) -> None:
+    async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
         event = json.loads(payload)
         self.sent.append(event)
         if event["commit"]:
