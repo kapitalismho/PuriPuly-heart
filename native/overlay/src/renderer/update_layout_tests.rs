@@ -141,3 +141,65 @@ fn windows_graphics_exact_wrapping_reuse_matches_sequential_boundaries_and_stays
         );
     }
 }
+
+#[test]
+fn windows_graphics_layout_cache_counts_membership_before_mutation_even_on_failure() {
+    use crate::renderer::CaptionChannel;
+
+    let engine = DirectWriteLayoutEngine::new_for_test().unwrap();
+    let policy = CaptionLayoutPolicy::default();
+    let presentation = CaptionPresentation::default();
+    let mut cache = LayoutCache::with_capacity(1);
+    let neighbor = CaptionBlock::new("self:one", "Stable e\u{301} 🐋")
+        .with_channel(CaptionChannel::SelfChannel)
+        .with_secondary_text("같은 문장", true)
+        .with_slot(1, 544.0);
+    let resolve = |blocks: &[CaptionBlock], cache: &mut LayoutCache| {
+        let mut diagnostics = RenderDiagnostics::default();
+        let result = policy.resolve_blocks_for_presentation_windows_cached(
+            blocks,
+            4096,
+            1056,
+            &presentation,
+            &engine,
+            Some((cache, &mut diagnostics)),
+        );
+        (
+            result,
+            (diagnostics.layout_cache_hits, diagnostics.layout_cache_misses),
+        )
+    };
+
+    let duplicate = CaptionBlock {
+        id: "same-content".into(),
+        ..neighbor.clone()
+    }
+    .with_slot(0, 40.0);
+    let (result, counts) = resolve(&[duplicate, neighbor.clone()], &mut cache);
+    let first = result.unwrap();
+    assert_eq!(counts, (0, 2));
+    assert_eq!(first.visible_blocks[0].id, "same-content");
+    assert_eq!(first.visible_blocks[1].id, "self:one");
+    assert_eq!(cache.len(), 1);
+
+    let mut changing = CaptionBlock::new("peer:one", "Changed 日本語 한국어 Latin")
+        .with_channel(CaptionChannel::PeerChannel)
+        .with_slot(0, 40.0);
+    let (result, counts) = resolve(&[changing.clone(), neighbor.clone()], &mut cache);
+    assert_eq!(counts, (1, 1));
+    assert_eq!(result.unwrap().visible_blocks[1], first.visible_blocks[1]);
+    assert_eq!(cache.len(), 1);
+
+    changing.fit_scales = Some(CaptionFitScales {
+        primary: -1.0,
+        secondary: 1.0,
+    });
+    let (result, counts) = resolve(&[changing, neighbor.clone()], &mut cache);
+    assert!(result.is_err());
+    assert_eq!(counts, (1, 1));
+    assert_eq!(cache.len(), 1);
+
+    let (result, counts) = resolve(&[neighbor], &mut cache);
+    assert_eq!(counts, (1, 0));
+    assert_eq!(result.unwrap().visible_blocks[0], first.visible_blocks[1]);
+}
