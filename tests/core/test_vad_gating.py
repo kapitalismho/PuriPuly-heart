@@ -515,6 +515,32 @@ def _capture_span(index: int) -> AudioCaptureSpan:
     )
 
 
+def test_resizing_pre_roll_keeps_pcm_and_capture_on_the_same_source_range() -> None:
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.0] * 5 + [0.9]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=128,
+    )
+    samples = np.arange(6 * 512, dtype=np.float32)
+
+    def feed(index: int):
+        span = _capture_span(index)
+        return gating.process_owned_chunk(samples[index * 512 : (index + 1) * 512], (span,))
+
+    for index in range(4):
+        feed(index)
+    for duration in (48, 112):
+        gating.reconfigure_next_segment(
+            speech_threshold=0.4, hangover_ms=64, ring_buffer_ms=duration
+        )
+    feed(4)
+    (start,) = feed(5)
+    assert isinstance(start, SpeechStart)
+    np.testing.assert_array_equal(start.pre_roll, samples[1280:2560])
+    source_ranges = [(s.source_start_sample, s.source_end_sample) for s in start.pre_roll_capture]
+    assert source_ranges == [(1280, 1536), (1536, 2048), (2048, 2560)]
+
+
 def test_peer_ordinary_onset_retains_500ms_pre_roll() -> None:
     gating = create_peer_vad_gating(
         SequenceVadEngine(probs=[0.0] * 16 + [0.9, 0.9, 0.9]),
