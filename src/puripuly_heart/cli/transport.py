@@ -248,8 +248,12 @@ class ControlServer:
                     )
 
                     async def forward_events() -> None:
-                        async for event in subscription:
-                            if disconnected.done() or self._closing:
+                        while not self._closing:
+                            try:
+                                event = await anext(subscription)
+                            except StopAsyncIteration:
+                                return
+                            if disconnected.done():
                                 return
                             await self._send(
                                 writer,
