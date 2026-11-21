@@ -174,20 +174,18 @@ def _mapping(value: object) -> Mapping:
     return value if isinstance(value, Mapping) else {}
 
 
+_SETTING_VALUE_PATHS = {
+    **SETTINGS_FIELD_PATHS,
+    **{f"languages.{name}": path for name, path in LANGUAGE_FIELD_PATHS.items()},
+}
+
+
 def setting_values(settings: Mapping) -> dict:
-    values = {
+    return {
         field: deepcopy(settings[path])
-        for field, path in SETTINGS_FIELD_PATHS.items()
+        for field, path in _SETTING_VALUE_PATHS.items()
         if path in settings
     }
-    values.update(
-        {
-            f"languages.{name}": deepcopy(settings[path])
-            for name, path in LANGUAGE_FIELD_PATHS.items()
-            if path in settings
-        }
-    )
-    return values
 
 
 def _static_choices(choices: object) -> bool:
@@ -236,11 +234,7 @@ def _settings(
     catalog = (
         _mapping(snapshot.get("settings_catalog")) if "settings.choices" not in missing else {}
     )
-    values = (
-        setting_values(_mapping(snapshot.get("settings")))
-        if "settings.current" not in missing
-        else {}
-    )
+    values = _mapping(snapshot.get("settings")) if "settings.current" not in missing else {}
     private = _mapping(snapshot.get("local_settings")) if "settings.current" not in missing else {}
     result: dict = {"settings": {}}
     options: dict[str, object] = {}
@@ -257,8 +251,8 @@ def _settings(
             result.setdefault("private", {})[field] = (
                 "saved" if presence is True else "empty" if presence is False else "unknown"
             )
-        elif field in values:
-            result["settings"][field] = values[field]
+        elif (path := _SETTING_VALUE_PATHS.get(field)) is not None and path in values:
+            result["settings"][field] = deepcopy(values[path])
         if descriptor.value_kind in _UNITS:
             entry["unit"] = _UNITS[descriptor.value_kind]
         raw_choices = _mapping(catalog.get(field)).get("choices")

@@ -129,9 +129,21 @@ async def test_one_visible_turn_progresses_without_final_translation_flicker(
     observed = []
     sync = card._sync_display
 
+    def appearance():
+        text = card._display_text
+        return (
+            text.value,
+            text.font_family,
+            text.style.letter_spacing,
+            text.size,
+            text.max_lines,
+            text.color,
+            text.weight,
+        )
+
     def capture():
         result = sync()
-        observed.append(card._display_text.value)
+        observed.append(appearance())
         return result
 
     monkeypatch.setattr(card, "_sync_display", capture)
@@ -153,15 +165,18 @@ async def test_one_visible_turn_progresses_without_final_translation_flicker(
     second = ready(extended, "extended translation")
     await publish(presentation, second)
     assert card._display_text.value == "extended translation"
+    translated_appearance = appearance()
+    observed.clear()
     sealed = replace(second, revision=5, source_closed=True)
     await publish(presentation, sealed)
     assert card._display_text.value == "extended translation"
     final = replace(sealed, revision=6, status="complete")
     accept(presentation, final)
     accept(presentation, final)
-    before = len(observed)
     await publish(presentation, final)
-    assert observed[before:] == ["extended translation"]
+    assert appearance() == translated_appearance
+    assert all(state == translated_appearance for state in observed)
+    assert presentation.dashboard._self_turn_snapshot == final
     assert len(presentation.logs.conversation_records) == 1
     record = presentation.logs.conversation_records[0]
     assert record.timestamp_label == timestamp
