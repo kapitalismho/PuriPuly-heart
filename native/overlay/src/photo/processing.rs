@@ -410,20 +410,13 @@ impl MaskProcessor {
             }])
         });
         let vertical = bbox.height() > 1.6 * bbox.width();
-        let owned = owned_lines(&foreground, roi, bbox, glyph_size, vertical);
-        let recovered = GrayImage::from_fn(roi.width, roi.height, |x, y| {
-            Luma([if owned.get_pixel(x, y)[0] != 0 || core.get_pixel(x, y)[0] != 0 {
-                255
-            } else {
-                0
-            }])
-        });
+        let recovered = recover_owned_lines(&foreground, &core, roi, bbox, glyph_size, vertical);
         let mask = dilate(
             &recovered,
             erase_radius(glyph_size, photo.reference_scale),
             true,
         );
-        let (fill, _, _) = colors_and_leftover(photo, bbox, roi, &core, &mask, glyph_size);
+        let fill = fill_color(photo, roi, &core, glyph_size);
         let mask_ms = mask_start.elapsed().as_secs_f64() * 1000.0;
         let erase_start = Instant::now();
         let erase = Some(erase_patch(photo, roi, &mask, erase_source, workspace)?);
@@ -457,8 +450,9 @@ struct Part {
     total: u32,
 }
 
-fn owned_lines(
+fn recover_owned_lines(
     foreground: &GrayImage,
+    core: &GrayImage,
     roi: PixelRect,
     bbox: Rect,
     glyph: f32,
@@ -541,8 +535,9 @@ fn owned_lines(
         })
         .collect();
     GrayImage::from_fn(width, height, |x, y| {
-        let label = labels[(y * width + x) as usize];
-        Luma([if label != u32::MAX && owned[label as usize] {
+        let index = (y * width + x) as usize;
+        let label = labels[index];
+        Luma([if core.as_raw()[index] != 0 || (label != u32::MAX && owned[label as usize]) {
             255
         } else {
             0
@@ -556,30 +551,39 @@ fn erase_radius(glyph_size: f32, reference_scale: f32) -> u32 {
 }
 
 fn dilate(core: &GrayImage, radius: u32, ellipse: bool) -> GrayImage {
+    let (width, height) = (core.width() as usize, core.height() as usize);
     let mut output = GrayImage::new(core.width(), core.height());
-    let radius = radius as i64;
-    for dy in -radius..=radius {
-        let reach = if ellipse {
+    if width == 0 || height == 0 {
+        return output;
+    }
+    let radius = i64::from(radius);
+    let vertical = radius.min(height as i64 - 1);
+    for dy in -vertical..=vertical {
+        let reach = if ellipse && radius != 0 {
             (radius as f64 * ((radius * radius - dy * dy) as f64 / (radius * radius) as f64).sqrt())
-                .round_ties_even() as i64
+                .round_ties_even() as usize
         } else {
-            radius
+            radius as usize
         };
-        for y in 0..core.height() {
-            let target_y = i64::from(y) + dy;
-            if target_y < 0 || target_y >= i64::from(core.height()) {
-                continue;
-            }
-            for x in 0..core.width() {
-                if core.get_pixel(x, y)[0] == 0 {
+        let input_start = (-dy).max(0) as usize * width;
+        let target_start = dy.max(0) as usize * width;
+        let len = (height - dy.unsigned_abs() as usize) * width;
+        let input_rows = core.as_raw()[input_start..input_start + len].chunks_exact(width);
+        let target_rows = output.as_mut()[target_start..target_start + len].chunks_exact_mut(width);
+        for (input, target) in input_rows.zip(target_rows) {
+            let (mut left, mut right) = (0, 0);
+            for (x, &value) in input.iter().enumerate() {
+                if value == 0 {
                     continue;
                 }
-                let first = (i64::from(x) - reach).max(0) as u32;
-                let last = (i64::from(x) + reach).min(i64::from(core.width()) - 1) as u32;
-                for target_x in first..=last {
-                    output.put_pixel(target_x, target_y as u32, Luma([255]));
+                let start = x.saturating_sub(reach);
+                if start > right {
+                    target[left..right].fill(255);
+                    left = start;
                 }
+                right = (x.saturating_add(reach).saturating_add(1)).min(width);
             }
+            target[left..right].fill(255);
         }
     }
     output
@@ -663,109 +667,70 @@ impl ColorHistogram {
     }
 }
 
-fn delta(a: [f32; 3], b: [f32; 3], normalized: bool) -> f32 {
-    let l = (a[0] - b[0]) * if normalized { 100.0 / 255.0 } else { 1.0 };
+fn delta(a: [f32; 3], b: [f32; 3]) -> f32 {
+    let l = a[0] - b[0];
     (l * l + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
 }
 
-fn colors_and_leftover(
-    photo: &WorkingPhoto,
-    bbox: Rect,
-    roi: PixelRect,
-    core: &GrayImage,
-    mask: &GrayImage,
-    glyph: f32,
-) -> ([u8; 3], f32, usize) {
+fn fill_color(photo: &WorkingPhoto, roi: PixelRect, core: &GrayImage, glyph: f32) -> [u8; 3] {
+    let count = core.as_raw().iter().filter(|&&value| value != 0).count();
+    if count == 0 {
+        return [245, 245, 240];
+    }
     let ring = dilate(
         core,
         (3.0 * photo.reference_scale).round_ties_even().max(1.0) as u32,
         false,
     );
-    let border_width = (0.08 * glyph)
-        .round_ties_even()
-        .max(3.0 * photo.reference_scale)
-        .round_ties_even()
-        .max(1.0) as u32;
-    let mut labs = Vec::with_capacity(core.as_raw().len());
-    let mut text = ColorHistogram::new();
     let mut background = ColorHistogram::new();
-    let mut border = ColorHistogram::new();
-    for y in 0..roi.height {
-        for x in 0..roi.width {
-            let value = lab(photo.pixels.get_pixel(roi.x + x, roi.y + y).0);
-            labs.push(value);
-            if core.get_pixel(x, y)[0] != 0 {
-                text.push(value);
-            } else if ring.get_pixel(x, y)[0] != 0 {
-                background.push(value);
-            }
-            if x < border_width
-                || y < border_width
-                || x.saturating_add(border_width) >= roi.width
-                || y.saturating_add(border_width) >= roi.height
-            {
-                border.push(value);
+    for (x, y, pixel) in ring.enumerate_pixels() {
+        if pixel[0] != 0 && core.get_pixel(x, y)[0] == 0 {
+            background.push(lab(photo.pixels.get_pixel(roi.x + x, roi.y + y).0));
+        }
+    }
+    if background.count == 0 {
+        let border_width = (0.08 * glyph)
+            .round_ties_even()
+            .max(3.0 * photo.reference_scale)
+            .round_ties_even()
+            .max(1.0) as u32;
+        for y in 0..roi.height {
+            for x in 0..roi.width {
+                if x < border_width
+                    || y < border_width
+                    || x.saturating_add(border_width) >= roi.width
+                    || y.saturating_add(border_width) >= roi.height
+                {
+                    background.push(lab(photo.pixels.get_pixel(roi.x + x, roi.y + y).0));
+                }
             }
         }
     }
-    if text.count == 0 {
-        return ([245, 245, 240], 0.0, 0);
-    }
-    let bg = if background.count == 0 {
-        border.median()
-    } else {
-        background.median()
-    };
-    let text_color = text.median();
-    let border_color = border.median();
-    let mut distances = Vec::with_capacity(text.count);
-    for (&value, &on) in labs.iter().zip(core.as_raw()) {
-        if on != 0 {
-            distances.push(delta(value.map(f32::from), bg, false));
+    let bg = background.median();
+    let mut samples = Vec::with_capacity(count);
+    for (x, y, pixel) in core.enumerate_pixels() {
+        if pixel[0] != 0 {
+            let rgb = photo.pixels.get_pixel(roi.x + x, roi.y + y).0;
+            samples.push((delta(lab(rgb).map(f32::from), bg), rgb));
         }
     }
-    let position = (distances.len() - 1) as f64 * 0.6;
+    let position = (samples.len() - 1) as f64 * 0.6;
     let low = position.floor() as usize;
     let fraction = (position - position.floor()) as f32;
-    let (_, lower, right) = distances.select_nth_unstable_by(low, f32::total_cmp);
+    let (_, lower, right) = samples.select_nth_unstable_by(low, |a, b| a.0.total_cmp(&b.0));
     let upper = right
         .iter()
-        .copied()
+        .map(|sample| sample.0)
         .min_by(f32::total_cmp)
-        .unwrap_or(*lower);
-    let threshold = *lower + (upper - *lower) * fraction;
-    let mut fill_pixels = ColorHistogram::new();
-    let mut leftover = 0;
-    for y in 0..roi.height {
-        for x in 0..roi.width {
-            let index = (y * roi.width + x) as usize;
-            let value = labs[index].map(f32::from);
-            if core.as_raw()[index] != 0 && delta(value, bg, false) >= threshold {
-                fill_pixels.push(
-                    photo
-                        .pixels
-                        .get_pixel(roi.x + x, roi.y + y)
-                        .0,
-                );
-            }
-            let inside = x as f32 + roi.x as f32 + 0.5 >= bbox.left
-                && x as f32 + roi.x as f32 + 0.5 < bbox.right
-                && y as f32 + roi.y as f32 + 0.5 >= bbox.top
-                && y as f32 + roi.y as f32 + 0.5 < bbox.bottom;
-            if inside
-                && mask.as_raw()[index] == 0
-                && delta(value, text_color, true) < 12.0
-                && delta(value, border_color, true) > 20.0
-            {
-                leftover += 1;
-            }
+        .unwrap_or(lower.0);
+    let threshold = lower.0 + (upper - lower.0) * fraction;
+    let mut fill = ColorHistogram::new();
+    for (distance, rgb) in samples {
+        if distance >= threshold {
+            fill.push(rgb);
         }
     }
-    (
-        fill_pixels.median().map(|v| v as u8),
-        leftover as f32 / text.count as f32,
-        text.count,
-    )
+    fill.median().map(|v| v as u8)
 }
 
 pub fn refresh_erase(

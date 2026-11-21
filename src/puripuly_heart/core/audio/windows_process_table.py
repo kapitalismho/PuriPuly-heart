@@ -152,6 +152,13 @@ def _token_user_sid(api: _WindowsApi, process_handle: int) -> bytes | None:
         api.kernel32.CloseHandle(token)
 
 
+def windows_process_create_time(process_handle: int) -> float:
+    created = _create_time(_api(), process_handle)
+    if created is None:
+        raise ctypes.WinError(ctypes.get_last_error())
+    return created
+
+
 def _create_time(api: _WindowsApi, process_handle: int) -> float | None:
     from ctypes import wintypes
 
@@ -266,4 +273,5 @@ __all__ = [
     "WindowsProcessRecord",
     "list_windows_processes",
     "snapshot_windows_processes",
+    "windows_process_create_time",
 ]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections import deque
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -85,7 +86,8 @@ class VadGating:
     _last_discarded_candidate_chunks: int
     _diagnostic_generation: int
 
-    _ring_capture: list[AudioCaptureSpan]
+    _ring_capture: deque[AudioCaptureSpan]
+    _ring_capture_samples: int
     _rollover_pending: bool
     _rollover_silence_run: int
     _pending_segment_settings: tuple[float, float, int, int] | None
@@ -155,7 +157,8 @@ class VadGating:
         self._pending_debounce_reached = False
         self._pending_start_capture = []
         self._speech_sample_count = 0
-        self._ring_capture = []
+        self._ring_capture = deque()
+        self._ring_capture_samples = 0
         self._rollover_pending = False
         self._rollover_silence_run = 0
         self._last_observation_was_speech = False
@@ -217,6 +220,7 @@ class VadGating:
         self.engine.reset()
         self._ring.clear()
         self._ring_capture.clear()
+        self._ring_capture_samples = 0
         self._in_speech = False
         self._utterance_id = None
         self._silence_run = 0
@@ -273,7 +277,8 @@ class VadGating:
         retained_capture = self._capture_suffix(retained.size)
         self._ring = RingBufferF32(capacity_samples=capacity_samples)
         self._ring.append(retained)
-        self._ring_capture = list(retained_capture)
+        self._ring_capture = deque(retained_capture)
+        self._ring_capture_samples = sum(span.normalized_sample_count for span in retained_capture)
 
     def process_chunk(self, chunk: np.ndarray) -> list[VadEvent]:
         return self.process_owned_chunk(chunk, ())
@@ -527,8 +532,25 @@ class VadGating:
         capture: tuple[AudioCaptureSpan, ...],
     ) -> None:
         self._ring.append(chunk)
-        self._ring_capture.extend(capture)
-        self._ring_capture = list(self._capture_suffix(self._ring.capacity_samples))
+        for span in capture:
+            count = span.normalized_sample_count
+            if count:
+                self._ring_capture.append(span)
+                self._ring_capture_samples += count
+        excess = self._ring_capture_samples - self._ring.capacity_samples
+        while excess > 0:
+            first = self._ring_capture[0]
+            count = first.normalized_sample_count
+            if count > excess:
+                start = first.normalized_start_sample
+                end = first.normalized_end_sample
+                assert start is not None and end is not None
+                self._ring_capture[0] = first.slice_normalized(start + excess, end)
+                self._ring_capture_samples -= excess
+                break
+            self._ring_capture.popleft()
+            self._ring_capture_samples -= count
+            excess -= count
 
     def _capture_suffix(self, sample_count: int) -> tuple[AudioCaptureSpan, ...]:
         if sample_count <= 0:

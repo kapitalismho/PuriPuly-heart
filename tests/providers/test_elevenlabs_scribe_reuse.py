@@ -219,8 +219,8 @@ async def test_callback_during_commit_waits_for_successful_commit_write() -> Non
 @pytest.mark.asyncio
 async def test_callback_during_failed_commit_cannot_authorize_reuse() -> None:
     class _FailingCommitConnection(FakeScribeWebSocket):
-        async def send(self, payload: str) -> None:
-            await super().send(payload)
+        async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
+            await super().send(payload, text=text)
             self.emit(
                 "committed_transcript",
                 {"message_type": "committed_transcript", "text": "not authoritative"},

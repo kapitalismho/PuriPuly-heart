@@ -83,7 +83,7 @@ class ChatboxQueue(Protocol):
     def send_typing(self, is_typing: bool) -> None: ...
     def set_typing_reason(self, reason: str, active: bool) -> None: ...
     def clear_typing_reasons(self) -> None: ...
-    def process_due(self) -> None: ...
+    async def run_flush_loop(self) -> None: ...
 
 
 class UIEventBridgePort(Protocol):
@@ -160,7 +160,6 @@ class OutputRuntime:
     clock: Clock = field(default_factory=SystemClock)
     overlay_sink: OverlaySink | None = None
     overlay_event_adapter: OverlayEventAdapter | None = None
-    flush_interval_s: float = 0.1
     diagnostics_capacity: int = 4096
     routing_observer: Callable[[OutputRoutingDecision], object] | None = field(
         default=None,
@@ -663,7 +662,7 @@ class OutputRuntime:
             self._chatbox_flush_task is None or self._chatbox_flush_task.done()
         ):
             self._chatbox_flush_task = self._create_task(
-                self._run_chatbox_flush_loop(),
+                self.chatbox.run_flush_loop(),
                 task_name="chatbox-flush",
             )
 
@@ -2409,14 +2408,6 @@ class OutputRuntime:
             reason="output_runtime_closed" if self._state == "closed" else "output_runtime_closing",
             metadata={"channel": channel, "state": self._state},
         )
-
-    async def _run_chatbox_flush_loop(self) -> None:
-        try:
-            while True:
-                self.chatbox.process_due()
-                await asyncio.sleep(self.flush_interval_s)
-        except asyncio.CancelledError:
-            raise
 
     def _create_task(
         self,

@@ -7,7 +7,7 @@ import sys
 import pytest
 
 from puripuly_heart.core.audio.process_identity import (
-    PsutilProcessIdentityWatcher,
+    SystemProcessIdentityWatcher,
     WindowsCurrentUserProcessSnapshots,
 )
 from puripuly_heart.core.audio.windows_process_table import (
@@ -75,11 +75,37 @@ def test_snapshot_identity_is_accepted_by_process_identity_watcher(child_process
         instance_id=snapshot.instance_id,
     )
 
-    watch = PsutilProcessIdentityWatcher().watch(identity, on_terminal=lambda: None)
+    watch = SystemProcessIdentityWatcher().watch(identity, on_terminal=lambda _reason, _cause: None)
     try:
         assert watch.identity_verified is True
     finally:
         watch.close()
+
+
+def test_process_identity_watcher_rejects_already_exited_child(child_process) -> None:
+    from puripuly_heart.config.process_capture_resolution import (
+        ResolvedProcessCaptureIdentity,
+    )
+    from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
+
+    identity = ResolvedProcessCaptureIdentity(
+        pid=child_process.pid,
+        target=ProcessCaptureTargetIntent.generic_executable(r"C:\Apps\Game\Game.exe"),
+        instance_id=f"{child_process.pid}:{psutil.Process(child_process.pid).create_time()}",
+    )
+    child_process.terminate()
+    child_process.wait(timeout=5)
+    callbacks = []
+    watch = SystemProcessIdentityWatcher().watch(
+        identity, on_terminal=lambda reason, _cause: callbacks.append(reason)
+    )
+    try:
+        assert watch.identity_verified is False
+        assert watch.terminal_reason == "target_exited"
+        assert watch.failure_diagnostics is None
+    finally:
+        watch.close()
+    assert not callbacks
 
 
 def test_snapshot_paths_and_ownership_match_psutil_for_live_processes() -> None:

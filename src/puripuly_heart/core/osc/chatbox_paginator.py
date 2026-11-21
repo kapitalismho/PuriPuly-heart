@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import textwrap
 from collections.abc import Callable
@@ -37,6 +38,7 @@ class ChatboxPaginator:
     _pending_pages: list[str] | None = None
     _pending_messages: list[OSCMessage] | None = None
     _next_page_at: float = 0.0
+    _schedule_changed: asyncio.Event = field(default_factory=asyncio.Event, init=False, repr=False)
     _active_message: OSCMessage | None = field(default=None, init=False, repr=False)
     _active_page_index: int = field(default=0, init=False, repr=False)
     _active_page_count: int = field(default=0, init=False, repr=False)
@@ -176,6 +178,17 @@ class ChatboxPaginator:
             self._drain_pending_messages()
         return None
 
+    async def run_flush_loop(self) -> None:
+        while True:
+            self.process_due()
+            self._schedule_changed.clear()
+            delay = self._next_page_at - self.clock.now() if self._pending_pages else None
+            try:
+                async with asyncio.timeout(delay):
+                    await self._schedule_changed.wait()
+            except TimeoutError:
+                pass
+
     def process_due(self) -> None:
         if not self._is_paginating():
             self._drain_pending_messages()
@@ -283,6 +296,7 @@ class ChatboxPaginator:
         self._pending_messages.clear()
         self._stream_final_revisions.clear()
         self._next_page_at = 0.0
+        self._schedule_changed.set()
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
@@ -445,6 +459,7 @@ class ChatboxPaginator:
         dropped_pages = len(self._pending_pages)
         self._pending_pages.clear()
         self._next_page_at = 0.0
+        self._schedule_changed.set()
         if self._active_message is not None:
             self._stream_final_revisions.pop(
                 (self._active_message.utterance_id, self._active_message.presentation_revision),
@@ -481,6 +496,7 @@ class ChatboxPaginator:
         if tail:
             self._pending_pages.extend(tail)
             self._next_page_at = self.clock.now() + self.page_interval_s
+            self._schedule_changed.set()
             return
         self._stream_final_revisions.pop(
             (message.utterance_id, message.presentation_revision), None

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, Mapping
@@ -192,6 +193,7 @@ def _reset_prompt_cache_for_tests() -> None:
     """Reset cached prompt pieces for tests that swap prompt directories."""
     global _PROMPT_CACHE
     _PROMPT_CACHE = None
+    _render_cached_template.cache_clear()
 
 
 def _normalize_language_name(language_name: str) -> str:
@@ -349,6 +351,25 @@ def render_translation_prompt_template(
     peer_request_kind: Literal["normal", "preview", "continuation"] = "normal",
 ) -> str:
     """Render the shared translation prompt template with dynamic variables."""
+    cache = _PROMPT_CACHE
+    render = (
+        _render_cached_template
+        if cache is not None and (template is cache.template or template is cache.luna_template)
+        else _render_template
+    )
+    return render(
+        template, source_name, target_name, input_channel, source_specified, peer_request_kind
+    )
+
+
+def _render_template(
+    template: str,
+    source_name: str,
+    target_name: str,
+    input_channel: str,
+    source_specified: bool,
+    peer_request_kind: Literal["normal", "preview", "continuation"],
+) -> str:
     rendered = template
     variables = build_translation_prompt_variables(
         source_name,
@@ -380,6 +401,9 @@ def render_translation_prompt_template(
     for key, value in sorted(variables.items(), key=lambda item: len(item[0]), reverse=True):
         rendered = rendered.replace(f"${{{key}}}", value)
     return _collapse_extra_blank_lines(rendered)
+
+
+_render_cached_template = lru_cache(maxsize=16)(_render_template)
 
 
 def get_translation_prompt_template(*, model: str | None = None) -> str:

@@ -26,8 +26,12 @@ async def test_scribe_raw_verified_proxy_audio_event_flow(certificates, monkeypa
 
     async def handler(ws):
         await ws.send(json.dumps({"message_type": "session_started", "session_id": "native-id"}))
-        audio = json.loads(await ws.recv())
-        commit = json.loads(await ws.recv())
+        raw_audio = await ws.recv()
+        raw_commit = await ws.recv()
+        assert isinstance(raw_audio, str)
+        assert isinstance(raw_commit, str)
+        audio = json.loads(raw_audio)
+        commit = json.loads(raw_commit)
         requests.append((ws.request.path, ws.request.headers, audio, commit))
         await ws.send(json.dumps({"message_type": "committed_transcript", "text": "recognized"}))
         await ws.wait_closed()

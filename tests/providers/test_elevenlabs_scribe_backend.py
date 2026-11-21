@@ -206,7 +206,7 @@ async def test_recoverable_scribe_events_end_stream_without_raising(event_name: 
 @pytest.mark.asyncio
 async def test_send_failure_ends_scribe_session_without_raising() -> None:
     class RaisingConnection(FakeScribeWebSocket):
-        async def send(self, payload: dict) -> None:
+        async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
             _ = payload
             raise RuntimeError("closed")
 
@@ -225,7 +225,7 @@ async def test_send_failure_ends_scribe_session_without_raising() -> None:
 @pytest.mark.asyncio
 async def test_fatal_error_is_not_hidden_by_later_close_or_send_failure() -> None:
     class RaisingConnection(FakeScribeWebSocket):
-        async def send(self, payload: dict) -> None:
+        async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
             _ = payload
             raise RuntimeError("closed")
 

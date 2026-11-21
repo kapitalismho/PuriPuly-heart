@@ -13,7 +13,7 @@ import pytest
 
 from puripuly_heart.config.process_capture_platform import ProcessCapturePlatformAvailability
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
-from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
+from puripuly_heart.core.audio.process_identity import SystemProcessIdentityWatcher
 from puripuly_heart.core.audio.process_source import (
     PROCESS_CAPTURE_CHANNELS,
     PROCESS_CAPTURE_SAMPLE_RATE_HZ,
@@ -506,7 +506,7 @@ async def test_process_source_close_stops_real_identity_watch_thread_while_targe
     try:
         source = ProcessAudioCaptureSource(
             identity=identity,
-            watcher=PsutilProcessIdentityWatcher(),
+            watcher=SystemProcessIdentityWatcher(),
             capture_factory=factory,
             platform_availability=_supported,
         )

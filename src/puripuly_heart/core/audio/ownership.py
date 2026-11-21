@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from operator import itemgetter
 from typing import Literal
 from uuid import UUID
 
@@ -228,9 +230,10 @@ class _MutableSegment:
     settings: AudioSegmentSettingsSnapshot
     opened_at_monotonic_s: float
     genuine_onset: bool
+    context_ranges: tuple[AudioCaptureSpan, ...]
+    prefix_context_sample_count: int
     content_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     failed_ranges: list[AudioCaptureSpan] = field(default_factory=list)
-    context_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     synthetic_context_sample_count: int = 0
     sealed_at_monotonic_s: float | None = None
     seal_reason: str | None = None
@@ -380,11 +383,14 @@ class PeerAudioSegmentLedger:
                     fallback=now_monotonic_s,
                 ),
                 genuine_onset=event.genuine_onset,
+                context_ranges=tuple(event.pre_roll_capture),
+                prefix_context_sample_count=sum(
+                    span.normalized_sample_count for span in event.pre_roll_capture
+                ),
             )
             self._segments[event.utterance_id] = segment
             self._segment_ids_by_order[identity.segment_order] = event.utterance_id
             self._open_segment_id = event.utterance_id
-            segment.context_ranges.extend(event.pre_roll_capture)
             self._append_content(segment, event.chunk_capture, int(event.chunk.size))
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
 
@@ -602,39 +608,28 @@ class PeerAudioSegmentLedger:
             end = item.normalized_end_sample
             if start is None or end is None or end <= start:
                 continue
-            remaining = [(start, end)]
             prior = self._claimed_ranges.setdefault(item.capture_epoch, [])
-            for prior_start, prior_end in prior:
-                next_remaining: list[tuple[int, int]] = []
-                for current_start, current_end in remaining:
-                    if prior_end <= current_start or prior_start >= current_end:
-                        next_remaining.append((current_start, current_end))
-                        continue
-                    if current_start < prior_start:
-                        next_remaining.append((current_start, prior_start))
-                    if prior_end < current_end:
-                        next_remaining.append((prior_end, current_end))
-                remaining = next_remaining
-            for current_start, current_end in remaining:
-                sliced = item.slice_normalized(current_start, current_end)
-                claimed.append(sliced)
-                prior.append((current_start, current_end))
-            prior.sort()
-            merged = self._merge_intervals(prior)
-            self._claimed_ranges[item.capture_epoch] = merged[
-                -self._MAX_CLAIM_INTERVALS_PER_EPOCH :
-            ]
-        return claimed
+            first = bisect_left(prior, start, key=itemgetter(1))
+            stop = first
+            cursor = start
+            while stop < len(prior):
+                prior_start, prior_end = prior[stop]
+                if prior_start > end:
+                    break
+                if cursor < prior_start:
+                    claimed.append(item.slice_normalized(cursor, prior_start))
+                cursor = max(cursor, prior_end)
+                stop += 1
+            if cursor < end:
+                claimed.append(item.slice_normalized(cursor, end))
 
-    @staticmethod
-    def _merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
-        merged: list[tuple[int, int]] = []
-        for start, end in intervals:
-            if not merged or start > merged[-1][1]:
-                merged.append((start, end))
+            if first == stop:
+                prior.insert(first, (start, end))
+                if len(prior) > self._MAX_CLAIM_INTERVALS_PER_EPOCH:
+                    del prior[0]
             else:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        return merged
+                prior[first:stop] = [(min(start, prior[first][0]), max(end, prior[stop - 1][1]))]
+        return claimed
 
     @staticmethod
     def _capture_epoch(ranges: tuple[AudioCaptureSpan, ...]) -> int:
@@ -651,11 +646,21 @@ class PeerAudioSegmentLedger:
     def contains_segment(self, segment_id: UUID) -> bool:
         return segment_id in self._segments or segment_id in self._retired_receipts
 
-    def is_segment_terminal(self, segment_id: UUID) -> bool:
-        if segment_id in self._retired_receipts:
-            return True
+    def segment_snapshot(self, segment_id: UUID) -> AudioSegmentSnapshot | None:
         segment = self._segments.get(segment_id)
-        return segment is not None and segment.terminal is not None
+        if segment is not None:
+            if segment.terminal is None:
+                return self._snapshot(segment)
+            return segment.terminal.segment
+        receipt = self._retired_receipts.get(segment_id)
+        return receipt.segment if receipt is not None else None
+
+    def terminal_receipt(self, segment_id: UUID) -> AudioSegmentTerminalReceipt | None:
+        segment = self._segments.get(segment_id)
+        return segment.terminal if segment is not None else self._retired_receipts.get(segment_id)
+
+    def is_segment_terminal(self, segment_id: UUID) -> bool:
+        return self.terminal_receipt(segment_id) is not None
 
     def _terminalize_sealed(
         self,
@@ -728,12 +733,10 @@ class PeerAudioSegmentLedger:
         terminal: bool = False,
     ) -> AudioSegmentSnapshot:
         content_ranges = tuple(segment.content_ranges)
-        context_ranges = tuple(segment.context_ranges)
         failed_ranges = tuple(segment.failed_ranges)
         content_sample_count = sum(item.normalized_sample_count for item in content_ranges)
         failed_normalized_sample_count = sum(item.normalized_sample_count for item in failed_ranges)
         failed_source_sample_count = sum(item.source_sample_count for item in failed_ranges)
-        prefix_context_sample_count = sum(item.normalized_sample_count for item in context_ranges)
         if terminal or segment.terminal is not None:
             state: Literal["open", "sealed", "terminal"] = "terminal"
         elif segment.sealed_at_monotonic_s is not None:
@@ -745,14 +748,14 @@ class PeerAudioSegmentLedger:
             settings=segment.settings,
             content_ranges=content_ranges,
             failed_ranges=failed_ranges,
-            context_ranges=context_ranges,
+            context_ranges=segment.context_ranges,
             content_sample_count=content_sample_count,
             failed_normalized_sample_count=failed_normalized_sample_count,
             failed_source_sample_count=failed_source_sample_count,
             context_sample_count=(
-                prefix_context_sample_count + segment.synthetic_context_sample_count
+                segment.prefix_context_sample_count + segment.synthetic_context_sample_count
             ),
-            prefix_context_sample_count=prefix_context_sample_count,
+            prefix_context_sample_count=segment.prefix_context_sample_count,
             synthetic_context_sample_count=segment.synthetic_context_sample_count,
             genuine_onset=segment.genuine_onset,
             state=state,

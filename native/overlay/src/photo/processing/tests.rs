@@ -175,105 +175,114 @@ fn ellipse_dilation_and_sampling_ring_preserve_reference_shape() {
 }
 
 #[test]
-fn fill_sampling_and_leftover_detect_unmasked_same_color_text() {
-    let mut original = RgbImage::from_pixel(100, 100, Rgb([240, 240, 240]));
-    let mut core = GrayImage::new(100, 100);
-    for y in 35..65 {
-        for x in 35..45 {
-            core.put_pixel(x, y, Luma([255]));
-            original.put_pixel(x, y, Rgb([10, 20, 30]));
-        }
-        for x in 55..65 {
-            original.put_pixel(x, y, Rgb([10, 20, 30]));
+fn dilation_matches_pixel_stamps_for_sparse_dense_and_clipped_masks() {
+    for (width, height) in [(0, 0), (1, 13), (23, 1), (23, 13)] {
+        for pattern in 0..4 {
+            let core = GrayImage::from_fn(width, height, |x, y| {
+                Luma([match pattern {
+                    0 => 0,
+                    1 if (x + y) % 3 == 0 => 1,
+                    2 if x < width / 2 || y == height - 1 => 255,
+                    3 => 255,
+                    _ => 0,
+                }])
+            });
+            for radius in [0i64, 1, 2, 5, 14] {
+                for ellipse in [false, true] {
+                    let mut expected = GrayImage::new(width, height);
+                    for (x, y, pixel) in core.enumerate_pixels() {
+                        if pixel[0] == 0 {
+                            continue;
+                        }
+                        for dy in -radius..=radius {
+                            let reach = if ellipse && radius != 0 {
+                                (radius as f64
+                                    * ((radius * radius - dy * dy) as f64 / (radius * radius) as f64)
+                                        .sqrt())
+                                .round_ties_even() as i64
+                            } else {
+                                radius
+                            };
+                            let py = i64::from(y) + dy;
+                            for dx in -reach..=reach {
+                                let px = i64::from(x) + dx;
+                                if (0..i64::from(width)).contains(&px)
+                                    && (0..i64::from(height)).contains(&py)
+                                {
+                                    expected.put_pixel(px as u32, py as u32, Luma([255]));
+                                }
+                            }
+                        }
+                    }
+                    assert_eq!(dilate(&core, radius as u32, ellipse), expected);
+                }
+            }
         }
     }
-    let work = WorkingPhoto {
-        pixels: Arc::new(original),
-        scale_x: 1.0,
-        scale_y: 1.0,
-        reference_scale: 1.0,
-    };
-    let bbox = Rect {
-        left: 20.0,
-        top: 20.0,
-        right: 80.0,
-        bottom: 80.0,
-    };
-    let roi = PixelRect {
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-    };
-    let mask = dilate(&core, 1, true);
-    let (fill, leftover, count) = colors_and_leftover(&work, bbox, roi, &core, &mask, 30.0);
-    assert_eq!(fill, [10, 20, 30]);
-    assert_eq!(count, 300);
-    assert_eq!(leftover, 1.0);
 }
 
 #[test]
-fn wider_erase_preserves_core_fill_and_coverage_but_can_reduce_leftover_plate() {
-    let mut pixels = RgbImage::from_pixel(100, 100, Rgb([240, 240, 240]));
-    let mut core = GrayImage::new(100, 100);
-    for y in 35..65 {
-        for x in 40..50 {
-            core.put_pixel(x, y, Luma([255]));
-            pixels.put_pixel(x, y, Rgb([10, 20, 30]));
-        }
-        for x in 51..54 {
-            pixels.put_pixel(x, y, Rgb([10, 20, 30]));
-        }
-    }
-    let work = WorkingPhoto {
-        pixels: Arc::new(pixels),
-        scale_x: 1.0,
-        scale_y: 1.0,
-        reference_scale: 0.75,
-    };
-    let bbox = Rect {
-        left: 20.0,
-        top: 20.0,
-        right: 80.0,
-        bottom: 80.0,
-    };
-    let roi = PixelRect {
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-    };
-    let before = colors_and_leftover(&work, bbox, roi, &core, &dilate(&core, 1, true), 20.0);
-    let after = colors_and_leftover(
-        &work,
-        bbox,
-        roi,
-        &core,
-        &dilate(&core, erase_radius(20.0, work.reference_scale), true),
-        20.0,
-    );
-    assert_eq!(before.0, [10, 20, 30]);
-    assert_eq!(after.0, before.0);
-    assert_eq!(before.2, 300);
-    assert_eq!(after.2, before.2);
-    assert_eq!(before.1, 0.3);
-    assert_eq!(after.1, 0.2);
-    let plate = |count: usize, leftover: f32| {
-        count as f32 / (bbox.width() * bbox.height()) < 0.03 || leftover >= 0.3
-    };
-    assert!(plate(before.2, before.1));
-    assert!(!plate(after.2, after.1));
-    for mask in [&dilate(&core, 1, true), &dilate(&core, 10, true)] {
-        let sparse = GrayImage::from_fn(100, 100, |x, y| {
-            Luma([if x == 40 && (35..65).contains(&y) {
-                255
-            } else {
-                0
-            }])
-        });
-        let (_, leftover, count) = colors_and_leftover(&work, bbox, roi, &sparse, mask, 20.0);
-        assert_eq!(count, 30);
-        assert!(plate(count, leftover));
+fn fill_uses_default_for_an_empty_core() {
+    let work = photo(20, 15);
+    let roi = PixelRect { x: 3, y: 4, width: 12, height: 8 };
+    let core = GrayImage::new(roi.width, roi.height);
+    assert_eq!(fill_color(&work, roi, &core, 12.0), [245, 245, 240]);
+}
+
+#[test]
+fn fill_uses_the_border_when_the_core_leaves_no_sampling_ring() {
+    let ink = [20, 30, 40];
+    let pixels = RgbImage::from_fn(40, 30, |x, y| {
+        Rgb(if (6..34).contains(&x) && (6..24).contains(&y) {
+            ink
+        } else {
+            [240, 240, 240]
+        })
+    });
+    let work = WorkingPhoto::new(Arc::new(pixels), [40, 30]).unwrap();
+    let roi = PixelRect { x: 2, y: 2, width: 36, height: 26 };
+    let core = GrayImage::from_pixel(roi.width, roi.height, Luma([255]));
+    assert_eq!(fill_color(&work, roi, &core, 10.0), ink);
+}
+
+#[test]
+fn fill_prefers_a_nearby_ring_to_the_distant_border() {
+    let ink = [10, 20, 30];
+    let text = |x, y| (35..45).contains(&x) && (35..65).contains(&y);
+    let pixels = RgbImage::from_fn(100, 100, |x, y| {
+        Rgb(if text(x, y) {
+            if x < 41 { [220, 220, 220] } else { ink }
+        } else if (32..48).contains(&x) && (32..68).contains(&y) {
+            [240, 240, 240]
+        } else {
+            ink
+        })
+    });
+    let work = WorkingPhoto::new(Arc::new(pixels), [100, 100]).unwrap();
+    let roi = PixelRect { x: 0, y: 0, width: 100, height: 100 };
+    let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        Luma([if text(x, y) { 255 } else { 0 }])
+    });
+    assert_eq!(fill_color(&work, roi, &core, 30.0), ink);
+}
+
+#[test]
+fn wider_ellipse_erase_extends_along_stroke_edges_without_filling_corners() {
+    let core = GrayImage::from_fn(12, 12, |x, y| {
+        Luma([if (3..6).contains(&x) && (4..8).contains(&y) { 255 } else { 0 }])
+    });
+    let narrow = dilate(&core, 1, true);
+    let wide = dilate(&core, erase_radius(20.0, 0.75), true);
+    for (x, y, before, after) in [
+        (6, 5, 255, 255),
+        (7, 5, 0, 255),
+        (8, 5, 0, 0),
+        (7, 3, 0, 255),
+        (4, 2, 0, 255),
+        (7, 2, 0, 0),
+    ] {
+        assert_eq!(narrow.get_pixel(x, y)[0], before);
+        assert_eq!(wide.get_pixel(x, y)[0], after);
     }
 }
 
@@ -598,48 +607,36 @@ fn fill_uses_the_farthest_forty_percent_not_the_core_average() {
         width: 40,
         height: 30,
     };
-    let bbox = Rect {
-        left: 5.0,
-        top: 5.0,
-        right: 35.0,
-        bottom: 25.0,
-    };
-    assert_eq!(
-        colors_and_leftover(&work, bbox, roi, &core, &core, 10.0).0,
-        [100, 10, 30]
-    );
+    assert_eq!(fill_color(&work, roi, &core, 10.0), [100, 10, 30]);
 }
 
 #[test]
 fn fill_sampling_preserves_even_color_medians_and_threshold_ties() {
-    let mut pixels = RgbImage::from_pixel(40, 30, Rgb([240, 240, 240]));
-    let mut core = GrayImage::new(40, 30);
-    for x in 10..20 {
-        core.put_pixel(x, 15, Luma([255]));
-        pixels.put_pixel(
-            x,
-            15,
-            Rgb(if x < 16 {
-                [220, 220, 220]
-            } else if x < 18 {
-                [10, 20, 30]
-            } else {
-                [15, 25, 35]
-            }),
-        );
-    }
-    let work = WorkingPhoto {
-        pixels: Arc::new(pixels),
-        scale_x: 1.0,
-        scale_y: 1.0,
-        reference_scale: 1.0,
-    };
     let roi = PixelRect { x: 0, y: 0, width: 40, height: 30 };
-    let bbox = Rect { left: 5.0, top: 5.0, right: 35.0, bottom: 25.0 };
-    let (fill, leftover, count) = colors_and_leftover(&work, bbox, roi, &core, &core, 10.0);
-    assert_eq!(fill, [12, 22, 32]);
-    assert_eq!(leftover, 0.0);
-    assert_eq!(count, 10);
+    let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        Luma([if (10..20).contains(&x) && y == 15 { 255 } else { 0 }])
+    });
+    for (close_count, middle, far, expected) in [
+        (6, [15, 25, 35], [10, 20, 30], [12, 22, 32]),
+        (4, [80, 80, 80], [20, 20, 20], [80, 80, 80]),
+    ] {
+        let mut pixels = RgbImage::from_pixel(roi.width, roi.height, Rgb([240, 240, 240]));
+        for x in 10..20 {
+            pixels.put_pixel(
+                x,
+                15,
+                Rgb(if x < 10 + close_count {
+                    [220, 220, 220]
+                } else if x < 18 {
+                    middle
+                } else {
+                    far
+                }),
+            );
+        }
+        let work = WorkingPhoto::new(Arc::new(pixels), [roi.width, roi.height]).unwrap();
+        assert_eq!(fill_color(&work, roi, &core, 10.0), expected);
+    }
 }
 
 fn apply_erase(background: &mut RgbImage, patch: &ErasePatch) {
@@ -690,7 +687,7 @@ fn erase_dependency_is_the_exact_scaled_expanded_input() {
 }
 
 #[test]
-fn refresh_rejects_wrong_background_without_changing_region_and_skips_plates() {
+fn refresh_rejects_wrong_background_without_changing_region() {
     let mut workspace = telea::Workspace::default();
     let work = photo(60, 40);
     let mut region = PreparedRegion {
@@ -945,9 +942,12 @@ fn recovery_follows_owned_lines_past_a_short_box_but_leaves_neighbor_lines() {
         let neighbor = (40..56).contains(&y) && (20..170).contains(&x) && glyph(x);
         Luma([if own_line || detached || neighbor { 255 } else { 0 }])
     });
-    let owned = owned_lines(&foreground, roi, bbox, 20.0, false);
-    assert_ne!(owned.get_pixel(150, 20)[0], 0, "glyph past the box on the same line");
-    assert_ne!(owned.get_pixel(185, 20)[0], 0, "detached glyph continuing the line");
-    assert_eq!(owned.get_pixel(30, 48)[0], 0, "line below belongs to another block");
-    assert_ne!(owned.get_pixel(30, 20)[0], 0);
+    let core = GrayImage::from_fn(roi.width, roi.height, |x, y| {
+        Luma([if inside(roi, bbox, x, y) { foreground.get_pixel(x, y)[0] } else { 0 }])
+    });
+    let recovered = recover_owned_lines(&foreground, &core, roi, bbox, 20.0, false);
+    assert_ne!(recovered.get_pixel(150, 20)[0], 0, "glyph past the box on the same line");
+    assert_ne!(recovered.get_pixel(185, 20)[0], 0, "detached glyph continuing the line");
+    assert_eq!(recovered.get_pixel(30, 48)[0], 0, "line below belongs to another block");
+    assert_ne!(recovered.get_pixel(30, 20)[0], 0);
 }

@@ -44,7 +44,6 @@ class RecordingChatbox:
     typing: list[bool] = field(default_factory=list)
     typing_reasons: set[str] = field(default_factory=set)
     clear_typing_reasons_calls: int = 0
-    process_due_calls: int = 0
     drop_pending_calls: int = 0
 
     def enqueue(self, message: OSCMessage) -> None:
@@ -70,8 +69,8 @@ class RecordingChatbox:
             self.typing.append(False)
         self.typing_reasons.clear()
 
-    def process_due(self) -> None:
-        self.process_due_calls += 1
+    async def run_flush_loop(self) -> None:
+        await asyncio.Event().wait()
 
     def drop_pending(self) -> None:
         self.drop_pending_calls += 1
@@ -125,8 +124,7 @@ class CleanupFailsOnceChatbox(RecordingChatbox):
 
 
 class FailingFlushChatbox(RecordingChatbox):
-    def process_due(self) -> None:
-        self.process_due_calls += 1
+    async def run_flush_loop(self) -> None:
         raise RuntimeError("flush task failed")
 
 
@@ -336,14 +334,13 @@ async def _publish_peer_overlay(owner, event, *, source_order: int = 1):
 async def test_output_runtime_starts_flush_loop_and_drops_chatbox_backlog_on_close() -> None:
     OutputRuntime = _output_runtime_class()
     chatbox = RecordingChatbox()
-    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0), flush_interval_s=0)
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
 
     await owner.start(auto_flush_chatbox=True)
     task = owner.chatbox_flush_task
     await asyncio.sleep(0)
 
     assert task is not None
-    assert chatbox.process_due_calls > 0
 
     await owner.close()
 
@@ -499,8 +496,10 @@ def test_reenabled_activation_notices_do_not_replay_or_retire_skipped_identity(
     entrypoint: str,
 ) -> None:
     OutputRuntime = _output_runtime_class()
-    chatbox = RecordingChatbox()
-    owner = OutputRuntime(chatbox=chatbox, activation_notice_enabled=False)
+    clock = FakeClock()
+    sender = FakeSender()
+    chatbox = ChatboxPaginator(sender=sender, clock=clock, max_chars=10)
+    owner = OutputRuntime(chatbox=chatbox, clock=clock, activation_notice_enabled=False)
     disclosure_id = uuid4()
     publish = getattr(owner, entrypoint)
 
@@ -509,8 +508,7 @@ def test_reenabled_activation_notices_do_not_replay_or_retire_skipped_identity(
     chatbox.process_due()
 
     assert skipped.decision.reason == "activation_notice_disabled"
-    assert chatbox.messages == []
-    assert chatbox.immediate_messages == []
+    assert sender.sent == []
 
     restored = publish(text="activation notice", disclosure_id=disclosure_id)
     owner.activation_notice_enabled = False
@@ -519,11 +517,12 @@ def test_reenabled_activation_notices_do_not_replay_or_retire_skipped_identity(
     assert restored.decision.decision == "published"
     assert duplicate.decision.reason == "duplicate_publication"
     if entrypoint == "publish_system_immediate_chatbox":
-        assert chatbox.immediate_messages == ["activation notice"]
-        assert chatbox.messages == []
+        assert sender.sent == ["activation notice"]
     else:
-        assert [message.text for message in chatbox.messages] == ["activation notice"]
-        assert chatbox.immediate_messages == []
+        assert sender.sent == ["activation"]
+        clock.advance(chatbox.page_interval_s)
+        chatbox.process_due()
+        assert sender.sent == ["activation", "notice"]
 
 
 @pytest.mark.asyncio
@@ -2244,7 +2243,7 @@ async def test_output_runtime_bounds_global_publication_and_adapter_namespace_id
 async def test_output_runtime_reports_flush_task_failure_replaced_before_close() -> None:
     OutputRuntime = _output_runtime_class()
     chatbox = FailingFlushChatbox()
-    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0), flush_interval_s=0)
+    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
 
     await owner.start(auto_flush_chatbox=True)
     failed_task = owner.chatbox_flush_task

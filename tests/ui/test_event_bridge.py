@@ -1049,8 +1049,8 @@ async def test_event_bridge_logs_peer_dashboard_translation_applied_detail_only(
         )
     )
 
-    assert app.view_dashboard.translation_calls == [("translated peer", "en")]
-    assert app.history == [("Peer Mic", "translated peer", True, "en")]
+    assert app.view_dashboard.translation_calls == [("translated peer", "ja")]
+    assert app.history == [("Peer Mic", "translated peer", True, "ja")]
     assert runtime_logging.basic_messages == []
     assert len(runtime_logging.detailed_messages) == 1
     level, message = runtime_logging.detailed_messages[0]
@@ -1060,7 +1060,7 @@ async def test_event_bridge_logs_peer_dashboard_translation_applied_detail_only(
         utterance_id=str(utterance_id),
         channel="peer",
         source_label="Peer Mic",
-        dashboard_target_language="en",
+        dashboard_target_language="ja",
         translation_target_language="ja",
         text_len=len("translated peer"),
     )

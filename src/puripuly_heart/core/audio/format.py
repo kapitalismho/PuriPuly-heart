@@ -210,9 +210,11 @@ def normalize_audio_frame_f32(
 
 def float32_to_pcm16le_bytes(samples: np.ndarray) -> bytes:
     samples = np.asarray(samples, dtype=np.float32)
-    clipped = np.clip(samples, -1.0, 1.0)
-    int16 = np.round(clipped * 32767.0).astype("<i2")
-    return int16.tobytes()
+    clipped = np.empty_like(samples)
+    np.clip(samples, -1.0, 1.0, out=clipped)
+    clipped *= 32767.0
+    np.rint(clipped, out=clipped)
+    return clipped.astype("<i2").tobytes()
 
 
 def pcm16le_bytes_to_float32(data: bytes) -> np.ndarray:
