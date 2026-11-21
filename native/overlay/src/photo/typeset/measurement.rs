@@ -40,19 +40,18 @@ pub fn measure_source(
             projection.angle(Direction::Horizontal),
             Direction::Horizontal,
             lines,
-        );
-        let vertical = measure(
-            core,
-            offset,
-            scale,
-            projection.angle(Direction::Vertical),
-            Direction::Vertical,
-            lines,
-        );
-        if let (Some(horizontal), Some(vertical)) = (horizontal, vertical) {
-            if horizontal.slots.len() == source_lines as usize
-                && vertical.slots.len() != source_lines as usize
-            {
+        )
+        .filter(|candidate| candidate.slots.len() == source_lines as usize);
+        if let Some(horizontal) = horizontal {
+            let vertical = measure(
+                core,
+                offset,
+                scale,
+                projection.angle(Direction::Vertical),
+                Direction::Vertical,
+                lines,
+            );
+            if vertical.is_some_and(|candidate| candidate.slots.len() != source_lines as usize) {
                 return Some(horizontal);
             }
         }
