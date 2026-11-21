@@ -481,9 +481,7 @@ def test_history_card_shows_manual_original_and_translation_as_one_bubble():
             target_index=target,
             parent_utterance_id="m1",
         )
-    view = AgentChatView(
-        Owner(snapshot()), AgentChatHooks(conversation_records=lambda: logs.conversation_records)
-    )
+    view = AgentChatView(Owner(snapshot()), AgentChatHooks(conversation_history=logs))
     view._open_history()
     (row,) = view._history_list.controls
     assert [text for text in texts(row) if text != row_time(row)] == ["안녕", "你好"]
@@ -546,20 +544,68 @@ def test_history_back_label_follows_current_locale_and_drops_stale_hover():
 
 
 @pytest.mark.asyncio
-async def test_open_history_refreshes_periodically_and_keeps_existing_rows(monkeypatch):
-    from puripuly_heart.core.conversation_history import ConversationRecord
+async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeypatch):
+    from puripuly_heart.core.conversation_history import ConversationHistory
 
-    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0.01)
-    records = [ConversationRecord("21:02", "Mic", "self", "첫 말", "first", utterance_id="a")]
-    view, tasks = view_for(Owner(snapshot()), conversation_records=lambda: records)
+    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
+    history = ConversationHistory()
+
+    def add(identity, text, *, revision=1):
+        history.append_conversation_record(
+            source="Listen",
+            channel="peer",
+            utterance_id=identity,
+            source_text=text,
+            translated_text=None,
+            peer_caption_revision=revision,
+        )
+
+    add("a", "first")
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
     view._open_history()
+    await asyncio.gather(*tasks)
     (first,) = view._history_list.controls
-    records.append(ConversationRecord("21:03", "Peer", "peer", "next", "다음", utterance_id="b"))
-    await asyncio.sleep(0.05)
-    assert len(view._history_list.controls) == 2
+    tasks.clear()
+
+    add("a", "duplicate")
+    assert tasks == []
+    add("b", "next")
+    add("b", "revised", revision=2)
+    assert len(tasks) == 1
+    await asyncio.gather(*tasks)
     assert view._history_list.controls[0] is first
+    assert texts(view._history_list.controls[1])[0] == "revised"
+
+    add("b", "newer", revision=3)
+    view.will_unmount()
+    await asyncio.gather(*tasks)
+    assert texts(view._history_list.controls[1])[0] == "revised"
+    tasks.clear()
+    add("c", "arrived offscreen")
+    assert tasks == []
+    remount_rows = []
+
+    def record_update(control):
+        if control is view:
+            remount_rows.extend(texts(row)[0] for row in view._history_list.controls)
+
+    monkeypatch.setattr(agent_chat, "update_control_if_mounted", record_update)
+    view.did_mount()
+    assert remount_rows == [
+        "first",
+        "newer",
+        "arrived offscreen",
+    ]
+    await asyncio.gather(*tasks)
+
     view._close_history()
-    await asyncio.wait_for(asyncio.gather(*tasks), 1)
+    tasks.clear()
+    add("d", "arrived while closed")
+    assert tasks == []
+    view._open_history()
+    assert texts(view._history_list.controls[-1])[0] == "arrived while closed"
+    await asyncio.gather(*tasks)
+    view.will_unmount()
 
 
 def test_chat_input_focus_border_is_coral_before_and_after_dictation():

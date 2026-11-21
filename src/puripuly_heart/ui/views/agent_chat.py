@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import webbrowser
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from typing import Protocol
@@ -10,6 +10,7 @@ from typing import Protocol
 import flet as ft
 
 from puripuly_heart.app.ports.agent_chat import AgentChatPort, AgentChatSnapshot
+from puripuly_heart.core.conversation_history import ConversationHistory
 from puripuly_heart.ui.agent_chat_model import (
     ChatItem,
     LeftView,
@@ -71,7 +72,7 @@ class DictationSource(Protocol):
 class AgentChatHooks:
     open_folder: Callable[[], None] | None = None
     show_snackbar: Callable[[str, str], None] | None = None
-    conversation_records: Callable[[], Sequence[object]] | None = None
+    conversation_history: ConversationHistory | None = None
     dictation: DictationSource | None = None
     run_task: Callable[[Callable[[], object]], object] | None = None
 
@@ -189,7 +190,9 @@ class AgentChatView(ft.Row):
         self._history_rows: dict[str, tuple[object, ft.Control]] = {}
         self._history_panel: ft.Container | None = None
         self._history_back: ft.Container | None = None
-        self._history_polling = False
+        self._unsubscribe_history: Callable[[], None] | None = None
+        self._history_refresh_pending = False
+        self._last_history_refresh = float("-inf")
         self._mounted = False
         self._input = ft.TextField(
             border_radius=16,
@@ -234,14 +237,16 @@ class AgentChatView(ft.Row):
     def did_mount(self) -> None:
         self._mounted = True
         self._unsubscribe = self._owner.observe(self._render)
+        self._observe_history()
+        if self._history_open and self._left_key == "history":
+            self._history_card()
         self._render(self._owner.snapshot)
         if self._history_open:
-            self._history_card()
             self._history_scroll.restore()
-            self._start_history_polling()
 
     def will_unmount(self) -> None:
         self._mounted = False
+        self._stop_observing_history()
         if self._unsubscribe is not None:
             self._unsubscribe()
         self._unsubscribe = None
@@ -723,7 +728,8 @@ class AgentChatView(ft.Row):
         return self._history_panel
 
     def _refresh_history(self) -> bool:
-        history = history_rows(self._records())
+        history_owner = self._hooks.conversation_history
+        history = history_rows(history_owner.conversation_records if history_owner else ())
         keys = tuple(history)
         if keys == self._history_keys:
             return False
@@ -803,36 +809,47 @@ class AgentChatView(ft.Row):
             key=row.key,
         )
 
-    def _start_history_polling(self) -> None:
-        if self._history_polling or not self._mounted:
-            return
-        self._history_polling = True
-        if self._run(self._poll_history) is None:
-            self._history_polling = False
+    def _observe_history(self) -> None:
+        history = self._hooks.conversation_history
+        if self._mounted and self._history_open and self._unsubscribe_history is None and history:
+            self._unsubscribe_history = history.observe_records(self._schedule_history_refresh)
 
-    async def _poll_history(self) -> None:
+    def _stop_observing_history(self) -> None:
+        if self._unsubscribe_history is not None:
+            self._unsubscribe_history()
+            self._unsubscribe_history = None
+
+    def _schedule_history_refresh(self) -> None:
+        if self._history_refresh_pending:
+            return
+        self._history_refresh_pending = True
+        if self._run(self._refresh_history_after_change) is None:
+            self._history_refresh_pending = False
+
+    async def _refresh_history_after_change(self) -> None:
         try:
-            while self._history_open and self._mounted:
-                await asyncio.sleep(HISTORY_REFRESH_S)
-                if self._history_open and self._mounted and self._refresh_history():
+            loop = asyncio.get_running_loop()
+            delay = self._last_history_refresh + HISTORY_REFRESH_S - loop.time()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            if self._history_open and self._mounted:
+                self._last_history_refresh = loop.time()
+                if self._refresh_history():
                     update_control_if_mounted(self._history_list)
         finally:
-            self._history_polling = False
-
-    def _records(self) -> Sequence[object]:
-        provider = self._hooks.conversation_records
-        return tuple(provider()) if provider is not None else ()
+            self._history_refresh_pending = False
 
     # Actions
 
     def _open_history(self) -> None:
         self._history_open = True
+        self._observe_history()
         self._render(self._owner.snapshot)
         self._history_scroll.restore()
-        self._start_history_polling()
 
     def _close_history(self) -> None:
         self._history_open = False
+        self._stop_observing_history()
         self._render(self._owner.snapshot)
 
     def _open_folder(self) -> None:
@@ -842,6 +859,7 @@ class AgentChatView(ft.Row):
     def _new_conversation(self) -> None:
         self._owner.new_conversation()
         self._history_open = False
+        self._stop_observing_history()
         self._render(self._owner.snapshot)
 
     def _dismiss(self, identity: str) -> None:
@@ -963,6 +981,7 @@ class AgentChatView(ft.Row):
 
     def ask_about_error(self, error_text: str, diagnostic_id: str) -> None:
         self._history_open = False
+        self._stop_observing_history()
 
         async def run() -> None:
             await self._owner.send(
