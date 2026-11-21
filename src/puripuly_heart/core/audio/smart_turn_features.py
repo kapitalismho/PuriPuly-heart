@@ -4,6 +4,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 _N_FFT = 400
+_FFT_BATCH_FRAMES = 64
 _HOP_LENGTH = 160
 _N_MELS = 80
 _SAMPLE_RATE_HZ = 16000
@@ -60,8 +61,11 @@ def _power_spectrogram(audio: np.ndarray) -> np.ndarray:
         mode="reflect",
     )
     windows = sliding_window_view(padded, _N_FFT)[::_HOP_LENGTH]
-    spectrum = np.fft.rfft(windows * _HANN_WINDOW, axis=-1)
-    power = np.abs(spectrum)
+    power = np.empty((len(windows), _N_FFT // 2 + 1), dtype=np.float64)
+    for start in range(0, len(windows), _FFT_BATCH_FRAMES):
+        batch = slice(start, start + _FFT_BATCH_FRAMES)
+        spectrum = np.fft.rfft(windows[batch] * _HANN_WINDOW, axis=-1)
+        np.abs(spectrum, out=power[batch])
     np.square(power, out=power)
     return power.T
 
