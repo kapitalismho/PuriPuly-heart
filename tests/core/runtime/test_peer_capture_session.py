@@ -3292,8 +3292,16 @@ async def test_terminal_process_loss_faults_and_allows_retry() -> None:
 
     owner, _admission, _resolver, provider, sources, _sink = make_owner(run_audio_loop=run_loop)
     await owner.apply_intent(make_config(target=target), enabled=True)
+    provider.release_gate = asyncio.Event()
     sources[0].terminal_reason = "target_exited"
     loop_release.set()
+    try:
+        await wait_until(lambda: bool(provider.releases))
+        assert owner.snapshot.state is PeerCaptureSessionState.STOPPING
+        assert not owner.snapshot.retry_available
+        assert not await owner.retry_process_capture()
+    finally:
+        provider.release_gate.set()
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.FAULTED)
 
     assert owner.snapshot.failure_reason.value == "source_lost"

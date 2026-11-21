@@ -839,7 +839,7 @@ class PeerCaptureSessionOwner:
             failure_reason=(self._last_failure.reason if self._last_failure is not None else None),
             admission_reason=self._admission_reason,
             target_reason=self._last_failure_unavailable_reason,
-            retry_available=self._retry_required_capture_target is not None,
+            retry_available=self._can_retry_process_capture(self._config),
             has_source=self._audio_source is not None,
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
@@ -1342,6 +1342,13 @@ class PeerCaptureSessionOwner:
             self._notify_state_changed()
             return self.snapshot
 
+    def _can_retry_process_capture(self, config: PeerCaptureSessionConfig | None) -> bool:
+        return (
+            self._state is PeerCaptureSessionState.FAULTED
+            and config is not None
+            and config.capture_target == self._retry_required_capture_target
+        )
+
     async def retry_process_capture(
         self,
         *,
@@ -1362,11 +1369,7 @@ class PeerCaptureSessionOwner:
         if target_config is None:
             return False
         async with self._lock:
-            if (
-                target_config.capture_target.kind != "process"
-                or self._retry_required_capture_target != target_config.capture_target
-                or self._state is not PeerCaptureSessionState.FAULTED
-            ):
+            if not self._can_retry_process_capture(target_config):
                 return False
             self._generation += 1
             generation = self._generation
