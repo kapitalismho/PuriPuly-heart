@@ -355,4 +355,4 @@ def _decode_process_capture_frame(data: bytes, frames: int) -> np.ndarray | None
     derived_frames = len(data) // (PROCESS_CAPTURE_CHANNELS * 4)
     if derived_frames <= 0 or (frames != -1 and frames != derived_frames):
         return None
-    return np.frombuffer(data, dtype="<f4").reshape((derived_frames, PROCESS_CAPTURE_CHANNELS))
+    return np.ndarray((derived_frames, PROCESS_CAPTURE_CHANNELS), dtype="<f4", buffer=data)

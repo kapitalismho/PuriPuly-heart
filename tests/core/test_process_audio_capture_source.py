@@ -122,26 +122,29 @@ async def test_process_source_bridges_fixed_stereo_float32_frames_and_drops_with
         max_queue_frames=1,
     )
     capture = factory.captures[0][1]
-    first = np.array([[0.1, -0.1]], dtype=np.float32)
+    first = np.array([[0.1, -0.1], [0.3, -0.3]], dtype=np.float32)
+    first_packet = _frame_bytes(first)
     second = np.array([[0.2, -0.2]], dtype=np.float32)
 
-    capture.on_data(_frame_bytes(first), -1)
+    capture.on_data(first_packet, -1)
     capture.on_data(_frame_bytes(second), 1)
     frame = await source.frames().__anext__()
 
     assert factory.captures[0][0] == 100
     assert capture.started is True
     np.testing.assert_array_equal(frame.samples, first)
+    assert frame.samples.base is first_packet
+    assert not frame.samples.flags.writeable
     assert frame.sample_rate_hz == PROCESS_CAPTURE_SAMPLE_RATE_HZ
     assert frame.channels == PROCESS_CAPTURE_CHANNELS
     assert frame.capture is not None
     assert frame.capture.source_start_sample == 0
-    assert frame.capture.source_end_sample == 1
+    assert frame.capture.source_end_sample == 2
     capture.on_data(_frame_bytes(second), 1)
     successor = await source.frames().__anext__()
     assert successor.capture is not None
-    assert successor.capture.source_start_sample == 2
-    assert successor.capture.source_end_sample == 3
+    assert successor.capture.source_start_sample == 3
+    assert successor.capture.source_end_sample == 4
     assert successor.capture.discontinuity_before is not None
     assert successor.capture.discontinuity_before.kind == "known_loss"
     assert successor.capture.discontinuity_before.lost_source_samples == 1
