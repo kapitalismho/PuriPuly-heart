@@ -172,14 +172,10 @@ class EncryptedFileSecretStore:
 @contextmanager
 def _secret_file_lock(path: Path) -> Iterator[None]:
     with path.with_suffix(path.suffix + ".lock").open("a+b") as handle:
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"\0")
-            handle.flush()
-        handle.seek(0)
         if os.name == "nt":
             import msvcrt
 
+            handle.seek(0)
             while True:
                 try:
                     msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -189,6 +185,10 @@ def _secret_file_lock(path: Path) -> Iterator[None]:
                         raise
                     time.sleep(0.05)
             try:
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
                 yield
             finally:
                 handle.seek(0)
