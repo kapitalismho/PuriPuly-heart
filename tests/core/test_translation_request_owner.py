@@ -9,6 +9,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
@@ -319,6 +320,86 @@ async def test_peer_segments_use_individual_requests_with_whole_parent_context()
         context = body["messages"][1]["content"]
         assert all(text in context for text in translations)
         assert "speaker=" not in context
+
+
+@pytest.mark.asyncio
+async def test_cancelled_openrouter_body_releases_shared_capacity(monkeypatch) -> None:
+    reading = asyncio.Event()
+    closed = asyncio.Event()
+    bodies = []
+
+    class HeldBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield b'{"choices":'
+            reading.set()
+            await asyncio.Future()
+
+        async def aclose(self) -> None:
+            closed.set()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        if len(bodies) == 1:
+            return httpx.Response(200, stream=HeldBody())
+        return httpx.Response(200, json={"choices": [{"message": {"content": "明天见。"}}]})
+
+    monkeypatch.setattr(
+        "puripuly_heart.providers.llm.openrouter.network_clients.external_async_client",
+        lambda **_kwargs: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
+    fixture = build_owner(
+        SemaphoreLLMProvider(
+            inner=OpenRouterLLMProvider(api_key="test-key", model=model),
+            semaphore=asyncio.Semaphore(1),
+            provider_name="openrouter",
+            model=model,
+        )
+    )
+    fixture.configuration.transform(
+        lambda config: replace(
+            config,
+            target_language="zh-CN",
+            peer_source_language="zh-CN",
+            peer_target_language="ko",
+        )
+    )
+    preview = replace(
+        process_request(fixture, channel="peer"),
+        text="你好。",
+        peer_request_kind="preview",
+        peer_caption_revision=1,
+    )
+    prepared = fixture.owner.prepare(
+        preview.text,
+        channel="peer",
+        config_snapshot=preview.config_snapshot,
+        peer_request_kind="preview",
+        peer_context_texts=(),
+    )
+    self_request = replace(process_request(fixture), text="내일 봐요.")
+    task = asyncio.create_task(fixture.owner.process(preview, prepared=prepared))
+    try:
+        await asyncio.wait_for(reading.wait(), timeout=2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert closed.is_set()
+        result = await asyncio.wait_for(fixture.owner.process(self_request), timeout=2)
+        assert result.output is not None
+        assert result.output.translation is not None
+        assert result.output.translation.text == "明天见。"
+        assert result.output.source_language == "ko"
+        assert result.output.target_language == "zh-CN"
+        assert result.output.child_utterance_id == self_request.utterance_id
+        assert fixture.presentation.messages == []
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await fixture.provider_runtime.close()
+
+    assert [body["model"] for body in bodies] == [model, model]
+    assert all("stream" not in body for body in bodies)
 
 
 @pytest.mark.asyncio
