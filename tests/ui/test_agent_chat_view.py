@@ -11,6 +11,7 @@ import pytest
 from puripuly_heart.app.ports.agent_chat import (
     AgentChatSnapshot,
     AgentMessage,
+    AgentPresentation,
     AgentReportOffer,
     AgentSecureEntryRequest,
     AgentSetupAction,
@@ -347,6 +348,40 @@ def test_chat_transcript_is_one_continuous_selection():
         item.value for item in transcript
     }
     assert not any(item.selectable for item in transcript)
+
+
+def test_chat_preserves_history_while_provisional_reply_is_replaced_and_archived():
+    prior = AgentMessage("assistant", "First sentence. Second sentence!")
+    prompt = AgentMessage("user", "Next question")
+    committed = AgentMessage("assistant", "Authoritative reply.")
+    owner = Owner(snapshot(messages=(prior, prompt)))
+    view, _ = view_for(owner)
+    original = view._messages.controls[1]
+
+    streaming = replace(
+        owner.snapshot,
+        busy=True,
+        phase="responding",
+        presentation=AgentPresentation(1, 1, ("Provisional reply.",)),
+    )
+    owner.publish(streaming)
+    assert view._messages.controls[1] is original
+    assert texts(view._messages.controls[-1]) == ["Provisional reply."]
+
+    owner.publish(snapshot(messages=(prior, prompt, committed)))
+    rows = view._messages.controls
+    assert rows[1] is original
+    assert texts(rows[1]) == ["First sentence.", "Second sentence!"]
+    assert texts(rows[-1]) == ["Authoritative reply."]
+    assert not any(row.key.startswith("assistant:live:") for row in rows)
+
+    archived = tuple(replace(message, archived=True) for message in owner.snapshot.messages)
+    owner.publish(snapshot(messages=(*archived, AgentMessage("notice", "새 대화로 시작했어요"))))
+    rows = view._messages.controls
+    assert [row.opacity for row in rows[:-1]] == [0.35] * 4
+    assert texts(rows[1]) == ["First sentence.", "Second sentence!"]
+    assert texts(rows[-2]) == ["Authoritative reply."]
+    assert texts(rows[-1]) == [agent_chat.t("agent_chat.reset_line")]
 
 
 class Dictation:

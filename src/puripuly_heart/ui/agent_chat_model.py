@@ -370,13 +370,17 @@ def select_left(
     return LeftView("home", "home")
 
 
+def assistant_lines(text: str) -> tuple[str, ...]:
+    return completed_sentences(text, final=True) or (text,)
+
+
 def chat_items(
     snapshot: AgentChatSnapshot,
     *,
     turn_lines: dict[int, str],
     sentence_splitter: Callable[[str], tuple[str, ...]] | None = None,
 ) -> list[ChatItem]:
-    split = sentence_splitter or (lambda text: completed_sentences(text, final=True) or (text,))
+    split = sentence_splitter or assistant_lines
     items: list[ChatItem] = [ChatItem("greeting", "greeting:0", _greeting())]
     for index, message in enumerate(snapshot.messages):
         if message.role == "notice":

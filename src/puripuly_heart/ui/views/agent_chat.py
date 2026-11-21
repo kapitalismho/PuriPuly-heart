@@ -4,7 +4,7 @@ import asyncio
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
+from functools import cache, partial
 from typing import Protocol
 
 import flet as ft
@@ -15,6 +15,7 @@ from puripuly_heart.ui.agent_chat_model import (
     ChatItem,
     LeftView,
     applied_label,
+    assistant_lines,
     change_blocks,
     chat_items,
     done_status,
@@ -140,8 +141,9 @@ class AgentChatView(ft.Row):
         self._action_pending = False
         self._key_failed: set[str] = set()
         self._dictation = _Dictation()
-        self._chat_keys: tuple[str, ...] = ()
-        self._chat_rows: dict[str, ft.Control] = {}
+        self._chat_items: list[ChatItem] = []
+        self._chat_rows: dict[ChatItem, ft.Control] = {}
+        self._split_assistant = cache(assistant_lines)
         self._input_edits = 0
 
         self._history_tile = PowerButton("HISTORY", ft.Icons.FORUM, self._open_history)
@@ -259,6 +261,7 @@ class AgentChatView(ft.Row):
             self._unsubscribe()
             self._unsubscribe = None
         self._owner = owner
+        self._split_assistant.cache_clear()
         if self._mounted:
             self._unsubscribe = owner.observe(self._render)
         self._render(owner.snapshot)
@@ -291,18 +294,14 @@ class AgentChatView(ft.Row):
         self._pending_lines.clear()
 
     def _render_chat(self, snapshot: AgentChatSnapshot) -> None:
-        items = chat_items(snapshot, turn_lines=self._turn_lines)
-        keys = tuple(
-            f"{item.key}:{len(item.lines)}:{item.archived}:{item.busy}:{item.lines}"
-            for item in items
+        items = chat_items(
+            snapshot, turn_lines=self._turn_lines, sentence_splitter=self._split_assistant
         )
-        if keys == self._chat_keys:
+        if items == self._chat_items:
             return
-        self._chat_keys = keys
+        self._chat_items = items
         cached = self._chat_rows
-        self._chat_rows = {
-            key: cached.get(key) or self._chat_control(item) for key, item in zip(keys, items)
-        }
+        self._chat_rows = {item: cached.get(item) or self._chat_control(item) for item in items}
         self._messages.controls = list(self._chat_rows.values())
 
     def _chat_control(self, item: ChatItem) -> ft.Control:
