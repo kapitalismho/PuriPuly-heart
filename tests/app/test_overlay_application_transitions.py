@@ -926,6 +926,114 @@ async def test_compatibility_switch_reuses_presenter_and_accepts_clear_during_te
         await owner.close()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["termination_unconfirmed", "shutdown_cleanup_failed"])
+async def test_failed_compatibility_switch_retains_generation_until_cleanup(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    runtime.set_overlay_instance_id("old")
+    runtime.vr_compatibility_mode = False
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock)
+    runtime.adopt_presenter(presenter)
+    runtime.create_monitor_task(asyncio.Event().wait())
+    owner.state = "connected"
+    owner.active_target = "steamvr"
+    output = SimpleNamespace(overlay_sink=presenter, reset_overlay_preview=_noop_async)
+    owner.output_provider = lambda: output
+    adapter = OverlayEventAdapter(clock=owner.clock)
+    turn = uuid4()
+
+    async def show_caption(utterance_id, text: str) -> None:
+        await presenter.emit(
+            adapter.transcript_final(
+                Transcript(utterance_id=utterance_id, channel="self", text=text, is_final=True),
+                source_language="en",
+                target_language="ko",
+            )
+        )
+
+    await show_caption(turn, "current before mode switch")
+    entry = presenter._presentation_state.display_entry(("self", turn))
+    assert entry is not None
+    deadline = presenter._entry_expiration_deadline(entry)
+    assert deadline is not None and deadline > owner.clock.now()
+    current_blocks = presenter.snapshot().blocks
+    assert current_blocks
+
+    async def replace_sink(sink, **_opts) -> bool:
+        output.overlay_sink = sink
+        return True
+
+    output.replace_overlay_sink = replace_sink
+    cleanup_obstacle = True
+    attempts = 0
+    starts = 0
+    old_manager = SimpleNamespace(state="connected", failure_reason=None)
+
+    async def stop_old() -> None:
+        nonlocal attempts
+        attempts += 1
+        assert output.overlay_sink is presenter
+        assert not owner.output_snapshot()["presentation_ready"]
+        assert runtime.monitor_task is None
+        if cleanup_obstacle:
+            old_manager.state = "failed"
+            old_manager.failure_reason = failure
+            raise RuntimeError("injected stop failure")
+        old_manager.state = "off"
+
+    old_manager.stop = stop_old
+    runtime.attach_process_manager(old_manager)
+
+    async def start_replacement(self, replacement) -> None:
+        nonlocal starts
+        starts += 1
+        assert runtime.is_closed and runtime.process_manager is None
+        assert old_manager.state == "off"
+        assert replacement.presenter is presenter and output.overlay_sink is presenter
+        replacement.set_overlay_instance_id("new")
+        replacement.vr_compatibility_mode = True
+        await presenter.begin_runtime_epoch(native_fresh_retry=True)
+        replacement.attach_process_manager(SimpleNamespace(state="connected", stop=_noop_async))
+        self.mark_connected()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_replacement)
+    try:
+        with pytest.raises(RuntimeError, match="compatibility mode was not applied"):
+            await owner.apply_vr_compatibility_mode(True)
+        failed = owner.output_snapshot()
+        assert failed["lifecycle"] == "failed" and recorder.states[-1] == ("failed", failure)
+        assert failed["desired_enabled"] is True and failed["runtime_active"] is True
+        assert failed["effective_vr_compatibility_mode"] is None
+        assert failed["generation"] == "old"
+        assert runtime.process_manager is old_manager and not runtime.is_closed
+        assert presenter.snapshot().blocks == current_blocks
+
+        await owner.set_enabled(True)
+        assert owner.state == "failed" and owner.runtime is runtime and attempts == 2
+        assert starts == 0 and old_manager.state == "failed"
+
+        cleanup_obstacle = False
+        owner.clock.advance(deadline - owner.clock.now() - 0.5)
+        await owner.set_enabled(True)
+        recovered = await owner.wait_start_outcome()
+        assert recovered["effective_vr_compatibility_mode"] is True
+        assert recovered["generation"] == "new" and attempts == 3 and starts == 1
+        assert presenter.snapshot().blocks == current_blocks
+        assert presenter._entry_expiration_deadline(entry) == deadline
+        owner.clock.advance(0.6)
+        await show_caption(uuid4(), "fresh after original deadline")
+        assert [block.primary_text for block in presenter.snapshot().blocks] == [
+            "fresh after original deadline"
+        ]
+    finally:
+        cleanup_obstacle = False
+        await owner.close()
+
+
 @pytest.mark.parametrize("phase", ["backoff", "teardown"])
 async def test_off_drains_recovery_without_late_respawn(monkeypatch, phase: str) -> None:
     owner = make_owner(Recorder())
