@@ -64,8 +64,7 @@ def _power_spectrogram(audio: np.ndarray) -> np.ndarray:
     power = np.empty((len(windows), _N_FFT // 2 + 1), dtype=np.float64)
     for start in range(0, len(windows), _FFT_BATCH_FRAMES):
         batch = slice(start, start + _FFT_BATCH_FRAMES)
-        spectrum = np.fft.rfft(windows[batch] * _HANN_WINDOW, axis=-1)
-        np.abs(spectrum, out=power[batch])
+        np.abs(np.fft.rfft(windows[batch] * _HANN_WINDOW, axis=-1), out=power[batch])
     np.square(power, out=power)
     return power.T
 
@@ -79,11 +78,16 @@ def compute_whisper_log_mel_features(audio: np.ndarray) -> np.ndarray:
         audio = np.pad(audio, (0, expected_samples - audio.size), mode="constant")
     elif audio.size > expected_samples:
         audio = audio[:expected_samples]
-    audio = (audio - audio.mean()) / np.sqrt(audio.var() + _NORMALIZATION_EPSILON)
-    mel = np.maximum(_MEL_FLOOR, _MEL_FILTERS.T @ _power_spectrogram(audio))
-    log_mel = np.log10(mel)[:, :-1]
-    log_mel = np.maximum(log_mel, log_mel.max() - 8.0)
-    return ((log_mel + 4.0) / 4.0).astype(np.float32)
+    mean = audio.mean()
+    audio = (audio - mean) / np.sqrt(audio.var(mean=mean) + _NORMALIZATION_EPSILON)
+    mel = _MEL_FILTERS.T @ _power_spectrogram(audio)
+    np.maximum(_MEL_FLOOR, mel, out=mel)
+    np.log10(mel, out=mel)
+    log_mel = mel[:, :-1]
+    np.maximum(log_mel, log_mel.max() - 8.0, out=log_mel)
+    log_mel += 4.0
+    log_mel /= 4.0
+    return log_mel.astype(np.float32)
 
 
 __all__ = ["compute_whisper_log_mel_features"]
