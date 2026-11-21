@@ -3032,15 +3032,16 @@ class TranslationOutputProjectionOwner:
             disposition = "overloaded"
         translation = submission.translation
         origin_wall_clock_ms = translation.origin_wall_clock_ms if translation is not None else None
+        configuration = submission.config_snapshot.value
         segment_index = self._conversation_segment_index(
             sequence=submission.sequence,
             channel=submission.channel,
-            configuration=submission.config_snapshot.value,
+            configuration=configuration,
         )
         source_language = self.conversation_source_language(
             submission.channel,
             submission.source_language,
-            submission.config_snapshot.value,
+            configuration,
         )
         self._record_conversation(
             utterance_id=submission.parent_utterance_id,
@@ -3078,7 +3079,12 @@ class TranslationOutputProjectionOwner:
             channel=submission.channel,
             source_text=None,
             translation_text=translation.text,
-            source_language=translation.source_language or source_language,
+            source_language=self.conversation_source_language(
+                submission.channel,
+                submission.source_language,
+                configuration,
+                translation_source_language=translation.source_language,
+            ),
             target_language=translation.target_language or submission.target_language,
             source=submission.source,
             turn_kind=submission.turn_kind or submission.channel,
@@ -3317,11 +3323,18 @@ class TranslationOutputProjectionOwner:
         channel: ChannelId,
         detected_language: str | None,
         configuration: TranslationRuntimeConfig,
+        *,
+        translation_source_language: str | None = None,
     ) -> str | None:
+        if channel == "peer" and configuration.peer_source_mode == "auto":
+            for language in (translation_source_language, detected_language):
+                if language is not None and language.strip() not in ("", "auto"):
+                    return language
+            return None
+        if translation_source_language:
+            return translation_source_language
         if detected_language is not None and detected_language.strip():
             return detected_language
-        if channel == "peer" and configuration.peer_source_mode == "auto":
-            return None
         return cls._source_language_for(channel, configuration)
 
     @staticmethod
