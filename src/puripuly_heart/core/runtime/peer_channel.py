@@ -1206,7 +1206,7 @@ class PeerCaptureSessionOwner:
                 )
                 return self.snapshot
         except asyncio.CancelledError:
-            if self._is_superseded(generation):
+            if generation != self._generation or self._closed:
                 return self.snapshot
             raise
         finally:
@@ -1676,6 +1676,7 @@ class PeerCaptureSessionOwner:
                 return
         source = None
         provider_ready = False
+        startup_failure_reason = PeerCaptureFailureReason.PROVIDER_FAILED
         load_started_at = self.clock.now()
         try:
             admission = await self._admission.admit(config)
@@ -1709,9 +1710,8 @@ class PeerCaptureSessionOwner:
             self._target_status = PeerCaptureTargetStatus.RESOLVED
             self._emit_event(PeerCaptureDiagnosticEvent.TARGET_CHANGED)
             try:
-                source = self._source_factory(config, resolution.target)
-                if inspect.isawaitable(source):
-                    source = await source
+                opening = self._source_factory(config, resolution.target)
+                source = await opening if inspect.isawaitable(opening) else opening
             except asyncio.CancelledError:
                 raise
             except AudioSourceOpenFailure as exc:
@@ -1743,10 +1743,16 @@ class PeerCaptureSessionOwner:
             if superseded:
                 await self._close_if_possible(source)
                 return
-            await self._cancel_loop(old_loop)
-            if old_segment_ledger is not None:
-                self._cancel_segment_ledger(old_segment_ledger)
-            await self._close_if_possible(old_source)
+            startup_failure_reason = PeerCaptureFailureReason.CLEANUP_FAILED
+            try:
+                await self._cancel_loop(old_loop)
+                if old_segment_ledger is not None:
+                    self._cancel_segment_ledger(old_segment_ledger)
+                await self._close_if_possible(old_source)
+            except BaseException:
+                self._retain_retired_source(old_source)
+                raise
+            startup_failure_reason = PeerCaptureFailureReason.PROVIDER_FAILED
             async with self._lock:
                 superseded = self._is_superseded(generation)
                 if not superseded:
@@ -1882,6 +1888,17 @@ class PeerCaptureSessionOwner:
                 return
             self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
             self._notify_state_changed()
+        except asyncio.CancelledError:
+            if source is not None and self._audio_source is not source:
+                try:
+                    await self._close_if_possible(source)
+                except asyncio.CancelledError:
+                    self._retain_retired_source(source)
+                    raise
+                except Exception as exc:
+                    self._retain_retired_source(source)
+                    self._log_loop_exception("cleanup_failed", exc, generation=generation)
+            raise
         except Exception as exc:
             if isinstance(
                 exc,
@@ -1896,7 +1913,7 @@ class PeerCaptureSessionOwner:
             elif provider_ready:
                 reason = self._failure_reason_from_startup_exception(config, exc)
             else:
-                reason = PeerCaptureFailureReason.PROVIDER_FAILED
+                reason = startup_failure_reason
             await self._fault_current_generation_locked(
                 generation,
                 config=config,
@@ -2192,6 +2209,7 @@ class PeerCaptureSessionOwner:
             )
         async with self._lock:
             if generation != self._generation or self._closed:
+                self._retain_retired_source(detached_source)
                 return
             if config is not None and config.capture_target.kind == "process":
                 self._retry_required_capture_target = config.capture_target
@@ -2278,12 +2296,16 @@ class PeerCaptureSessionOwner:
         if release_mode != "drain" and segment_ledger is not None:
             self._retire_publication_generation(segment_ledger.activation_generation)
         prior_cleanup_debt = tuple(self._retired_sources)
-        await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
-        await self._attempt_cleanup(
-            failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
+        try:
+            await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
+            await self._attempt_cleanup(
+                failures,
+                lambda: self._close_if_possible(source),
+                retain_on_failure=lambda: self._retain_retired_source(source),
+            )
+        except asyncio.CancelledError:
+            self._retain_retired_source(source)
+            raise
         if cancel_segments and segment_ledger is not None:
             self._cancel_segment_ledger(segment_ledger)
         await self._retry_retired_cleanup_debt(failures, prior_cleanup_debt)

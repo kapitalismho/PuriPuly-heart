@@ -3279,6 +3279,63 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         await owner.close()
 
 
+@pytest.mark.parametrize("retarget", [False, True])
+async def test_superseded_retirement_keeps_unsettled_sources_until_reactivation(
+    retarget: bool,
+) -> None:
+    entered = asyncio.Event()
+    released = False
+    sources = []
+    running = []
+
+    class HeldSource(FakeSource):
+        async def close(self) -> None:
+            self.close_calls += 1
+            if self is sources[0] and self.close_calls == 1:
+                entered.set()
+                await asyncio.Event().wait()
+            if not released:
+                raise TimeoutError("source has not settled")
+
+    def open_source(_config, _target):
+        source = HeldSource()
+        sources.append(source)
+        return source
+
+    async def run_loop(*, source, **_kwargs):
+        running.append(source)
+        await asyncio.Event().wait()
+
+    owner, *_ = make_owner(source_factory=open_source, run_audio_loop=run_loop)
+    config = make_config()
+    try:
+        await owner.apply_intent(config, enabled=True)
+        await wait_until(lambda: bool(running))
+        old_generation = owner.snapshot.generation
+        retiring = asyncio.create_task(owner.apply_intent(config, enabled=retarget, restart=True))
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        if not retarget:
+            retiring.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await retiring
+        with pytest.raises((TimeoutError, ExceptionGroup)):
+            await owner.apply_intent(config, enabled=True, restart=True)
+        if retarget:
+            await retiring
+        expected = 2 if retarget else 1
+        assert len(sources) == owner.snapshot.cleanup_debt == expected
+        assert not owner.is_current_generation(old_generation)
+        assert not owner.snapshot.effective_active and len(running) == 1
+        released = True
+        await owner.apply_intent(config, enabled=True)
+        await wait_until(lambda: len(running) == 2)
+        assert len(sources) == expected + 1 and running[-1] is sources[-1]
+        assert owner.snapshot.effective_active and owner.snapshot.cleanup_debt == 0
+    finally:
+        released = True
+        await owner.close()
+
+
 async def test_terminal_process_loss_faults_and_allows_retry() -> None:
     target = PeerCaptureTargetIntent(
         kind="process",
