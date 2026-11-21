@@ -36,32 +36,13 @@ def log_start_time(file_name: str) -> float | None:
     if match is None:
         return None
     try:
-        moment = time.mktime(
-            (
-                int(match.group(1)),
-                int(match.group(2)),
-                int(match.group(3)),
-                int(match.group(4)),
-                int(match.group(5)),
-                int(match.group(6)),
-                0,
-                0,
-                -1,
-            )
-        )
+        fields = tuple(map(int, match.groups()))
+        moment = time.mktime((*fields, 0, 0, -1))
     except OverflowError, ValueError:
         return None
     if moment <= 0:
         return None
-    local = time.localtime(moment)
-    if (
-        local.tm_year,
-        local.tm_mon,
-        local.tm_mday,
-        local.tm_hour,
-        local.tm_min,
-        local.tm_sec,
-    ) != tuple(int(match.group(index)) for index in range(1, 7)):
+    if time.localtime(moment)[:6] != fields:
         return None
     return moment
 
