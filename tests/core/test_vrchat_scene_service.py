@@ -7,10 +7,12 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from puripuly_heart.config.process_capture_resolution import ProcessSnapshot
+from puripuly_heart.core.audio import process_identity, windows_process_table
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
@@ -128,6 +130,113 @@ async def _wait_for_status(service: VrchatSceneService, status: str) -> None:
             return
         await asyncio.sleep(0.02)
     raise AssertionError(f"scene never reached {status}: {service.snapshot()}")
+
+
+def test_default_windows_scene_uses_resolved_paths_before_process_enrichment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inventory = {
+        10: ("VRChat.exe", r"C:\Other.exe"),
+        20: ("", r"C:\Older\VRChat.exe"),
+        30: ("PriorImage.exe", r"D:\Replacement\vRcHaT.ExE"),
+        40: ("VRChat.exe", None),
+        50: ("VRChat.exe", r"C:\OtherUser\VRChat.exe"),
+        60: ("VRChat.exe", r"C:\NoHandle\VRChat.exe"),
+        70: ("VRChat.exe", r"C:\NoTime\VRChat.exe"),
+        80: ("VRChat.exe", r"C:\NoSid\VRChat.exe"),
+    }
+    paths = {pid: path for pid, (_, path) in inventory.items()}
+    entries = tuple(
+        windows_process_table.WindowsProcessEntry(pid, 1, name)
+        for pid, (name, _) in inventory.items()
+    )
+    opened: list[int] = []
+
+    def resolve(_api, pid, _buffer, _prefixes):
+        return paths[pid]
+
+    def open_process(_access, _inherit, pid):
+        opened.append(pid)
+        return None if pid == 60 else pid
+
+    def token_sid(_api, handle):
+        return {50: b"other", 80: None}.get(handle, b"owner")
+
+    def create_time(_api, handle):
+        return None if handle == 70 else float(handle)
+
+    api = SimpleNamespace(
+        kernel32=SimpleNamespace(
+            GetCurrentProcess=lambda: -1,
+            OpenProcess=open_process,
+            CloseHandle=lambda _handle: None,
+        )
+    )
+    monkeypatch.setattr(process_identity.sys, "platform", "win32")
+    monkeypatch.setattr(windows_process_table, "_api", lambda: api)
+    monkeypatch.setattr(windows_process_table, "_dos_device_prefixes", lambda _api: ())
+    monkeypatch.setattr(windows_process_table, "list_windows_processes", lambda: entries)
+    monkeypatch.setattr(windows_process_table, "_executable_path", resolve)
+    monkeypatch.setattr(windows_process_table, "_token_user_sid", token_sid)
+    monkeypatch.setattr(windows_process_table, "_create_time", create_time)
+
+    service = VrchatSceneService(log_directory=tmp_path)
+    identity = service._find_vrchat_identity()
+    assert identity is not None
+    assert (identity.pid, identity.instance_id) == (30, "30:30.0")
+    assert identity.target.executable_identity == r"d:\replacement\vrchat.exe"
+    assert set(opened) == {20, 30, 50, 60, 70, 80}
+
+    paths[30] = r"D:\Replacement\Other.exe"
+    identity = service._find_vrchat_identity()
+    assert identity is not None and identity.pid == 20
+
+    opened.clear()
+    generic = tuple(process_identity.default_current_user_process_snapshots().snapshots())
+    assert [item.executable_path for item in generic] == list(paths.values())
+    assert opened == list(paths)
+
+
+@pytest.mark.parametrize("fail_path_query", [False, True])
+async def test_default_windows_scene_scan_failure_is_not_process_absence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_path_query: bool
+) -> None:
+    failed = True
+
+    def inventory():
+        if not failed:
+            return ()
+        if fail_path_query:
+            return (windows_process_table.WindowsProcessEntry(10, 1, "PriorImage.exe"),)
+        raise OSError(5, "synthetic process enumeration failure")
+
+    def resolve(*_args):
+        raise OSError(5, "synthetic full path query failure")
+
+    monkeypatch.setattr(process_identity.sys, "platform", "win32")
+    api = SimpleNamespace(kernel32=SimpleNamespace(GetCurrentProcess=lambda: -1))
+    monkeypatch.setattr(windows_process_table, "_api", lambda: api)
+    monkeypatch.setattr(windows_process_table, "_token_user_sid", lambda *_args: b"owner")
+    monkeypatch.setattr(windows_process_table, "_dos_device_prefixes", lambda _api: ())
+    monkeypatch.setattr(windows_process_table, "list_windows_processes", inventory)
+    monkeypatch.setattr(windows_process_table, "_executable_path", resolve)
+    service = VrchatSceneService(log_directory=tmp_path)
+    service._started = True
+    try:
+        await service._poll_once(service.generation)
+        observation = service.lifecycle_owner_snapshot()
+        assert observation["process_observation_succeeded"] is False
+        assert observation["process_present"] is None
+        assert observation["observation_diagnostic_id"] is not None
+
+        failed = False
+        await service._poll_once(service.generation)
+        observation = service.lifecycle_owner_snapshot()
+        assert observation["process_observation_succeeded"] is True
+        assert observation["process_present"] is False
+        assert observation["observation_diagnostic_id"] is None
+    finally:
+        await service.close()
 
 
 async def test_no_process_means_unavailable(tmp_path: Path) -> None:

@@ -5,6 +5,7 @@ import logging
 import ntpath
 import time
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 
 from puripuly_heart.config.process_capture_resolution import (
@@ -39,6 +40,7 @@ _SCOPE_NAME = "VrchatSceneService"
 _MONITOR_TASK = "monitor"
 _DEFAULT_POLL_INTERVAL_S = 3.0
 _DEFAULT_QUIESCENCE_S = 2.0
+_VRCHAT_EXECUTABLE_BASENAME = "vrchat.exe"
 
 
 def _by_path(found: tuple[VrchatSceneLogCandidate, ...], path: Path) -> VrchatSceneLogCandidate:
@@ -74,7 +76,10 @@ def _is_newer(selected: VrchatSceneLogCandidate, current: VrchatSceneLogCandidat
 @dataclass(slots=True)
 class VrchatSceneService(SceneSnapshotProvider):
     snapshots: CurrentUserProcessSnapshotPort = field(
-        default_factory=default_current_user_process_snapshots
+        default_factory=partial(
+            default_current_user_process_snapshots,
+            windows_executable_basename=_VRCHAT_EXECUTABLE_BASENAME,
+        )
     )
     watcher_factory: SystemProcessIdentityWatcher = field(
         default_factory=SystemProcessIdentityWatcher
@@ -257,7 +262,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             executable_path = item.executable_path
             if not isinstance(executable_path, str) or not executable_path:
                 continue
-            if ntpath.basename(executable_path).casefold() != "vrchat.exe":
+            if ntpath.basename(executable_path).casefold() != _VRCHAT_EXECUTABLE_BASENAME:
                 continue
             create_time = _create_time_of(item.instance_id)
             if create_time is None:
