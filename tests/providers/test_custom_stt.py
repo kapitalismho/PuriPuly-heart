@@ -78,14 +78,15 @@ class _FakeAsyncClient:
 
 class _FakeWebSocket:
     def __init__(self, messages: list[object], *, hang: bool = False) -> None:
-        self.sent: list[str] = []
+        self.sent: list[str | bytes] = []
         self._messages = list(messages)
         self._hang = hang
         self._closed = asyncio.Event()
         self._available = asyncio.Event()
         self.closed = False
 
-    async def send(self, payload: str) -> None:
+    async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
+        assert text is True or (text is None and isinstance(payload, str))
         self.sent.append(payload)
 
     def __aiter__(self) -> _FakeWebSocket:
@@ -983,17 +984,20 @@ async def test_streaming_session_discards_partials_and_keeps_finals() -> None:
         websocket_connect=connect,
     )
     session = await backend.open_session()
-    await session.send_audio(b"\x00\x00" * 80)
+    pcm16le = b"\xfb\xff\x00\x80"
+    await session.send_audio(pcm16le)
     await session.on_speech_end()
     event = await anext(session.events())
     await session.close()
 
     assert event.is_final is True
     assert event.text == "hello"
-    sent_types = [json.loads(item)["type"] for item in ws.sent]
-    assert "session.update" in sent_types
-    assert "input_audio_buffer.append" in sent_types
-    assert "input_audio_buffer.commit" in sent_types
+    assert [json.loads(item)["type"] for item in ws.sent] == [
+        "session.update",
+        "input_audio_buffer.append",
+        "input_audio_buffer.commit",
+    ]
+    assert ws.sent[1] == b'{"type": "input_audio_buffer.append", "audio": "+/8AgA=="}'
 
 
 @pytest.mark.asyncio
@@ -1174,7 +1178,7 @@ class _StartupWebSocket(_FakeWebSocket):
         if not block_close:
             self.close_release.set()
 
-    async def send(self, payload):
+    async def send(self, payload, *, text=None):
         packet = json.loads(payload)
         if packet["type"] == "session.update":
             self.update_started.set()
@@ -1183,7 +1187,7 @@ class _StartupWebSocket(_FakeWebSocket):
             except asyncio.CancelledError:
                 self.update_cancelled.set()
                 raise
-        await super().send(payload)
+        await super().send(payload, text=text)
         if packet["type"] == "input_audio_buffer.append":
             self.audio.extend(base64.b64decode(packet["audio"]))
         if packet["type"] == "input_audio_buffer.commit":
@@ -1290,10 +1294,10 @@ async def test_realtime_failed_startup_cleanup_remains_owned_for_backend_close_r
 
 async def test_commit_failure_retains_transport_cause_and_known_reason() -> None:
     class FailingCommitSocket(_FakeWebSocket):
-        async def send(self, payload):
+        async def send(self, payload, *, text=None):
             if json.loads(payload)["type"] == "input_audio_buffer.commit":
                 raise OSError(10054, "PRIVATE_SOCKET_DETAIL")
-            await super().send(payload)
+            await super().send(payload, text=text)
 
     ws = FailingCommitSocket([], hang=True)
 

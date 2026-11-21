@@ -917,10 +917,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
 
     async def _append_audio(self, pcm16le: bytes) -> None:
         await self._send_json(
-            {
-                "type": "input_audio_buffer.append",
-                "audio": base64.b64encode(pcm16le).decode("ascii"),
-            }
+            b'{"type": "input_audio_buffer.append", "audio": "%s"}' % base64.b64encode(pcm16le)
         )
 
     async def _wait_for_previous_final(self) -> None:
@@ -934,12 +931,17 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             self._final_ready.set()
             self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
-    async def _send_json(self, payload: dict[str, Any]) -> None:
+    async def _send_json(self, payload: dict[str, Any] | bytes) -> None:
         ws = self._ws
         if ws is None:
             raise RuntimeError("Custom STT realtime session is not started")
         try:
-            await asyncio.wait_for(ws.send(json.dumps(payload)), timeout=5.0)
+            send = (
+                ws.send(payload, text=True)
+                if isinstance(payload, bytes)
+                else ws.send(json.dumps(payload))
+            )
+            await asyncio.wait_for(send, timeout=5.0)
         except Exception as exc:
             self._event_projection.put_legacy(_sanitized_error(exc, secret=self.api_key))
             raise
