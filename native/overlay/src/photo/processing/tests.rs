@@ -417,7 +417,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
         let expected = erase_patch(
             &work,
             region.roi,
-            &dilate(&core, radius, true),
+            &dilate(&region.recovered, radius, true),
             &work.pixels,
             &mut workspace,
         )
