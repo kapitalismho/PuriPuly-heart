@@ -22,7 +22,7 @@ from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.vrchat_scene import SceneSnapshotProvider, VrchatSceneSnapshot
-from puripuly_heart.core.vrchat_scene_events import UNAVAILABLE_SNAPSHOT
+from puripuly_heart.core.vrchat_scene_events import UNAVAILABLE_SNAPSHOT, VrchatSceneEvent
 from puripuly_heart.core.vrchat_scene_parser import parse_vrchat_scene_line
 from puripuly_heart.core.vrchat_scene_tailer import (
     VrchatSceneLogCandidate,
@@ -88,7 +88,7 @@ class VrchatSceneService(SceneSnapshotProvider):
     _tracker: VrchatScenePresenceTracker = field(
         default_factory=VrchatScenePresenceTracker, init=False, repr=False
     )
-    _tailer: VrchatSceneLogTailer = field(init=False, repr=False)
+    _tailer: VrchatSceneLogTailer[VrchatSceneEvent] = field(init=False, repr=False)
     _snapshot: VrchatSceneSnapshot = field(default=UNAVAILABLE_SNAPSHOT, init=False, repr=False)
     _generation: int = field(default=0, init=False, repr=False)
     _started: bool = field(default=False, init=False, repr=False)
@@ -108,7 +108,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             raise ValueError("scene poll interval must be positive")
         if self.quiescence_s < 0:
             raise ValueError("scene quiescence must be non-negative")
-        self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._tailer = VrchatSceneLogTailer(self.log_directory, parse_vrchat_scene_line)
 
     @property
     def owner_name(self) -> str:
@@ -162,7 +162,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._in_lifecycle = False
         self._instance_id = None
         self._log_candidate = None
-        self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._tailer = VrchatSceneLogTailer(self.log_directory, parse_vrchat_scene_line)
         self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
@@ -280,7 +280,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._in_lifecycle = True
         self._instance_id = identity.instance_id
         self._log_candidate = None
-        self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._tailer = VrchatSceneLogTailer(self.log_directory, parse_vrchat_scene_line)
         self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(self._tracker.snapshot())
@@ -328,7 +328,7 @@ class VrchatSceneService(SceneSnapshotProvider):
         self._in_lifecycle = False
         self._instance_id = None
         self._log_candidate = None
-        self._tailer = VrchatSceneLogTailer(self.log_directory)
+        self._tailer = VrchatSceneLogTailer(self.log_directory, parse_vrchat_scene_line)
         self._file_failure_diagnostics = None
         self._tracker.reset()
         self._publish_snapshot(UNAVAILABLE_SNAPSHOT)
@@ -372,14 +372,14 @@ class VrchatSceneService(SceneSnapshotProvider):
         if selected is None:
             return
         try:
-            lines = await run_owned_thread_call(lambda: tailer.begin_replay(selected))
+            events = await run_owned_thread_call(lambda: tailer.begin_replay(selected))
         except Exception as error:
             self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         self._log_candidate = _by_path(found, selected)
-        self._feed_lines(lines)
+        self._apply_events(events)
         self._touch()
         self._settle_if_quiet(generation)
 
@@ -403,7 +403,7 @@ class VrchatSceneService(SceneSnapshotProvider):
             await self._rebuild(generation, tailer, _by_path(found, selected))
             return
         try:
-            lines = await run_owned_thread_call(tailer.read_new_lines)
+            events = await run_owned_thread_call(tailer.read_new_lines)
         except VrchatSceneLogTruncated:
             await self._rebuild_same_file(generation, tailer)
             return
@@ -412,45 +412,48 @@ class VrchatSceneService(SceneSnapshotProvider):
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
-        if self._feed_lines(lines) > 0:
+        self._apply_events(events)
+        if events:
             self._touch()
         self._settle_if_quiet(generation)
 
     async def _rebuild(
         self,
         generation: int,
-        tailer: VrchatSceneLogTailer,
+        tailer: VrchatSceneLogTailer[VrchatSceneEvent],
         selected: VrchatSceneLogCandidate,
     ) -> None:
         self._tracker.on_transition()
         self._publish_snapshot(self._tracker.snapshot())
         self._touch()
         try:
-            lines = await run_owned_thread_call(lambda: tailer.begin_replay(selected.path))
+            events = await run_owned_thread_call(lambda: tailer.begin_replay(selected.path))
         except Exception as error:
             self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
         self._log_candidate = selected
-        self._feed_lines(lines)
+        self._apply_events(events)
         self._touch()
         self._settle_if_quiet(generation)
 
-    async def _rebuild_same_file(self, generation: int, tailer: VrchatSceneLogTailer) -> None:
+    async def _rebuild_same_file(
+        self, generation: int, tailer: VrchatSceneLogTailer[VrchatSceneEvent]
+    ) -> None:
         current = self._log_candidate
         self._tracker.on_transition()
         self._publish_snapshot(self._tracker.snapshot())
         if current is None:
             return
         try:
-            rebuilt = await run_owned_thread_call(lambda: tailer.begin_replay(current.path))
+            events = await run_owned_thread_call(lambda: tailer.begin_replay(current.path))
         except Exception as error:
             self._mark_file_failure(generation, error)
             return
         if not self._fresh(generation) or tailer is not self._tailer:
             return
-        self._feed_lines(rebuilt)
+        self._apply_events(events)
         self._touch()
         self._settle_if_quiet(generation)
 
@@ -492,16 +495,11 @@ class VrchatSceneService(SceneSnapshotProvider):
                 stage="scene_log_read",
             )
 
-    def _feed_lines(self, lines: list[str]) -> int:
+    def _apply_events(self, events: list[VrchatSceneEvent]) -> None:
         self._file_failure_diagnostics = None
-        parsed = 0
-        for line in lines:
-            event = parse_vrchat_scene_line(line)
-            if event is not None:
-                parsed += 1
-                self._tracker.on_event(event)
+        for event in events:
+            self._tracker.on_event(event)
         self._publish_snapshot(self._tracker.snapshot())
-        return parsed
 
     def _touch(self) -> None:
         try:

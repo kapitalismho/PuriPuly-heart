@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -870,6 +871,52 @@ async def test_pinned_service_ignores_newer_second_process(tmp_path: Path) -> No
         assert snapshots.calls == 0
         assert service._instance_id == f"4242:{create_time}"
         assert service.snapshot().participant_count == 1
+    finally:
+        await service.close()
+
+
+async def test_exit_while_appended_join_is_being_read_cannot_republish_old_roster(tmp_path):
+    create_time = time.time() - 5
+    path = tmp_path / _log_name(create_time)
+    path.write_text("\n".join(_roster_block(("Self",), (_USER_A,), "Self")) + "\n")
+    snapshots = CountingSnapshots()
+    snapshots.items = (_snapshot(4242, "C:\\VRChat\\VRChat.exe", create_time),)
+    watcher = PinnedWatcherFactory()
+    service = VrchatSceneService(
+        snapshots=snapshots,
+        watcher_factory=watcher,
+        log_directory=tmp_path,
+        poll_interval_s=3600,
+        quiescence_s=0,
+    )
+    entered = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    await service.start()
+    try:
+        await _wait_for_status(service, "ready")
+        parse = service._tailer.project_line
+
+        def held_parse(line):
+            event = parse(line)
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(5)
+            return event
+
+        service._tailer.project_line = held_parse
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(_join("Peer", _USER_B) + "\n")
+        async with asyncio.TaskGroup() as group:
+            group.create_task(service._poll_once(service.generation))
+            try:
+                await asyncio.wait_for(entered.wait(), timeout=5)
+                snapshots.items = ()
+                watcher.terminals[-1]("target_exited", None)
+                await _wait_for_status(service, "unavailable")
+            finally:
+                release.set()
+        assert service.snapshot().status == "unavailable"
+        assert service.snapshot().participant_count is None
     finally:
         await service.close()
 

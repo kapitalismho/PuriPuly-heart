@@ -5,6 +5,7 @@ import math
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -125,8 +126,9 @@ def _newest(
 
 
 @dataclass(slots=True)
-class VrchatSceneLogTailer:
+class VrchatSceneLogTailer[T]:
     log_directory: Path
+    project_line: Callable[[str], T | None]
     read_chunk_bytes: int = _READ_CHUNK_BYTES
     _path: Path | None = field(default=None, init=False, repr=False)
     _offset: int = field(default=0, init=False, repr=False)
@@ -173,7 +175,7 @@ class VrchatSceneLogTailer:
             )
         return tuple(found)
 
-    def begin_replay(self, path: Path) -> list[str]:
+    def begin_replay(self, path: Path) -> list[T]:
         self._path = path
         self._offset = 0
         self._pending_text = ""
@@ -181,11 +183,9 @@ class VrchatSceneLogTailer:
         self._identity = None
         self._anchor = b""
         self._observed_mtime = None
-        lines = self._consume(path, 0)
-        self._record_observation(path)
-        return lines
+        return self._consume(path, 0)
 
-    def read_new_lines(self) -> list[str]:
+    def read_new_lines(self) -> list[T]:
         path = self._path
         if path is None:
             return []
@@ -200,9 +200,7 @@ class VrchatSceneLogTailer:
             if self._observed_mtime is not None and status.st_mtime != self._observed_mtime:
                 raise VrchatSceneLogTruncated(str(path))
             return []
-        lines = self._consume(path, self._offset)
-        self._record_observation(path)
-        return lines
+        return self._consume(path, self._offset)
 
     def _record_observation(self, path: Path) -> None:
         status = path.stat()
@@ -217,12 +215,13 @@ class VrchatSceneLogTailer:
             stream.seek(self._offset - len(anchor))
             return stream.read(len(anchor)) == anchor
 
-    def _consume(self, path: Path, start: int) -> list[str]:
+    def _consume(self, path: Path, start: int) -> list[T]:
         decoder = self._decoder
         if decoder is None:
             decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             self._decoder = decoder
-        pieces: list[str] = []
+        partial = [self._pending_text] if self._pending_text else []
+        results: list[T] = []
         offset = start
         with open(path, "rb") as stream:
             stream.seek(start)
@@ -235,20 +234,22 @@ class VrchatSceneLogTailer:
                     self._anchor = chunk[-_ANCHOR_BYTES:]
                 else:
                     self._anchor = (self._anchor + chunk)[-_ANCHOR_BYTES:]
-                pieces.append(decoder.decode(chunk, False))
-        text = self._pending_text + "".join(pieces)
+                parts = decoder.decode(chunk, False).split("\n")
+                tail = parts.pop()
+                if parts and partial:
+                    partial.append(parts[0])
+                    parts[0] = "".join(partial)
+                    partial.clear()
+                for line in parts:
+                    result = self.project_line(line.removesuffix("\r"))
+                    if result is not None:
+                        results.append(result)
+                if tail:
+                    partial.append(tail)
+        self._pending_text = "".join(partial)
         self._offset = offset
-        if text.endswith("\n"):
-            self._pending_text = ""
-            return [item[:-1] if item.endswith("\r") else item for item in text.split("\n")[:-1]]
-        head, _, tail = text.rpartition("\n")
-        if not head and not tail:
-            return []
-        if not head:
-            self._pending_text = tail
-            return []
-        self._pending_text = tail
-        return [item[:-1] if item.endswith("\r") else item for item in head.split("\n")]
+        self._record_observation(path)
+        return results
 
 
 __all__ = [
