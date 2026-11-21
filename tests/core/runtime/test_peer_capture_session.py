@@ -3760,24 +3760,39 @@ async def test_partial_peer_open_retains_owned_cleanup_debt_and_native_cause():
                 raise OSError(5, "private cleanup detail")
             self.closed = True
 
+    config = make_config(
+        target=PeerCaptureTargetIntent(
+            kind="process", process_kind="vrchat", executable_identity=r"c:\games\vrchat.exe"
+        )
+    )
+
     source = Source()
     calls = []
 
     def create_source(config, target):
         calls.append(config)
+        if source.closed:
+            return FakeSource()
         raise AudioSourceOpenFailure(source, OSError(13, "private open detail"))
 
     owner, *_ = make_owner(source_factory=create_source)
     try:
         with pytest.raises(OSError):
-            await owner.apply_intent(make_config(), enabled=True)
+            await owner.apply_intent(config, enabled=True)
         assert owner.snapshot.cleanup_debt == 1
         assert owner.cleanup_source is source
         assert owner.snapshot.failure_reason.value == "source_open_failed"
         assert "private" not in repr(owner.snapshot.failure_diagnostics)
         with pytest.raises(OSError):
-            await owner.apply_intent(make_config(), enabled=True)
+            await owner.apply_intent(config, enabled=True)
+        with pytest.raises(OSError):
+            await owner.retry_process_capture()
+        assert owner.snapshot.retry_available
         assert len(calls) == 1
+        source.fail_close = False
+        assert await owner.retry_process_capture()
+        assert len(calls) == 2
+        assert owner.snapshot.effective_active and not owner.snapshot.retry_available
     finally:
         source.fail_close = False
         await owner.close()

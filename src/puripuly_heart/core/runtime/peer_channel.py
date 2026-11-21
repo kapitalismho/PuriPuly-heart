@@ -1377,7 +1377,6 @@ class PeerCaptureSessionOwner:
             self._generation_operation = (generation, provider_operation)
             self._config = target_config
             self._desired_active = True
-            self._retry_required_capture_target = None
             self._mutation_observations[asyncio.current_task()] = _MutationObservation(
                 generation, True, requires_setup_authority=False
             )
@@ -1874,6 +1873,7 @@ class PeerCaptureSessionOwner:
                 if not should_release:
                     self._provider_signature = config.provider_signature
                     self._provider_status = PeerCaptureProviderStatus.READY
+                    self._retry_required_capture_target = None
                     self._state = PeerCaptureSessionState.RUNNING
                     self._last_failure = None
                     provider_ingress_ready.set()
