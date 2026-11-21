@@ -862,6 +862,70 @@ async def test_owned_monitor_recovers_with_presenter_and_original_expiration(
     await owner.close()
 
 
+@pytest.mark.asyncio
+async def test_compatibility_switch_reuses_presenter_and_accepts_clear_during_teardown(
+    monkeypatch,
+) -> None:
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    runtime.vr_compatibility_mode = False
+    runtime.set_overlay_instance_id("original")
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock)
+    runtime.adopt_presenter(presenter)
+    output = SimpleNamespace(overlay_sink=presenter)
+    owner.output_provider = lambda: output
+    owner.state = "connected"
+    owner.active_target = "steamvr"
+    await presenter.emit(
+        OverlayEventAdapter(clock=owner.clock).transcript_final(
+            Transcript(utterance_id=uuid4(), channel="self", text="current", is_final=True),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    assert presenter.snapshot().blocks
+    enabled = True
+    started: list[bool] = []
+
+    async def stop_after_clear() -> None:
+        assert output.overlay_sink is presenter
+        await output.overlay_sink.clear_for_runtime_detach()
+
+    async def replace_sink(sink, **_opts) -> bool:
+        output.overlay_sink = sink
+        return True
+
+    output.replace_overlay_sink = replace_sink
+    output.reset_overlay_preview = _noop_async
+    runtime.attach_process_manager(SimpleNamespace(state="connected", stop=_noop_async))
+
+    async def start_replacement(self, generation) -> None:
+        generation.set_overlay_instance_id(f"changed-{enabled}")
+        generation.vr_compatibility_mode = enabled
+        assert generation.presenter is presenter
+        await presenter.begin_runtime_epoch(native_fresh_retry=enabled)
+        assert bool(presenter.snapshot().blocks) is enabled
+        generation.attach_process_manager(SimpleNamespace(state="connected", stop=stop_after_clear))
+        started.append(enabled)
+        self.mark_connected()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_replacement)
+    try:
+        await owner.apply_vr_compatibility_mode(True)
+        await owner.apply_vr_compatibility_mode(True)
+        assert owner.output_snapshot()["effective_vr_compatibility_mode"] is True
+        enabled = False
+        await owner.apply_vr_compatibility_mode(False)
+        assert owner.output_snapshot()["effective_vr_compatibility_mode"] is False
+        assert started == [True, False]
+        assert not presenter.snapshot().blocks
+        assert output.overlay_sink is presenter
+    finally:
+        assert owner.runtime is not None
+        owner.runtime.process_manager.stop = _noop_async
+        await owner.close()
+
+
 @pytest.mark.parametrize("phase", ["backoff", "teardown"])
 async def test_off_drains_recovery_without_late_respawn(monkeypatch, phase: str) -> None:
     owner = make_owner(Recorder())

@@ -758,9 +758,9 @@ class OverlayPresenter(OverlaySink):
             )
         self._drain_presentation_state_removals()
 
-    async def begin_runtime_epoch(self, *, diagnostic_retry: bool = False) -> None:
+    async def begin_runtime_epoch(self, *, native_fresh_retry: bool = False) -> None:
         async with self._ownership_transition_lock:
-            enable_retry = diagnostic_retry and not self._closing and not self._closed
+            enable_retry = native_fresh_retry and not self._closing and not self._closed
             if enable_retry:
                 self._retry_projection.begin(enabled=True, snapshot=self.snapshot())
             elif self.native_retry_enabled:

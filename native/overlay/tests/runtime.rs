@@ -300,7 +300,55 @@ fn test_manifest() -> OverlayManifest {
             .to_string(),
         log_level: "INFO".into(),
         locale: "en".into(),
+        vr_compatibility_mode: false,
     }
+}
+
+#[test]
+fn caption_compatibility_manifest_opts_in_to_p05_without_changing_default() {
+    let mut wire = serde_json::to_value(test_manifest()).unwrap();
+    wire.as_object_mut().unwrap().remove("vr_compatibility_mode");
+    let default: OverlayManifest = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(
+        default.caption_quiet_tail_profile(),
+        QuietTailProfile::NoRetry
+    );
+
+    wire["vr_compatibility_mode"] = json!(true);
+    let compatibility: OverlayManifest = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(
+        compatibility.caption_quiet_tail_profile(),
+        QuietTailProfile::P05
+    );
+
+    wire["vr_compatibility_mode"] = json!("true");
+    assert!(serde_json::from_value::<OverlayManifest>(wire).is_err());
+}
+
+#[test]
+fn caption_compatibility_does_not_read_cached_experiment_profile() {
+    let path = unique_temp_file("compatibility-selection", "json");
+    let manifest = OverlayManifest {
+        contract_version: EXPECTED_CONTRACT_VERSION + 1,
+        vr_compatibility_mode: true,
+        ..test_manifest()
+    };
+    std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    let output = Command::new(overlay_binary())
+        .args(["--config", path.to_str().unwrap()])
+        .env(
+            "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT",
+            "cached_frame_rehandoff",
+        )
+        .env("PURIPULY_OVERLAY_QUIET_TAIL_PROFILE", "invalid-profile")
+        .output()
+        .unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(output.status.code(), Some(10));
+    assert_eq!(
+        parse_event_payloads(&output.stderr)[0]["failure_reason"],
+        "contract_mismatch"
+    );
 }
 
 fn unique_log_dir(name: &str) -> String {

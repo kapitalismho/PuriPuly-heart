@@ -51,6 +51,7 @@ class OverlayRuntimeHandle:
         self._shutdown_grace_s = shutdown_grace_s
         self.operation_id = operation_id
         self.request_id = request_id
+        self.vr_compatibility_mode: bool | None = None
         self._presenter: object | None = None
         self._bridge: object | None = None
         self._process_manager: object | None = None
@@ -311,6 +312,7 @@ class OverlayRuntimeHandle:
         preview_reset: Callable[[], Awaitable[None]] | None = None,
         diagnostics_detach: Callable[[object | None], object] | None = None,
         emit_shutdown: bool = True,
+        keep_presenter_ingress: bool = False,
     ) -> None:
         if self._close_completed and not self._has_resources():
             return
@@ -322,14 +324,18 @@ class OverlayRuntimeHandle:
             failures: list[Exception] = []
             output_ingress_detached = False
             output_ingress_detach_failed = False
-            try:
-                output_ingress_detached = await self._detach_overlay_ingress(
-                    self._presenter,
-                    overlay_sink_detach,
-                )
-            except Exception as exc:
-                output_ingress_detach_failed = True
-                failures.append(exc)
+            if keep_presenter_ingress and preserve_presenter_state:
+                if self._presenter is not None:
+                    self._detach_presenter_runtime_resources(self._presenter)
+            else:
+                try:
+                    output_ingress_detached = await self._detach_overlay_ingress(
+                        self._presenter,
+                        overlay_sink_detach,
+                    )
+                except Exception as exc:
+                    output_ingress_detach_failed = True
+                    failures.append(exc)
             try:
                 if emit_shutdown:
                     await self._attempt(failures, self._mark_process_shutdown_requested)

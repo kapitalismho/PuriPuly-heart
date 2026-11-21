@@ -92,6 +92,18 @@ pub struct OverlayManifest {
     pub log_dir: String,
     pub log_level: String,
     pub locale: String,
+    #[serde(default)]
+    pub vr_compatibility_mode: bool,
+}
+
+impl OverlayManifest {
+    pub fn caption_quiet_tail_profile(&self) -> QuietTailProfile {
+        if self.vr_compatibility_mode {
+            QuietTailProfile::P05
+        } else {
+            QuietTailProfile::NoRetry
+        }
+    }
 }
 
 pub fn resolve_quiet_tail_profile_from_env(

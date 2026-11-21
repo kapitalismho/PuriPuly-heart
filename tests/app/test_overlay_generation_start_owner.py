@@ -40,8 +40,8 @@ class FakePresenter:
         self.events.append(f"presenter:translation_enabled:{next_enabled}")
         self.translation_enabled = next_enabled
 
-    async def begin_runtime_epoch(self, *, diagnostic_retry: bool = False) -> None:
-        self.events.append(f"presenter:runtime_epoch:{diagnostic_retry}")
+    async def begin_runtime_epoch(self, *, native_fresh_retry: bool = False) -> None:
+        self.events.append(f"presenter:runtime_epoch:{native_fresh_retry}")
         if isinstance(self.snapshot_value, dict):
             self.snapshot_value = {
                 key: value
@@ -166,7 +166,9 @@ class StartHarness:
         FakeBridge.events = self.events
         FakeProcessManager.events = self.events
 
-    def request(self, *, desktop: bool) -> OverlayGenerationStartRequest:
+    def request(
+        self, *, desktop: bool, vr_compatibility_mode: bool = False
+    ) -> OverlayGenerationStartRequest:
         target = "desktop" if desktop else "steamvr"
         return OverlayGenerationStartRequest(
             config=ResolvedOverlayConfig(
@@ -174,6 +176,7 @@ class StartHarness:
                 target=target,
                 show_translation=False,
                 show_peer_original=True,
+                vr_compatibility_mode=vr_compatibility_mode,
                 calibration={},
                 desktop_overlay_options={},
             ),
@@ -330,6 +333,26 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     else:
         assert runtime.renderer_events is None
         assert harness.renderer_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("desktop", [False, True], ids=["steamvr", "desktop"])
+async def test_compatibility_intent_only_reaches_steamvr_presenter_and_manifest(
+    desktop: bool,
+) -> None:
+    harness = StartHarness()
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    owner = OverlayGenerationStartOwner()
+    status = await owner.start(
+        runtime,
+        lambda: harness.request(desktop=desktop, vr_compatibility_mode=True),
+        harness.effects(),
+    )
+    await asyncio.sleep(0)
+    assert status == "connected"
+    assert runtime.vr_compatibility_mode is (None if desktop else True)
+    assert FakeProcessManager.instances[0].kwargs["vr_compatibility_mode"] is not desktop
+    assert f"presenter:runtime_epoch:{not desktop}" in FakePresenter.events
 
 
 @pytest.mark.asyncio

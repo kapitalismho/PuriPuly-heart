@@ -143,6 +143,7 @@ class OverlayProcessManager:
     log_level: str = "INFO"
     quiet_tail_profile: str | None = None
     handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
+    vr_compatibility_mode: bool = False
     renderer_events: asyncio.Queue[dict[str, object]] | None = None
     overlay_instance_id: str = field(default_factory=lambda: f"overlay-{uuid4()}")
     diagnostics_dir: Path = field(default_factory=default_overlay_diagnostics_dir)
@@ -575,7 +576,7 @@ class OverlayProcessManager:
         self._record_process(
             "runtime_configuration",
             quiet_tail_profile=(
-                "no_retry"
+                ("p05" if self.vr_compatibility_mode else "no_retry")
                 if self.handoff_experiment == HANDOFF_EXPERIMENT_OFF
                 else self.quiet_tail_profile
             ),
@@ -837,6 +838,7 @@ class OverlayProcessManager:
             log_dir=self.log_dir,
             log_level=self.log_level,
             locale=self.locale,
+            vr_compatibility_mode=self.vr_compatibility_mode,
         )
 
     def _write_manifest(self, manifest: OverlayLaunchManifest) -> Path:

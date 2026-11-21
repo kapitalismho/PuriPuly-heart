@@ -564,6 +564,47 @@ async def test_cli_photo_settings_apply_and_survive_restart(tmp_path, monkeypatc
         await restarted.stop()
 
 
+@pytest.mark.asyncio
+async def test_cli_vr_compatibility_is_boolean_persistent_and_does_not_enable_overlay(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    legacy_settings = json.loads(path.read_text(encoding="utf-8"))
+    key = "vr_compatibility_mode"
+    legacy_settings["intent"]["overlay"].pop(key)
+    path.write_text(json.dumps(legacy_settings), encoding="utf-8")
+    field = f"overlay.{key}"
+    for initial, change in [(False, True), (True, False), (False, None)]:
+        app = compose_headless_application(path)
+        try:
+            await app.start()
+            control = app.control()
+            control.bind_instance(f"caption-compatibility-{initial}-{change}")
+            catalog = await control.query("settings.choices", {})
+            assert catalog["field_schemas"][field] == {"type": "boolean", "free_form": False}
+            before = await control.query("settings.current", {})
+            assert before["settings"]["intent"]["overlay"][key] is initial
+            output = (await control.query("overlay.status", {}))["output"]
+            assert output["desired_enabled"] is False
+            assert output["effective_vr_compatibility_mode"] is None
+            if change is not None:
+                admitted = await control.submit(
+                    "settings.apply",
+                    {"changes": {field: change}},
+                    request_id=f"compatibility-{change}",
+                )
+                result = await control.wait(admitted["operation_id"], timeout=5)
+                assert result["status"] == "applied", result
+                after = (await control.query("settings.current", {}))["settings"]
+                expected = deepcopy(before["settings"])
+                expected["intent"]["overlay"][key] = change
+                assert after == expected
+        finally:
+            await app.stop()
+
+
 def test_headless_runtime_error_is_localized_in_dashboard_state(caplog) -> None:
     from puripuly_heart.ui.i18n import t
 

@@ -2682,8 +2682,8 @@ fn startup_error_from_preflight(error: OpenVrStartupPreflightError) -> StartupEr
 }
 
 pub async fn run_with_manifest(manifest: OverlayManifest) -> i32 {
-    run_with_manifest_and_profile(manifest, QuietTailProfile::default(), HandoffExperiment::Off)
-        .await
+    let profile = manifest.caption_quiet_tail_profile();
+    run_with_manifest_and_profile(manifest, profile, HandoffExperiment::Off).await
 }
 
 async fn run_with_manifest_and_profile(
@@ -2817,6 +2817,9 @@ pub async fn run_cli(args: &[String]) -> i32 {
             return error.exit_code();
         }
     };
+    if manifest.vr_compatibility_mode {
+        return run_with_manifest(manifest).await;
+    }
 
     let handoff_experiment = match resolve_handoff_experiment_from_env() {
         Ok(experiment) => experiment,
@@ -3863,6 +3866,7 @@ mod tests {
             log_dir: std::env::temp_dir().display().to_string(),
             log_level: "INFO".to_string(),
             locale: "en".to_string(),
+            vr_compatibility_mode: false,
         }
     }
 
@@ -4640,6 +4644,7 @@ mod tests {
                                 log_dir: std::env::temp_dir().display().to_string(),
                                 log_level: "INFO".into(),
                                 locale: "en".into(),
+                                vr_compatibility_mode: false,
                             };
                             let (mut bridge, snapshot) =
                                 BridgeClient::connect(&manifest).await.unwrap();

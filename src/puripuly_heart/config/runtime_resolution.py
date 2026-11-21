@@ -918,6 +918,7 @@ class OverlayRuntimeIntent:
     target: str = OVERLAY_TARGET_STEAMVR
     show_translation: bool = True
     show_peer_original: bool = True
+    vr_compatibility_mode: bool = False
     calibration: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
     desktop_overlay_options: Mapping[str, ResolvedOptionValue] = field(
         default_factory=_empty_options
@@ -933,6 +934,7 @@ class OverlayRuntimeIntent:
         object.__setattr__(self, "enabled", bool(self.enabled))
         object.__setattr__(self, "show_translation", bool(self.show_translation))
         object.__setattr__(self, "show_peer_original", bool(self.show_peer_original))
+        object.__setattr__(self, "vr_compatibility_mode", bool(self.vr_compatibility_mode))
         object.__setattr__(
             self,
             "calibration",
@@ -1439,6 +1441,7 @@ def resolve_overlay_config(intent: OverlayRuntimeIntent) -> ResolvedOverlayConfi
         target=cast(str, intent.target),
         show_translation=intent.show_translation,
         show_peer_original=intent.show_peer_original,
+        vr_compatibility_mode=intent.vr_compatibility_mode,
         calibration=intent.calibration,
         desktop_overlay_options=intent.desktop_overlay_options,
     )

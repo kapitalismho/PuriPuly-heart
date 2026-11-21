@@ -3923,7 +3923,7 @@ async def test_native_retry_epoch_replays_valid_caption_with_fresh_intent_only()
     presenter._retry_projection.generations = NativeFreshRenderGenerations(self=4)
     await presenter._publish_if_changed(force_protocol_publish=True)
 
-    await presenter.begin_runtime_epoch(diagnostic_retry=True)
+    await presenter.begin_runtime_epoch(native_fresh_retry=True)
 
     snapshot = presenter.snapshot()
     assert snapshot.blocks[0].primary_text == "preserved caption"

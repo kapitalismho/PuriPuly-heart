@@ -75,6 +75,10 @@ class OverlayGenerationStartRequest:
     def desktop(self) -> bool:
         return self.target == OVERLAY_TARGET_DESKTOP
 
+    @property
+    def vr_compatibility_mode(self) -> bool | None:
+        return None if self.desktop else self.config.vr_compatibility_mode
+
 
 @dataclass(frozen=True, slots=True)
 class OverlayGenerationStartEffects:
@@ -145,6 +149,7 @@ class OverlayGenerationStartOwner:
             diagnostics = OverlayDiagnosticsRecorder(overlay_instance_id=overlay_instance_id)
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
+            runtime.vr_compatibility_mode = request.vr_compatibility_mode
             effects.set_target(request.target)
             if presenter is None:
                 presenter = OverlayPresenter(
@@ -162,7 +167,9 @@ class OverlayGenerationStartOwner:
                 show_translation=request.config.show_translation,
                 show_peer_original=request.config.show_peer_original,
             )
-            await presenter.begin_runtime_epoch()
+            await presenter.begin_runtime_epoch(
+                native_fresh_retry=request.vr_compatibility_mode is True,
+            )
             bridge = OverlayBridge(
                 session_token=self.session_token_factory(),
                 initial_snapshot=presenter.snapshot(),
@@ -246,6 +253,7 @@ class OverlayGenerationStartOwner:
                 "diagnostics": diagnostics,
                 "task_factory": runtime.create_child_task,
                 "selected_target": request.target,
+                "vr_compatibility_mode": request.vr_compatibility_mode is True,
                 "fallback_reason": request.fallback_reason,
                 "geometry_authority": "flet" if request.desktop else "native",
                 "graceful_shutdown_request": bridge.broadcast_shutdown,
