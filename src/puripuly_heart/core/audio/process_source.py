@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 PROCESS_CAPTURE_SAMPLE_RATE_HZ = 48000
 PROCESS_CAPTURE_CHANNELS = 2
+_PROCTAP_WORKER_OWNERSHIP_UNVERIFIED = "ProcTap 1.1.1 worker ownership could not be verified"
 
 
 class ProcessAudioCaptureSetupError(RuntimeError):
@@ -71,6 +72,52 @@ class ProcessIdentityWatcher(Protocol):
     ) -> ProcessIdentityWatchPort: ...
 
 
+@dataclass(slots=True)
+class _ProcTapProcessAudioCapture:
+    _capture: ProcessAudioCapturePort
+    _worker: threading.Thread | None = field(init=False, default=None, repr=False)
+    _worker_unobservable: bool = field(init=False, default=False)
+    _close_returned: bool = field(init=False, default=False)
+    _lock: threading.Lock = field(init=False, default_factory=threading.Lock, repr=False)
+
+    def _remember_worker(self, *, required: bool) -> None:
+        worker = getattr(self._capture, "_thread", False)
+        if isinstance(worker, threading.Thread):
+            self._worker = worker
+        elif worker is not None or required:
+            self._worker_unobservable = True
+
+    def _verify_worker_contract(self) -> None:
+        self._remember_worker(required=False)
+        if self._worker_unobservable or self._worker is not None:
+            raise ProcessAudioCaptureSetupError(_PROCTAP_WORKER_OWNERSHIP_UNVERIFIED)
+
+    def start(self) -> None:
+        with self._lock:
+            if self._close_returned and (self._worker is not None or self._worker_unobservable):
+                raise ProcessAudioCaptureSetupError("ProcTap worker cleanup is incomplete")
+            self._close_returned = False
+            started = False
+            try:
+                self._capture.start()
+                started = True
+            finally:
+                self._remember_worker(required=started)
+            if self._worker_unobservable:
+                raise ProcessAudioCaptureSetupError(_PROCTAP_WORKER_OWNERSHIP_UNVERIFIED)
+
+    def close(self) -> None:
+        with self._lock:
+            if not self._close_returned:
+                self._capture.close()
+                self._close_returned = True
+            if self._worker_unobservable:
+                raise RuntimeError("ProcTap worker settlement could not be verified")
+            if self._worker is not None and self._worker.is_alive():
+                raise TimeoutError("ProcTap worker did not stop")
+            self._worker = None
+
+
 @dataclass(frozen=True, slots=True)
 class ProcTapProcessAudioCaptureFactory:
     platform_availability: Callable[[], ProcessCapturePlatformAvailability] = (
@@ -87,8 +134,9 @@ class ProcTapProcessAudioCaptureFactory:
             raise ProcessAudioCaptureUnavailableError("process capture platform is unavailable")
         module = importlib.import_module("proctap")
         capture_type = getattr(module, "ProcessAudioCapture")
-        capture = capture_type(pid, on_data=on_data)
+        capture = _ProcTapProcessAudioCapture(capture_type(pid, on_data=on_data))
         try:
+            capture._verify_worker_contract()
             verify_proctap_process_specific(capture)
         except Exception as exc:
             try:
@@ -114,6 +162,8 @@ class ProcTapProcessAudioCaptureFactory:
 
 
 def verify_proctap_process_specific(capture: object) -> bool:
+    if isinstance(capture, _ProcTapProcessAudioCapture):
+        capture = capture._capture
     backend = getattr(capture, "_backend", None)
     native = getattr(backend, "_native", None)
     verifier = getattr(native, "is_process_specific", None)
