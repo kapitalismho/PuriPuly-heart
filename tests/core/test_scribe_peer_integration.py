@@ -23,10 +23,12 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.conversation_history import ConversationHistory
+from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.observability import ConversationRecord
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import STTFinalSpeakerEvidence, STTProviderTurnTerminal
+from puripuly_heart.core.translation_backend import TranslationBackendRequest
 from tests.core.runtime.test_local_asr_provider_runtime import FakeProvisioningPort
 from tests.core.runtime.test_peer_capture_session import (
     FakeAdmission,
@@ -556,14 +558,14 @@ async def test_scribe_inflight_identity_styles_the_first_peer_caption(route):
 
 
 @pytest.mark.asyncio
-async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_results(route):
+async def test_scribe_regroup_cancels_whole_source_and_orders_out_of_order_repairs(route):
     harness, backend, presenter, _, surface, history, committed, diarized, _, _ = route
     backend.block = True
     parent = await committed("Initial left. Initial right.")
     await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
     await diarized(0, ("Initial left. ", "speaker-A"), ("Initial right.", "speaker-B"))
     await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
-    assert not backend.completions[0].done()
+    assert backend.completions[0].cancelled()
     backend.completions[2].set_result(None)
     await wait_until(lambda: bool(presenter.snapshot().blocks), timeout_s=2)
     assert [block.primary_text for block in presenter.snapshot().blocks] == [
@@ -571,7 +573,6 @@ async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_
     ]
     assert not history.conversation_records
     backend.completions[1].set_result(None)
-    backend.completions[0].set_result(None)
     await _idle(harness)
     assert [record.source_text for record in history.conversation_records] == [
         "Initial left.",
@@ -586,6 +587,111 @@ async def test_scribe_inflight_whole_source_cannot_overwrite_out_of_order_group_
 
 
 @pytest.mark.asyncio
+async def test_scribe_regroup_releases_shared_permit_for_repairs_and_successor(route):
+    harness, _, _, _, surface, history, committed, diarized, _, _ = route
+    backend = ControlledBackend()
+    backend.block = True
+
+    class ControlledProvider(LLMProvider):
+        async def translate(self, **kwargs):
+            return await backend.translate(TranslationBackendRequest(**kwargs))
+
+        async def close(self) -> None:
+            await backend.close()
+
+    await harness.replace_llm_provider(
+        SemaphoreLLMProvider(ControlledProvider(), asyncio.Semaphore(1))
+    )
+    whole = "First group. Second group."
+    await committed(whole)
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    await diarized(0, ("First group. ", "speaker-A"), ("Second group.", "speaker-B"))
+    await wait_until(lambda: len(backend.completions) == 2, timeout_s=2)
+    assert backend.completions[0].cancelled()
+    assert not history.conversation_records
+    await committed("Following turn.")
+
+    for index in range(1, 4):
+        await wait_until(lambda: len(backend.completions) == index + 1, timeout_s=2)
+        backend.completions[index].set_result(None)
+    await _idle(harness)
+    assert [call.text.strip() for call in backend.calls] == [
+        whole,
+        "First group.",
+        "Second group.",
+        "Following turn.",
+    ]
+    assert [record.source_text for record in history.conversation_records] == [
+        "First group.",
+        "Second group.",
+        "Following turn.",
+    ]
+    assert all(
+        whole not in block.primary_text for scene in surface.snapshots for block in scene.blocks
+    )
+
+
+@pytest.mark.asyncio
+async def test_scribe_regroup_does_not_cancel_started_overlay_publication(route, monkeypatch):
+    harness, _, _, _, _, history, committed, diarized, _, _ = route
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    whole = "Projecting head. Projecting tail."
+    projecting = None
+    projection_type = type(harness.output_projection)
+    project = projection_type.project_peer_overlay
+
+    async def hold_whole(projection, submission, **kwargs):
+        nonlocal projecting
+        await project(projection, submission, **kwargs)
+        if submission.source_text == whole:
+            projecting = asyncio.current_task()
+            entered.set()
+            await release.wait()
+
+    monkeypatch.setattr(projection_type, "project_peer_overlay", hold_whole)
+    try:
+        await committed(whole)
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        await diarized(0, ("Projecting head. ", "speaker-A"), ("Projecting tail.", "speaker-B"))
+        assert projecting is not None
+        assert not projecting.done() and not projecting.cancelling()
+    finally:
+        release.set()
+    await _idle(harness)
+    assert [record.source_text for record in history.conversation_records] == [
+        "Projecting head.",
+        "Projecting tail.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_scribe_merge_retires_inflight_replaced_and_removed_repairs(route):
+    harness, backend, _, _, _, history, committed, diarized, socket, _ = route
+    whole = "One group. Another group."
+    backend.block = True
+    turn = await committed(whole)
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    await diarized(0, ("One group. ", "speaker-A"), ("Another group.", "speaker-B"))
+    await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
+    assert backend.completions[0].cancelled()
+    socket.push("speakers_merged", from_speaker_id="speaker-B", to_speaker_id="speaker-A")
+    await wait_until(lambda: len(backend.completions) == 4, timeout_s=2)
+    assert all(completion.cancelled() for completion in backend.completions[:3])
+    backend.completions[3].set_result(None)
+    await _idle(harness)
+    assert [call.text.strip() for call in backend.calls] == [
+        whole,
+        "One group.",
+        "Another group.",
+        whole,
+    ]
+    assert [(row.utterance_id, row.source_text) for row in history.conversation_records] == [
+        (str(turn), whole)
+    ]
+
+
+@pytest.mark.asyncio
 async def test_admitted_scribe_split_survives_clean_socket_retirement(route):
     harness, backend, presenter, timeline, _, history, committed, diarized, socket, urls = route
     backend.block = True
@@ -595,7 +701,9 @@ async def test_admitted_scribe_split_survives_clean_socket_retirement(route):
     await wait_until(lambda: len(backend.completions) == 3, timeout_s=2)
     socket.emit_close()
     await wait_until(lambda: socket.closed and not evidence.is_current(), timeout_s=2)
-    for completion in backend.completions:
+    assert backend.completions[0].cancelled()
+    for completion in backend.completions[1:]:
+        assert not completion.done()
         completion.set_result(None)
     await _idle(harness)
     assert [record.source_text for record in history.conversation_records] == [
