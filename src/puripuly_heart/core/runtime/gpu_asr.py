@@ -1696,13 +1696,17 @@ class SharedGpuASRRuntime:
 
 def _write_pcm16_wav(path: Path, samples_f32: np.ndarray | bytes) -> None:
     if isinstance(samples_f32, bytes):
-        samples_f32 = pcm16le_bytes_to_float32(samples_f32)
-    pcm16 = np.rint(np.clip(samples_f32, -1.0, 1.0) * 32767.0).astype("<i2")
+        clipped = pcm16le_bytes_to_float32(samples_f32)
+    else:
+        clipped = np.clip(samples_f32, -1.0, 1.0)
+    clipped *= 32767.0
+    np.rint(clipped, out=clipped)
+    pcm16 = clipped.astype("<i2", order="C")
     with wave.open(str(path), "wb") as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(GPU_SAMPLE_RATE_HZ)
-        wav_file.writeframes(pcm16.tobytes())
+        wav_file.writeframes(memoryview(pcm16).cast("B"))
 
 
 def _failure_code(exception: BaseException) -> str:
