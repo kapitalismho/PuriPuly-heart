@@ -80,14 +80,13 @@ impl BridgeClient {
             .map_err(|error| BridgeError::Connect(error.to_string()))?;
 
         let snapshot = match Self::read_json_message(&mut stream).await? {
-            Value::Object(payload) => match payload.get("type").and_then(Value::as_str) {
+            Value::Object(mut payload) => match payload.get("type").and_then(Value::as_str) {
                 Some("auth_error") => {
                     return Err(BridgeError::Auth("bridge rejected session token".into()))
                 }
                 Some("snapshot") => {
                     let snapshot_value = payload
-                        .get("payload")
-                        .cloned()
+                        .remove("payload")
                         .ok_or_else(|| BridgeError::Protocol("snapshot payload missing".into()))?;
                     serde_json::from_value(snapshot_value)
                         .map_err(|error| BridgeError::Protocol(error.to_string()))?
@@ -141,7 +140,7 @@ impl BridgeClient {
 
     pub async fn next_message(&mut self) -> Result<BridgeIncoming, BridgeError> {
         let payload = Self::read_json_message(&mut self.stream).await?;
-        let Value::Object(map) = payload else {
+        let Value::Object(mut map) = payload else {
             return Err(BridgeError::Protocol(
                 "bridge payload must decode to an object".into(),
             ));
@@ -165,8 +164,7 @@ impl BridgeClient {
         match event_type {
             "snapshot" => {
                 let snapshot_value = map
-                    .get("payload")
-                    .cloned()
+                    .remove("payload")
                     .ok_or_else(|| BridgeError::Protocol("snapshot payload missing".into()))?;
                 let snapshot = serde_json::from_value(snapshot_value)
                     .map_err(|error| BridgeError::Protocol(error.to_string()))?;
