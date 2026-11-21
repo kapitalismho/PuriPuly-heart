@@ -18,6 +18,8 @@ Use observed results in the running application as the main completion evidence 
 
 **Expectations and limits:** Failed/cancelled startup must settle already spawned children before replacement. Authentication retry must preserve existing connections on failure and prevent cancelled attempts from activating; use the focused [ChatGPT account checks](../tests/app/test_chatgpt_account.py) for detailed retry boundaries rather than repeating an OAuth incident recipe here.
 
+**Windows clipboard listener:** Never use the workstation clipboard as a fixture. Run the real message window with its text reader replaced by a synthetic source. Cancel activation after registration but before startup returns, or hold a read beyond the stop timeout. Check that retired text cannot submit and no replacement listener starts before retirement. On recovery, send one fresh notification. To check diagnostics end to end, route that input to an isolated translation provider, return a controlled failure, and query its retained diagnostic by ID from the CLI. The record must exclude the input text; a succeeding turn should reach the dashboard.
+
 **Prerequisites:** Runnable candidate and isolated writable roots. No account/model is needed for an unrelated setting. GUI editing claims require the actual settings UI; visible caption effects also need [captions/output](#captions-and-output).
 
 ## Speech recognition and translation
@@ -31,6 +33,8 @@ Use observed results in the running application as the main completion evidence 
 If the same unit is still stalled at a second qualifying end, verify that only fresh speech opens the replacement route and that previously sent audio is not replayed. A native final already queued before that end must win over retirement. A 192 ms pause or a ten-second rollover alone must not arm the timer. Controlled responses verify app behavior, not Gemini service latency.
 
 **Local ASR and translation:** Replay one frozen speech clip through a paced capture source, real VAD and an installed recognizer. Match the final transcript and turn ID to the translation delivered to Self or Peer; an earlier partial transcript can legitimately trigger a different request. For managed E4B, check the effective CPU or Vulkan backend and that the app stops its server. For a user-managed compatible endpoint, check the opposite: closing the app must leave the server running. For Index-Translate, a controlled HTTP response verifies routing and recovery, not live service availability.
+
+**Windows process audio:** For Peer process loopback, select an owned helper that plays a generated tone through an explicit WASAPI render route. Verify that the captured packets contain that tone, not just silence. With queued packets, compare target exit (admitted packets drain before termination) with explicit close (pending packets discarded, target left alive). This checks process selection and audio ingress, not ASR or headset output.
 
 **Shared GPU:** To check contention, run Qwen ASR and E4B on the same reported Vulkan device. Submit a Peer decode while a translation request is outstanding, then stop Self capture and submit another Peer decode. Match the final Self translation and check Peer worker reuse and eventual shutdown. Overlapping request intervals do not prove simultaneous GPU kernel execution, and headless delivery does not prove visible captions.
 
