@@ -30,6 +30,8 @@ Use observed results in the running application as the main completion evidence 
 
 If the same unit is still stalled at a second qualifying end, verify that only fresh speech opens the replacement route and that previously sent audio is not replayed. A native final already queued before that end must win over retirement. A 192 ms pause or a ten-second rollover alone must not arm the timer. Controlled responses verify app behavior, not Gemini service latency.
 
+**Local ASR and translation:** Replay the same frozen speech clip through an isolated capture source with real VAD and an installed local recognizer. Follow the recognized text and turn ID through the chosen translation route to its application destination. For managed E4B, check the effective CPU or Vulkan backend, distinguish prefix preparation from translation calls, and confirm the server exits on shutdown. Index-Translate is a public API: a controlled HTTP response can verify its request, delivery, and recovery without establishing live service availability. A headless destination does not establish visible captions.
+
 **Prerequisites and limits:** Controlled microphone/loopback/process audio, ready ASR assets or authorized provider, and a ready translation backend when used. Peer capture requires [explicit consent](cli.md#peer-capture-and-audio-tests). Preserve Self/Peer identity through switching and recovery. Missing devices, assets, or authorization are gaps.
 
 **Measurements:** [ASR benchmarks](../benchmarks/asr/README.md) own input preparation, worker prerequisites, scoring, and timing boundaries. Resident decode and paced replay are not end-to-end caption latency. Compare relevant inputs/configurations/environments; no universal corpus, repetition count, or threshold is required.
