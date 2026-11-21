@@ -2146,6 +2146,7 @@ class PeerCaptureSessionOwner:
         detached_source: object | None = None,
         failure_observed: bool = False,
     ) -> None:
+        self._retain_retired_source(detached_source)
         current_task = asyncio.current_task()
         defer_diagnostic = current_task is not None and self._loop_task is current_task
         diagnostic = None
@@ -2209,7 +2210,6 @@ class PeerCaptureSessionOwner:
             )
         async with self._lock:
             if generation != self._generation or self._closed:
-                self._retain_retired_source(detached_source)
                 return
             if config is not None and config.capture_target.kind == "process":
                 self._retry_required_capture_target = config.capture_target
@@ -2233,11 +2233,7 @@ class PeerCaptureSessionOwner:
             except Exception as exc:
                 failures.append(exc)
         if detached_source is not None:
-            await self._attempt_cleanup(
-                failures,
-                lambda: self._close_if_possible(detached_source),
-                retain_on_failure=lambda: self._retain_retired_source(detached_source),
-            )
+            await self._retry_retired_cleanup_debt(failures, (detached_source,))
         try:
             await self._attempt_cleanup(
                 failures,

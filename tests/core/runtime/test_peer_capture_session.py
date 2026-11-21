@@ -3279,10 +3279,12 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         await owner.close()
 
 
-@pytest.mark.parametrize("retarget", [False, True])
+@pytest.mark.parametrize("interruption", ["disable", "old_close", "candidate_close"])
 async def test_superseded_retirement_keeps_unsettled_sources_until_reactivation(
-    retarget: bool,
+    interruption: str,
 ) -> None:
+    retarget = interruption != "disable"
+    held_source_index = 1 if interruption == "candidate_close" else 0
     entered = asyncio.Event()
     released = False
     sources = []
@@ -3291,7 +3293,7 @@ async def test_superseded_retirement_keeps_unsettled_sources_until_reactivation(
     class HeldSource(FakeSource):
         async def close(self) -> None:
             self.close_calls += 1
-            if self is sources[0] and self.close_calls == 1:
+            if self is sources[held_source_index] and self.close_calls == 1:
                 entered.set()
                 await asyncio.Event().wait()
             if not released:
