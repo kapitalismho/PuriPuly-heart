@@ -124,6 +124,90 @@ async def test_late_clipboard_callback_from_old_generation_is_ignored() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancelled_start_rejects_text_and_settles_before_replacement() -> None:
+    entered = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    watchers = []
+    submitted = []
+
+    class Watcher(FakeClipboardWatcher):
+        def start(self):
+            super().start()
+            if self is watchers[0]:
+                loop.call_soon_threadsafe(entered.set)
+                assert release.wait(5)
+
+    def factory(on_text):
+        watchers.append(Watcher(on_text))
+        return watchers[-1]
+
+    async def submit(text):
+        submitted.append(text)
+
+    runtime = ClipboardRuntime(watcher_factory=factory, submit_handler=submit)
+    starting = asyncio.create_task(runtime.start())
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        starting.cancel()
+        await _flush_loop()
+        replacement = asyncio.create_task(runtime.start())
+        watchers[0].on_text("cancelled")
+        starting.cancel()
+        await _flush_loop()
+        assert not starting.done() and not replacement.done()
+        assert not submitted
+    finally:
+        release.set()
+        await asyncio.gather(starting, return_exceptions=True)
+    await replacement
+    try:
+        assert starting.cancelled() and watchers[0].stop_calls == 1
+        watchers[0].on_text("retired")
+        watchers[1].on_text("successor")
+        await _flush_loop()
+        assert submitted == ["successor"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_unsettled_watcher_prevents_a_second_listener_until_retry_succeeds():
+    watchers = []
+    retire = False
+    submitted = []
+
+    class Watcher(FakeClipboardWatcher):
+        def stop(self):
+            if not retire:
+                raise TimeoutError
+            super().stop()
+
+    def factory(on_text):
+        watchers.append(Watcher(on_text))
+        return watchers[-1]
+
+    async def submit(text):
+        submitted.append(text)
+
+    runtime = ClipboardRuntime(watcher_factory=factory, submit_handler=submit)
+    await runtime.start()
+    assert (await runtime.stop()).operation == "watcher_stop"
+    with pytest.raises(TimeoutError):
+        await runtime.start(strict_runtime_errors=True)
+    assert len(watchers) == 1
+    watchers[0].on_text("retiring")
+    retire = True
+    await runtime.start()
+    try:
+        watchers[1].on_text("recovered")
+        await _flush_loop()
+        assert watchers[0].stopped and submitted == ["recovered"]
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_clipboard_runtime_submit_gather_timeout_is_bounded() -> None:
     watchers: list[FakeClipboardWatcher] = []
     submit_started = asyncio.Event()

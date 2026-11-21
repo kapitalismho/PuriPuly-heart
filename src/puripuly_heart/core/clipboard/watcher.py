@@ -128,8 +128,7 @@ class WindowsClipboardWatcher:
         if thread.is_alive():
             thread.join(timeout=2.0)
         if thread.is_alive():
-            self._record_failure(TimeoutError(), "watcher_stop")
-            return
+            raise TimeoutError("clipboard watcher did not stop")
         self._clear_thread_refs_if_stopped()
 
     def _clear_thread_refs_if_stopped(self) -> None:
