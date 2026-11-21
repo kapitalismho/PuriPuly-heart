@@ -10,6 +10,7 @@ import math
 import os
 import re
 import sys
+import threading
 from collections.abc import Awaitable, Callable, Mapping
 from concurrent.futures import Future as ConcurrentFuture
 from dataclasses import dataclass, field, replace
@@ -73,6 +74,7 @@ from puripuly_heart.core.overlay.protocol import (
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.runtime_layout import current_runtime_layout
 from puripuly_heart.ui.desktop_overlay_startup import (
     DesktopOverlayStartupCoordinator,
@@ -2609,75 +2611,81 @@ class BridgeDisconnectParentMonitor:
 
 @dataclass(slots=True)
 class WindowsParentHandleMonitor:
-    handle: object
-    poll_interval_s: float = 0.25
-    wait_handle_signaled: Callable[[object], bool] | None = None
-    close_handle: Callable[[object], None] | None = None
-    _closed: bool = field(init=False, default=False)
+    handle: int | None
+    _interrupt: int | None = field(init=False, default=None)
 
     async def wait_for_parent_exit(self, stop_event: asyncio.Event) -> None:
-        wait_handle_signaled = self.wait_handle_signaled or _default_windows_handle_signaled
+        import _overlapped
+        import _winapi
+
+        handle = self.handle
+        if handle is None:
+            return
         try:
-            while not stop_event.is_set():
-                if await asyncio.to_thread(wait_handle_signaled, self.handle):
-                    return
+            if stop_event.is_set():
+                return
+            try:
+                interrupt = _overlapped.CreateEvent(None, True, False, None)
+            except OSError:
+                logger.warning("[DesktopOverlay] No parent wait; relying on bridge disconnect")
+                await stop_event.wait()
+                return
+            self._interrupt = interrupt
+            loop = asyncio.get_running_loop()
+            finished = loop.create_future()
+
+            def wait() -> None:
                 try:
-                    await asyncio.wait_for(stop_event.wait(), timeout=self.poll_interval_s)
-                except TimeoutError:
-                    continue
+                    _winapi.WaitForMultipleObjects((interrupt, handle), False, _winapi.INFINITE)
+                except OSError:
+                    logger.warning("[DesktopOverlay] Parent wait failed; using bridge disconnect")
+                    return
+                loop.call_soon_threadsafe(finished.set_result, None)
+
+            thread = threading.Thread(target=wait, name="desktop-parent-watch")
+            thread.start()
+            try:
+                async with asyncio.TaskGroup() as group:
+                    stopped = group.create_task(stop_event.wait())
+                    try:
+                        await asyncio.wait((stopped, finished), return_when=asyncio.FIRST_COMPLETED)
+                    finally:
+                        stopped.cancel()
+            finally:
+                _winapi.SetEvent(interrupt)
+                await run_owned_thread_call(thread.join)
         finally:
-            await asyncio.to_thread(self.close)
+            if self._interrupt is not None:
+                _winapi.CloseHandle(self._interrupt)
+                self._interrupt = None
+            self.close()
 
     def close(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        close_handle = self.close_handle or _default_close_windows_handle
-        close_handle(self.handle)
+        import _winapi
+
+        if self._interrupt is not None:
+            _winapi.SetEvent(self._interrupt)
+        elif self.handle is not None:
+            _winapi.CloseHandle(self.handle)
+            self.handle = None
 
 
-def _default_open_windows_parent_handle(parent_pid: int) -> object | None:
+def _default_open_windows_parent_handle(parent_pid: int) -> int | None:
     if os.name != "nt" or parent_pid <= 0:
         return None
     try:
-        import ctypes
+        import _winapi
 
-        synchronize = 0x00100000
-        handle = ctypes.windll.kernel32.OpenProcess(synchronize, False, int(parent_pid))
-    except Exception:
+        return _winapi.OpenProcess(_winapi.SYNCHRONIZE, False, parent_pid)
+    except OSError, OverflowError:
         return None
-    if not handle:
-        return None
-    return int(handle)
-
-
-def _default_windows_handle_signaled(handle: object) -> bool:
-    if os.name != "nt":
-        return False
-    try:
-        import ctypes
-
-        wait_object_0 = 0x00000000
-        result = ctypes.windll.kernel32.WaitForSingleObject(int(handle), 0)
-    except Exception:
-        return False
-    return result == wait_object_0
-
-
-def _default_close_windows_handle(handle: object) -> None:
-    if os.name != "nt":
-        return
-    with contextlib.suppress(Exception):
-        import ctypes
-
-        ctypes.windll.kernel32.CloseHandle(int(handle))
 
 
 def create_parent_monitor(
     parent_pid: int,
     *,
     is_windows: bool | None = None,
-    open_windows_handle: Callable[[int], object | None] | None = None,
+    open_windows_handle: Callable[[int], int | None] | None = None,
 ) -> ParentMonitor:
     windows = os.name == "nt" if is_windows is None else is_windows
     if windows:
