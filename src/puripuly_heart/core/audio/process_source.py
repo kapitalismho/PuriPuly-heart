@@ -278,15 +278,17 @@ class ProcessAudioCaptureSource:
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
             if self._terminal_reason is not None and self._queue.async_q.empty():
-                await self.close()
-                return
+                break
             frame = await self._queue.async_q.get()
             if frame is None:
-                await self.close()
-                return
+                break
             yield frame
+        await self._close(raise_on_failure=self._terminal_reason in {None, "closed"})
 
     async def close(self) -> None:
+        await self._close(raise_on_failure=True)
+
+    async def _close(self, *, raise_on_failure: bool) -> None:
         with self._lock:
             if self._closed and self._watch is None and self._capture is None:
                 return
@@ -294,7 +296,9 @@ class ProcessAudioCaptureSource:
             if self._terminal_reason is None:
                 self._terminal_reason = "closed"
         try:
-            await run_owned_thread_call(self._release_native_resources)
+            await run_owned_thread_call(
+                lambda: self._release_native_resources(raise_on_failure=raise_on_failure)
+            )
         finally:
             self._signal_terminal()
             self._queue.close()
@@ -356,7 +360,7 @@ class ProcessAudioCaptureSource:
             )
             self._signal_terminal()
 
-    def _release_native_resources(self) -> None:
+    def _release_native_resources(self, *, raise_on_failure: bool = True) -> None:
         failures: list[Exception] = []
         for attribute in ("_watch", "_capture"):
             resource = getattr(self, attribute)
@@ -388,7 +392,8 @@ class ProcessAudioCaptureSource:
             emit_failure(
                 logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
             )
-            raise failure
+            if raise_on_failure:
+                raise failure
 
     def _signal_terminal(self) -> None:
         try:

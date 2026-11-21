@@ -13,6 +13,7 @@ import pytest
 
 from puripuly_heart.config.process_capture_platform import ProcessCapturePlatformAvailability
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
+from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
 from puripuly_heart.core.audio.process_identity import SystemProcessIdentityWatcher
 from puripuly_heart.core.audio.process_source import (
     PROCESS_CAPTURE_CHANNELS,
@@ -546,7 +547,10 @@ def _spawn_live_process_identity() -> (
 
 
 @pytest.mark.asyncio
-async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monkeypatch) -> None:
+@pytest.mark.parametrize("target_exits", [False, True], ids=["explicit_close", "target_exit"])
+async def test_proctap_source_retries_settlement_after_vendor_join_timeout(
+    monkeypatch, target_exits: bool
+) -> None:
     if sys.platform != "win32":
         pytest.skip("requires the pinned Windows ProcTap backend")
     native = pytest.importorskip("proctap._native")
@@ -560,6 +564,7 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
     class HeldNative:
         def __init__(self, pid: int) -> None:
             assert pid == child.pid
+            self.send_tail = target_exits
 
         def get_format(self) -> dict[str, int]:
             return {"sample_rate": 48000, "channels": 2, "bits_per_sample": 32}
@@ -575,6 +580,9 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
             stop_calls += 1
 
         def read(self) -> bytes | None:
+            if self.send_tail:
+                self.send_tail = False
+                return bytes(8 * 48)
             workers.append(threading.current_thread())
             read_entered.set()
             return bytes(8) if release_read.wait(10) else None
@@ -583,7 +591,8 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
 
     def observe_callback(source: ProcessAudioCaptureSource, data: bytes, frames: int) -> None:
         original_callback(source, data, frames)
-        callback_delivered.set()
+        if len(data) == 8:
+            callback_delivered.set()
 
     monkeypatch.setattr(native, "ProcessLoopback", HeldNative)
     monkeypatch.setattr(ProcessAudioCaptureSource, "_on_data", observe_callback)
@@ -599,6 +608,24 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
         capture = source._capture
         worker = workers[0]
         progression = source.capture_progression_snapshot
+        if target_exits:
+            child.terminate()
+            await asyncio.to_thread(child.wait, 5)
+            pipeline = DesktopPeerPipeline(source=source)
+            async with asyncio.timeout(5):
+                assert [frame async for frame in pipeline.frames()] == []
+            assert pipeline.terminal_reason == "target_exited"
+            (discarded,) = pipeline.terminal_discarded_capture
+            assert (discarded.source_start_sample, discarded.source_end_sample) == (0, 48)
+            terminal = source.terminal_diagnostics
+            assert terminal is not None and terminal.code == "capture.peer.target_exited"
+            (cleanup,) = terminal.causes
+            assert cleanup.code == "capture.peer.cleanup_failed"
+            assert cleanup.fields["cleanup_confirmed"] is False
+            assert cleanup.causes[0].fields["exception_class"] == "TimeoutError"
+            assert worker.is_alive()
+            assert source._capture is capture
+            assert stop_calls == 1
         for _ in range(2):
             with pytest.raises(ExceptionGroup) as raised:
                 await source.close()
@@ -618,7 +645,7 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
         await source.close()
         assert source._capture is None
         assert stop_calls == 1
-        assert child.poll() is None
+        assert (child.poll() is not None) == target_exits
     finally:
         release_read.set()
         try:
@@ -627,7 +654,8 @@ async def test_proctap_source_retries_settlement_after_vendor_join_timeout(monke
             if source is not None:
                 await source.close()
         finally:
-            child.terminate()
+            if child.poll() is None:
+                child.terminate()
             child.wait(timeout=5)
 
 
