@@ -114,11 +114,18 @@ def test_validate_local_stt_runtime_ready_accepts_matching_manifest_without_chec
     install_dir = tmp_path / manifest.install_dirname
     install_dir.mkdir()
     _write_valid_install(install_dir, manifest)
+    asset_paths = {install_dir / asset.relative_path for asset in manifest.files}
+    exists = Path.exists
+
+    def reject_redundant_exists(path: Path, *, follow_symlinks: bool = True) -> bool:
+        assert path not in asset_paths
+        return exists(path, follow_symlinks=follow_symlinks)
 
     def fail_if_hashed(_path: Path) -> str:
         raise AssertionError("runtime validator must not hash files")
 
     monkeypatch.setattr(local_stt_assets_module, "_sha256_file", fail_if_hashed)
+    monkeypatch.setattr(Path, "exists", reject_redundant_exists)
 
     installed = local_stt_assets_module.validate_local_stt_runtime_ready(
         install_dir,
@@ -152,6 +159,21 @@ def test_validate_local_stt_runtime_ready_rejects_missing_required_file(tmp_path
             install_dir,
             manifest=manifest,
         )
+
+
+def test_validate_local_stt_runtime_ready_rejects_directory_in_place_of_file(
+    tmp_path: Path,
+) -> None:
+    manifest = _test_manifest()
+    install_dir = tmp_path / manifest.install_dirname
+    install_dir.mkdir()
+    _write_valid_install(install_dir, manifest)
+    asset_path = install_dir / "tokens.txt"
+    asset_path.unlink()
+    asset_path.mkdir()
+
+    with pytest.raises(LocalSTTManifestInvalidError, match="required model path is not a file"):
+        local_stt_assets_module.validate_local_stt_runtime_ready(install_dir, manifest=manifest)
 
 
 def test_validate_local_stt_install_rejects_stale_revision(tmp_path: Path) -> None:

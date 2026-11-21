@@ -286,12 +286,27 @@ def validate_gemma_install(
 ) -> InstalledGemmaManifest:
     resolved_spec = spec or e4b_gemma_spec()
     resolved = (install_dir or default_gemma_install_dir(resolved_spec)).resolve()
+    return _validate_resolved_gemma_install(
+        resolved,
+        resolved_spec,
+        verify_checksums=verify_checksums,
+        check_cancelled=check_cancelled,
+    )
+
+
+def _validate_resolved_gemma_install(
+    resolved: Path,
+    spec: GemmaModelSpec,
+    *,
+    verify_checksums: bool,
+    check_cancelled: Callable[[], None] | None,
+) -> InstalledGemmaManifest:
     if not resolved.exists():
         raise GemmaInstallMissingError("Gemma model directory is missing")
     if not resolved.is_dir():
         raise GemmaInstallInvalidError("Gemma model path is not a directory")
-    manifest = _load_installed_manifest(resolved, resolved_spec)
-    for asset in resolved_spec.assets:
+    manifest = _load_installed_manifest(resolved, spec)
+    for asset in spec.assets:
         if check_cancelled is not None:
             check_cancelled()
         path = resolved / asset.filename
@@ -318,10 +333,10 @@ def inspect_gemma_install(
     resolved_spec = spec or e4b_gemma_spec()
     resolved = (install_dir or default_gemma_install_dir(resolved_spec)).resolve()
     try:
-        manifest = validate_gemma_install(
+        manifest = _validate_resolved_gemma_install(
             resolved,
+            resolved_spec,
             verify_checksums=verify_checksums,
-            spec=resolved_spec,
             check_cancelled=check_cancelled,
         )
     except GemmaInstallMissingError:
