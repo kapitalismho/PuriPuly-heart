@@ -771,11 +771,16 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
                 pending: list[str] = []
                 pending_bytes = 0
                 current_bytes = self._stream_size()
+                encoding = self.encoding or "utf-8"
                 for record in records:
                     if not self.filter(record):
                         continue
                     text = f"{self.format(record)}{self.terminator}"
-                    encoded_size = len(text.encode(self.encoding or "utf-8", errors="replace"))
+                    encoded_size = (
+                        _utf8_size(text)
+                        if encoding == "utf-8"
+                        else len(text.encode(encoding, errors="replace"))
+                    )
                     if self.maxBytes > 0 and encoded_size > self.maxBytes:
                         self.oversized_records += 1
                         continue
@@ -832,9 +837,13 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
             self.last_progress_at = time.monotonic()
 
 
+def _utf8_size(text: str) -> int:
+    return len(text) if text.isascii() else len(text.encode("utf-8", errors="replace"))
+
+
 def _estimated_record_bytes(record: logging.LogRecord) -> int:
     try:
-        return len(record.getMessage().encode("utf-8", errors="replace")) + 96
+        return _utf8_size(record.getMessage()) + 96
     except Exception:
         return 96
 
