@@ -377,7 +377,7 @@ async fn issue403_python_fragment_targets_and_retirement_keep_current_scene() {
     let owner = run_rows(rows, "issue403-fragments").await;
     let audit = owner.fresh_retry_audit_for_test();
     for row in rows.iter().filter(|row| {
-        ["two-fragments", "corrected", "growth", "shrink"].contains(&row["label"].as_str().unwrap())
+        ["two-fragments", "corrected", "growth"].contains(&row["label"].as_str().unwrap())
     }) {
         assert!(
             audit.iter().any(|fact| fact.0 == "peer"
@@ -386,16 +386,40 @@ async fn issue403_python_fragment_targets_and_retirement_keep_current_scene() {
             "{audit:?}"
         );
     }
-    let removed = &rows[5];
-    assert!(removed["snapshot"]["native_fresh_render_targets"]["peer"].is_null());
-    let prior = peer_generation(&rows[5]);
-    assert!(audit.iter().any(|fact| fact.0 == "peer"
-        && fact.1 == prior
-        && (fact.2 == "cancelled" || fact.2 == "replaced")));
-    assert!(audit
+    let previous = &rows[4];
+    let shrink = &rows[5];
+    let successor = &rows[6];
+    let prior = peer_generation(previous);
+    assert!(previous["snapshot"]["native_fresh_render_targets"]["peer"].is_string());
+    assert_eq!(peer_generation(shrink), prior);
+    assert!(shrink["snapshot"]["native_fresh_render_targets"]["peer"].is_null());
+    assert!(peer_generation(successor) > prior);
+    assert!(successor["snapshot"]["native_fresh_render_targets"]["peer"].is_string());
+    for row in rows[..4].iter().filter(|row| peer_generation(row) == prior) {
+        for field in ["native_fresh_render_targets", "native_quiet_tail_episodes"] {
+            assert_eq!(
+                row["snapshot"][field]["peer"], previous["snapshot"][field]["peer"],
+                "Peer retry intent changed before shrink without a new generation: {field}"
+            );
+        }
+    }
+
+    let mut prior_events = audit
         .iter()
-        .filter(|fact| fact.0 == "peer" && fact.1 == prior && fact.2 == "completed")
-        .all(|fact| fact.4 < Duration::from_millis(removed["at_ms"].as_u64().unwrap())));
+        .filter(|fact| fact.0 == "peer" && fact.1 == prior);
+    assert_eq!(
+        prior_events.next().map(|fact| fact.2),
+        Some("scheduled"),
+        "Peer retry was not scheduled before shrink: {audit:?}"
+    );
+    assert!(
+        prior_events.by_ref().any(|fact| fact.2 == "cancelled"),
+        "shrink did not cancel the active Peer retry: {audit:?}"
+    );
+    assert!(
+        !prior_events.any(|fact| fact.2 == "completed"),
+        "retired Peer retry completed after shrink cancellation: {audit:?}"
+    );
 }
 
 #[tokio::test]
