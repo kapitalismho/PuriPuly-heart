@@ -305,8 +305,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         self._event_projection.seal(identity)
         if self._scoped_task is not None and not self._scoped_task.done():
             raise RuntimeError("Custom offline transcription is already running")
-        utterance = bytes(self._scoped_buffer)
-        self._scoped_buffer.clear()
+        utterance, self._scoped_buffer = self._scoped_buffer, bytearray()
         self._scoped_task = asyncio.create_task(
             self._run_scoped_transcription(identity, utterance),
             name="custom-offline-scoped-transcription",
@@ -315,7 +314,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     async def _run_scoped_transcription(
         self,
         identity: STTProviderTurnIdentity,
-        pcm16le: bytes,
+        pcm16le: bytearray,
     ) -> None:
         try:
             async with self._transcribe_lock:
@@ -428,8 +427,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         _ = trailing_silence_ms, reason
         if self._stopped:
             return
-        utterance = bytes(self._buffer)
-        self._buffer.clear()
+        utterance, self._buffer = self._buffer, bytearray()
         async with self._transcribe_lock:
             if self._stopped:
                 return
@@ -493,11 +491,11 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         async for event in self._event_projection.events():
             yield event
 
-    async def _transcribe(self, pcm16le: bytes) -> None:
+    async def _transcribe(self, pcm16le: bytearray) -> None:
         text = await self._request_transcription(pcm16le)
         self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
 
-    async def _request_transcription(self, pcm16le: bytes) -> str:
+    async def _request_transcription(self, pcm16le: bytearray) -> str:
         client = self._client
         if client is None:
             raise RuntimeError("Custom STT offline session is not started")
