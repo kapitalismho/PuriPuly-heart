@@ -530,6 +530,55 @@ async def test_pending_work_expires_exactly_at_twelve_seconds_before_start() -> 
     await runtime.close()
 
 
+async def test_pending_reaper_parks_and_wakes_behind_active_decode() -> None:
+    gate = asyncio.Event()
+    client = FakeASRWorkerClient(transcribe_gate=gate)
+    clock = FakeClock(_now=100.0)
+    scheduled_ticks: asyncio.Queue[asyncio.Event] = asyncio.Queue()
+
+    async def sleep_until_tick(_interval: float) -> None:
+        tick = asyncio.Event()
+        scheduled_ticks.put_nowait(tick)
+        await tick.wait()
+
+    runtime = SharedGpuASRRuntime(
+        process_factory=FakeASRWorkerFactory([client]),
+        clock=clock,
+        sleep=sleep_until_tick,
+    )
+    requests: list[asyncio.Task[ASRWorkerTranscription]] = []
+    try:
+        await _activate(runtime)
+        assert scheduled_ticks.empty()
+
+        samples = np.zeros(1600, dtype=np.float32)
+        active = asyncio.create_task(runtime.submit("self", samples, speech_end_at=100.0))
+        requests.append(active)
+        await asyncio.wait_for(client.started.wait(), timeout=5)
+        if not scheduled_ticks.empty():
+            scheduled_ticks.get_nowait().set()
+            await asyncio.sleep(0)
+        assert scheduled_ticks.empty()
+
+        pending = asyncio.create_task(runtime.submit("self", samples, speech_end_at=100.0))
+        requests.append(pending)
+        tick = await asyncio.wait_for(scheduled_ticks.get(), timeout=5)
+        clock.advance(12.0)
+        tick.set()
+
+        with pytest.raises(GpuASRWorkExpired, match="speech_end_ttl"):
+            await asyncio.wait_for(pending, timeout=5)
+        assert not active.done()
+        assert len(client.transcribe_calls) == 1
+        assert scheduled_ticks.empty()
+
+        gate.set()
+        assert (await asyncio.wait_for(active, timeout=5)).text == "self-1"
+    finally:
+        await runtime.close()
+        await asyncio.gather(*requests, return_exceptions=True)
+
+
 async def test_active_decode_survives_ttl() -> None:
     gate = asyncio.Event()
     client = FakeASRWorkerClient(transcribe_gate=gate)
