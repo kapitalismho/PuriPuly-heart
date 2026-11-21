@@ -461,51 +461,70 @@ def _minute_label(label: str) -> str:
 
 
 def history_rows(records: Sequence[object]) -> list[HistoryRow]:
-    groups: dict[object, dict] = {}
+    groups: dict[tuple[object, object], list[object]] = {}
     for position, record in enumerate(records):
         channel = getattr(record, "channel", "self")
         utterance = getattr(record, "parent_utterance_id", None) or getattr(
             record, "utterance_id", "legacy"
         )
         key = ("row", position) if utterance == "legacy" else (channel, utterance)
-        group = groups.setdefault(
-            key,
-            {
-                "mine": channel == "self",
-                "sources": [],
-                "source_language": None,
-                "translations": [],
-                "translation_languages": [],
-                "failed": False,
-                "time": _minute_label(getattr(record, "timestamp_label", "") or ""),
-                "key": ":".join(str(part) for part in key),
-            },
+        group = groups.get(key)
+        if group is None:
+            groups[key] = [record]
+        else:
+            group.append(record)
+    return [_history_row(key, group) for key, group in groups.items()]
+
+
+def _history_row(key: tuple[object, object], group: list[object]) -> HistoryRow:
+    first = group[0]
+    mine = getattr(first, "channel", "self") == "self"
+    time_label = _minute_label(getattr(first, "timestamp_label", "") or "")
+    row_key = ":".join(str(part) for part in key)
+    if len(group) == 1:
+        source = getattr(first, "source_text", None)
+        translation = getattr(first, "translated_text", None)
+        return HistoryRow(
+            mine,
+            source or None,
+            (translation,) if translation else (),
+            not translation and _history_record_failed(first),
+            time_label,
+            getattr(first, "source_language", None) if source else None,
+            (getattr(first, "target_language", None),) if translation else (),
+            row_key,
         )
+
+    sources = []
+    source_language = None
+    translations = []
+    translation_languages = []
+    failed = False
+    for record in group:
         source = getattr(record, "source_text", None)
         translation = getattr(record, "translated_text", None)
-        if source and source not in group["sources"]:
-            group["sources"].append(source)
-            group["source_language"] = group["source_language"] or getattr(
-                record, "source_language", None
-            )
-        if translation and translation not in group["translations"]:
-            group["translations"].append(translation)
-            group["translation_languages"].append(getattr(record, "target_language", None))
-        if not translation and (
-            getattr(record, "disposition", None) == "failed"
-            or getattr(record, "turn_status", None) == "failed"
-        ):
-            group["failed"] = True
-    return [
-        HistoryRow(
-            group["mine"],
-            " ".join(group["sources"]) or None,
-            tuple(group["translations"]),
-            group["failed"] and not group["translations"],
-            group["time"],
-            group["source_language"],
-            tuple(group["translation_languages"]),
-            group["key"],
-        )
-        for group in groups.values()
-    ]
+        if source and source not in sources:
+            sources.append(source)
+            source_language = source_language or getattr(record, "source_language", None)
+        if translation and translation not in translations:
+            translations.append(translation)
+            translation_languages.append(getattr(record, "target_language", None))
+        if not translation and _history_record_failed(record):
+            failed = True
+    return HistoryRow(
+        mine,
+        " ".join(sources) or None,
+        tuple(translations),
+        failed and not translations,
+        time_label,
+        source_language,
+        tuple(translation_languages),
+        row_key,
+    )
+
+
+def _history_record_failed(record: object) -> bool:
+    return (
+        getattr(record, "disposition", None) == "failed"
+        or getattr(record, "turn_status", None) == "failed"
+    )

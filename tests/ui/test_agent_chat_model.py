@@ -298,3 +298,19 @@ def test_history_joins_split_original_and_translation_records_of_one_utterance()
         (False, "Hi there", ("안녕하세요",)),
         (True, "first second", ("en:first", "en:second")),
     ]
+
+
+def test_history_group_uses_first_metadata_and_keeps_legacy_rows_separate():
+    records = [
+        record("self", "u1", "Hello", None, source_language="en", disposition="failed"),
+        record("peer", "legacy", "Listen", None),
+        record("self", "u1", "Hello", "안녕", source_language="ja", target_language="ko"),
+        record("self", "u1", None, "안녕", target_language="ja"),
+        record("self", "legacy", "Talk", None),
+    ]
+    joined, peer, mine = history_rows(records)
+    assert [row.key for row in (joined, peer, mine)] == ["self:u1", "row:1", "row:4"]
+    assert (joined.source, joined.source_language) == ("Hello", "en")
+    assert (joined.translations, joined.translation_languages) == (("안녕",), ("ko",))
+    assert not joined.failed
+    assert (peer.mine, mine.mine) == (False, True)
