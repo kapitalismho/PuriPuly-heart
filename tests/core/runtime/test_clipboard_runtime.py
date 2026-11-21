@@ -208,6 +208,66 @@ async def test_unsettled_watcher_prevents_a_second_listener_until_retry_succeeds
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("during_join", [True, False], ids=["native_join", "submit_drain"])
+async def test_cancelled_close_retains_native_stop_failure(during_join):
+    join_entered = asyncio.Event()
+    drain_entered = asyncio.Event()
+    release_join = threading.Event()
+    submit_started = asyncio.Event()
+    release_submit = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    failures = []
+    fail_stop = True
+
+    class Watcher(FakeClipboardWatcher):
+        def stop(self):
+            if fail_stop:
+                loop.call_soon_threadsafe(join_entered.set)
+                assert release_join.wait(5)
+                raise TimeoutError("private native failure")
+            super().stop()
+
+    class Runtime(ClipboardRuntime):
+        async def _gather_submit_tasks_bounded(self):
+            drain_entered.set()
+            return await super()._gather_submit_tasks_bounded()
+
+    async def submit(text):
+        submit_started.set()
+        await release_submit.wait()
+
+    runtime = Runtime(watcher_factory=Watcher, submit_handler=submit, failure_sink=failures.append)
+    await runtime.start()
+    watcher = runtime.watcher
+    watcher.on_text("fixture")
+    await asyncio.wait_for(submit_started.wait(), 2)
+    closing = asyncio.create_task(runtime.close())
+    try:
+        await asyncio.wait_for(join_entered.wait(), 2)
+        if not during_join:
+            release_join.set()
+            await asyncio.wait_for(drain_entered.wait(), 2)
+        closing.cancel()
+        await _flush_loop()
+        if during_join:
+            closing.cancel()
+            await _flush_loop()
+            assert not closing.done()
+        release_join.set()
+        with pytest.raises(asyncio.CancelledError):
+            await closing
+        assert [d.operation for d in failures] == ["watcher_stop"]
+        assert failures[0].fields["exception_class"] == "TimeoutError"
+        assert "private" not in repr(failures)
+    finally:
+        fail_stop = False
+        release_join.set()
+        release_submit.set()
+        await runtime.close()
+    assert watcher.stopped and not runtime.active_submit_task_count
+
+
+@pytest.mark.asyncio
 async def test_clipboard_runtime_submit_gather_timeout_is_bounded() -> None:
     watchers: list[FakeClipboardWatcher] = []
     submit_started = asyncio.Event()

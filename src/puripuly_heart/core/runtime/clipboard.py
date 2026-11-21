@@ -9,7 +9,7 @@ from typing import Any
 
 from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.core.owned_thread import wait_for_owned_future
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +137,16 @@ class ClipboardRuntime:
                 if strict_runtime_errors:
                     raise
                 return diagnostics
-            context = copy_context()
             try:
-                await run_owned_thread_call(
-                    lambda: context.run(watcher.start), on_cancel=self._revoke_ingress
+                starting = asyncio.get_running_loop().run_in_executor(
+                    None, copy_context().run, watcher.start
                 )
+                await wait_for_owned_future(starting, on_cancel=self._revoke_ingress)
             except asyncio.CancelledError:
+                if not starting.cancelled() and isinstance(
+                    error := starting.exception(), Exception
+                ):
+                    self.record_failure(error, "watcher_start")
                 try:
                     await self._stop_watcher(watcher)
                 except Exception as exc:
@@ -178,8 +182,19 @@ class ClipboardRuntime:
 
     async def _stop_watcher(self, watcher: object) -> None:
         self._retiring_watcher = watcher
-        context = copy_context()
-        await run_owned_thread_call(lambda: context.run(watcher.stop))
+        stopping = asyncio.get_running_loop().run_in_executor(
+            None, copy_context().run, watcher.stop
+        )
+        try:
+            await wait_for_owned_future(stopping)
+        except asyncio.CancelledError:
+            if not stopping.cancelled():
+                error = stopping.exception()
+                if error is None:
+                    self._retiring_watcher = None
+                elif isinstance(error, Exception):
+                    self.record_failure(error, "watcher_stop")
+            raise
         self._retiring_watcher = None
 
     async def stop(self, *, strict_runtime_errors: bool = False) -> ErrorDiagnostics | None:
@@ -201,7 +216,12 @@ class ClipboardRuntime:
                         operation="watcher_stop",
                         code="clipboard_failed",
                     )
-        drain_diagnostics = await self._gather_submit_tasks_bounded()
+        try:
+            drain_diagnostics = await self._gather_submit_tasks_bounded()
+        except asyncio.CancelledError:
+            if stop_failure is not None and stop_diagnostics is not None:
+                self._retain_failure(stop_failure, stop_diagnostics)
+            raise
         if stop_failure is not None and stop_diagnostics is not None:
             if drain_diagnostics is not None:
                 stop_diagnostics = replace(
