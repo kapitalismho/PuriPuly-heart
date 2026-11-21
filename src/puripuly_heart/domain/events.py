@@ -139,6 +139,7 @@ class UIEvent:
     operation_id: str | None = None
     request_id: str | None = None
     peer_caption_revision: int = 0
+    transcript_language: str | None = None
 
     def __post_init__(self) -> None:
         resolved_channel = self.channel

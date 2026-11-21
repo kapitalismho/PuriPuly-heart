@@ -99,6 +99,7 @@ class TranslationUiMessage:
     presentation_is_current: Callable[[], bool] | None = field(
         default=None, repr=False, compare=False
     )
+    transcript_language: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -1734,6 +1735,7 @@ class TranslationOutputProjectionOwner:
             operation_id=message.operation_id,
             request_id=message.request_id,
             peer_caption_revision=message.peer_caption_revision,
+            transcript_language=message.transcript_language,
         )
         if (
             scoped_peer_event
@@ -2626,6 +2628,9 @@ class TranslationOutputProjectionOwner:
                     utterance_id=submission.child_utterance_id,
                     payload=transcript,
                     source="Peer",
+                    transcript_language=self.conversation_source_language(
+                        "peer", submission.source_language, submission.config_snapshot.value
+                    ),
                     peer_caption_revision=submission.peer_caption_revision,
                 )
             )
@@ -2990,7 +2995,7 @@ class TranslationOutputProjectionOwner:
             channel=child.channel,
             source_text=child.transcript.text,
             translation_text=None,
-            source_language=self._conversation_source_language(
+            source_language=self.conversation_source_language(
                 child.channel,
                 child.detected_language,
                 child.config_snapshot.value,
@@ -3032,7 +3037,7 @@ class TranslationOutputProjectionOwner:
             channel=submission.channel,
             configuration=submission.config_snapshot.value,
         )
-        source_language = self._conversation_source_language(
+        source_language = self.conversation_source_language(
             submission.channel,
             submission.source_language,
             submission.config_snapshot.value,
@@ -3307,7 +3312,7 @@ class TranslationOutputProjectionOwner:
         return fallback
 
     @classmethod
-    def _conversation_source_language(
+    def conversation_source_language(
         cls,
         channel: ChannelId,
         detected_language: str | None,

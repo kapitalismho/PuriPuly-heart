@@ -835,34 +835,6 @@ class PeerTranslationChannelOwner:
         if not self._accepting_events:
             raise RuntimeError("Peer translation ingress is closed")
 
-    async def _handle_peer_final_transcript(
-        self,
-        transcript: Transcript,
-        *,
-        parent_utterance_id: UUID,
-        source: str,
-    ) -> None:
-        runtime = self.runtime
-        bundle = runtime.get_or_create_bundle(transcript.utterance_id)
-        bundle.with_transcript(transcript)
-        self._remember_source(transcript.utterance_id, source, channel="peer")
-        await self.output_projection.publish_ui(
-            TranslationUiMessage(
-                event_type=UIEventType.TRANSCRIPT_FINAL,
-                utterance_id=transcript.utterance_id,
-                payload=transcript,
-                source=source,
-                publication_generation=transcript.publication_generation,
-                source_order=transcript.source_order,
-                parent_utterance_id=parent_utterance_id,
-            )
-        )
-        self._record_latency_stage(
-            channel="peer",
-            utterance_id=transcript.utterance_id,
-            stage="stt_final",
-        )
-
     async def on_child_created(self, child: TranslationTurnChild) -> None:
         if child.channel != "peer":
             raise ValueError("Peer translation owner received a non-Peer child")
@@ -870,10 +842,29 @@ class PeerTranslationChannelOwner:
             parent_utterance_id=child.parent_utterance_id,
             peer_turn_id=child.utterance_id,
         )
-        await self._handle_peer_final_transcript(
-            child.transcript,
-            parent_utterance_id=child.parent_utterance_id,
-            source=child.source,
+        transcript = child.transcript
+        runtime = self.runtime
+        bundle = runtime.get_or_create_bundle(transcript.utterance_id)
+        bundle.with_transcript(transcript)
+        self._remember_source(transcript.utterance_id, child.source, channel="peer")
+        await self.output_projection.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.TRANSCRIPT_FINAL,
+                utterance_id=transcript.utterance_id,
+                payload=transcript,
+                source=child.source,
+                transcript_language=self.output_projection.conversation_source_language(
+                    "peer", child.detected_language, child.config_snapshot.value
+                ),
+                publication_generation=transcript.publication_generation,
+                source_order=transcript.source_order,
+                parent_utterance_id=child.parent_utterance_id,
+            )
+        )
+        self._record_latency_stage(
+            channel="peer",
+            utterance_id=transcript.utterance_id,
+            stage="stt_final",
         )
 
     async def process_child(
