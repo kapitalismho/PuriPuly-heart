@@ -165,41 +165,51 @@ impl Projection {
 
 fn projection_angle(core: &GrayImage, count: usize) -> Projection {
     let mut points = Vec::with_capacity(count);
-    for (x, y, pixel) in core.enumerate_pixels() {
-        if pixel[0] != 0 {
-            points.push([x as f64 + 0.5, y as f64 + 0.5]);
+    let mut row_starts = Vec::with_capacity((core.height() as usize).min(count) + 1);
+    for (y, row) in core.rows().enumerate() {
+        let start = points.len();
+        for (x, pixel) in row.enumerate() {
+            if pixel[0] != 0 {
+                points.push([x as f64 + 0.5, y as f64 + 0.5]);
+            }
+        }
+        if points.len() != start {
+            row_starts.push(start);
         }
     }
+    row_starts.push(points.len());
     let bins = ((core.width() as f32).hypot(core.height() as f32).ceil() as usize) + 3;
     let mut histogram = vec![0u32; bins];
-    let mut projections = vec![0.0f64; count];
     let mut best_h = (-1.0f64, 0.0f32);
     let mut best_v = best_h;
     let mut zero = [0.0; 2];
     for step in -90..=90 {
         let angle = step as f32 * 0.5;
         let (s, c) = (angle as f64).to_radians().sin_cos();
-        let score = |vertical: bool, histogram: &mut [u32], projections: &mut [f64]| {
-            histogram.fill(0);
-            let mut min = f64::INFINITY;
-            for (point, projected) in points.iter().zip(projections.iter_mut()) {
-                *projected = if vertical {
+        let score = |vertical: bool, histogram: &mut [u32]| {
+            let project = |point: [f64; 2]| {
+                if vertical {
                     point[0] * c + point[1] * s
                 } else {
                     point[1] * c - point[0] * s
-                };
-                min = min.min(*projected);
-            }
-            for &projected in projections.iter() {
-                histogram[(projected - min) as usize] += 1;
+                }
+            };
+            let rightmost = !vertical && s > 0.0;
+            let min = row_starts
+                .windows(2)
+                .map(|row| project(points[if rightmost { row[1] - 1 } else { row[0] }]))
+                .fold(f64::INFINITY, f64::min);
+            histogram.fill(0);
+            for &point in &points {
+                histogram[(project(point) - min) as usize] += 1;
             }
             histogram
                 .iter()
                 .map(|&n| (n as f64) * (n as f64))
                 .sum::<f64>()
         };
-        let hs = score(false, &mut histogram, &mut projections);
-        let vs = score(true, &mut histogram, &mut projections);
+        let hs = score(false, &mut histogram);
+        let vs = score(true, &mut histogram);
         if step == 0 {
             zero = [hs, vs];
         }
