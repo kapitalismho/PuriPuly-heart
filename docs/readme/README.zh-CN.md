@@ -196,6 +196,8 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 7. 在 VRChat 中启用 OSC：Action menu → Settings → OSC → Enable
 
+双向控制设置和稳定的参数 ABI 请参阅 [VRChat OSC 控制](../vrchat-osc.md)。
+
 ---
 
 ### 中国大陆用户指南
@@ -401,12 +403,12 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 ## 开发
 
-需要 Windows x64、启用常规 GIL 的 CPython 3.14 和 [uv](https://docs.astral.sh/uv/)。请在仓库根目录运行以下命令。
+需要 Windows x64、启用常规 GIL 的 CPython **3.14.10** 和 [uv](https://docs.astral.sh/uv/) **0.13.6**，与 CI 固定版本一致。同步环境前请先显式安装对应的 Python。请在仓库根目录运行以下命令。
 
 ### 安装
 
 ```powershell
-uv sync --frozen --extra dev
+uv sync --locked --extra dev --python 3.14.10
 ```
 
 ### GUI
@@ -426,9 +428,9 @@ uv run python -m puripuly_heart.main cli --help
 ### 验证
 
 ```powershell
-uv run black --check src tests
-uv run ruff check src tests
-uv run python -m pytest
+uv run --locked black --check .
+uv run --locked ruff check .
+uv run --locked python scripts/ci/check_test_selection.py
 ```
 
 ---

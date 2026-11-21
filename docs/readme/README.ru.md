@@ -196,6 +196,8 @@ GPU-инференс работает на Vulkan. Подходит для лю�
 
 7. Включите OSC в VRChat: Меню действий → Настройки → OSC → Включить.
 
+Настройка двустороннего управления и стабильный ABI параметров описаны в разделе [Управление VRChat через OSC](../vrchat-osc.md).
+
 ---
 
 ### Пользователям из Китая
@@ -403,12 +405,12 @@ PuriPuly работает лучше всего с облачным STT.
 
 ## Разработка
 
-Нужны Windows x64, обычный CPython 3.14 с GIL и [uv](https://docs.astral.sh/uv/). Выполняйте команды из корня репозитория.
+Нужны Windows x64, обычный CPython **3.14.10** с GIL и [uv](https://docs.astral.sh/uv/) **0.13.6** — те же версии, что закреплены в CI. Перед синхронизацией окружения явно установите нужную версию Python. Выполняйте команды из корня репозитория.
 
 ### Установка
 
 ```powershell
-uv sync --frozen --extra dev
+uv sync --locked --extra dev --python 3.14.10
 ```
 
 ### GUI
@@ -428,12 +430,10 @@ uv run python -m puripuly_heart.main cli --help
 ### Проверка
 
 ```powershell
-uv run black --check src tests
-uv run ruff check src tests
-uv run python -m pytest
+uv run --locked black --check .
+uv run --locked ruff check .
+uv run --locked python scripts/ci/check_test_selection.py
 ```
-
-[Разработка брокера (Linux)](../../services/broker/README.md) · [Разработка VR-оверлея (Windows)](../../native/overlay/README.md)
 
 ---
 
