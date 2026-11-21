@@ -929,6 +929,7 @@ class PeerCaptionOwner:
         caption.revision += 1
         if caption.scribe_family is not None:
             caption.required_lineage_members = ()
+            self._cancel_scribe_translation(caption)
         self._last = caption
         prepared = self._prepare(caption, source, kind, config)
         self.runtime.translation_history[:] = [

@@ -632,6 +632,27 @@ async def test_scribe_regroup_releases_shared_permit_for_repairs_and_successor(r
 
 
 @pytest.mark.asyncio
+async def test_scribe_adjacent_merge_retires_the_previous_translation(route):
+    harness, backend, _, timeline, _, history, committed, _, _, _ = route
+    backend.block = True
+    first = await committed("The first part,", partial=True)
+    await wait_until(lambda: len(backend.completions) == 1, timeout_s=2)
+    await timeline.advance(0.2)
+    await committed("and a second.", partial=True)
+    await wait_until(lambda: len(backend.completions) == 2, timeout_s=2)
+    assert backend.completions[0].cancelled()
+    backend.completions[1].set_result(None)
+    await _idle(harness)
+    backend.block = False
+    successor = await committed("A fresh final.")
+    await _idle(harness)
+    assert [(row.utterance_id, row.source_text) for row in history.conversation_records] == [
+        (str(first), "The first part, and a second."),
+        (str(successor), "A fresh final."),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_scribe_regroup_does_not_cancel_started_overlay_publication(route, monkeypatch):
     harness, _, _, _, _, history, committed, diarized, _, _ = route
     entered = asyncio.Event()
