@@ -278,13 +278,13 @@ async function networkEnrollmentSubject(
   now: Date,
   windowMinutes: number,
 ): Promise<PuriEnrollmentSubject> {
-  const [current] = await resolveRequestNetworkIdentityCandidates(ip, secrets, now, now);
-  if (!current) {
-    return { subjectKey: 'unattributed', candidateKeys: ['unattributed'], ipKeyVersion: null, ipEpoch: null };
-  }
   const candidates = await resolveRequestNetworkIdentityCandidates(
     ip, secrets, now, new Date(now.getTime() - windowMinutes * 60_000),
   );
+  const current = candidates.findLast((identity) => identity.keyVersion === secrets.currentVersion);
+  if (!current) {
+    return { subjectKey: 'unattributed', candidateKeys: ['unattributed'], ipKeyVersion: null, ipEpoch: null };
+  }
   return {
     subjectKey: current.digest, candidateKeys: candidates.map((identity) => identity.digest),
     ipKeyVersion: current.keyVersion, ipEpoch: current.epoch,

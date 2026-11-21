@@ -4,9 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { contracts, currentProtocol, supportedProtocols } from '../src/contracts';
 import relay from '../src/index';
 import { workInstructions } from '../src/instructions';
-import { authHeaders, responseEvents, testEnv } from './fixtures';
+import { photoPolicy } from '../src/usage';
+import { authHeaders, installationHash, responseEvents, testEnv } from './fixtures';
 
-type AppRequest = { path: string; body: { agent_protocol: number; route?: string; input: Record<string, unknown>[] } };
+type AppRequest = { path: string; body: { agent_protocol: number; route?: string; allow_tools?: boolean; input: Record<string, unknown>[] } };
 
 const fixtures = new URL('./app-requests/', import.meta.url);
 const recorded = new Map(readdirSync(fixtures).map((name) => {
@@ -58,14 +59,34 @@ describe('app protocol contracts', () => {
         method: 'POST', headers: authHeaders(), body: JSON.stringify(body),
       }), env);
       expect(response.status, `${path} ${body.route ?? ''}`).toBe(200);
-      const sent = JSON.parse(fetch.mock.calls.at(-1)![1]?.body as string);
+      const wireBody = fetch.mock.calls.at(-1)![1]?.body as string;
+      const sent = JSON.parse(wireBody);
       expect(sent.input.slice(sent.input.length - body.input.length)).toEqual(body.input);
       if (path === '/v1/classify') {
         expect(sent.questions.map(({ name }: { name: string }) => name))
           .toEqual(expect.arrayContaining(contract.contextModules.map(({ name }) => `context_${name}`)));
       } else if (body.route === 'work' || body.route === 'unclear') {
-        expect(sent.tools.map(({ name }: { name: string }) => name)).toEqual(names);
-        expect(sent.input[0].content[0].text).toContain(contract.appContext.replaceAll('\r\n', '\n').trim());
+        expect(wireBody).toBe(JSON.stringify({
+          model: 'gpt-5.6-terra',
+          safety_identifier: installationHash,
+          tools: contract.tools,
+          reasoning: { effort: 'high' },
+          prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+          input: [{
+            role: 'developer',
+            content: [{
+              type: 'input_text',
+              text: workInstructions(contract, photoPolicy().allowance),
+              prompt_cache_breakpoint: { mode: 'explicit', ttl: '12h' },
+            }],
+          }, ...body.input],
+          store: false,
+          stream: true,
+          parallel_tool_calls: true,
+          tool_choice: body.allow_tools ? 'auto' : 'none',
+          max_output_tokens: 25000,
+          include: ['reasoning.encrypted_content'],
+        }));
       }
       for (const item of body.input) {
         if (item.type === 'function_call') expect(names).toContain(item.name);
