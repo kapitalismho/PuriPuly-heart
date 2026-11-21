@@ -240,6 +240,35 @@ async def test_event_follow_reports_host_loss_instead_of_success():
 
 
 @pytest.mark.asyncio
+async def test_idle_follow_disconnect_releases_subscription_without_another_event():
+    released = asyncio.Event()
+
+    class EventControl(_Control):
+        def subscribe(self, **_arguments):
+            async def stream():
+                try:
+                    yield {"topic": "state", "sequence": 1}
+                    await asyncio.Event().wait()
+                finally:
+                    released.set()
+
+            return stream()
+
+    server = ControlServer(
+        EventControl(), instance_id="correct-instance", token="local-secret-token"
+    )
+    port = await server.start()
+    stream = follow(_Record(port), {"topics": ["state"]})
+    try:
+        assert (await asyncio.wait_for(anext(stream), 2))["sequence"] == 1
+        await stream.aclose()
+        await asyncio.wait_for(released.wait(), 2)
+    finally:
+        await stream.aclose()
+        await server.close()
+
+
+@pytest.mark.asyncio
 async def test_ui_event_subscriptions_project_only_explicit_content_over_loopback():
     events = ControlEvents()
     utterance_id = UUID("00000000-0000-0000-0000-000000000193")
