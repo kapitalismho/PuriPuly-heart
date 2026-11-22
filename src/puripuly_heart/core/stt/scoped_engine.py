@@ -225,7 +225,7 @@ class _ActiveTurn:
     final_wait_started_at_s: float | None = None
     independent_recognition: bool = False
     pending_update: STTProviderTurnUpdate | None = None
-    unit_suffix: str = ""
+    seal_reason: str | None = None
     source_frontier: int | None = None
 
 
@@ -1323,6 +1323,7 @@ class ScopedRecognitionEngine:
             await self._drain_completed_turns()
             return
         turn.local_sealed = True
+        turn.seal_reason = event.reason
         session = self._session
         if (
             not turn.write_failed
@@ -1350,8 +1351,6 @@ class ScopedRecognitionEngine:
                 ),
             )
             if turn.independent_recognition:
-                if sent:
-                    turn.unit_suffix = self._seal_recognition_units(str(event.reason))
                 if sent and not turn.terminal_ready.done():
                     turn.terminal_ready.set_result(
                         STTProviderInputTerminal(
@@ -2141,8 +2140,7 @@ class ScopedRecognitionEngine:
                         and not turn.terminal_ready.done()
                     ):
                         turn.terminal_ready.set_result(event)
-                        if event.outcome != "submitted":
-                            await self._drain_completed_turns()
+                        await self._drain_completed_turns()
                     fence = event.audio_fence
                     if (
                         fence is not None
@@ -2836,7 +2834,13 @@ class ScopedRecognitionEngine:
                     else None
                 ),
                 int(turn.watchdogs.final_timeout_s * 1000),
-                turn.unit_suffix,
+                (
+                    self._seal_recognition_units(turn.seal_reason)
+                    if terminal.outcome == "submitted"
+                    and turn.seal_reason is not None
+                    and turn.identity.provider_epoch_id == self._provider_epoch_id
+                    else ""
+                ),
             )
             if (
                 self.channel == "peer"
