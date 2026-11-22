@@ -576,10 +576,6 @@ class _RollingSession(STTBackendSession):
             and self.inner.independent_recognition_units
         )
 
-    @property
-    def ordered_recognition_seals(self) -> bool:
-        return getattr(self.inner, "ordered_recognition_seals", False)
-
     def _scoped_inner(self) -> STTScopedTurnSession:
         if not isinstance(self.inner, STTScopedTurnSession):
             raise TypeError(f"rolling member {self.definition.name.value} is not scoped")

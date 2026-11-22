@@ -30,6 +30,7 @@ from puripuly_heart.core.stt.backend import (
     STTChannelAvailability,
     STTContributionConsumptionLedger,
     STTNativeProvenance,
+    STTProviderAudioFence,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -3854,6 +3855,7 @@ class ControlledStreamSession(ControlledScopedSession):
         self.mapping = STTStreamInputMap()
         self.stream: RecognitionStreamIdentity | None = None
         self.audio: list[tuple[bytes, tuple[AudioCaptureSpan, ...]]] = []
+        self._audio_since_fence = False
         self.failure: Exception | None = None
         self.write_entered = asyncio.Event()
         self.write_cancelled = asyncio.Event()
@@ -3899,6 +3901,37 @@ class ControlledStreamSession(ControlledScopedSession):
         if write is not None:
             self.mapping.commit(write)
             self.audio.append((pcm, source_ranges))
+            self._audio_since_fence = True
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        await super().seal_turn(
+            identity,
+            sealed_content_ranges=sealed_content_ranges,
+            seal_reason=seal_reason,
+            observed_trailing_silence_ms=observed_trailing_silence_ms,
+        )
+        request = self.requests[-1]
+        clock = request.recognition_fence_clock
+        if self._audio_since_fence and clock is not None:
+            self.emit(
+                STTProviderInputTerminal(
+                    identity,
+                    "submitted",
+                    request.channel,
+                    independent_recognition=True,
+                    audio_fence=STTProviderAudioFence(
+                        clock(), seal_reason, observed_trailing_silence_ms
+                    ),
+                )
+            )
+        self._audio_since_fence = False
 
     def recognition_source_covers(self, ranges: tuple[AudioCaptureSpan, ...]) -> bool:
         return self.mapping.covers(ranges)
@@ -4560,6 +4593,7 @@ async def test_peer_preview_grace_preserves_native_final(
                 STTProviderInputTerminal(session.requests[-1].identity, "submitted", channel)
             )
             await send(2, "during seal")
+            assert not any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted)
             clock.value += 1.0
         finally:
             session.seal_gate.set()
@@ -4862,6 +4896,7 @@ async def test_stalled_gemini_unit_resumes_only_with_fresh_speech() -> None:
                 await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
             await engine.handle_owned_vad_event(end)
             clock.value += 1.0
+        await wait_until(lambda: ("close",) in sessions[0].calls)
         await engine.handle_stream_input(stream_input(ledger, 20, 22))
         assert len(sessions) == 1
         fresh = stream_input(ledger, 22, 25, speech_observed=True)
@@ -4945,6 +4980,7 @@ async def test_stalled_rolling_gemini_keeps_ready_turn_fallback_without_replay(
             await engine.handle_owned_vad_event(end)
             clock.value += 1.0
 
+        await wait_until(lambda: ("close",) in gemini.calls)
         await engine.handle_stream_input(stream_input(ledger, 22, 23))
         assert sessions == [gemini]
         await engine.handle_stream_input(

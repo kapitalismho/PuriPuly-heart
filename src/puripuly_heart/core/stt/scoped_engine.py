@@ -1257,10 +1257,7 @@ class ScopedRecognitionEngine:
                     settings=settings,
                     channel=self.channel,
                     recognition_fence_clock=(
-                        self.monotonic_clock
-                        if self._is_gemini_peer_turn(identity)
-                        and getattr(session, "ordered_recognition_seals", False)
-                        else None
+                        self.monotonic_clock if self._is_gemini_peer_turn(identity) else None
                     ),
                 )
             ),
@@ -1359,13 +1356,6 @@ class ScopedRecognitionEngine:
                             turn.identity, "submitted", self.channel, independent_recognition=True
                         )
                     )
-                if (
-                    sent
-                    and gemini_peer
-                    and not getattr(session, "ordered_recognition_seals", False)
-                    and self._qualifying_preview_end(event.reason, observed_pause_ms)
-                ):
-                    await self._apply_peer_preview_end(self.monotonic_clock())
                 if not turn.terminal_ready.done():
                     self._set_turn_failure(turn, "provider_input_submission_failed")
                 await self._drain_completed_turns()

@@ -410,7 +410,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     allows_sealed_turn_overlap: ClassVar[bool] = True
     accepts_stream_input: ClassVar[bool] = True
     independent_recognition_units: ClassVar[bool] = True
-    ordered_recognition_seals: ClassVar[bool] = True
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
