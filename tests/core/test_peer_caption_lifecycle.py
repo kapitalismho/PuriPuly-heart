@@ -25,6 +25,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
@@ -1337,6 +1338,162 @@ def rolling_peer(harness, stream):
         is_current_recognition_stream=lambda _channel, identity: identity == stream,
     )
     return callbacks
+
+
+@pytest.mark.asyncio
+async def test_gemini_preview_deadline_cancels_refresh_and_preserves_shown_caption(preview_timeline):
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    stream = RecognitionStreamIdentity(
+        "peer", 1, 0, "gemini-epoch", ("rolling_free",), "gemini_transcribe"
+    )
+    callbacks = rolling_peer(harness, stream)
+    owner = harness.peer_owner.cloud_captions
+    unit_id = uuid4()
+    initial = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 1), "Initial preview", is_final=False
+    )
+    refreshed = replace(
+        initial, identity=RecognitionUnitIdentity(stream, unit_id, 2), text="Initial preview grows"
+    )
+    settled = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 3), "Corrected final source."
+    )
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(initial)
+        await preview_timeline.advance(5)
+        await idle(harness)
+        assert [event.source_text for event in events] == [initial.text]
+
+        await callbacks.retired_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() - 1)
+        )
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(
+                replace(stream, capture_epoch=1), unit_id, clock.now() - 1
+            )
+        )
+        await callbacks.peer_event_handler(refreshed)
+        await preview_timeline.advance(3.75)
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        )
+        backend.block = True
+        await preview_timeline.advance(0.25)
+        assert [request.text for request in backend.calls] == [initial.text, refreshed.text]
+
+        await preview_timeline.advance(0.35)
+        await idle(harness)
+        assert backend.completions[0].cancelled()
+        assert owner._tasks == set()
+        assert [event.source_text for event in events] == [initial.text]
+        assert harness.peer_runtime.translation_history == []
+
+        backend.block = False
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert [(event.type, event.utterance_id, event.source_text) for event in events] == [
+            ("translation_stream_update", unit_id, initial.text),
+            ("translation_final", unit_id, settled.text),
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_gemini_preview_deadline_prevents_pending_caption_from_rendering(preview_timeline):
+    surface = Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=preview_timeline.clock,
+        sleep=preview_timeline.sleep,
+        bridge=surface,
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=preview_timeline.clock)
+    stream = RecognitionStreamIdentity("peer", 1, 0, "gemini-epoch", ("gemini_transcribe",))
+    callbacks = rolling_peer(harness, stream)
+    unit_id = uuid4()
+    unit = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 1), "Pending preview", is_final=False
+    )
+    occupant = uuid4()
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(unit)
+        await preview_timeline.advance(4.75)
+        await presenter.emit(caption(1, occupant, "가" * 64))
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        )
+        await preview_timeline.advance(0.25)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [unit.text]
+        assert presenter.peer_fragment_state(unit_id, 0).pending
+
+        await preview_timeline.advance(1)
+        assert all(
+            block.id != f"peer:{unit_id}"
+            for snapshot in surface.snapshots
+            for block in snapshot.blocks
+        )
+
+        settled = STTRecognitionUnit(
+            RecognitionUnitIdentity(stream, unit_id, 2), "Settled late source."
+        )
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert (presenter.snapshot().blocks[-1].id, presenter.snapshot().blocks[-1].primary_text) == (
+            f"peer:{unit_id}",
+            f"translated:{settled.text}",
+        )
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_gemini_delayed_deadline_prevents_first_preview_after_empty_partial():
+    harness, backend, events, clock = setup()
+    stream = RecognitionStreamIdentity("peer", 1, 0, "gemini-epoch", ("gemini_transcribe",))
+    callbacks = rolling_peer(harness, stream)
+    owner = harness.peer_owner.cloud_captions
+    unit_id = uuid4()
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(
+            STTRecognitionUnit(
+                RecognitionUnitIdentity(stream, unit_id, 1), "", is_final=False, observed_at=0.0
+            )
+        )
+        deadline = STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        clock.advance(6)
+        await callbacks.peer_event_handler(deadline)
+        await callbacks.peer_event_handler(
+            STTRecognitionUnit(
+                RecognitionUnitIdentity(stream, unit_id, 2),
+                "Became available during grace",
+                is_final=False,
+                observed_at=0.3,
+            )
+        )
+        await idle(harness)
+        assert backend.calls == []
+        assert owner._segments == {}
+        assert owner._tasks == set()
+
+        settled = STTRecognitionUnit(
+            RecognitionUnitIdentity(stream, unit_id, 3), "Settled without a preview."
+        )
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert [(event.type, event.utterance_id, event.source_text) for event in events] == [
+            ("translation_final", unit_id, settled.text)
+        ]
+        assert owner._preview_deadlines == {}
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio

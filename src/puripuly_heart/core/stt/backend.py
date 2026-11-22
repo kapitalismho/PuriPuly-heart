@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
+from uuid import UUID
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
@@ -336,6 +337,13 @@ class STTRecognitionUnit:
 
 
 @dataclass(frozen=True, slots=True)
+class STTRecognitionPreviewDeadline:
+    stream: RecognitionStreamIdentity
+    unit_id: UUID
+    expires_at_s: float
+
+
+@dataclass(frozen=True, slots=True)
 class STTRecognitionUnitTerminal:
     unit: STTRecognitionUnit
     outcome: Literal["final", "empty", "failed", "cancelled"]
@@ -349,6 +357,7 @@ STTProviderTurnEvent = (
     | STTProviderEpochEnded
     | STTProviderInputTerminal
     | STTRecognitionUnit
+    | STTRecognitionPreviewDeadline
     | STTRecognitionUnitTerminal
 )
 

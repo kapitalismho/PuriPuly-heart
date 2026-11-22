@@ -175,6 +175,9 @@ class TranslationStreamUpdate(OverlayEvent):
     peer_caption_revision: int = 0
     peer_superseded_unit_ids: tuple[UUID, ...] = ()
     peer_lineage_revision: PeerCaptionRevision | None = field(default=None, compare=False)
+    peer_preview_is_current: Callable[[], bool] | None = field(
+        default=None, compare=False, repr=False
+    )
 
     EVENT_TYPE: ClassVar[str] = "translation_stream_update"
 

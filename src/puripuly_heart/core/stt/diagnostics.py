@@ -29,6 +29,7 @@ _RECOGNITION_CAUSES = frozenset(
         "gemini_write_failed",
         "gemini_connection_ended",
         "gemini_go_away",
+        "gemini_preview_stalled",
         "gemini_write_cancelled",
         "gemini_recognition_buffer_overflow",
         "provider_final_timeout",

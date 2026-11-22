@@ -496,6 +496,7 @@ class OverlayPresenter(OverlaySink):
                 and entry.peer_pending
                 and not entry.caption_staged
                 and not entry.peer_dormant
+                and (entry.peer_preview_is_current is None or entry.peer_preview_is_current())
             ),
             key=lambda entry: entry.appearance_seq,
             default=None,
@@ -582,6 +583,8 @@ class OverlayPresenter(OverlaySink):
         changed = self._apply_event(event, peer_fragments=peer_fragments)
         entry = self._entries.get(key)
         registration = self._peer_registration_context.get(event.event_id)
+        if isinstance(event, TranslationStreamUpdate) and entry is not None:
+            entry.peer_preview_is_current = event.peer_preview_is_current
         if registration is not None and entry is not None:
             entry.peer_publication_generation = registration.generation
             entry.peer_is_current = registration.is_current
@@ -628,6 +631,12 @@ class OverlayPresenter(OverlaySink):
             or (registration.is_current is not None and not registration.is_current())
         ):
             return "publication_revoked"
+        if (
+            isinstance(event, TranslationStreamUpdate)
+            and event.peer_preview_is_current is not None
+            and not event.peer_preview_is_current()
+        ):
+            return "peer_preview_expired"
         entry = self._entries.get((event.channel, event.utterance_id))
         if (
             entry is not None

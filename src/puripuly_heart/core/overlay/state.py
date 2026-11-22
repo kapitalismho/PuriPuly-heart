@@ -106,6 +106,7 @@ class OverlayLogicalTurnEntry:
     peer_protected_until: float | None = None
     peer_publication_generation: int | None = None
     peer_is_current: Callable[[], bool] | None = None
+    peer_preview_is_current: Callable[[], bool] | None = None
     peer_partition_is_source: bool = False
     peer_source_index: int | None = None
     peer_translation_index: int | None = None
@@ -177,6 +178,10 @@ class PeerFragmentRegistration:
     @property
     def peer_caption_revision(self) -> int:
         return self.parent.peer_caption_revision
+
+    @property
+    def peer_preview_is_current(self) -> Callable[[], bool] | None:
+        return self.parent.peer_preview_is_current
 
 
 @dataclass(frozen=True, slots=True)

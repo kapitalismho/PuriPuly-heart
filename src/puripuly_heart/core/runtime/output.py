@@ -379,6 +379,20 @@ class OutputRuntime:
         async with self._batch_admission.lock:
             self._supersede_peer_previews(unit_ids)
 
+    async def freeze_peer_caption_preview(self, utterance_id: UUID) -> None:
+        sink = self.overlay_sink
+        if isinstance(sink, PeerCaptionAdmissionPort):
+            sink.refresh_peer_caption_currentness()
+        await self.supersede_peer_caption_previews((utterance_id,))
+
+    @staticmethod
+    def _peer_preview_is_current(event: OverlayEventUnion) -> bool:
+        return (
+            not isinstance(event, TranslationStreamUpdate)
+            or event.peer_preview_is_current is None
+            or event.peer_preview_is_current()
+        )
+
     def _supersede_peer_previews(
         self,
         unit_ids: tuple[UUID, ...],
@@ -1641,6 +1655,8 @@ class OutputRuntime:
             generation, order = identity
             if generation != self._peer_generation:
                 return self._overlay_failure_result(event, "publication_generation_retired")
+            if not self._peer_preview_is_current(event):
+                return self._overlay_failure_result(event, "peer_preview_expired")
             if (
                 isinstance(event, TranslationStreamUpdate)
                 and event.peer_lineage_revision is not None
@@ -1865,6 +1881,15 @@ class OutputRuntime:
                             if batch.admission_epoch != self._peer_caption_admission_epoch
                             else "peer_caption_superseded"
                         ),
+                    )
+                    continue
+                if not self._peer_preview_is_current(event):
+                    self._reject_peer_event(
+                        event,
+                        publication_key,
+                        publication_scope,
+                        destination_batch,
+                        reason="peer_preview_expired",
                     )
                     continue
                 sink = self.overlay_sink
