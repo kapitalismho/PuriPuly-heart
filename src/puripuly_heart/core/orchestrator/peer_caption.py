@@ -203,6 +203,7 @@ class _Caption:
     required_lineage_members: tuple[UUID, ...] = ()
     history_after: UUID | None = None
     history_removals: tuple[UUID, ...] = ()
+    preview_lifetime: PeerPreviewLifetime | None = None
 
 
 @dataclass(slots=True)
@@ -218,12 +219,12 @@ class _Segment:
     timer: asyncio.Task[None] | None = None
     pending: str | None = None
     closed: bool = False
-    preview_lifetime: PeerPreviewLifetime | None = None
     preview_frozen: bool = False
 
     @property
     def preview_deadline_at(self) -> float | None:
-        return self.preview_lifetime.deadline_at if self.preview_lifetime is not None else None
+        lifetime = self.caption.preview_lifetime
+        return lifetime.deadline_at if lifetime is not None else None
 
 
 @dataclass(slots=True)
@@ -369,12 +370,12 @@ class PeerCaptionOwner:
         if segment is None:
             self._preview_deadlines.setdefault(utterance_id, (scope, expires_at_s))
             return
-        lifetime = segment.preview_lifetime
+        lifetime = segment.caption.preview_lifetime
         if (
             lifetime is None
             or segment.caption.scope != scope
             or segment.closed
-            or segment.preview_deadline_at is not None
+            or lifetime.deadline_at is not None
         ):
             return
         lifetime.deadline_at = expires_at_s
@@ -460,6 +461,8 @@ class PeerCaptionOwner:
                 scope,
                 track_scribe_lineage=provider_id == _SCRIBE_SOURCE and diarization,
             )
+            if provider_id == "gemini_transcribe":
+                caption.preview_lifetime = PeerPreviewLifetime(deadline)
             if not diarization:
                 caption.speaker_assignment = SpeakerAssignment(
                     SpeakerAttribution("non_diarized"),
@@ -471,9 +474,6 @@ class PeerCaptionOwner:
                 started + 5.0,
                 transcript.text,
                 config,
-                preview_lifetime=(
-                    PeerPreviewLifetime(deadline) if provider_id == "gemini_transcribe" else None
-                ),
             )
             self._segments[transcript.utterance_id] = segment
             self._preview_deadlines.pop(transcript.utterance_id, None)
@@ -551,7 +551,7 @@ class PeerCaptionOwner:
                 assignment=segment.caption.speaker_assignment,
                 admitted=segment.caption.admitted,
                 predecessor=segment.caption.predecessor,
-                peer_preview_lifetime=segment.preview_lifetime,
+                peer_preview_lifetime=segment.caption.preview_lifetime,
             )
 
     def abandon(self, utterance_id: UUID) -> None:
@@ -606,7 +606,7 @@ class PeerCaptionOwner:
                 peer_superseded_unit_ids=caption.superseded,
                 speaker_assignment=caption.speaker_assignment,
             ),
-            peer_preview_lifetime=segment.preview_lifetime,
+            peer_preview_lifetime=caption.preview_lifetime,
         )
 
     async def retire_epoch(self, provider_epoch_id: str) -> None:
@@ -997,11 +997,8 @@ class PeerCaptionOwner:
                 admitted=request_admission,
                 predecessor=request_predecessor,
                 peer_preview_lifetime=(
-                    segment.preview_lifetime
-                    if segment is not None
-                    and caption is segment.caption
-                    and caption.provider_id == provider_id
-                    and caption.scope == scope
+                    caption.preview_lifetime
+                    if caption.provider_id == provider_id and caption.scope == scope
                     else None
                 ),
             ),
