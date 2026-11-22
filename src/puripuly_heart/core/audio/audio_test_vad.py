@@ -46,7 +46,7 @@ class AudioTestVadProbe:
         )
         self._normalizer: MonoFirstStreamingResampler | None = None
         self._source_format: tuple[int, int] | None = None
-        self._pending = np.empty((0,), dtype=np.float32)
+        self._pending: np.ndarray | None = None
 
     @property
     def settings(self) -> AudioTestVadSettings:
@@ -78,8 +78,11 @@ class AudioTestVadProbe:
         samples = np.asarray(frame.samples, dtype=np.float32)
         if not np.all(np.isfinite(samples)):
             raise ValueError("invalid_pcm")
-        mono = self._normalizer.resample_chunk(samples.reshape(-1, frame_format[1]))
-        buffer = np.concatenate((self._pending, np.asarray(mono, dtype=np.float32).reshape(-1)))
+        buffer = self._normalizer.resample_chunk(samples.reshape(-1, frame_format[1]))
+        if not buffer.size:
+            return ()
+        if self._pending is not None:
+            buffer = np.concatenate((self._pending, buffer))
         chunk_samples = self._gating.chunk_samples
         observations: list[AudioTestVadSample] = []
         offset = 0
@@ -96,7 +99,7 @@ class AudioTestVadProbe:
                     threshold=self._gating.speech_threshold,
                 )
             )
-        self._pending = buffer[offset:].copy()
+        self._pending = buffer[offset:].copy() if offset < buffer.size else None
         return tuple(observations)
 
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +13,8 @@ from puripuly_heart.core.local_asr.local_stt_assets import (
     GIGAAM_MODEL_ID,
     GRANITE_MODEL_ID,
     LOCAL_QWEN_GPU_MODEL_ID,
+    InstalledLocalSTTManifest,
+    load_local_stt_asset_manifest,
 )
 from puripuly_heart.core.local_asr.local_stt_runtime_installer import LocalSTTRuntimeInstallError
 from puripuly_heart.core.model_asset_diagnostics import model_asset_failure_diagnostics
@@ -127,6 +131,60 @@ async def test_entries_report_disk_integrity_without_touching_owners(tmp_path) -
     assert entries[GEMMA_ID].status == "invalid"
     assert entries[GEMMA_ID].required_files == ("model.gguf", "draft.gguf")
     assert provisioning.requests == []
+
+
+@pytest.mark.asyncio
+async def test_refresh_reinspects_replacement_install_and_clears_diagnostics(
+    tmp_path: Path,
+) -> None:
+    model_root = tmp_path / "private-model-root"
+    model_root.mkdir()
+    service, _provisioning, _gemma = _service(model_root)
+    manifest = load_local_stt_asset_manifest(GRANITE_MODEL_ID)
+    chosen_source, source = next(iter(manifest.sources.items()))
+    installed = InstalledLocalSTTManifest(
+        manifest_version=manifest.installed_manifest_version,
+        model_id=manifest.model_id,
+        engine=manifest.engine,
+        install_dirname=manifest.install_dirname,
+        selected_source=chosen_source,
+        selected_revision=source.revision,
+    )
+    install_dir = model_root / manifest.install_dirname
+    replacement_dir = tmp_path / "replacement"
+    for root in (install_dir, replacement_dir):
+        root.mkdir()
+        (root / manifest.installed_manifest_filename).write_text(
+            json.dumps(installed.to_dict()), encoding="utf-8"
+        )
+        for asset in manifest.files:
+            path = root / asset.relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"model")
+
+    await service.refresh()
+    assert service.entry(GRANITE_MODEL_ID).status == "installed"
+
+    asset_path = replacement_dir / manifest.files[0].relative_path
+    asset_path.unlink()
+    asset_path.mkdir()
+    install_dir.rename(tmp_path / "old-install")
+    replacement_dir.rename(install_dir)
+
+    await service.refresh()
+    entry = service.entry(GRANITE_MODEL_ID)
+    assert entry.status == "invalid"
+    assert [item.code for item in entry.secondary_diagnostics] == ["local_asr.invalid_assets"]
+    assert model_root.name not in json.dumps(entry.to_dict())
+
+    asset_path = install_dir / manifest.files[0].relative_path
+    asset_path.rmdir()
+    asset_path.write_bytes(b"repaired model")
+
+    await service.refresh()
+    entry = service.entry(GRANITE_MODEL_ID)
+    assert entry.status == "installed"
+    assert entry.secondary_diagnostics == ()
 
 
 @pytest.mark.asyncio

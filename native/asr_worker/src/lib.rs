@@ -319,14 +319,16 @@ where
 {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(heartbeat_interval);
+        let heartbeat = encode_frame(&json!({
+            "type": "heartbeat",
+            "contract_version": CONTRACT_VERSION,
+            "session_id": session_id,
+        }))?;
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    write_frame(&mut writer, &json!({
-                        "type": "heartbeat",
-                        "contract_version": CONTRACT_VERSION,
-                        "session_id": session_id,
-                    })).await?;
+                    writer.write_all(&heartbeat).await?;
+                    writer.flush().await?;
                 }
                 payload = outgoing.recv() => {
                     let Some(payload) = payload else { return Ok(()); };
@@ -569,10 +571,14 @@ async fn write_frame<W>(writer: &mut W, payload: &Value) -> Result<(), std::io::
 where
     W: AsyncWrite + Unpin,
 {
+    writer.write_all(&encode_frame(payload)?).await?;
+    writer.flush().await
+}
+
+fn encode_frame(payload: &Value) -> Result<Vec<u8>, serde_json::Error> {
     let mut bytes = serde_json::to_vec(payload)?;
     bytes.push(b'\n');
-    writer.write_all(&bytes).await?;
-    writer.flush().await
+    Ok(bytes)
 }
 
 #[cfg(test)]

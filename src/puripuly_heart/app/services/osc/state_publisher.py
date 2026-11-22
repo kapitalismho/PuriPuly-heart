@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import Any
 
 from puripuly_heart.app.ports.osc_control import (
     ASR_ID_BY_PROVIDER,
-    BOOLEAN_CONTROLS,
     LANGUAGE_ID_BY_CODE,
     OSC_PARAMETER_ADDRESS_PREFIX,
     SECONDARY_LANGUAGE_ID_BY_CODE,
@@ -180,33 +179,28 @@ class OscStatePublisher:
 
     @staticmethod
     def values_for_state(state: OscCanonicalState) -> dict[str, bool | int]:
-        fields_by_name = {field.name: getattr(state, field.name) for field in fields(state)}
-        values: dict[str, bool | int] = {}
-        for parameter, target in BOOLEAN_CONTROLS.items():
-            field_name = (
-                target.replace("vrc_mic_intercept", "mute_sync")
-                .replace("chatbox_include_source", "chatbox_source")
-                .replace("peer_source_mode", "peer_source_auto")
-            )
-            values[parameter] = bool(fields_by_name[field_name])
-        values.update(
-            {
-                "PuriPuly_SelfSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_source_language"]],
-                "PuriPuly_SelfDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["self_target_language"]],
-                "PuriPuly_SelfDstLang2": SECONDARY_LANGUAGE_ID_BY_CODE[
-                    fields_by_name["self_secondary_target_language"]
-                ],
-                "PuriPuly_PeerSrcLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_source_language"]],
-                "PuriPuly_PeerDstLang": LANGUAGE_ID_BY_CODE[fields_by_name["peer_target_language"]],
-                "PuriPuly_SelfASR": ASR_ID_BY_PROVIDER[fields_by_name["self_asr"]],
-                "PuriPuly_PeerASR": ASR_ID_BY_PROVIDER[fields_by_name["peer_asr"]],
-                "PuriPuly_Translator": translation_model_id_for_selection(
-                    fields_by_name["translation_model"],
-                    fields_by_name["translation_connection"],
-                ),
-            }
-        )
-        return values
+        return {
+            "PuriPuly_Talk": bool(state.self_capture),
+            "PuriPuly_Listen": bool(state.peer_capture),
+            "PuriPuly_Trans": bool(state.translation),
+            "PuriPuly_Captions": bool(state.captions),
+            "PuriPuly_PeerAuto": bool(state.peer_source_auto),
+            "PuriPuly_MuteSync": bool(state.mute_sync),
+            "PuriPuly_ChatboxSource": bool(state.chatbox_source),
+            "PuriPuly_SelfSrcLang": LANGUAGE_ID_BY_CODE[state.self_source_language],
+            "PuriPuly_SelfDstLang": LANGUAGE_ID_BY_CODE[state.self_target_language],
+            "PuriPuly_SelfDstLang2": SECONDARY_LANGUAGE_ID_BY_CODE[
+                state.self_secondary_target_language
+            ],
+            "PuriPuly_PeerSrcLang": LANGUAGE_ID_BY_CODE[state.peer_source_language],
+            "PuriPuly_PeerDstLang": LANGUAGE_ID_BY_CODE[state.peer_target_language],
+            "PuriPuly_SelfASR": ASR_ID_BY_PROVIDER[state.self_asr],
+            "PuriPuly_PeerASR": ASR_ID_BY_PROVIDER[state.peer_asr],
+            "PuriPuly_Translator": translation_model_id_for_selection(
+                state.translation_model,
+                state.translation_connection,
+            ),
+        }
 
 
 def state_from_settings(

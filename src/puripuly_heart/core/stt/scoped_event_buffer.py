@@ -12,6 +12,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnEvent,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
@@ -125,7 +126,11 @@ class STTProviderEventBuffer:
                 self._fail_scoped_turn(event)
                 return False
             if isinstance(
-                event, (STTProviderInputTerminal, STTRecognitionUnit, STTRecognitionUnitTerminal)
+                event,
+                STTProviderInputTerminal
+                | STTRecognitionPreviewDeadline
+                | STTRecognitionUnit
+                | STTRecognitionUnitTerminal,
             ):
                 self._fail_epoch(epoch_id)
                 return False
@@ -247,6 +252,8 @@ def _is_provisional_snapshot(event: STTProviderTurnEvent) -> bool:
 def _event_epoch_id(event: STTProviderTurnEvent) -> str:
     if isinstance(event, STTProviderEpochEnded | STTFinalSpeakerEvidence):
         return event.provider_epoch_id
+    if isinstance(event, STTRecognitionPreviewDeadline):
+        return event.stream.provider_epoch_id
     if isinstance(event, STTRecognitionUnitTerminal):
         return event.unit.identity.stream.provider_epoch_id
     if isinstance(event, STTRecognitionUnit):

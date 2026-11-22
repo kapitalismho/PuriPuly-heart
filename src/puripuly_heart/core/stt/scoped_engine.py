@@ -9,7 +9,7 @@ from collections import OrderedDict, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from typing import Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 
@@ -39,6 +39,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTScopedTurnSession,
@@ -60,6 +61,9 @@ from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 logger = logging.getLogger(__name__)
+
+_GEMINI_PEER_PREVIEW_GRACE_S = 0.6
+_GEMINI_PEER_END_PAUSE_MS = 500
 
 _CLOUD_TURN_PROVIDERS = frozenset(
     {
@@ -95,6 +99,7 @@ def _log_recognition_terminal(
     context_bytes: int,
     final_wait_ms: int | None,
     final_timeout_ms: int | None,
+    unit_suffix: str = "",
 ) -> None:
     with contextlib.suppress(Exception):
         logger.info(
@@ -102,7 +107,7 @@ def _log_recognition_terminal(
             "outcome=%s cause=%s text_authority=%s successful_payloads=%d "
             "successful_samples=%d successful_bytes=%d content_bytes=%d context_bytes=%d "
             "activation_generation=%d final_wait_ms=%s final_timeout_ms=%s "
-            "failure_retryable=%d recovery_pending=%d",
+            "failure_retryable=%d recovery_pending=%d%s",
             channel,
             identity.segment.segment_id,
             provider_id,
@@ -121,6 +126,7 @@ def _log_recognition_terminal(
             final_timeout_ms if final_timeout_ms is not None else "none",
             int(getattr(terminal, "failure_retryable", False)),
             int(terminal.channel_availability is STTChannelAvailability.RECOVERING),
+            unit_suffix,
         )
 
 
@@ -219,6 +225,20 @@ class _ActiveTurn:
     final_wait_started_at_s: float | None = None
     independent_recognition: bool = False
     pending_update: STTProviderTurnUpdate | None = None
+    seal_reason: str | None = None
+    source_frontier: int | None = None
+
+
+@dataclass(slots=True)
+class _RecognitionUnitState:
+    partials: int = 0
+    finals: int = 0
+    open_unit_id: UUID | None = None
+    open_unit_at_s: float | None = None
+    open_unit_receipts: int = 0
+    sealed_at_s: float | None = None
+    seal_reason: str | None = None
+    preview_expires_at_s: float | None = None
 
 
 @dataclass(slots=True)
@@ -230,6 +250,7 @@ class _StreamRecovery:
     pending: bool = True
     require_speech: bool = False
     resume_pre_roll: bool = False
+    preview_stalled: bool = False
 
 
 @dataclass(slots=True)
@@ -276,6 +297,9 @@ class ScopedRecognitionEngine:
         init=False, default=None, repr=False
     )
     _last_receipt_sequence: int = field(init=False, default=0, repr=False)
+    _unit_state: _RecognitionUnitState = field(
+        init=False, default_factory=_RecognitionUnitState, repr=False
+    )
     _estimated_speech_scope: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     _estimated_last_speech_at: float | None = field(init=False, default=None, repr=False)
     _recognition_authorities: OrderedDict[RecognitionStreamIdentity, int] = field(
@@ -512,6 +536,19 @@ class ScopedRecognitionEngine:
                         return
                     session = self._session
                     if (
+                        recovery.preview_stalled
+                        and owned.settings.provider_id == "rolling_free"
+                        and authority_generation == self._authority_generation
+                        and self._recovery_matches(recovery, owned)
+                        and self._provider_epoch_id is not None
+                        and session is not None
+                        and (
+                            not isinstance(session, STTIndependentRecognitionSession)
+                            or not session.independent_recognition_units
+                        )
+                    ):
+                        return
+                    if (
                         authority_generation != self._authority_generation
                         or not self._recovery_matches(recovery, owned)
                         or not isinstance(session, STTIndependentRecognitionSession)
@@ -690,18 +727,24 @@ class ScopedRecognitionEngine:
         recovery = self._stream_recovery
         if recovery is None or not ranges:
             return samples, ranges
-        frontier = recovery.source_frontier
+        skipped, remaining = self._source_after_frontier(ranges, recovery.source_frontier)
+        return samples[skipped:], remaining
+
+    @staticmethod
+    def _source_after_frontier(
+        ranges: tuple[AudioCaptureSpan, ...], frontier: int
+    ) -> tuple[int, tuple[AudioCaptureSpan, ...]]:
         skipped = 0
         remaining: list[AudioCaptureSpan] = []
         for span in ranges:
             start, end = span.normalized_start_sample, span.normalized_end_sample
             if start is None or end is None:
-                return samples, ranges
+                return 0, ranges
             left = min(end, max(start, frontier))
             skipped += left - start
             if left < end:
                 remaining.append(span if left == start else span.slice_normalized(left, end))
-        return samples[skipped:], tuple(remaining)
+        return skipped, tuple(remaining)
 
     def _register_recognition_stream(
         self, stream: RecognitionStreamIdentity, settings: AudioSegmentSettingsSnapshot
@@ -711,6 +754,7 @@ class ScopedRecognitionEngine:
             self._estimated_last_speech_at = None
             self._recognition_stream = stream
             self._last_receipt_sequence = 0
+            self._unit_state = _RecognitionUnitState()
         recovery = self._stream_recovery
         frontier = (
             recovery.source_frontier
@@ -1149,6 +1193,20 @@ class ScopedRecognitionEngine:
         independent = isinstance(session, STTIndependentRecognitionSession) and (
             session.independent_recognition_units
         )
+        recovery = self._stream_recovery
+        source_frontier = None
+        if (
+            not independent
+            and recovery is not None
+            and recovery.preview_stalled
+            and settings.provider_id == "rolling_free"
+            and recovery.authority_generation == authority_generation
+            and recovery.stream.activation_generation == identity.segment.activation_generation
+            and recovery.stream.capture_epoch == identity.segment.capture_epoch
+            and recovery.settings == settings
+        ):
+            recovery.pending = False
+            source_frontier = recovery.source_frontier
         turn = _ActiveTurn(
             identity=identity,
             settings=settings,
@@ -1168,6 +1226,7 @@ class ScopedRecognitionEngine:
             failure_version=self._failure_version,
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
             independent_recognition=independent,
+            source_frontier=source_frontier,
         )
         self._turn = turn
         self._turns[identity] = turn
@@ -1197,6 +1256,9 @@ class ScopedRecognitionEngine:
                     identity=identity,
                     settings=settings,
                     channel=self.channel,
+                    recognition_fence_clock=(
+                        self.monotonic_clock if self._is_gemini_peer_turn(identity) else None
+                    ),
                 )
             ),
         ):
@@ -1261,21 +1323,31 @@ class ScopedRecognitionEngine:
             await self._drain_completed_turns()
             return
         turn.local_sealed = True
+        turn.seal_reason = event.reason
         session = self._session
         if (
             not turn.write_failed
             and session is not None
             and self._has_write_authority(session, turn)
         ):
+            gemini_peer = turn.independent_recognition and self._is_gemini_peer_turn(turn.identity)
+            observed_pause_ms = event.trailing_silence_ms
+            if gemini_peer and owned.segment.delivery_pause_s is not None:
+                observed_pause_ms = int(owned.segment.delivery_pause_s * 1000)
+            content_ranges = owned.segment.content_ranges
+            if turn.source_frontier is not None:
+                _, content_ranges = self._source_after_frontier(
+                    content_ranges, turn.source_frontier
+                )
             sent = await self._run_write(
                 session,
                 turn,
                 "seal",
                 session.seal_turn(
                     turn.identity,
-                    sealed_content_ranges=owned.segment.content_ranges,
+                    sealed_content_ranges=content_ranges,
                     seal_reason=str(event.reason),
-                    observed_trailing_silence_ms=event.trailing_silence_ms,
+                    observed_trailing_silence_ms=observed_pause_ms,
                 ),
             )
             if turn.independent_recognition:
@@ -1305,6 +1377,38 @@ class ScopedRecognitionEngine:
             self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
         await self._drain_completed_turns()
 
+    def _is_gemini_peer_turn(self, identity: STTProviderTurnIdentity) -> bool:
+        return (
+            self.channel == "peer"
+            and (identity.recognizer_id or identity.settings_scope[0]) == "gemini_transcribe"
+        )
+
+    @staticmethod
+    def _qualifying_preview_end(reason: str, pause_ms: int | None) -> bool:
+        return (
+            reason in {"silence", "delivery_pause"}
+            and pause_ms is not None
+            and pause_ms >= _GEMINI_PEER_END_PAUSE_MS
+        )
+
+    async def _apply_peer_preview_end(self, written_at_s: float) -> None:
+        stream = self._recognition_stream
+        state = self._unit_state
+        open_unit_id = state.open_unit_id
+        if stream is None or open_unit_id is None:
+            return
+        if state.preview_expires_at_s is None:
+            state.preview_expires_at_s = written_at_s + _GEMINI_PEER_PREVIEW_GRACE_S
+            await self._emit(
+                STTRecognitionPreviewDeadline(stream, open_unit_id, state.preview_expires_at_s)
+            )
+        elif written_at_s >= state.preview_expires_at_s:
+            async with self._input_lock:
+                if self._recognition_stream == stream:
+                    await self._end_current_session(
+                        reason="gemini_preview_stalled", require_speech=True
+                    )
+
     async def _send_payload(
         self,
         turn: _ActiveTurn,
@@ -1326,6 +1430,11 @@ class ScopedRecognitionEngine:
                 await self.abort(reason="stream_input_ownership_changed")
                 return
             samples, source_ranges = self._after_stream_failure(samples, source_ranges)
+        elif turn.source_frontier is not None:
+            skipped, source_ranges = self._source_after_frontier(
+                source_ranges, turn.source_frontier
+            )
+            samples = samples[skipped:]
         if (
             turn.independent_recognition
             and source_ranges
@@ -1822,6 +1931,59 @@ class ScopedRecognitionEngine:
             self._notify_terminal_failure(last_error)
         return False
 
+    def _admit_recognition_unit(self, unit: STTRecognitionUnit, epoch_id: str) -> bool:
+        stats = self._unit_state
+        now = self.monotonic_clock()
+        if stats.open_unit_id != unit.identity.unit_id:
+            stats.open_unit_id = unit.identity.unit_id
+            stats.open_unit_at_s = now
+            stats.open_unit_receipts = 0
+            stats.sealed_at_s = None
+            stats.seal_reason = None
+            stats.preview_expires_at_s = None
+        stats.open_unit_receipts += 1
+        if not unit.is_final:
+            stats.partials += 1
+            return stats.preview_expires_at_s is None or now < stats.preview_expires_at_s
+        stats.finals += 1
+        if stats.sealed_at_s is not None and stats.open_unit_at_s is not None:
+            with contextlib.suppress(Exception):
+                logger.info(
+                    "[Recognition] unit_final channel=%s provider=%s epoch=%s "
+                    "seal_reason=%s after_seal_ms=%d unit_ms=%d unit_receipts=%d",
+                    self.channel,
+                    self._session_scope[0] if self._session_scope is not None else "none",
+                    epoch_id,
+                    stats.seal_reason,
+                    max(0, int((now - stats.sealed_at_s) * 1000)),
+                    max(0, int((now - stats.open_unit_at_s) * 1000)),
+                    stats.open_unit_receipts,
+                )
+        stats.open_unit_id = None
+        stats.open_unit_at_s = None
+        stats.open_unit_receipts = 0
+        stats.sealed_at_s = None
+        stats.seal_reason = None
+        stats.preview_expires_at_s = None
+        return True
+
+    def _seal_recognition_units(self, seal_reason: str) -> str:
+        stats = self._unit_state
+        now = self.monotonic_clock()
+        opened_at_s = stats.open_unit_at_s
+        suffix = f" unit_partials={stats.partials} unit_finals={stats.finals} " + (
+            f"open_unit_ms={max(0, int((now - opened_at_s) * 1000))} "
+            f"open_unit_receipts={stats.open_unit_receipts}"
+            if opened_at_s is not None
+            else "open_unit_ms=none open_unit_receipts=0"
+        )
+        stats.partials = 0
+        stats.finals = 0
+        if opened_at_s is not None:
+            stats.sealed_at_s = now
+            stats.seal_reason = seal_reason
+        return suffix
+
     async def _consume_session_events(
         self,
         session: STTScopedTurnSession,
@@ -1845,6 +2007,8 @@ class ScopedRecognitionEngine:
                     ):
                         continue
                     self._last_receipt_sequence = event.identity.receipt_sequence
+                    if not self._admit_recognition_unit(event, epoch_id):
+                        continue
                     stream = event.identity.stream
                     if event.text.strip():
                         self._last_native_speech_at_s = self.monotonic_clock()
@@ -1882,6 +2046,9 @@ class ScopedRecognitionEngine:
                         and session.independent_recognition_units
                         and session.accepts_stream_input
                     ):
+                        if epoch_id != self._provider_epoch_id:
+                            await self._emit(event)
+                            return
                         async with self._input_lock:
                             if epoch_id == self._provider_epoch_id:
                                 await self._end_current_session(
@@ -1966,13 +2133,27 @@ class ScopedRecognitionEngine:
                     await self._accept_speaker_evidence(event, epoch_id)
                     continue
                 turn = self._turns.get(event.identity)
-                if turn is None:
-                    continue
                 if isinstance(event, STTProviderInputTerminal):
-                    if not turn.independent_recognition or turn.terminal_ready.done():
-                        continue
-                    turn.terminal_ready.set_result(event)
-                    await self._drain_completed_turns()
+                    if (
+                        turn is not None
+                        and turn.independent_recognition
+                        and not turn.terminal_ready.done()
+                    ):
+                        turn.terminal_ready.set_result(event)
+                        await self._drain_completed_turns()
+                    fence = event.audio_fence
+                    if (
+                        fence is not None
+                        and epoch_id == self._provider_epoch_id == event.identity.provider_epoch_id
+                        and event.outcome == "submitted"
+                        and self._is_gemini_peer_turn(event.identity)
+                        and self._qualifying_preview_end(
+                            fence.reason, fence.observed_trailing_silence_ms
+                        )
+                    ):
+                        await self._apply_peer_preview_end(fence.written_at_s)
+                    continue
+                if turn is None:
                     continue
                 if isinstance(event, STTProviderTurnUpdate):
                     if (
@@ -2653,6 +2834,13 @@ class ScopedRecognitionEngine:
                     else None
                 ),
                 int(turn.watchdogs.final_timeout_s * 1000),
+                (
+                    self._seal_recognition_units(turn.seal_reason)
+                    if terminal.outcome == "submitted"
+                    and turn.seal_reason is not None
+                    and turn.identity.provider_epoch_id == self._provider_epoch_id
+                    else ""
+                ),
             )
             if (
                 self.channel == "peer"
@@ -2810,8 +2998,11 @@ class ScopedRecognitionEngine:
         ):
             recovery.pending = True
             recovery.require_speech = require_speech
+            recovery.preview_stalled = reason == "gemini_preview_stalled"
             recovery.resume_pre_roll = (
-                reason == "provider_idle_timeout" and require_speech and not failed
+                reason in {"provider_idle_timeout", "gemini_preview_stalled"}
+                and require_speech
+                and not failed
             )
             if failed:
                 self._episode_failures += 1
@@ -2841,6 +3032,7 @@ class ScopedRecognitionEngine:
         self._session_initial_readiness_pending = False
         self._recognition_stream = None
         self._last_receipt_sequence = 0
+        self._unit_state = _RecognitionUnitState()
         self._session_consumer = None
         self._session_opened_at_s = None
         self._session_scope = None
@@ -2918,6 +3110,7 @@ class ScopedRecognitionEngine:
         *,
         reason: str = "provider_session_lifetime_exceeded",
         resume_stream: bool = True,
+        require_speech: bool = False,
         failed: bool = False,
         failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
@@ -2961,7 +3154,12 @@ class ScopedRecognitionEngine:
             turn.write_failed = True
         for task in self._operation_tasks.get(id(session), ()):
             task.cancel()
-        self._retire_current_session(reason=reason, resume_stream=resume_stream, failed=failed)
+        self._retire_current_session(
+            reason=reason,
+            resume_stream=resume_stream,
+            require_speech=require_speech,
+            failed=failed,
+        )
         for turn in turns:
             await self._finish_failed_turn_immediately(turn)
 
@@ -3088,13 +3286,15 @@ class ScopedRecognitionEngine:
         self._event_drained.clear()
         accepted = self._event_buffer.put(event, preserve_observations=soniox)
         if not accepted and isinstance(
-            event, (STTRecognitionUnitTerminal, STTProviderInputTerminal)
+            event,
+            STTRecognitionUnitTerminal | STTProviderInputTerminal | STTRecognitionPreviewDeadline,
         ):
-            epoch_id = (
-                event.unit.identity.stream.provider_epoch_id
-                if isinstance(event, STTRecognitionUnitTerminal)
-                else event.identity.provider_epoch_id
-            )
+            if isinstance(event, STTRecognitionUnitTerminal):
+                epoch_id = event.unit.identity.stream.provider_epoch_id
+            elif isinstance(event, STTRecognitionPreviewDeadline):
+                epoch_id = event.stream.provider_epoch_id
+            else:
+                epoch_id = event.identity.provider_epoch_id
             if epoch_id == self._provider_epoch_id:
                 for turn in self._turns.values():
                     if turn.identity.provider_epoch_id == epoch_id:

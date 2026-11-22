@@ -14,7 +14,7 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _emulate_stable_creation_identity(tailer: VrchatSceneLogTailer, path: Path) -> None:
+def _emulate_stable_creation_identity(tailer: VrchatSceneLogTailer[str], path: Path) -> None:
     status = path.stat()
     recorded = tailer._identity
     if recorded is None:
@@ -28,7 +28,7 @@ def _emulate_stable_creation_identity(tailer: VrchatSceneLogTailer, path: Path) 
 def test_append_is_not_reported_as_truncation(tmp_path: Path) -> None:
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "first\nsecond\npartial")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["first", "second"]
     assert tailer.read_new_lines() == []
@@ -42,7 +42,7 @@ def test_append_is_not_reported_as_truncation(tmp_path: Path) -> None:
 def test_append_across_multibyte_chunks(tmp_path: Path) -> None:
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "alpha\n")
-    tailer = VrchatSceneLogTailer(tmp_path, read_chunk_bytes=3)
+    tailer = VrchatSceneLogTailer(tmp_path, str, read_chunk_bytes=3)
 
     assert tailer.begin_replay(path) == ["alpha"]
 
@@ -55,7 +55,7 @@ def test_append_across_multibyte_chunks(tmp_path: Path) -> None:
 def test_in_place_rewrite_longer_than_offset_is_detected(tmp_path: Path) -> None:
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "line1\nline2\n")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["line1", "line2"]
 
@@ -71,7 +71,7 @@ def test_in_place_rewrite_longer_than_offset_is_detected(tmp_path: Path) -> None
 def test_shorter_rewrite_is_detected_and_replay_recovers(tmp_path: Path) -> None:
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "first\nsecond\n")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["first", "second"]
 
@@ -87,7 +87,7 @@ def test_same_size_in_place_rewrite_is_detected(tmp_path: Path) -> None:
 
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "aaaa\n")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["aaaa"]
 
@@ -107,7 +107,7 @@ def test_same_size_and_mtime_rewrite_is_detected_and_replay_recovers(
 
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     path.write_bytes(b"a" * 128 + b"\n")
-    tailer = VrchatSceneLogTailer(tmp_path, read_chunk_bytes=read_chunk_bytes)
+    tailer = VrchatSceneLogTailer(tmp_path, str, read_chunk_bytes=read_chunk_bytes)
     assert tailer.begin_replay(path) == ["a" * 128]
     original_status = path.stat()
 
@@ -135,7 +135,7 @@ def test_equal_size_replacement_file_is_detected(tmp_path: Path) -> None:
 
     path = tmp_path / "output_log_2026-09-07_01-48-37.txt"
     _write(path, "aaaa\n")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["aaaa"]
     assert tailer.read_new_lines() == []

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import socket
+from contextlib import closing
 from uuid import uuid4
+
+import pytest
+from pythonosc.osc_message import OscMessage
 
 from puripuly_heart.core.clock import FakeClock, SystemClock
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
@@ -27,9 +31,13 @@ class _RaisingSender:
 
 def _capture() -> tuple[VrchatOscUdpSender, socket.socket]:
     receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    receiver.bind(("127.0.0.1", 0))
-    receiver.settimeout(0.2)
-    sender = VrchatOscUdpSender(host="127.0.0.1", port=receiver.getsockname()[1])
+    try:
+        receiver.bind(("127.0.0.1", 0))
+        receiver.settimeout(0.2)
+        sender = VrchatOscUdpSender(host="127.0.0.1", port=receiver.getsockname()[1])
+    except BaseException:
+        receiver.close()
+        raise
     return sender, receiver
 
 
@@ -78,6 +86,63 @@ def test_unencodable_tail_page_is_dropped_and_pagination_continues() -> None:
     finally:
         sender.close()
         receiver.close()
+
+
+async def test_output_runtime_sends_first_chatbox_tail_after_idle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sender, receiver = _capture()
+    with closing(sender), receiver:
+        clock = SystemClock()
+        page_interval_s = 0.05
+        paginator = ChatboxPaginator(
+            sender=sender, clock=clock, max_chars=5, page_interval_s=page_interval_s
+        )
+        runtime = OutputRuntime(chatbox=paginator, clock=clock)
+        idle = asyncio.Event()
+        schedule_changed = paginator._schedule_changed
+        original_wait = schedule_changed.wait
+        send_times: list[float] = []
+        original_send_chatbox = VrchatOscUdpSender.send_chatbox
+
+        async def observe_wait() -> bool:
+            if not schedule_changed.is_set():
+                idle.set()
+            return await original_wait()
+
+        def record_send(udp_sender: VrchatOscUdpSender, text: str) -> None:
+            send_times.append(clock.now())
+            original_send_chatbox(udp_sender, text)
+
+        monkeypatch.setattr(schedule_changed, "wait", observe_wait)
+        monkeypatch.setattr(VrchatOscUdpSender, "send_chatbox", record_send)
+        try:
+            await runtime.start(auto_flush_chatbox=True)
+            await asyncio.wait_for(idle.wait(), timeout=2.0)
+
+            await runtime.publish_chatbox(
+                publication_id=uuid4(),
+                channel="self",
+                transcript_text="alpha bravo",
+                translation_text=None,
+                include_source=False,
+            )
+            head_packet, _ = receiver.recvfrom(65535)
+            head = OscMessage(head_packet)
+            assert (head.address, head.params) == ("/chatbox/input", ["alpha", True, False])
+
+            receiver.setblocking(False)
+            try:
+                async with asyncio.timeout(2.0):
+                    tail_packet, _ = await asyncio.get_running_loop().sock_recvfrom(receiver, 65535)
+            except TimeoutError:
+                pytest.fail("Chatbox tail 'bravo' was not received after inline head 'alpha'")
+            tail = OscMessage(tail_packet)
+            assert (tail.address, tail.params) == ("/chatbox/input", ["bravo", True, False])
+            head_at, tail_at = send_times
+            assert tail_at >= head_at + page_interval_s, "Chatbox tail was sent before eligibility"
+        finally:
+            await asyncio.wait_for(runtime.close(), timeout=1.0)
 
 
 async def test_output_runtime_chatbox_survives_unencodable_page_and_close_succeeds() -> None:

@@ -228,13 +228,14 @@ fn linear_coordinate(destination: u32, source_size: u32, target_size: u32) -> (u
 }
 
 fn resize_tile(source: &RgbImage, rect: PixelRect, input: &mut [u8]) {
-    let xs: [(u32, u32, f32); MODEL_SIZE] =
-        std::array::from_fn(|x| linear_coordinate(x as u32, rect.width, MODEL_SIZE as u32));
+    let xs: [(u32, u32, i32); MODEL_SIZE] = std::array::from_fn(|x| {
+        let (x0, x1, fx) = linear_coordinate(x as u32, rect.width, MODEL_SIZE as u32);
+        (x0, x1, (fx * 2048.0).round_ties_even() as i32)
+    });
     for y in 0..MODEL_SIZE as u32 {
         let (y0, y1, fy) = linear_coordinate(y, rect.height, MODEL_SIZE as u32);
         let by = (fy * 2048.0).round_ties_even() as i32;
-        for (x, &(x0, x1, fx)) in xs.iter().enumerate() {
-            let bx = (fx * 2048.0).round_ties_even() as i32;
+        for (x, &(x0, x1, bx)) in xs.iter().enumerate() {
             let p00 = source.get_pixel(rect.x + x0, rect.y + y0).0;
             let p01 = source.get_pixel(rect.x + x1, rect.y + y0).0;
             let p10 = source.get_pixel(rect.x + x0, rect.y + y1).0;
@@ -786,16 +787,10 @@ fn erase_patch(
     let x = input.x;
     let y = input.y;
     let crop = imageops::crop_imm(erase_source, x, y, input.width, input.height).to_image();
-    let mut expanded_mask = GrayImage::new(crop.width(), crop.height());
-    imageops::replace(
-        &mut expanded_mask,
-        mask,
-        i64::from(roi.x - x),
-        i64::from(roi.y - y),
-    );
     let erased = telea::inpaint(
         crop,
-        &expanded_mask,
+        mask,
+        [roi.x - x, roi.y - y],
         (5.0 * photo.reference_scale).round_ties_even().max(1.0) as u32,
         workspace,
     )

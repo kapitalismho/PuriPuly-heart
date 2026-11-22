@@ -2270,6 +2270,14 @@ def test_recognition_turn_metadata_survives_file_sink_without_content(tmp_path) 
         f"[Recognition] session_retired channel=peer provider=qwen_audio epoch={epoch} "
         "cause=provider_final_timeout recovery=none",
         "[QwenAudio] task_failed channel=peer reason=qwen_final_timeout cause_class=TimeoutError",
+        f"[Recognition] terminal channel=peer utterance_id={utterance} "
+        f"provider=gemini_transcribe epoch={epoch} turn={turn} outcome=submitted cause=none "
+        "text_authority=none successful_payloads=4 successful_samples=6400 "
+        "successful_bytes=12800 content_bytes=12800 context_bytes=0 activation_generation=1 "
+        "final_wait_ms=none final_timeout_ms=12000 failure_retryable=0 recovery_pending=0 "
+        "unit_partials=7 unit_finals=0 open_unit_ms=184000 open_unit_receipts=10",
+        f"[Recognition] unit_final channel=peer provider=gemini_transcribe epoch={epoch} "
+        "seal_reason=delivery_pause after_seal_ms=420 unit_ms=2900 unit_receipts=6",
         "[VAD] window channel=peer reason=interval generation=3 observed_audio_ms=1000 "
         "input_rms=0.01234 max_probability=0.9123 threshold_min=0.4000 threshold_max=unknown "
         "threshold_hits=12 candidate_discarded=0 candidate_max_run_ms=64.0 "
@@ -2287,6 +2295,8 @@ def test_recognition_turn_metadata_survives_file_sink_without_content(tmp_path) 
         "[Recognition] All configured speech recognition services are unavailable private.",
         "[QwenAudio] task_failed channel=peer reason=private_reason cause_class=TimeoutError",
         "[QwenAudio] task_failed channel=peer reason=qwen_final_timeout cause_class=private-detail",
+        "[Recognition] unit_final channel=peer seal_reason=private after_seal_ms=1",
+        "[Recognition] unit_final channel=peer text=private-transcript",
         "[VAD] window channel=peer reason=private input_rms=0.1",
         "[VAD] committed channel=peer kind=onset kind=rollover private=1",
     ]

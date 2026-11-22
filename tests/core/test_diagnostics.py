@@ -149,6 +149,22 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
             history.query(arguments)
 
 
+def test_mutating_nested_failure_receipts_and_pages_cannot_change_retained_evidence():
+    history = DiagnosticHistory()
+    original = diagnostic(causes=(diagnostic(fields={"errno": 13}),))
+    receipt, fresh = history.retain(original, severity="error", disposition="failed")
+    assert fresh
+    receipt["causes"][0]["fields"]["errno"] = 0
+    duplicate, fresh = history.retain(original, severity="warning", disposition="recovered")
+    assert not fresh
+    assert duplicate["severity"] == "error"
+    assert duplicate["causes"][0]["fields"] == {"errno": 13}
+    duplicate["causes"].clear()
+    page = history.query({})
+    page["records"][0]["causes"][0]["fields"].clear()
+    assert history.query({})["records"][0]["causes"][0]["fields"] == {"errno": 13}
+
+
 def test_caught_up_cursor_distinguishes_new_records_from_missing_identity():
     history = DiagnosticHistory(max_records=1)
     history.bind_instance(str(uuid4()))

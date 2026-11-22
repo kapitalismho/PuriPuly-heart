@@ -39,6 +39,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     OverlayPublicationScope,
     OverlaySink,
+    PeerPreviewLifetime,
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputPublicationResult, OutputRuntime
@@ -1241,11 +1242,17 @@ class TranslationOutputProjectionOwner:
         *,
         early: bool = False,
         cancellation_requested: Callable[[], bool] | None = None,
+        peer_preview_is_current: Callable[[], bool] | None = None,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.peer_caption_revision > 0:
             if cancellation_requested is not None and cancellation_requested():
                 raise asyncio.CancelledError
-            await self._project_peer_caption_overlay(submission)
+            await self._project_peer_caption_overlay(
+                submission,
+                peer_preview_is_current=peer_preview_is_current,
+                peer_preview_lifetime=peer_preview_lifetime,
+            )
             return
         key = (submission.parent_utterance_id, submission.sequence)
         if not early and key in self._early_peer_overlays:
@@ -2563,7 +2570,13 @@ class TranslationOutputProjectionOwner:
             request_id=submission.request_id,
         )
 
-    async def _project_peer_caption_overlay(self, submission: TranslationOutputSubmission) -> None:
+    async def _project_peer_caption_overlay(
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        peer_preview_is_current: Callable[[], bool] | None,
+        peer_preview_lifetime: PeerPreviewLifetime | None,
+    ) -> None:
         preview = submission.peer_request_kind == "preview"
         translation = submission.translation
         if translation is not None or not preview:
@@ -2597,13 +2610,22 @@ class TranslationOutputProjectionOwner:
                 ),
             )
             await self.publish_overlay_event(
-                replace(event, peer_lineage_revision=submission.peer_lineage_revision),
+                replace(
+                    event,
+                    peer_lineage_revision=submission.peer_lineage_revision,
+                    peer_preview_is_current=peer_preview_is_current,
+                    peer_preview_lifetime=peer_preview_lifetime,
+                ),
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,
             )
 
     async def project_peer_caption(
-        self, submission: TranslationOutputSubmission, *, overlay_projected: bool = False
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        overlay_projected: bool = False,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.channel != "peer" or submission.peer_caption_revision < 1:
             raise ValueError("Peer caption publication requires revision identity")
@@ -2612,7 +2634,7 @@ class TranslationOutputProjectionOwner:
         if not preview and submission.source_text.strip():
             self._record_conversation_submission(submission)
         if not overlay_projected:
-            await self.project_peer_overlay(submission)
+            await self.project_peer_overlay(submission, peer_preview_lifetime=peer_preview_lifetime)
         if not preview and submission.source_text.strip():
             transcript = Transcript(
                 utterance_id=submission.child_utterance_id,

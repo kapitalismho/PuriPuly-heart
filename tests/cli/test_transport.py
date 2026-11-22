@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+from contextlib import aclosing
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -234,6 +235,132 @@ async def test_event_follow_reports_host_loss_instead_of_success():
             await asyncio.wait_for(anext(stream), 2)
         assert error.value.code == "connection_lost"
         await asyncio.wait_for(closing, 2)
+    finally:
+        await stream.aclose()
+        await server.close()
+
+
+@pytest.mark.asyncio
+async def test_freeze_delivers_pending_interrupted_operation_over_loopback():
+    pulling = asyncio.Event()
+
+    class ObservedEvents(ControlEvents):
+        async def subscribe(self, **arguments):
+            async with aclosing(super().subscribe(**arguments)) as subscription:
+                pulling.set()
+                async for event in subscription:
+                    yield event
+
+    events = ObservedEvents(instance_id="correct-instance")
+    server = ControlServer(events, instance_id="correct-instance", token="local-secret-token")
+    port = await server.start()
+    stream = follow(_Record(port), {"topics": ["operation"]})
+    received = asyncio.create_task(anext(stream))
+    try:
+        await asyncio.wait_for(pulling.wait(), 2)
+        await asyncio.wait_for(server.wait_for_idle(), 2)
+        assert events.delivery_health()["active_subscribers"] == 1
+
+        server.freeze()
+        terminal = {
+            "topic": "operation",
+            "operation_id": "pending-operation",
+            "status": "interrupted",
+            "terminal": True,
+            "revision": 0,
+        }
+        events.publish(terminal)
+        assert await asyncio.wait_for(received, 2) == terminal | {
+            "sequence": 1,
+            "instance_id": "correct-instance",
+        }
+        with pytest.raises(ControlTransportError) as error:
+            await asyncio.wait_for(anext(stream), 2)
+        assert error.value.code == "connection_lost"
+        assert events.delivery_health()["active_subscribers"] == 0
+    finally:
+        received.cancel()
+        await asyncio.gather(received, return_exceptions=True)
+        await stream.aclose()
+        await server.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("frame", ["result", "event"], ids=["ack", "event"])
+async def test_freeze_during_send_does_not_start_another_subscription_pull(frame, monkeypatch):
+    draining = asyncio.Event()
+    release = asyncio.Event()
+    pulls = []
+
+    class EventControl(_Control):
+        async def subscribe(self, **_arguments):
+            for sequence in (1, 2):
+                pulls.append(sequence)
+                yield {"topic": "operation", "sequence": sequence}
+
+    class GatedServer(ControlServer):
+        async def _send(self, writer, response):
+            if frame not in response:
+                await super()._send(writer, response)
+                return
+            drain = writer.drain
+
+            async def gated_drain():
+                await drain()
+                draining.set()
+                await release.wait()
+
+            with monkeypatch.context() as patch:
+                patch.setattr(writer, "drain", gated_drain)
+                await super()._send(writer, response)
+
+    server = GatedServer(EventControl(), instance_id="correct-instance", token="local-secret-token")
+    port = await server.start()
+    stream = follow(_Record(port), {"topics": ["operation"]})
+    received = asyncio.create_task(anext(stream))
+    try:
+        await asyncio.wait_for(draining.wait(), 2)
+        server.freeze()
+        release.set()
+        if frame == "event":
+            assert await asyncio.wait_for(received, 2) == {"topic": "operation", "sequence": 1}
+            received = asyncio.create_task(anext(stream))
+        with pytest.raises(ControlTransportError) as error:
+            await asyncio.wait_for(received, 2)
+        assert error.value.code == "connection_lost"
+        assert pulls == ([1] if frame == "event" else [])
+    finally:
+        release.set()
+        received.cancel()
+        await asyncio.gather(received, return_exceptions=True)
+        await stream.aclose()
+        await server.close()
+
+
+@pytest.mark.asyncio
+async def test_idle_follow_disconnect_releases_subscription_without_another_event():
+    released = asyncio.Event()
+
+    class EventControl(_Control):
+        def subscribe(self, **_arguments):
+            async def stream():
+                try:
+                    yield {"topic": "state", "sequence": 1}
+                    await asyncio.Event().wait()
+                finally:
+                    released.set()
+
+            return stream()
+
+    server = ControlServer(
+        EventControl(), instance_id="correct-instance", token="local-secret-token"
+    )
+    port = await server.start()
+    stream = follow(_Record(port), {"topics": ["state"]})
+    try:
+        assert (await asyncio.wait_for(anext(stream), 2))["sequence"] == 1
+        await stream.aclose()
+        await asyncio.wait_for(released.wait(), 2)
     finally:
         await stream.aclose()
         await server.close()

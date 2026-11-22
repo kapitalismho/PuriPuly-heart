@@ -59,10 +59,9 @@ class ConversationHistoryModel:
     def records(self) -> tuple[ConversationRecord, ...]:
         return tuple(self._records)
 
-    def append(self, record: ConversationRecord) -> None:
+    def append(self, record: ConversationRecord) -> bool:
         if record.channel == "peer" and record.peer_caption_revision > 0:
-            self._append_peer_caption(record)
-            return
+            return self._append_peer_caption(record)
         parent_id = record.parent_utterance_id or record.utterance_id
         matches = [
             index
@@ -82,20 +81,31 @@ class ConversationHistoryModel:
             )
         ]
         if matches:
+            changed = False
             for index in matches:
                 previous = self._records[index]
+                source_text = record.source_text or previous.source_text
+                translated_text = record.translated_text or previous.translated_text
+                if (
+                    previous.accepted
+                    and source_text == previous.source_text
+                    and translated_text == previous.translated_text
+                ):
+                    continue
+                changed = True
                 self._records[index] = replace(
                     previous,
                     accepted=True,
-                    source_text=record.source_text or previous.source_text,
-                    translated_text=record.translated_text or previous.translated_text,
+                    source_text=source_text,
+                    translated_text=translated_text,
                 )
-            return
+            return changed
         self._records.append(record)
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
+        return True
 
-    def _append_peer_caption(self, record: ConversationRecord) -> None:
+    def _append_peer_caption(self, record: ConversationRecord) -> bool:
         unit_id = record.parent_utterance_id or record.utterance_id
         record = replace(record, utterance_id=unit_id)
         revision = record.peer_caption_revision
@@ -104,12 +114,12 @@ class ConversationHistoryModel:
         has_translation = record.translated_text is not None
         if previous_revision is not None:
             if revision < previous_revision[0]:
-                return
+                return False
             if revision == previous_revision[0]:
                 has_source = has_source and not previous_revision[1]
                 has_translation = has_translation and not previous_revision[2]
                 if not has_source and not has_translation:
-                    return
+                    return False
         same_revision = previous_revision is not None and revision == previous_revision[0]
         self._peer_revisions[unit_id] = (
             revision,
@@ -151,7 +161,7 @@ class ConversationHistoryModel:
                     else previous.target_index
                 ),
             )
-            return
+            return True
         if record.peer_history_after is None:
             self._records.append(record)
         else:
@@ -167,8 +177,9 @@ class ConversationHistoryModel:
             self._records.insert(index, record)
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
+        return True
 
-    def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+    def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> bool:
         utterance_id = str(snapshot.utterance_id)
         indices = []
         existing = []
@@ -186,7 +197,7 @@ class ConversationHistoryModel:
             or snapshot.source_revision < managed.source_revision
             or (managed.turn_status != "active" and snapshot.status != managed.turn_status)
         ):
-            return
+            return False
         timestamp = (
             existing[0].timestamp_label if existing else _format_conversation_timestamp(None)
         )
@@ -239,6 +250,7 @@ class ConversationHistoryModel:
         self._records[insertion:insertion] = replacements
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
+        return True
 
 
 class ConversationHistory:
@@ -249,11 +261,20 @@ class ConversationHistory:
         cleanup_batch: int = CLEANUP_BATCH,
     ) -> None:
         self._model = ConversationHistoryModel(max_entries=max_entries, cleanup_batch=cleanup_batch)
+        self._record_observers: list[Callable[[], None]] = []
         self._self_turn_observers: list[Callable[[SelfTurnPresentation, str], None]] = []
 
     @property
     def conversation_records(self) -> tuple[ConversationRecord, ...]:
         return self._model.records
+
+    def observe_records(self, callback: Callable[[], None]) -> Callable[[], None]:
+        self._record_observers.append(callback)
+        return lambda: self._record_observers.remove(callback)
+
+    def _notify_records_changed(self) -> None:
+        for callback in tuple(self._record_observers):
+            callback()
 
     def observe_self_turns(
         self, callback: Callable[[SelfTurnPresentation, str], None]
@@ -311,7 +332,7 @@ class ConversationHistory:
         cleaned_translation = translated_text.strip() if isinstance(translated_text, str) else None
         if not cleaned_source and not cleaned_translation:
             return
-        self._model.append(
+        changed = self._model.append(
             ConversationRecord(
                 timestamp_label=_format_conversation_timestamp(origin_wall_clock_ms),
                 source=source.strip() or ("Listen" if channel == "peer" else "Mic"),
@@ -330,8 +351,11 @@ class ConversationHistory:
                 peer_history_removals=peer_history_removals,
             )
         )
+        if changed:
+            self._notify_records_changed()
 
     def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
-        self._model.update_self_turn(snapshot, source=source)
+        if self._model.update_self_turn(snapshot, source=source):
+            self._notify_records_changed()
         for callback in tuple(self._self_turn_observers):
             callback(snapshot, source)

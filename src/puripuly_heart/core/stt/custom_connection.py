@@ -37,7 +37,7 @@ _STREAM_CONNECT_TIMEOUT_S = 5.0
 _SESSION_READY_EVENT_TYPES = frozenset({"session.created", "session.updated"})
 
 
-def pcm16le_to_wav(pcm16le: bytes, *, sample_rate_hz: int) -> bytes:
+def pcm16le_to_wav(pcm16le: bytes | bytearray, *, sample_rate_hz: int) -> bytes:
     buffer = io.BytesIO()
     with wave.open(buffer, "wb") as handle:
         handle.setnchannels(1)

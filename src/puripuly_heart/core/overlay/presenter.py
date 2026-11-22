@@ -298,12 +298,21 @@ class OverlayPresenter(OverlaySink):
             if existing is not None:
                 return existing
             self._expire_closed_entries(now=self.clock.now())
+            self._discard_revoked_peer_pending()
             event = self._acceptance.normalize_sequence(event, self._entries)
+            registration = self._peer_registration_context.get(event.event_id)
+            replaces_expired_preview = (
+                registration is not None
+                and registration.generation == event.turn_generation
+                and self._acceptance.can_replace_expired_peer_preview(event)
+            )
             peer_fragments = self._presentation_state.peer_fragment_plan(
                 event, translation_enabled=self.translation_enabled
             )
             rejection_reason = self._application_rejection_reason(
-                event, peer_fragments=peer_fragments
+                event,
+                peer_fragments=peer_fragments,
+                replaces_expired_preview=replaces_expired_preview,
             )
             if rejection_reason is not None:
                 receipt = OverlayApplicationReceipt(
@@ -343,8 +352,15 @@ class OverlayPresenter(OverlaySink):
                 )
                 self._acceptance.remember_receipt(receipt_event, receipt)
 
+            if replaces_expired_preview:
+                self._acceptance.consume_expired_peer_preview(
+                    self._entry_key(event.channel, event.utterance_id)
+                )
             await self._emit_serialized(
-                event, peer_fragments=peer_fragments, on_accepted=remember_application
+                event,
+                peer_fragments=peer_fragments,
+                on_accepted=remember_application,
+                replaces_expired_preview=replaces_expired_preview,
             )
             return receipt
 
@@ -496,6 +512,7 @@ class OverlayPresenter(OverlaySink):
                 and entry.peer_pending
                 and not entry.caption_staged
                 and not entry.peer_dormant
+                and (entry.peer_preview_is_current is None or entry.peer_preview_is_current())
             ),
             key=lambda entry: entry.appearance_seq,
             default=None,
@@ -568,6 +585,7 @@ class OverlayPresenter(OverlaySink):
         *,
         peer_fragments: PeerFragmentPlan | None = None,
         on_accepted: Callable[[], None] | None = None,
+        replaces_expired_preview: bool = False,
     ) -> None:
         key = (event.channel, event.utterance_id)
         previous = self._entries.get(key)
@@ -582,6 +600,8 @@ class OverlayPresenter(OverlaySink):
         changed = self._apply_event(event, peer_fragments=peer_fragments)
         entry = self._entries.get(key)
         registration = self._peer_registration_context.get(event.event_id)
+        if isinstance(event, TranslationStreamUpdate) and entry is not None:
+            entry.peer_preview_is_current = event.peer_preview_is_current
         if registration is not None and entry is not None:
             entry.peer_publication_generation = registration.generation
             entry.peer_is_current = registration.is_current
@@ -600,7 +620,7 @@ class OverlayPresenter(OverlaySink):
                     if entry.peer_pending:
                         entry.visible_since = None
                         entry.last_meaningful_visible_at = None
-                if registration.started_at is not None:
+                if registration.started_at is not None and not replaces_expired_preview:
                     entry.peer_registered_at = registration.started_at
         self._acceptance.record_entry_ordering(event, self._entries)
         attribution_only = (
@@ -619,15 +639,24 @@ class OverlayPresenter(OverlaySink):
             on_accepted()
 
     def _application_rejection_reason(
-        self, event: OverlayEventUnion, *, peer_fragments: PeerFragmentPlan | None = None
+        self,
+        event: OverlayEventUnion,
+        *,
+        peer_fragments: PeerFragmentPlan | None = None,
+        replaces_expired_preview: bool = False,
     ) -> str | None:
-        self._discard_revoked_peer_pending()
         registration = self._peer_registration_context.get(event.event_id)
         if registration is not None and (
             registration.generation <= self._retired_peer_generation
             or (registration.is_current is not None and not registration.is_current())
         ):
             return "publication_revoked"
+        if (
+            isinstance(event, TranslationStreamUpdate)
+            and event.peer_preview_is_current is not None
+            and not event.peer_preview_is_current()
+        ):
+            return "peer_preview_expired"
         entry = self._entries.get((event.channel, event.utterance_id))
         if (
             entry is not None
@@ -660,6 +689,7 @@ class OverlayPresenter(OverlaySink):
             self._entries,
             closed=self._closing or self._closed,
             peer_fragments=peer_fragments,
+            replaces_expired_preview=replaces_expired_preview,
         )
 
     async def update_calibration(self, calibration: OverlayCalibration) -> None:
@@ -1521,12 +1551,23 @@ class OverlayPresenter(OverlaySink):
     def _record_removed_entry(self, record: OverlayEntryRemovalRecord) -> None:
         key = record.key
         entry = record.entry
-        if entry.peer_parent_id is not None:
+        if isinstance(entry, PeerFragmentRegistration):
             return
-        self._acceptance.retire_entry(key)
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:
             self._acceptance.remember_scene_terminal(key, record.reason)
+            lifetime = entry.peer_preview_lifetime
+            if (
+                lifetime is not None
+                and lifetime.is_frozen_at(record.now)
+                and not entry.peer_preview_was_evicted
+                and not entry.retained_hidden
+                and entry.closed_seq is None
+                and self._peer_parent_is_current(entry)
+            ):
+                self._acceptance.remember_expired_peer_preview(
+                    key, lifetime, revision=entry.peer_caption_revision, seq=entry.last_updated_seq
+                )
         if record.reason in {
             "evicted_by_newer_turn",
             "absorbed_by_repair",
@@ -1538,6 +1579,7 @@ class OverlayPresenter(OverlaySink):
             self._acceptance.remember_scene_terminal(key, record.reason)
         if seq is not None:
             self._acceptance.remember_tombstone(key, seq)
+        self._acceptance.retire_entry(key)
 
     def _cancel_expiration_task(self, key: tuple[str, UUID]) -> None:
         task = self._expiration_tasks.pop(key, None)

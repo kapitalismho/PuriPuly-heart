@@ -42,7 +42,7 @@ def _noise(count: int, *, start: int = 0) -> str:
 def test_plain_append_is_read_incrementally(tmp_path: Path) -> None:
     path = tmp_path / _LOG_NAME
     path.write_text("first\nsecond\n", encoding="utf-8")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
 
     assert tailer.begin_replay(path) == ["first", "second"]
 
@@ -55,7 +55,7 @@ def test_plain_append_is_read_incrementally(tmp_path: Path) -> None:
 def test_same_name_replacement_is_still_detected(tmp_path: Path) -> None:
     path = tmp_path / _LOG_NAME
     path.write_text("first\nsecond\nthird\n", encoding="utf-8")
-    tailer = VrchatSceneLogTailer(tmp_path)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
     assert tailer.begin_replay(path) == ["first", "second", "third"]
 
     path.write_text("replacement\n", encoding="utf-8")

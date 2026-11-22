@@ -1092,17 +1092,16 @@ impl WindowsCaptionRenderer {
         &mut self,
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
-        role: LineRole,
+        key: &LineCacheKey,
         diagnostics: &mut RenderDiagnostics,
     ) -> Result<ID2D1CommandList, CaptionRenderError> {
-        let key = self.line_cache_key(block, line, role);
-        if let Some(cached) = self.caches.line_cache.get(&key) {
+        if let Some(cached) = self.caches.line_cache.get(key) {
             diagnostics.line_cache_hits += 1;
             return Ok(cached.clone());
         }
         diagnostics.line_cache_misses += 1;
         let cached = self.build_cached_line_visual(block, line)?;
-        self.caches.line_cache.insert(key, cached.clone());
+        self.caches.line_cache.insert(key.clone(), cached.clone());
         Ok(cached)
     }
 
@@ -1296,7 +1295,7 @@ impl WindowsCaptionRenderer {
                     continue;
                 }
                 let visual = self
-                    .cached_line_visual(block, line, role, diagnostics)
+                    .cached_line_visual(block, line, &key, diagnostics)
                     .map_err(|error| prefix_render_error("line_cache_build", error))?;
                 prepared.lines.insert(key, visual);
             }
@@ -2798,8 +2797,9 @@ mod tests {
         for channel in [CaptionChannel::SelfChannel, CaptionChannel::PeerChannel] {
             block.channel = Some(channel);
             for role in [LineRole::Primary, LineRole::Secondary] {
+                let key = renderer.line_cache_key(&block, &line, role);
                 let visual = renderer
-                    .cached_line_visual(&block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, &key, &mut diagnostics)
                     .unwrap();
                 let bounds = unsafe { renderer.d2d_context.GetImageLocalBounds(&visual) }.unwrap();
                 let pixel_equivalent_bytes = f64::from(bounds.right - bounds.left)
@@ -2807,7 +2807,7 @@ mod tests {
                     * 4.0;
                 assert!(pixel_equivalent_bytes > 64.0 * 1024.0 * 1024.0);
                 renderer
-                    .cached_line_visual(&block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, &key, &mut diagnostics)
                     .unwrap();
             }
         }

@@ -209,9 +209,11 @@ class LocalCppSTTBackend(LocalOfflineSTTBackend):
 
 
 def _write_audio(path: Path, samples: np.ndarray) -> None:
-    pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    clipped = np.clip(samples, -1.0, 1.0)
+    clipped *= 32767.0
+    pcm = clipped.astype("<i2", order="C")
     with wave.open(str(path), "wb") as output:
         output.setnchannels(1)
         output.setsampwidth(2)
         output.setframerate(16000)
-        output.writeframes(pcm.tobytes())
+        output.writeframes(memoryview(pcm).cast("B"))

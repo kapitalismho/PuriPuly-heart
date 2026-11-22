@@ -4,6 +4,7 @@ import sys
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import TYPE_CHECKING
 
 from puripuly_heart.config.process_capture_resolution import (
@@ -25,8 +26,16 @@ _WATCH_POLL_INTERVAL_S = 0.05
 _WATCH_JOIN_TIMEOUT_S = 0.5
 
 
-def default_current_user_process_snapshots() -> CurrentUserProcessSnapshotPort:
+def default_current_user_process_snapshots(
+    *, windows_executable_basename: str | None = None
+) -> CurrentUserProcessSnapshotPort:
     if sys.platform == "win32":
+        if windows_executable_basename is not None:
+            return WindowsCurrentUserProcessSnapshots(
+                scan=partial(
+                    snapshot_windows_processes, executable_basename=windows_executable_basename
+                )
+            )
         return WindowsCurrentUserProcessSnapshots()
     return PsutilCurrentUserProcessSnapshots()
 

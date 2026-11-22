@@ -212,12 +212,13 @@ class PhotoCaptureWatcher:
                 while chunk := stream.read(65536):
                     self._log_offset += len(chunk)
                     text = self._pending_line + self._decoder.decode(chunk)
-                    lines = text.split("\n")
-                    self._pending_line = lines.pop()[-8192:]
-                    for line in lines:
-                        if _CAMERA_SIGNAL not in line:
-                            continue
-                        raw = line.split(_CAMERA_SIGNAL, 1)[1].strip().strip('"\r')
+                    complete_end = text.rfind("\n") + 1
+                    self._pending_line = text[max(complete_end, len(text) - 8192) :]
+                    start = 0
+                    while (signal := text.find(_CAMERA_SIGNAL, start, complete_end)) != -1:
+                        line_end = text.index("\n", signal, complete_end)
+                        raw = text[signal + len(_CAMERA_SIGNAL) : line_end].strip().strip('"\r')
+                        start = line_end + 1
                         candidate = Path(raw)
                         if candidate.is_absolute() and candidate.suffix.lower() == ".png":
                             self._pending_paths.setdefault(candidate.resolve(), now)

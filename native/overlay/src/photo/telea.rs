@@ -114,10 +114,17 @@ pub struct Workspace {
 pub fn inpaint(
     mut output: RgbImage,
     mask: &GrayImage,
+    [mask_x, mask_y]: [u32; 2],
     radius: u32,
     workspace: &mut Workspace,
 ) -> Result<RgbImage, &'static str> {
-    if output.dimensions() != mask.dimensions() || output.width() == 0 || output.height() == 0 {
+    if output.width() == 0
+        || output.height() == 0
+        || mask_x > output.width()
+        || mask.width() > output.width() - mask_x
+        || mask_y > output.height()
+        || mask.height() > output.height() - mask_y
+    {
         return Err("telea_invalid_dimensions");
     }
     let width = output.width() as usize;
@@ -125,7 +132,9 @@ pub fn inpaint(
     let stride = width + 2;
     let rows = height + 2;
     let radius = radius.clamp(1, 100) as usize;
-    if !mask.as_raw().iter().any(|&value| value != 0) {
+    let mask_width = mask.width() as usize;
+    let mask_pixels = &mask.as_raw()[..mask_width * mask.height() as usize];
+    if !mask_pixels.iter().any(|&value| value != 0) {
         return Ok(output);
     }
     workspace.distance_weights.extend(
@@ -151,13 +160,10 @@ pub fn inpaint(
         horizontal,
         distance_weights,
     } = workspace;
-    for y in 0..height {
-        for x in 0..width {
-            state[(y + 1) * stride + x + 1] = if mask.as_raw()[y * width + x] != 0 {
-                INSIDE
-            } else {
-                0
-            };
+    for (y, row) in mask_pixels.chunks_exact(mask_width).enumerate() {
+        let start = (mask_y as usize + y + 1) * stride + mask_x as usize + 1;
+        for (cell, &value) in state[start..start + mask_width].iter_mut().zip(row) {
+            *cell = if value != 0 { INSIDE } else { 0 };
         }
     }
     let mut order = 0;

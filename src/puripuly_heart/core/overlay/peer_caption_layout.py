@@ -3,6 +3,7 @@ from __future__ import annotations
 import unicodedata
 
 PEER_LINE_WIDTH_EM = (4096 - 2 * (48 + 24 + 5)) / 132 * 0.95
+_MAX_CHAR_WIDTH_EM = 1.15
 _SOURCE_TARGET_LENGTH_RATIOS = {("en", "ko"): 0.856, ("ko", "en"): 1.617}
 
 
@@ -11,7 +12,7 @@ def _caption_char_width_em(char: str) -> float:
     if char.isspace():
         return 0.32
     if 0x1F000 <= codepoint <= 0x1FAFF:
-        return 1.15
+        return _MAX_CHAR_WIDTH_EM
     if (
         0x1100 <= codepoint <= 0x11FF
         or 0x3040 <= codepoint <= 0x30FF
@@ -91,6 +92,8 @@ def peer_translation_fragments(text: str, *, text_scale: float = 1.0) -> tuple[s
     if not text:
         return ()
     width_limit = PEER_LINE_WIDTH_EM / max(1.0, text_scale)
+    if (len(text) + 1) * _MAX_CHAR_WIDTH_EM <= width_limit and "\n" not in text:
+        return (text.rstrip("\r"),)
     widths, raw_ends, line_ends = _wrap_bounds(text, width_limit)
     size = len(text)
     line_counts = [0] * (size + 1)

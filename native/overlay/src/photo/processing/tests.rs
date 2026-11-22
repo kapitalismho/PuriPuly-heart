@@ -118,6 +118,30 @@ fn long_side_tiles_cover_the_edge_and_keep_dimensionless_overlap() {
 }
 
 #[test]
+fn mask_input_resize_preserves_planar_bytes_for_offset_and_clamped_tiles() {
+    let source = RgbImage::from_fn(301, 139, |x, y| {
+        Rgb([
+            (x * 17 + y * 29) as u8,
+            (x * 11 + y * 7 + 53) as u8,
+            (x * 3 + y * 19 + x * y) as u8,
+        ])
+    });
+    let mut actual = vec![0; MODEL_SIZE * MODEL_SIZE * 3];
+    for ([x, y, width, height], expected) in [
+        ([2, 7, 1, 1], 0x12e2_d47e_d73c_2325),
+        ([3, 5, 19, 7], 0x42a5_770b_0dfe_3c42),
+        ([11, 1, 13, 27], 0x07b7_9262_4219_b9aa),
+        ([4, 4, 293, 131], 0xde37_fe74_a7f2_05b5),
+    ] {
+        resize_tile(&source, PixelRect { x, y, width, height }, &mut actual);
+        let fnv1a = actual.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, &byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+        });
+        assert_eq!(fnv1a, expected, "tile ({x}, {y}, {width}, {height})");
+    }
+}
+
+#[test]
 fn overlapping_tile_masks_threshold_after_interpolation_and_clip_fractional_boxes() {
     let roi = PixelRect {
         x: 10,
@@ -393,7 +417,7 @@ fn selected_model_prepare_and_refresh_share_actual_scale_erase_support() {
         let expected = erase_patch(
             &work,
             region.roi,
-            &dilate(&core, radius, true),
+            &dilate(&region.recovered, radius, true),
             &work.pixels,
             &mut workspace,
         )
@@ -469,10 +493,10 @@ fn telea_rejects_mismatch_and_leaves_unmasked_image_unchanged() {
     let mut workspace = telea::Workspace::default();
     let image = RgbImage::from_fn(17, 15, |x, y| Rgb([x as u8 * 10, y as u8 * 10, 70]));
     assert_eq!(
-        telea::inpaint(image.clone(), &GrayImage::new(17, 15), 5, &mut workspace).unwrap(),
+        telea::inpaint(image.clone(), &GrayImage::new(17, 15), [0, 0], 5, &mut workspace).unwrap(),
         image
     );
-    assert!(telea::inpaint(image, &GrayImage::new(16, 15), 5, &mut workspace).is_err());
+    assert!(telea::inpaint(image, &GrayImage::new(16, 15), [2, 0], 5, &mut workspace).is_err());
 }
 #[test]
 #[ignore = "requires controlled offline OpenCV reference fixtures via PURI_PHOTO340_REFERENCE"]
@@ -498,6 +522,7 @@ fn rust_telea_matches_controlled_opencv_reference() {
         let actual = telea::inpaint(
             source.clone(),
             &mask,
+            [0, 0],
             case["radius"].as_u64().unwrap() as u32,
             &mut workspace,
         )
@@ -851,13 +876,14 @@ fn telea_keeps_owned_storage_and_resets_workspace_across_masks_sizes_and_radii()
         let expected = telea::inpaint(
             source.clone(),
             &mask,
+            [0, 0],
             radius,
             &mut telea::Workspace::default(),
         )
         .unwrap();
         let owned = source.clone();
         let allocation = owned.as_raw().as_ptr();
-        let actual = telea::inpaint(owned, &mask, radius, &mut workspace).unwrap();
+        let actual = telea::inpaint(owned, &mask, [0, 0], radius, &mut workspace).unwrap();
         assert_eq!(actual.as_raw().as_ptr(), allocation);
         assert_eq!(actual, expected);
         assert_eq!(mask, original_mask);
@@ -866,6 +892,30 @@ fn telea_keeps_owned_storage_and_resets_workspace_across_masks_sizes_and_radii()
                 assert_eq!(pixel, source.get_pixel(x, y));
             }
         }
+    }
+}
+
+#[test]
+fn telea_inset_mask_matches_explicit_padding_at_interior_and_edges() {
+    let source = RgbImage::from_fn(21, 15, |x, y| {
+        Rgb([(x * 11 + y * 7) as u8, (y * 17) as u8, (x * y) as u8])
+    });
+    let mut workspace = telea::Workspace::default();
+    for (offset, radius, masked) in [
+        ([5, 3], 4, true),
+        ([14, 9], 2, true),
+        ([5, 3], 4, false),
+        ([0, 0], 3, true),
+    ] {
+        let mask = GrayImage::from_fn(7, 6, |x, y| {
+            Luma([if masked && (x + y * 2) % 5 < 2 { 13 } else { 0 }])
+        });
+        let mut padded = GrayImage::new(source.width(), source.height());
+        imageops::replace(&mut padded, &mask, i64::from(offset[0]), i64::from(offset[1]));
+        let expected =
+            telea::inpaint(source.clone(), &padded, [0, 0], radius, &mut workspace).unwrap();
+        let actual = telea::inpaint(source.clone(), &mask, offset, radius, &mut workspace).unwrap();
+        assert_eq!(actual, expected, "mask at {offset:?}, radius {radius}");
     }
 }
 

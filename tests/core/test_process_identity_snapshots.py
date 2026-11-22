@@ -110,6 +110,12 @@ def test_default_snapshots_follow_platform(monkeypatch) -> None:
         process_identity.default_current_user_process_snapshots(),
         process_identity.PsutilCurrentUserProcessSnapshots,
     )
+    assert isinstance(
+        process_identity.default_current_user_process_snapshots(
+            windows_executable_basename="vrchat.exe"
+        ),
+        process_identity.PsutilCurrentUserProcessSnapshots,
+    )
 
 
 def test_snapshot_scan_uses_one_bulk_parent_lookup(monkeypatch) -> None:

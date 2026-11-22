@@ -134,9 +134,9 @@ describe('upstream response streaming', () => {
     expect(database.writes[0].slice(2, 10)).toEqual([100, 0, 0, 0, 20, 0, 1, 0]);
   });
 
-  it('rejects an unfinished event at EOF without publishing a completed response', async () => {
+  it.each([' {"type":"response.completed"}', ''])('rejects an unfinished event with data suffix %j at EOF', async (suffix) => {
     const text = 'data: {"type":"response.output_text.delta","delta":"Provisional."}\n\n'
-      + 'data: {"type":"response.completed"}\n';
+      + `data:${suffix}\n`;
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(text, { headers: { 'content-type': 'text/event-stream' } }));
     const database = usageDatabase();
     expect(await relayEvents(await relay.fetch(request(), { ...testEnv(), AGENT_USAGE_DB: database.db }))).toEqual([

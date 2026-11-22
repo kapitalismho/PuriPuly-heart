@@ -61,6 +61,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
@@ -561,6 +562,28 @@ class PeerTranslationChannelOwner:
         )
         await self.handle_stt_event(
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
+        )
+
+    async def handle_recognition_preview_deadline(
+        self, event: STTRecognitionPreviewDeadline
+    ) -> None:
+        stream = event.stream
+        provider_id = stream.recognizer_id or (
+            str(stream.settings_scope[0]) if stream.settings_scope else ""
+        )
+        if (
+            not self._accepting_events
+            or stream.channel != "peer"
+            or provider_id != "gemini_transcribe"
+        ):
+            return
+        remembered = self._native_caption_orders.get(event.unit_id)
+        if remembered is not None and remembered[0] != stream:
+            return
+        await self.cloud_captions.set_preview_deadline(
+            event.unit_id,
+            scope=(stream.activation_generation, stream.capture_epoch, stream.provider_epoch_id),
+            expires_at_s=event.expires_at_s,
         )
 
     async def handle_recognition_unit_terminal(self, event: STTRecognitionUnitTerminal) -> None:
