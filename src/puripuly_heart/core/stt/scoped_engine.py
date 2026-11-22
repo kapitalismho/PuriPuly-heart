@@ -63,7 +63,7 @@ from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 logger = logging.getLogger(__name__)
 
 _GEMINI_PEER_PREVIEW_GRACE_S = 0.6
-_GEMINI_PEER_END_PAUSE_S = 0.5
+_GEMINI_PEER_END_PAUSE_MS = 500
 
 _CLOUD_TURN_PROVIDERS = frozenset(
     {
@@ -226,6 +226,7 @@ class _ActiveTurn:
     independent_recognition: bool = False
     pending_update: STTProviderTurnUpdate | None = None
     unit_suffix: str = ""
+    source_frontier: int | None = None
 
 
 @dataclass(slots=True)
@@ -249,6 +250,7 @@ class _StreamRecovery:
     pending: bool = True
     require_speech: bool = False
     resume_pre_roll: bool = False
+    preview_stalled: bool = False
 
 
 @dataclass(slots=True)
@@ -534,6 +536,19 @@ class ScopedRecognitionEngine:
                         return
                     session = self._session
                     if (
+                        recovery.preview_stalled
+                        and owned.settings.provider_id == "rolling_free"
+                        and authority_generation == self._authority_generation
+                        and self._recovery_matches(recovery, owned)
+                        and self._provider_epoch_id is not None
+                        and session is not None
+                        and (
+                            not isinstance(session, STTIndependentRecognitionSession)
+                            or not session.independent_recognition_units
+                        )
+                    ):
+                        return
+                    if (
                         authority_generation != self._authority_generation
                         or not self._recovery_matches(recovery, owned)
                         or not isinstance(session, STTIndependentRecognitionSession)
@@ -712,18 +727,24 @@ class ScopedRecognitionEngine:
         recovery = self._stream_recovery
         if recovery is None or not ranges:
             return samples, ranges
-        frontier = recovery.source_frontier
+        skipped, remaining = self._source_after_frontier(ranges, recovery.source_frontier)
+        return samples[skipped:], remaining
+
+    @staticmethod
+    def _source_after_frontier(
+        ranges: tuple[AudioCaptureSpan, ...], frontier: int
+    ) -> tuple[int, tuple[AudioCaptureSpan, ...]]:
         skipped = 0
         remaining: list[AudioCaptureSpan] = []
         for span in ranges:
             start, end = span.normalized_start_sample, span.normalized_end_sample
             if start is None or end is None:
-                return samples, ranges
+                return 0, ranges
             left = min(end, max(start, frontier))
             skipped += left - start
             if left < end:
                 remaining.append(span if left == start else span.slice_normalized(left, end))
-        return samples[skipped:], tuple(remaining)
+        return skipped, tuple(remaining)
 
     def _register_recognition_stream(
         self, stream: RecognitionStreamIdentity, settings: AudioSegmentSettingsSnapshot
@@ -1172,6 +1193,20 @@ class ScopedRecognitionEngine:
         independent = isinstance(session, STTIndependentRecognitionSession) and (
             session.independent_recognition_units
         )
+        recovery = self._stream_recovery
+        source_frontier = None
+        if (
+            not independent
+            and recovery is not None
+            and recovery.preview_stalled
+            and settings.provider_id == "rolling_free"
+            and recovery.authority_generation == authority_generation
+            and recovery.stream.activation_generation == identity.segment.activation_generation
+            and recovery.stream.capture_epoch == identity.segment.capture_epoch
+            and recovery.settings == settings
+        ):
+            recovery.pending = False
+            source_frontier = recovery.source_frontier
         turn = _ActiveTurn(
             identity=identity,
             settings=settings,
@@ -1191,6 +1226,7 @@ class ScopedRecognitionEngine:
             failure_version=self._failure_version,
             retention_budget=(owned.retention.budget if owned.retention is not None else None),
             independent_recognition=independent,
+            source_frontier=source_frontier,
         )
         self._turn = turn
         self._turns[identity] = turn
@@ -1220,6 +1256,12 @@ class ScopedRecognitionEngine:
                     identity=identity,
                     settings=settings,
                     channel=self.channel,
+                    recognition_fence_clock=(
+                        self.monotonic_clock
+                        if self._is_gemini_peer_turn(identity)
+                        and getattr(session, "ordered_recognition_seals", False)
+                        else None
+                    ),
                 )
             ),
         ):
@@ -1290,28 +1332,40 @@ class ScopedRecognitionEngine:
             and session is not None
             and self._has_write_authority(session, turn)
         ):
-            open_unit_id = self._unit_state.open_unit_id
+            gemini_peer = turn.independent_recognition and self._is_gemini_peer_turn(turn.identity)
+            observed_pause_ms = event.trailing_silence_ms
+            if gemini_peer and owned.segment.delivery_pause_s is not None:
+                observed_pause_ms = int(owned.segment.delivery_pause_s * 1000)
+            content_ranges = owned.segment.content_ranges
+            if turn.source_frontier is not None:
+                _, content_ranges = self._source_after_frontier(content_ranges, turn.source_frontier)
             sent = await self._run_write(
                 session,
                 turn,
                 "seal",
                 session.seal_turn(
                     turn.identity,
-                    sealed_content_ranges=owned.segment.content_ranges,
+                    sealed_content_ranges=content_ranges,
                     seal_reason=str(event.reason),
-                    observed_trailing_silence_ms=event.trailing_silence_ms,
+                    observed_trailing_silence_ms=observed_pause_ms,
                 ),
             )
             if turn.independent_recognition:
                 if sent:
                     turn.unit_suffix = self._seal_recognition_units(str(event.reason))
-                    await self._apply_peer_preview_end(owned, event, turn, open_unit_id)
                 if sent and not turn.terminal_ready.done():
                     turn.terminal_ready.set_result(
                         STTProviderInputTerminal(
                             turn.identity, "submitted", self.channel, independent_recognition=True
                         )
                     )
+                if (
+                    sent
+                    and gemini_peer
+                    and not getattr(session, "ordered_recognition_seals", False)
+                    and self._qualifying_preview_end(event.reason, observed_pause_ms)
+                ):
+                    await self._apply_peer_preview_end(self.monotonic_clock())
                 if not turn.terminal_ready.done():
                     self._set_turn_failure(turn, "provider_input_submission_failed")
                 await self._drain_completed_turns()
@@ -1332,38 +1386,36 @@ class ScopedRecognitionEngine:
             self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
         await self._drain_completed_turns()
 
-    async def _apply_peer_preview_end(
-        self, owned: OwnedVadEvent, event: SpeechEnd, turn: _ActiveTurn, open_unit_id: UUID | None
-    ) -> None:
+    def _is_gemini_peer_turn(self, identity: STTProviderTurnIdentity) -> bool:
+        return self.channel == "peer" and (
+            identity.recognizer_id or identity.settings_scope[0]
+        ) == "gemini_transcribe"
+
+    @staticmethod
+    def _qualifying_preview_end(reason: str, pause_ms: int | None) -> bool:
+        return (
+            reason in {"silence", "delivery_pause"}
+            and pause_ms is not None
+            and pause_ms >= _GEMINI_PEER_END_PAUSE_MS
+        )
+
+    async def _apply_peer_preview_end(self, written_at_s: float) -> None:
         stream = self._recognition_stream
         state = self._unit_state
-        if (
-            self.channel != "peer"
-            or (turn.identity.recognizer_id or turn.settings.provider_id) != "gemini_transcribe"
-            or open_unit_id is None
-            or state.open_unit_id != open_unit_id
-            or stream is None
-            or event.reason not in {"silence", "delivery_pause"}
-        ):
+        open_unit_id = state.open_unit_id
+        if stream is None or open_unit_id is None:
             return
-        pause_s = owned.segment.delivery_pause_s
-        if pause_s is None:
-            pause_s = event.trailing_silence_ms / 1000
-        if pause_s < _GEMINI_PEER_END_PAUSE_S:
-            return
-        now = self.monotonic_clock()
         if state.preview_expires_at_s is None:
-            state.preview_expires_at_s = now + _GEMINI_PEER_PREVIEW_GRACE_S
+            state.preview_expires_at_s = written_at_s + _GEMINI_PEER_PREVIEW_GRACE_S
             await self._emit(
                 STTRecognitionPreviewDeadline(stream, open_unit_id, state.preview_expires_at_s)
             )
-        elif now >= state.preview_expires_at_s:
-            self._retire_current_session(
-                turn.watchdogs,
-                reason="gemini_preview_stalled",
-                resume_stream=True,
-                require_speech=True,
-            )
+        elif written_at_s >= state.preview_expires_at_s:
+            async with self._input_lock:
+                if self._recognition_stream == stream:
+                    await self._end_current_session(
+                        reason="gemini_preview_stalled", require_speech=True
+                    )
 
     async def _send_payload(
         self,
@@ -1386,6 +1438,11 @@ class ScopedRecognitionEngine:
                 await self.abort(reason="stream_input_ownership_changed")
                 return
             samples, source_ranges = self._after_stream_failure(samples, source_ranges)
+        elif turn.source_frontier is not None:
+            skipped, source_ranges = self._source_after_frontier(
+                source_ranges, turn.source_frontier
+            )
+            samples = samples[skipped:]
         if (
             turn.independent_recognition
             and source_ranges
@@ -2084,14 +2141,28 @@ class ScopedRecognitionEngine:
                     await self._accept_speaker_evidence(event, epoch_id)
                     continue
                 turn = self._turns.get(event.identity)
-                if turn is None:
-                    continue
                 if isinstance(event, STTProviderInputTerminal):
-                    if not turn.independent_recognition or turn.terminal_ready.done():
-                        continue
-                    turn.terminal_ready.set_result(event)
-                    if event.outcome != "submitted":
-                        await self._drain_completed_turns()
+                    if (
+                        turn is not None
+                        and turn.independent_recognition
+                        and not turn.terminal_ready.done()
+                    ):
+                        turn.terminal_ready.set_result(event)
+                        if event.outcome != "submitted":
+                            await self._drain_completed_turns()
+                    fence = event.audio_fence
+                    if (
+                        fence is not None
+                        and epoch_id == self._provider_epoch_id == event.identity.provider_epoch_id
+                        and event.outcome == "submitted"
+                        and self._is_gemini_peer_turn(event.identity)
+                        and self._qualifying_preview_end(
+                            fence.reason, fence.observed_trailing_silence_ms
+                        )
+                    ):
+                        await self._apply_peer_preview_end(fence.written_at_s)
+                    continue
+                if turn is None:
                     continue
                 if isinstance(event, STTProviderTurnUpdate):
                     if (
@@ -2930,8 +3001,11 @@ class ScopedRecognitionEngine:
         ):
             recovery.pending = True
             recovery.require_speech = require_speech
+            recovery.preview_stalled = reason == "gemini_preview_stalled"
             recovery.resume_pre_roll = (
-                reason == "provider_idle_timeout" and require_speech and not failed
+                reason in {"provider_idle_timeout", "gemini_preview_stalled"}
+                and require_speech
+                and not failed
             )
             if failed:
                 self._episode_failures += 1
@@ -3039,6 +3113,7 @@ class ScopedRecognitionEngine:
         *,
         reason: str = "provider_session_lifetime_exceeded",
         resume_stream: bool = True,
+        require_speech: bool = False,
         failed: bool = False,
         failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
@@ -3082,7 +3157,12 @@ class ScopedRecognitionEngine:
             turn.write_failed = True
         for task in self._operation_tasks.get(id(session), ()):
             task.cancel()
-        self._retire_current_session(reason=reason, resume_stream=resume_stream, failed=failed)
+        self._retire_current_session(
+            reason=reason,
+            resume_stream=resume_stream,
+            require_speech=require_speech,
+            failed=failed,
+        )
         for turn in turns:
             await self._finish_failed_turn_immediately(turn)
 

@@ -68,6 +68,9 @@ class STTProviderTurnRequest:
     identity: STTProviderTurnIdentity
     settings: AudioSegmentSettingsSnapshot
     channel: Literal["self", "peer"] = "peer"
+    recognition_fence_clock: Callable[[], float] | None = field(
+        default=None, compare=False, repr=False
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,6 +304,13 @@ class STTProviderEpochEnded:
 
 
 @dataclass(frozen=True, slots=True)
+class STTProviderAudioFence:
+    written_at_s: float
+    reason: str
+    observed_trailing_silence_ms: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderInputTerminal:
     identity: STTProviderTurnIdentity
     outcome: Literal["submitted", "failed", "expired", "cancelled"]
@@ -310,6 +320,7 @@ class STTProviderInputTerminal:
     channel_availability: STTChannelAvailability = STTChannelAvailability.UNAVAILABLE
     failure_diagnostics: ErrorDiagnostics | None = None
     independent_recognition: bool = False
+    audio_fence: STTProviderAudioFence | None = None
 
     def __post_init__(self) -> None:
         if self.outcome in {"submitted", "cancelled"}:

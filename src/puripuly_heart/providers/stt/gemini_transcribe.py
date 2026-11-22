@@ -21,6 +21,7 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
+    STTProviderAudioFence,
     STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -47,10 +48,12 @@ GEMINI_TRANSCRIBE_DRAIN_TIMEOUT_S = 2.0
 GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S = 9.0 * 60.0
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _EndStream:
     reason: str
     completion: asyncio.Future[None]
+    recognition_clock: Callable[[], float] | None = None
+    written_at_s: float | None = field(init=False, default=None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -407,6 +410,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     allows_sealed_turn_overlap: ClassVar[bool] = True
     accepts_stream_input: ClassVar[bool] = True
     independent_recognition_units: ClassVar[bool] = True
+    ordered_recognition_seals: ClassVar[bool] = True
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -640,6 +644,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 if isinstance(item, _EndStream):
                     if self._audio_since_fence:
                         await self._send_realtime(audio_stream_end=True)
+                        if item.recognition_clock is not None:
+                            item.written_at_s = item.recognition_clock()
                         self._audio_since_fence = False
                 else:
                     self._queued_audio_bytes -= len(item.pcm16le)
@@ -1032,13 +1038,26 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if self._sealing:
             raise RuntimeError("Gemini scoped input is already sealing")
         self._sealing = True
-        await self._enqueue(_EndStream(seal_reason, asyncio.get_running_loop().create_future()))
+        fence = _EndStream(
+            seal_reason, asyncio.get_running_loop().create_future(), request.recognition_fence_clock
+        )
+        await self._enqueue(fence)
         if sealed_content_ranges and not self._input_map.covers(sealed_content_ranges):
             raise RuntimeError("Gemini sealed input contains unsubmitted audio")
         self._event_projection.seal(identity)
         self._event_projection.terminal(
             STTProviderInputTerminal(
-                identity, "submitted", request.channel, independent_recognition=True
+                identity,
+                "submitted",
+                request.channel,
+                independent_recognition=True,
+                audio_fence=(
+                    STTProviderAudioFence(
+                        fence.written_at_s, seal_reason, observed_trailing_silence_ms
+                    )
+                    if fence.written_at_s is not None
+                    else None
+                ),
             )
         )
         self._scoped_request = None
