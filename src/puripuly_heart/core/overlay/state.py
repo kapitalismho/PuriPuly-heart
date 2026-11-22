@@ -1455,7 +1455,9 @@ class OverlayPresentationState:
         entry.translation_text = event.text
         entry.peer_caption_revision = event.peer_caption_revision
         entry.peer_caption_final = isinstance(event, TranslationFinal)
-        entry.peer_preview_lifetime = None if entry.peer_caption_final else event.peer_preview_lifetime
+        entry.peer_preview_lifetime = (
+            None if entry.peer_caption_final else event.peer_preview_lifetime
+        )
         entry.peer_publication_id = event.event_id
         if revision is not None:
             entry.peer_lineage = revision.lineage

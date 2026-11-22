@@ -2621,7 +2621,11 @@ class TranslationOutputProjectionOwner:
             )
 
     async def project_peer_caption(
-        self, submission: TranslationOutputSubmission, *, overlay_projected: bool = False
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        overlay_projected: bool = False,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.channel != "peer" or submission.peer_caption_revision < 1:
             raise ValueError("Peer caption publication requires revision identity")
@@ -2630,7 +2634,7 @@ class TranslationOutputProjectionOwner:
         if not preview and submission.source_text.strip():
             self._record_conversation_submission(submission)
         if not overlay_projected:
-            await self.project_peer_overlay(submission)
+            await self.project_peer_overlay(submission, peer_preview_lifetime=peer_preview_lifetime)
         if not preview and submission.source_text.strip():
             transcript = Transcript(
                 utterance_id=submission.child_utterance_id,

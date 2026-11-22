@@ -891,13 +891,14 @@ async def test_expired_peer_preview_does_not_revive_disallowed_outputs(condition
         preview = replace(
             caption(1, unit, text, final=False), peer_preview_lifetime=lifetime, **scope
         )
-        assert (await presenter.register_peer_caption(preview, publication_generation=1)).outcome == (
-            "applied"
-        )
+        receipt = await presenter.register_peer_caption(preview, publication_generation=1)
+        assert receipt.outcome == "applied"
         await timeline.advance(0)
         if condition == "split-evicted":
             await presenter.emit(
-                replace(caption(2, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2)
+                replace(
+                    caption(2, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2
+                )
             )
             await timeline.advance(1)
             assert presenter.peer_fragment_state(unit, 0).departed
@@ -915,7 +916,9 @@ async def test_expired_peer_preview_does_not_revive_disallowed_outputs(condition
             ).outcome == "applied"
         elif condition == "stale-order":
             await presenter.emit(
-                replace(caption(3, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2)
+                replace(
+                    caption(3, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2
+                )
             )
             await timeline.advance(8)
         elif condition == "generation-retired":

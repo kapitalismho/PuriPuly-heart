@@ -588,7 +588,7 @@ class PeerCaptionOwner:
         self.abandon(utterance_id)
         caption.revision += 1
         await self.output.supersede_peer_caption_previews((utterance_id,))
-        await self.output.project_peer_overlay(
+        await self.output.project_peer_caption(
             TranslationOutputSubmission(
                 caption.utterance_id,
                 caption.utterance_id,

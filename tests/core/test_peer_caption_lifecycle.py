@@ -17,7 +17,10 @@ from puripuly_heart.core.orchestrator.peer_caption import join_action, preview_s
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
-from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
+from puripuly_heart.core.overlay.peer_caption_layout import (
+    estimate_peer_translation_lines,
+    peer_translation_fragments,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
@@ -1503,18 +1506,24 @@ async def test_frozen_gemini_preview_expires_visually_then_native_final_renders_
         assert presenter.snapshot().blocks == []
         assert presenter.peer_fragment_states(unit_id) == ()
         assert harness.peer_runtime.translation_history == []
-        stale_preview = await presenter.emit(caption(100, unit_id, "stale", revision=99, final=False))
+        stale_preview = await presenter.emit(
+            caption(100, unit_id, "stale", revision=99, final=False)
+        )
         assert stale_preview.outcome == "stale"
 
         await final(harness, settled, provider="gemini_transcribe")
         await idle(harness)
         blocks = presenter.snapshot().blocks
-        assert [block.primary_text for block in blocks] == list(peer_translation_fragments(final_text))
+        assert [block.primary_text for block in blocks] == list(
+            peer_translation_fragments(final_text)
+        )
         assert blocks[0].id == block_id
         assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
         shown = len(surface.snapshots)
         await final(harness, settled, provider="gemini_transcribe")
-        stale_preview = await presenter.emit(caption(101, unit_id, "stale", revision=99, final=False))
+        stale_preview = await presenter.emit(
+            caption(101, unit_id, "stale", revision=99, final=False)
+        )
         await idle(harness)
         assert stale_preview.outcome == "stale"
         assert len(surface.snapshots) == shown
@@ -1523,7 +1532,9 @@ async def test_frozen_gemini_preview_expires_visually_then_native_final_renders_
         await preview_timeline.advance(8.01)
         assert presenter.snapshot().blocks == []
         await final(harness, settled, provider="gemini_transcribe")
-        stale_preview = await presenter.emit(caption(102, unit_id, "stale", revision=99, final=False))
+        stale_preview = await presenter.emit(
+            caption(102, unit_id, "stale", revision=99, final=False)
+        )
         await idle(harness)
         assert stale_preview.outcome == "stale"
         assert presenter.snapshot().blocks == []
