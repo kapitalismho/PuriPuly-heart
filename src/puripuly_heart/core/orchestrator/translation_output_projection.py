@@ -39,6 +39,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     OverlayPublicationScope,
     OverlaySink,
+    PeerPreviewLifetime,
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputPublicationResult, OutputRuntime
@@ -1242,12 +1243,15 @@ class TranslationOutputProjectionOwner:
         early: bool = False,
         cancellation_requested: Callable[[], bool] | None = None,
         peer_preview_is_current: Callable[[], bool] | None = None,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.peer_caption_revision > 0:
             if cancellation_requested is not None and cancellation_requested():
                 raise asyncio.CancelledError
             await self._project_peer_caption_overlay(
-                submission, peer_preview_is_current=peer_preview_is_current
+                submission,
+                peer_preview_is_current=peer_preview_is_current,
+                peer_preview_lifetime=peer_preview_lifetime,
             )
             return
         key = (submission.parent_utterance_id, submission.sequence)
@@ -2571,6 +2575,7 @@ class TranslationOutputProjectionOwner:
         submission: TranslationOutputSubmission,
         *,
         peer_preview_is_current: Callable[[], bool] | None,
+        peer_preview_lifetime: PeerPreviewLifetime | None,
     ) -> None:
         preview = submission.peer_request_kind == "preview"
         translation = submission.translation
@@ -2609,6 +2614,7 @@ class TranslationOutputProjectionOwner:
                     event,
                     peer_lineage_revision=submission.peer_lineage_revision,
                     peer_preview_is_current=peer_preview_is_current,
+                    peer_preview_lifetime=peer_preview_lifetime,
                 ),
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,

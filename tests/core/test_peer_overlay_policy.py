@@ -17,6 +17,7 @@ from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
 from puripuly_heart.core.overlay.sink import (
     PeerCaptionAdmissionPort,
     PeerCaptionLayoutPort,
+    PeerPreviewLifetime,
     SelfActiveUpdate,
     TranslationFinal,
     TranslationStreamUpdate,
@@ -858,5 +859,110 @@ async def test_superseding_final_uses_remaining_original_caption_admission_budge
         assert stale.outcome == "stale"
         assert presenter.application_receipt(preview_receipt.publication_id) is preview_receipt
         assert presenter.application_receipt(final_receipt.publication_id) is final_receipt
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("condition", "cause"),
+    [
+        ("unfrozen", "stale"),
+        ("non-gemini", "stale"),
+        ("split-evicted", "stale"),
+        ("retired", "stale"),
+        ("stale-order", "stale"),
+        ("generation-retired", "publication_revoked"),
+        ("revoked", "publication_revoked"),
+    ],
+)
+async def test_expired_peer_preview_does_not_revive_disallowed_outputs(condition, cause):
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    unit = uuid4()
+    lifetime = (
+        None
+        if condition == "non-gemini"
+        else PeerPreviewLifetime(None if condition == "unfrozen" else 0.6)
+    )
+    text = "가" * 64 if condition == "split-evicted" else "preview"
+    scope = dict(turn_kind="peer", turn_generation=1, turn_order=1)
+    try:
+        preview = replace(
+            caption(1, unit, text, final=False), peer_preview_lifetime=lifetime, **scope
+        )
+        assert (await presenter.register_peer_caption(preview, publication_generation=1)).outcome == (
+            "applied"
+        )
+        await timeline.advance(0)
+        if condition == "split-evicted":
+            await presenter.emit(
+                replace(caption(2, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2)
+            )
+            await timeline.advance(1)
+            assert presenter.peer_fragment_state(unit, 0).departed
+            assert not presenter.peer_fragment_state(unit, 1).departed
+            await timeline.advance(7.01)
+        else:
+            await timeline.advance(8)
+        assert presenter.peer_fragment_states(unit) == ()
+        if condition == "retired":
+            retirement = replace(
+                caption(3, unit, "", revision=2, source=""), peer_preview_lifetime=lifetime, **scope
+            )
+            assert (
+                await presenter.register_peer_caption(retirement, publication_generation=1)
+            ).outcome == "applied"
+        elif condition == "stale-order":
+            await presenter.emit(
+                replace(caption(3, uuid4(), "newer"), turn_kind="peer", turn_generation=1, turn_order=2)
+            )
+            await timeline.advance(8)
+        elif condition == "generation-retired":
+            presenter.retire_peer_generation(1)
+        before = presenter.snapshot().blocks
+        settled = replace(
+            caption(4, unit, "final", revision=3), peer_preview_lifetime=lifetime, **scope
+        )
+        result = await presenter.register_peer_caption(
+            settled, publication_generation=1, is_current=lambda: condition != "revoked"
+        )
+        assert result.cause == cause
+        assert presenter.snapshot().blocks == before
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_frozen_preview_final_revises_surviving_fragment_without_replaying_expired_head():
+    timeline = Timeline()
+    presenter = presenter_for(timeline)
+    unit = uuid4()
+    lifetime = PeerPreviewLifetime(1.6)
+    scope = dict(turn_kind="peer", turn_generation=1, turn_order=1, peer_preview_lifetime=lifetime)
+    text = "가" * 64
+    head = peer_translation_fragments(text)[0].replace("\n", "")
+    try:
+        await presenter.register_peer_caption(
+            replace(caption(1, unit, head, final=False), **scope), publication_generation=1
+        )
+        await timeline.advance(1)
+        await presenter.register_peer_caption(
+            replace(caption(2, unit, text, revision=2, final=False), **scope),
+            publication_generation=1,
+        )
+        assert presenter.peer_fragment_state(unit, 0).expires_at == 8
+        tail = presenter.peer_fragment_state(unit, 1)
+        assert tail.expires_at == 9
+        await timeline.advance(7.01)
+        assert [block.id for block in presenter.snapshot().blocks] == [tail.id]
+        final_text = "나" * 64
+        result = await presenter.register_peer_caption(
+            replace(caption(3, unit, final_text, revision=3), **scope), publication_generation=1
+        )
+        assert result.outcome == "applied"
+        assert [(block.id, block.primary_text) for block in presenter.snapshot().blocks] == [
+            (tail.id, peer_translation_fragments(final_text)[1])
+        ]
     finally:
         await presenter.close()

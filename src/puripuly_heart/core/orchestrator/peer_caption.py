@@ -33,7 +33,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     _translation_turn_child_id,
 )
 from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
-from puripuly_heart.core.overlay.sink import PeerCaptionLineage, PeerCaptionRevision
+from puripuly_heart.core.overlay.sink import (
+    PeerCaptionLineage,
+    PeerCaptionRevision,
+    PeerPreviewLifetime,
+)
 from puripuly_heart.core.speaker_identity import (
     PeerSpeakerIdentityAllocator,
     native_peer_attribution,
@@ -214,8 +218,12 @@ class _Segment:
     timer: asyncio.Task[None] | None = None
     pending: str | None = None
     closed: bool = False
-    preview_deadline_at: float | None = None
+    preview_lifetime: PeerPreviewLifetime | None = None
     preview_frozen: bool = False
+
+    @property
+    def preview_deadline_at(self) -> float | None:
+        return self.preview_lifetime.deadline_at if self.preview_lifetime is not None else None
 
 
 @dataclass(slots=True)
@@ -361,14 +369,15 @@ class PeerCaptionOwner:
         if segment is None:
             self._preview_deadlines.setdefault(utterance_id, (scope, expires_at_s))
             return
+        lifetime = segment.preview_lifetime
         if (
-            segment.caption.provider_id != "gemini_transcribe"
+            lifetime is None
             or segment.caption.scope != scope
             or segment.closed
             or segment.preview_deadline_at is not None
         ):
             return
-        segment.preview_deadline_at = expires_at_s
+        lifetime.deadline_at = expires_at_s
         if not self._preview_is_current(segment):
             await self._freeze_preview(segment)
             return
@@ -462,7 +471,9 @@ class PeerCaptionOwner:
                 started + 5.0,
                 transcript.text,
                 config,
-                preview_deadline_at=deadline,
+                preview_lifetime=(
+                    PeerPreviewLifetime(deadline) if provider_id == "gemini_transcribe" else None
+                ),
             )
             self._segments[transcript.utterance_id] = segment
             self._preview_deadlines.pop(transcript.utterance_id, None)
@@ -540,6 +551,7 @@ class PeerCaptionOwner:
                 assignment=segment.caption.speaker_assignment,
                 admitted=segment.caption.admitted,
                 predecessor=segment.caption.predecessor,
+                peer_preview_lifetime=segment.preview_lifetime,
             )
 
     def abandon(self, utterance_id: UUID) -> None:
@@ -576,7 +588,7 @@ class PeerCaptionOwner:
         self.abandon(utterance_id)
         caption.revision += 1
         await self.output.supersede_peer_caption_previews((utterance_id,))
-        await self.output.project_peer_caption(
+        await self.output.project_peer_overlay(
             TranslationOutputSubmission(
                 caption.utterance_id,
                 caption.utterance_id,
@@ -593,7 +605,8 @@ class PeerCaptionOwner:
                 peer_caption_revision=caption.revision,
                 peer_superseded_unit_ids=caption.superseded,
                 speaker_assignment=caption.speaker_assignment,
-            )
+            ),
+            peer_preview_lifetime=segment.preview_lifetime,
         )
 
     async def retire_epoch(self, provider_epoch_id: str) -> None:
@@ -983,6 +996,14 @@ class PeerCaptionOwner:
                 detected_language=request_language,
                 admitted=request_admission,
                 predecessor=request_predecessor,
+                peer_preview_lifetime=(
+                    segment.preview_lifetime
+                    if segment is not None
+                    and caption is segment.caption
+                    and caption.provider_id == provider_id
+                    and caption.scope == scope
+                    else None
+                ),
             ),
             f"peer:{kind}:{caption.utterance_id}:{revision}",
         )
@@ -1492,6 +1513,7 @@ class PeerCaptionOwner:
         *,
         admitted: asyncio.Event,
         predecessor: asyncio.Event | None,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         epoch = self._epoch
         scribe_plan = caption.scribe_family is not None
@@ -1599,6 +1621,7 @@ class PeerCaptionOwner:
                     if segment is not None and caption.provider_id == "gemini_transcribe"
                     else None
                 ),
+                peer_preview_lifetime=peer_preview_lifetime,
             )
             if predecessor is not None and not admitted.is_set():
                 await predecessor.wait()
