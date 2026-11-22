@@ -4749,6 +4749,77 @@ async def test_ordered_gemini_fence_resolves_final_before_stall_retirement(
 
 
 @pytest.mark.asyncio
+async def test_ordered_gemini_fence_does_not_arm_first_post_write_interim(monkeypatch) -> None:
+    from tests.helpers.scoped_provider_sessions import (
+        _FakeGeminiLive,
+        _gemini_message,
+        _gemini_session,
+    )
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    start, chunk, end = segment_events(ledger, start_sample=0, now=100, trailing_silence_ms=500)
+    clock = ControlledMonotonicClock(value=100.0)
+    wire_entered = asyncio.Event()
+    release_wire = asyncio.Event()
+    emitted: list[STTProviderTurnEvent] = []
+    connections = []
+    original_send = _FakeGeminiLive.send_realtime_input
+
+    async def send_realtime_input(live, **options):
+        if options.get("audio_stream_end"):
+            wire_entered.set()
+            await release_wire.wait()
+        await original_send(live, **options)
+
+    monkeypatch.setattr(_FakeGeminiLive, "send_realtime_input", send_realtime_input)
+
+    async def factory(_settings, epoch):
+        session, live = await _gemini_session(epoch=epoch)
+        connections.append(live)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        event_sink=emitted.append,
+        monotonic_clock=clock.now,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=2.0),
+    )
+    sealing = None
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        live = connections[0]
+        sealing = asyncio.create_task(engine.handle_owned_vad_event(end))
+        await asyncio.wait_for(wire_entered.wait(), 1)
+        interim = _gemini_message(interim="first post-write preview")
+        release_wire.set()
+        live.push(interim)
+        await asyncio.wait_for(sealing, 1)
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+
+        clock.value += 0.7
+        live.push(_gemini_message(interim="post-write preview grows"))
+        live.push(_gemini_message(final="native final"))
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
+        assert sum(item.get("audio_stream_end", False) for item in live.sent) == 1
+        assert not any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted)
+        partials = [e for e in emitted if isinstance(e, STTRecognitionUnit)]
+        assert [e.text for e in partials] == [
+            "first post-write preview",
+            "post-write preview grows",
+        ]
+        finals = [e.unit for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]
+        assert [(unit.identity.unit_id, unit.text) for unit in finals] == [
+            (partials[0].identity.unit_id, "native final")
+        ]
+    finally:
+        release_wire.set()
+        if sealing is not None:
+            await asyncio.gather(sealing, return_exceptions=True)
+        await engine.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("previous_unit", [False, True], ids=["first-unit", "successor"])
 async def test_ordered_gemini_fence_arms_unit_open_at_write_with_absolute_grace(
     monkeypatch, previous_unit: bool
