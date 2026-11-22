@@ -536,6 +536,7 @@ async def test_lists_return_to_the_end_or_to_the_last_read_position():
     tasks = []
 
     class Listing:
+        reverse = False
         on_scroll = None
         scroll_interval = None
 
@@ -553,12 +554,12 @@ async def test_lists_return_to_the_end_or_to_the_last_read_position():
     memory.restore()
     await asyncio.gather(*tasks)
     assert calls == [-1, -1]
-    memory._scrolled(SimpleNamespace(pixels=120.0, max_scroll_extent=600.0))
+    memory.remember(SimpleNamespace(pixels=120.0, max_scroll_extent=600.0))
     memory.follow()
     memory.restore()
     await asyncio.gather(*tasks)
     assert calls == [-1, -1, 120.0]
-    memory._scrolled(SimpleNamespace(pixels=590.0, max_scroll_extent=600.0))
+    memory.remember(SimpleNamespace(pixels=590.0, max_scroll_extent=600.0))
     memory.follow()
     await asyncio.gather(*tasks)
     assert calls[-1] == -1
@@ -639,6 +640,59 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
     assert tasks == []
     view._open_history()
     assert texts(view._history_list.controls[-1])[0] == "arrived while closed"
+    await asyncio.gather(*tasks)
+    view.will_unmount()
+
+
+@pytest.mark.asyncio
+async def test_history_scrolls_to_older_turns_and_keeps_the_reader_on_reopen(monkeypatch):
+    from puripuly_heart.core.conversation_history import ConversationHistory
+
+    monkeypatch.setattr(agent_chat, "HISTORY_PAGE_ROWS", 3)
+    history = ConversationHistory()
+
+    def add(i, revision=1):
+        history.append_conversation_record(
+            source="Listen",
+            channel="peer",
+            utterance_id=str(i),
+            source_text=f"turn {i} rev {revision}",
+            translated_text=None,
+            peer_caption_revision=revision,
+        )
+
+    for i in range(9):
+        add(i)
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
+
+    def visible_rows():
+        rows = view._history_list.controls
+        if view._history_list.reverse:
+            rows = reversed(rows)
+        return [texts(row)[0] for row in rows]
+
+    def scroll(offset, extent):
+        view._history_list.on_scroll(
+            SimpleNamespace(pixels=offset, max_scroll_extent=extent, viewport_dimension=100)
+        )
+
+    view._open_history()
+    assert visible_rows() == [f"turn {i} rev 1" for i in (6, 7, 8)]
+    scroll(100, 180)
+    scroll(300, 380)
+    assert visible_rows() == [f"turn {i} rev 1" for i in range(9)]
+    view._close_history()
+    add(4, revision=2)
+    add(9)
+    view._open_history()
+    assert view._history_scroll.offset == 300
+    assert visible_rows()[4] == "turn 4 rev 2"
+    assert visible_rows()[-1] == "turn 8 rev 1"
+    scroll(0, 380)
+    assert visible_rows()[-1] == "turn 9 rev 1"
+    view._close_history()
+    view._open_history()
+    assert visible_rows() == [f"turn {i} rev 1" for i in (7, 8, 9)]
     await asyncio.gather(*tasks)
     view.will_unmount()
 

@@ -68,6 +68,8 @@ For loss with unflushed resampler input, check that the previously admitted tail
 
 **Example — visible Conversation History:** Open History, deliver Self and Peer turns, then revise one Peer translation. Check that the row changes in place, the Self row is unchanged, and leaving and reopening History picks up turns delivered while away. To measure idle work rather than just unchanged pixels, count history projections over a quiet interval separately.
 
+**Populated History entry:** In an isolated desktop app, seed a known set of short, numbered Self/Peer turns (for example, 20 and 1,250). From the Agent tab click History, go back, and click it again without changing the records. Measure mouse release to the first visible change of the History header, not transition completion or just the Python callback. Check that the latest turn is visible, scroll upward past the initially loaded rows, and reopen from there: the same text should remain at the same position. Deliver a correction and a new turn while away; check the correction where it belongs and the new turn when returning to the bottom. Use generated records, not workstation transcripts.
+
 **Prerequisites:** Actual desktop GUI for desktop claims; built native runtime plus SteamVR/headset for VR presentation; VRChat and configured OSC for game presentation. Desktop and VR renderers need their own observations. Prepared Self text does not establish microphone/ASR. Compose with [settings](#settings-and-application-management) for settings-triggered layout effects.
 
 ## Image translation
