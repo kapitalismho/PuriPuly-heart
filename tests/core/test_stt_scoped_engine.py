@@ -4689,7 +4689,9 @@ async def test_ordered_gemini_fence_resolves_final_before_stall_retirement(
         await wait_until(lambda: any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted))
 
         clock.value = 101.0
-        start, chunk, end = segment_events(ledger, start_sample=10, now=101, trailing_silence_ms=500)
+        start, chunk, end = segment_events(
+            ledger, start_sample=10, now=101, trailing_silence_ms=500
+        )
         await engine.handle_owned_vad_event(start)
         await engine.handle_owned_vad_event(chunk)
         second_end = True
@@ -4718,9 +4720,9 @@ async def test_ordered_gemini_fence_resolves_final_before_stall_retirement(
             clock.value = 102.0
             live.push(_gemini_message(interim="independent preview still growing"))
             await wait_until(lambda: engine._last_receipt_sequence == 4)
-            assert [
-                e.unit_id for e in emitted if isinstance(e, STTRecognitionPreviewDeadline)
-            ] == [partial.identity.unit_id]
+            assert [e.unit_id for e in emitted if isinstance(e, STTRecognitionPreviewDeadline)] == [
+                partial.identity.unit_id
+            ]
             assert [e.text for e in emitted if isinstance(e, STTRecognitionUnit)][-2:] == [
                 "opened after acknowledgement",
                 "independent preview still growing",
@@ -4892,11 +4894,15 @@ async def test_ordered_gemini_fence_arms_unit_open_at_write_with_absolute_grace(
         session, live = sessions[0]
         if previous_unit:
             live.push(_gemini_message(final="previous final"))
-            await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
+            await wait_until(
+                lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted)
+            )
         live.push(_gemini_message(interim="opens during write"))
         await asyncio.wait_for(preview_held.wait(), 1)
         partial = next(
-            e for e in emitted if isinstance(e, STTRecognitionUnit) and e.text == "opens during write"
+            e
+            for e in emitted
+            if isinstance(e, STTRecognitionUnit) and e.text == "opens during write"
         )
         assert not sealing.done()
         assert not any(
@@ -4975,9 +4981,7 @@ async def test_stalled_gemini_unit_resumes_only_with_fresh_speech() -> None:
         await engine.handle_stream_input(
             replace(
                 fresh,
-                event=replace(
-                    fresh.event, pre_roll=pre_roll, pre_roll_capture=(span(18, 18, 22),)
-                ),
+                event=replace(fresh.event, pre_roll=pre_roll, pre_roll_capture=(span(18, 18, 22),)),
             )
         )
         assert len(sessions) == 2

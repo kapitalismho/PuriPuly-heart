@@ -1335,7 +1335,9 @@ class ScopedRecognitionEngine:
                 observed_pause_ms = int(owned.segment.delivery_pause_s * 1000)
             content_ranges = owned.segment.content_ranges
             if turn.source_frontier is not None:
-                _, content_ranges = self._source_after_frontier(content_ranges, turn.source_frontier)
+                _, content_ranges = self._source_after_frontier(
+                    content_ranges, turn.source_frontier
+                )
             sent = await self._run_write(
                 session,
                 turn,
@@ -1377,9 +1379,10 @@ class ScopedRecognitionEngine:
         await self._drain_completed_turns()
 
     def _is_gemini_peer_turn(self, identity: STTProviderTurnIdentity) -> bool:
-        return self.channel == "peer" and (
-            identity.recognizer_id or identity.settings_scope[0]
-        ) == "gemini_transcribe"
+        return (
+            self.channel == "peer"
+            and (identity.recognizer_id or identity.settings_scope[0]) == "gemini_transcribe"
+        )
 
     @staticmethod
     def _qualifying_preview_end(reason: str, pause_ms: int | None) -> bool:
