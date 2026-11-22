@@ -103,12 +103,13 @@ class _ScrollMemory:
     def __init__(self, listing: ft.ListView, run: Callable[[Callable[[], object]], object]) -> None:
         self.listing = listing
         self.offset = 0.0
+        self.extent = 0.0
         self.at_end = True
         self._run = run
-        listing.scroll_interval = 100
 
     def remember(self, event) -> None:
         self.offset = float(event.pixels)
+        self.extent = float(event.max_scroll_extent)
         self.at_end = (
             event.pixels <= SCROLL_END_SLACK
             if self.listing.reverse
@@ -119,9 +120,18 @@ class _ScrollMemory:
         if self.at_end:
             self._run(partial(self._scroll, 0 if self.listing.reverse else -1))
 
-    def restore(self) -> None:
-        offset = (0 if self.listing.reverse else -1) if self.at_end else self.offset
-        self._run(partial(self._scroll, offset, wait=True))
+    @property
+    def restore_offset(self) -> float:
+        if self.at_end:
+            return 0 if self.listing.reverse else -1
+        if self.listing.reverse:
+            return min(0.0, self.offset - self.extent) - 1
+        return self.offset
+
+    def restore(self, *, offset: float | None = None, wait: bool = True) -> None:
+        if offset is None:
+            offset = self.restore_offset
+        self._run(partial(self._scroll, offset, wait=wait))
 
     async def _scroll(self, offset: float, *, wait: bool = False) -> None:
         if wait:
@@ -193,14 +203,26 @@ class AgentChatView(ft.Row):
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
             expand=True,
         )
+        self._history_content = ft.Column(
+            spacing=14, tight=True, on_size_change=self._history_resized
+        )
         self._history_list = ft.ListView(
-            expand=True, spacing=14, on_size_change=self._history_viewport_resized
+            [self._history_content],
+            expand=True,
+            build_controls_on_demand=False,
+            padding=0,
+            scroll_interval=-1,
+            on_scroll=self._history_scrolled,
+            on_size_change=self._history_viewport_resized,
         )
         self._history_scroll = _ScrollMemory(self._history_list, self._run)
-        self._history_list.on_scroll = self._history_scrolled
         self._history_projection: list[HistoryRow] = []
         self._history_end = 0
         self._history_limit = HISTORY_PAGE_ROWS
+        self._history_min_rows = HISTORY_PAGE_ROWS
+        self._history_content_height: float | None = None
+        self._history_viewport_height: float | None = None
+        self._history_layout_restore: float | None = None
         self._history_keys: tuple[HistoryRow, ...] = ()
         self._history_rows: dict[str, tuple[HistoryRow, ft.Control]] = {}
         self._history_panel: ft.Container | None = None
@@ -256,8 +278,6 @@ class AgentChatView(ft.Row):
         if self._history_open and self._left_key == "history":
             self._history_card()
         self._render(self._owner.snapshot)
-        if self._history_open:
-            self._history_scroll.restore()
 
     def will_unmount(self) -> None:
         self._mounted = False
@@ -737,11 +757,14 @@ class AgentChatView(ft.Row):
             back_text.value = t("agent_chat.back")
             back_text.color = COLOR_SECONDARY
         if self._history_scroll.at_end:
-            self._history_limit = HISTORY_PAGE_ROWS
-        self._refresh_history()
+            self._history_limit = self._history_min_rows
+        self._refresh_history(entering=True)
         return self._history_panel
 
-    def _refresh_history(self) -> bool:
+    def _refresh_history(self, *, entering: bool = False) -> None:
+        previous = self._history_keys
+        reverse = self._history_list.reverse
+        restore_offset = self._history_scroll.restore_offset
         history_owner = self._hooks.conversation_history
         history = [
             row
@@ -751,34 +774,96 @@ class AgentChatView(ft.Row):
         end = len(history)
         if self._history_scroll.at_end or not history:
             self._history_list.reverse = end > HISTORY_PAGE_ROWS
-        elif self._history_list.reverse and self._history_keys:
-            end = next(
+        elif self._history_list.reverse and previous:
+            surviving_end = next(
                 (i + 1 for i in range(end - 1, -1, -1) if history[i].key in self._history_rows),
-                min(end, self._history_limit),
+                0,
             )
+            end = max(surviving_end, min(end, self._history_min_rows))
         self._history_projection = history
         self._history_end = end
-        return self._show_history_window()
+        changed = self._show_history_window() or reverse != self._history_list.reverse
+        if not entering and not changed:
+            return
+        self._history_layout_restore = None
+        current = self._history_keys
+        same_oldest = previous and current and previous[0].key == current[0].key
+        same_latest = previous and current and previous[-1].key == current[-1].key
+        if self._history_scroll.at_end:
+            if entering:
+                self._history_scroll.restore()
+            else:
+                update_control_if_mounted(self._history_list)
+                self._history_scroll.follow()
+            return
+        if not same_oldest and not same_latest:
+            restore_offset = -1 if self._history_list.reverse else 0
+        elif not same_oldest:
+            restore_offset = self._history_scroll.offset
+        if entering:
+            self._history_scroll.restore(offset=restore_offset)
+        else:
+            if same_oldest and self._history_list.reverse:
+                self._history_layout_restore = restore_offset
+            update_control_if_mounted(self._history_list)
+            if not same_oldest and not same_latest:
+                self._history_scroll.restore(offset=restore_offset)
+
+    def _history_resized(self, event: ft.LayoutSizeChangeEvent) -> None:
+        if not self._mounted:
+            return
+        extent = self._history_scroll.extent
+        self._history_content_height = event.height
+        self._measure_history_extent()
+        offset = self._history_layout_restore
+        self._history_layout_restore = None
+        if self._left_key != "history":
+            return
+        if offset is not None and extent != self._history_scroll.extent:
+            self._history_scroll.restore(offset=offset, wait=False)
+
+    def _measure_history_extent(self) -> None:
+        content = self._history_content_height
+        viewport = self._history_viewport_height
+        if content is not None and viewport is not None:
+            self._history_scroll.extent = max(0.0, content - viewport)
 
     def _history_viewport_resized(self, event: ft.LayoutSizeChangeEvent) -> None:
-        if not self._history_list.reverse or not self._mounted or self._left_key != "history":
+        if not self._mounted:
             return
-        minimum = int(event.height // HISTORY_MIN_ROW_HEIGHT) + 2
-        if self._history_limit < minimum:
-            self._history_limit = minimum
-            if self._show_history_window():
-                update_control_if_mounted(self._history_list)
+        self._history_viewport_height = event.height
+        self._measure_history_extent()
+        if self._left_key != "history":
+            return
+        self._history_min_rows = max(
+            HISTORY_PAGE_ROWS, int(event.height // HISTORY_MIN_ROW_HEIGHT) + 2
+        )
+        if not self._history_list.reverse:
+            return
+        self._history_limit = max(self._history_limit, self._history_min_rows)
+        end = self._history_end
+        self._history_end = max(end, min(len(self._history_projection), self._history_min_rows))
+        if self._show_history_window():
+            update_control_if_mounted(self._history_list)
+            if self._history_end > end:
+                self._history_scroll.restore()
 
     def _history_scrolled(self, event: ft.OnScrollEvent) -> None:
         if not self._mounted or not self._history_open or self._left_key != "history":
             return
+        self._history_layout_restore = None
+        self._history_viewport_height = event.viewport_dimension
         self._history_scroll.remember(event)
         if not self._history_list.reverse:
             return
-        if self._history_scroll.at_end and self._history_end < len(self._history_projection):
+        returning = self._history_scroll.at_end and self._history_end < len(
+            self._history_projection
+        )
+        if returning:
             self._history_end = len(self._history_projection)
         elif (
-            self._history_limit < self._history_end
+            (event.scroll_delta or 0) > 0
+            and self._history_limit < self._history_end
             and event.max_scroll_extent - event.pixels <= event.viewport_dimension
         ):
             self._history_limit += HISTORY_PAGE_ROWS
@@ -786,12 +871,14 @@ class AgentChatView(ft.Row):
             return
         if self._show_history_window():
             update_control_if_mounted(self._history_list)
+            if returning:
+                self._history_scroll.follow()
 
     def _show_history_window(self) -> bool:
         history = self._history_projection
         if self._history_list.reverse:
             end = self._history_end
-            keys = tuple(reversed(history[max(0, end - self._history_limit) : end]))
+            keys = tuple(history[max(0, end - self._history_limit) : end])
         else:
             keys = tuple(history)
         if keys == self._history_keys:
@@ -807,7 +894,7 @@ class AgentChatView(ft.Row):
             rows[row.key] = (row, control)
             controls.append(control)
         self._history_rows = rows
-        self._history_list.controls = controls
+        self._history_content.controls = controls
         return True
 
     def _history_row(self, row: HistoryRow) -> ft.Control:
@@ -892,9 +979,7 @@ class AgentChatView(ft.Row):
                 await asyncio.sleep(delay)
             if self._history_open and self._mounted:
                 self._last_history_refresh = loop.time()
-                if self._refresh_history():
-                    update_control_if_mounted(self._history_list)
-                    self._history_scroll.follow()
+                self._refresh_history()
         finally:
             self._history_refresh_pending = False
 
@@ -905,7 +990,6 @@ class AgentChatView(ft.Row):
         self._observe_history()
         self._render_left(self._snapshot)
         update_control_if_mounted(self._switcher)
-        self._history_scroll.restore()
 
     def _close_history(self) -> None:
         self._history_open = False

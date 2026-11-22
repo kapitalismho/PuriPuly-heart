@@ -46,7 +46,7 @@ def trace_history_entries():
             raise
         elapsed = (perf_counter() - entry[1]) * 1000
         print(
-            f"HISTORY_TIMING click={entry[0]} attached_rows={len(view._history_list.controls)} "
+            f"HISTORY_TIMING click={entry[0]} attached_rows={len(view._history_rows)} "
             f"handler_start_at_ms={(entry[1] - started) * 1000:.1f} handler_ms={elapsed:.1f}",
             file=sys.stderr,
             flush=True,

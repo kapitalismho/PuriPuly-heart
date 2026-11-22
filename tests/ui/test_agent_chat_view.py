@@ -518,7 +518,7 @@ def test_history_card_shows_manual_original_and_translation_as_one_bubble():
         )
     view = AgentChatView(Owner(snapshot()), AgentChatHooks(conversation_history=logs))
     view._open_history()
-    (row,) = view._history_list.controls
+    (row,) = view._history_content.controls
     assert [text for text in texts(row) if text != row_time(row)] == ["안녕", "你好"]
     source, translation = agent_chat._texts(row)[:2]
     assert source.font_family == font_for_language("ko")
@@ -537,8 +537,6 @@ async def test_lists_return_to_the_end_or_to_the_last_read_position():
 
     class Listing:
         reverse = False
-        on_scroll = None
-        scroll_interval = None
 
         async def scroll_to(self, offset):
             calls.append(offset)
@@ -600,7 +598,7 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
     view, tasks = view_for(Owner(snapshot()), conversation_history=history)
     view._open_history()
     await asyncio.gather(*tasks)
-    (first,) = view._history_list.controls
+    (first,) = view._history_content.controls
     tasks.clear()
 
     add("a", "duplicate")
@@ -609,13 +607,13 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
     add("b", "revised", revision=2)
     assert len(tasks) == 1
     await asyncio.gather(*tasks)
-    assert view._history_list.controls[0] is first
-    assert texts(view._history_list.controls[1])[0] == "revised"
+    assert view._history_content.controls[0] is first
+    assert texts(view._history_content.controls[1])[0] == "revised"
 
     add("b", "newer", revision=3)
     view.will_unmount()
     await asyncio.gather(*tasks)
-    assert texts(view._history_list.controls[1])[0] == "revised"
+    assert texts(view._history_content.controls[1])[0] == "revised"
     tasks.clear()
     add("c", "arrived offscreen")
     assert tasks == []
@@ -623,7 +621,7 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
 
     def record_update(control):
         if control is view:
-            remount_rows.extend(texts(row)[0] for row in view._history_list.controls)
+            remount_rows.extend(texts(row)[0] for row in view._history_content.controls)
 
     monkeypatch.setattr(agent_chat, "update_control_if_mounted", record_update)
     view.did_mount()
@@ -639,26 +637,36 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
     add("d", "arrived while closed")
     assert tasks == []
     view._open_history()
-    assert texts(view._history_list.controls[-1])[0] == "arrived while closed"
+    assert texts(view._history_content.controls[-1])[0] == "arrived while closed"
     await asyncio.gather(*tasks)
     view.will_unmount()
 
 
 @pytest.mark.asyncio
-async def test_history_scrolls_to_older_turns_and_keeps_the_reader_on_reopen(monkeypatch):
+async def test_history_keeps_older_position_after_paging_and_newer_growth(monkeypatch):
     from puripuly_heart.core.conversation_history import ConversationHistory
 
     monkeypatch.setattr(agent_chat, "HISTORY_PAGE_ROWS", 3)
+    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
     history = ConversationHistory()
+    viewport = 80
+    extent = 0
+    offsets = []
 
-    def add(i, revision=1):
+    async def scroll_to(_listing, *, offset):
+        pixels = extent + offset + 1 if offset < 0 else offset
+        offsets.append(pixels)
+
+    monkeypatch.setattr(ft.ListView, "scroll_to", scroll_to)
+
+    def add(i, translation=None):
         history.append_conversation_record(
             source="Listen",
             channel="peer",
             utterance_id=str(i),
-            source_text=f"turn {i} rev {revision}",
-            translated_text=None,
-            peer_caption_revision=revision,
+            source_text=f"turn {i}" if translation is None else None,
+            translated_text=translation,
+            peer_caption_revision=1,
         )
 
     for i in range(9):
@@ -666,33 +674,173 @@ async def test_history_scrolls_to_older_turns_and_keeps_the_reader_on_reopen(mon
     view, tasks = view_for(Owner(snapshot()), conversation_history=history)
 
     def visible_rows():
-        rows = view._history_list.controls
-        if view._history_list.reverse:
-            rows = reversed(rows)
-        return [texts(row)[0] for row in rows]
+        return [texts(row)[0] for row in view._history_content.controls]
 
-    def scroll(offset, extent):
+    def layout(height):
+        nonlocal extent
+        extent = height - viewport
+        view._history_content.on_size_change(SimpleNamespace(height=height))
+
+    def scroll(pixels, delta):
         view._history_list.on_scroll(
-            SimpleNamespace(pixels=offset, max_scroll_extent=extent, viewport_dimension=100)
+            SimpleNamespace(
+                pixels=pixels,
+                max_scroll_extent=extent,
+                viewport_dimension=viewport,
+                scroll_delta=delta,
+            )
         )
 
     view._open_history()
-    assert visible_rows() == [f"turn {i} rev 1" for i in (6, 7, 8)]
-    scroll(100, 180)
-    scroll(300, 380)
-    assert visible_rows() == [f"turn {i} rev 1" for i in range(9)]
+    view._history_list.on_size_change(SimpleNamespace(height=viewport))
+    layout(300)
+    await asyncio.gather(*tasks)
+    assert view._history_list.controls == [view._history_content]
+    assert view._history_list.reverse
+    assert offsets == [0]
+    assert visible_rows() == [f"turn {i}" for i in (6, 7, 8)]
+
+    scroll(160, 160)
+    layout(600)
+    scroll(450, 290)
+    layout(900)
+    assert visible_rows() == [f"turn {i}" for i in range(9)]
+    older_position = extent - 450
+    reader_row = view._history_content.controls[3]
+
     view._close_history()
-    add(4, revision=2)
+    add(8, "A newer bubble received a translation while History was closed. " * 8)
     add(9)
     view._open_history()
-    assert view._history_scroll.offset == 300
-    assert visible_rows()[4] == "turn 4 rev 2"
-    assert visible_rows()[-1] == "turn 8 rev 1"
-    scroll(0, 380)
-    assert visible_rows()[-1] == "turn 9 rev 1"
+    layout(1000)
+    await asyncio.gather(*tasks)
+    assert view._history_content.controls[3] is reader_row
+    assert visible_rows()[-1] == "turn 8"
+    assert len(texts(view._history_content.controls[-1])) == 3
+    assert extent - offsets[-1] == older_position
+
+    scroll(offsets[-1], offsets[-1])
+    tasks.clear()
+    add(7, "Another newer bubble received a translation while History stayed open. " * 8)
+    await asyncio.gather(*tasks)
+    layout(1100)
+    await asyncio.gather(*tasks)
+    assert view._history_content.controls[3] is reader_row
+    assert len(texts(view._history_content.controls[-2])) == 3
+    assert extent - offsets[-1] == older_position
+
+    assert view._history_list.scroll_interval == -1
+    scroll(60, 60 - offsets[-1])
+    assert visible_rows()[-1] == "turn 8"
+    scroll(0, -60)
+    await asyncio.gather(*tasks)
+    assert visible_rows()[-1] == "turn 9"
+    assert offsets[-1] == 0
+
     view._close_history()
     view._open_history()
-    assert visible_rows() == [f"turn {i} rev 1" for i in (7, 8, 9)]
+    assert visible_rows() == [f"turn {i}" for i in (7, 8, 9)]
+    await asyncio.gather(*tasks)
+    view.will_unmount()
+
+
+@pytest.mark.asyncio
+async def test_history_keeps_surviving_reader_position_when_older_rows_are_pruned(monkeypatch):
+    from puripuly_heart.core.conversation_history import ConversationHistory
+
+    monkeypatch.setattr(agent_chat, "HISTORY_PAGE_ROWS", 3)
+    history = ConversationHistory(max_entries=4, cleanup_batch=2)
+    offsets = []
+
+    async def scroll_to(_listing, *, offset):
+        offsets.append(offset)
+
+    monkeypatch.setattr(ft.ListView, "scroll_to", scroll_to)
+
+    def add(i):
+        history.append_conversation_record(
+            source="Listen",
+            channel="peer",
+            utterance_id=str(i),
+            source_text=f"turn {i}",
+            translated_text=None,
+        )
+
+    def scroll(pixels, extent, delta):
+        view._history_list.on_scroll(
+            SimpleNamespace(
+                pixels=pixels,
+                max_scroll_extent=extent,
+                viewport_dimension=80,
+                scroll_delta=delta,
+            )
+        )
+
+    for i in range(5):
+        add(i)
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
+    view._open_history()
+    await asyncio.gather(*tasks)
+    scroll(160, 220, 160)
+    scroll(200, 420, 40)
+    reader_row = view._history_content.controls[2]
+    assert texts(reader_row)[0] == "turn 2"
+
+    view._close_history()
+    add(5)
+    add(6)
+    view._open_history()
+    await asyncio.gather(*tasks)
+    assert view._history_content.controls[0] is reader_row
+    assert [texts(row)[0] for row in view._history_content.controls] == [
+        "turn 2",
+        "turn 3",
+        "turn 4",
+    ]
+    assert offsets[-1] == 200
+    view.will_unmount()
+
+
+@pytest.mark.asyncio
+async def test_pruned_history_backfills_a_scrollable_window_and_can_reach_latest(monkeypatch):
+    from puripuly_heart.core.conversation_history import ConversationHistory
+
+    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
+    history = ConversationHistory()
+
+    def add(i):
+        history.append_conversation_record(
+            source="Listen",
+            channel="peer",
+            utterance_id=str(i),
+            source_text=f"turn {i}",
+            translated_text=None,
+        )
+
+    def attached():
+        return [texts(row)[0] for row in view._history_content.controls]
+
+    for i in range(1, 506):
+        add(i)
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
+    view._open_history()
+    await asyncio.gather(*tasks)
+    assert attached() == [f"turn {i}" for i in range(482, 506)]
+    view._history_list.on_scroll(
+        SimpleNamespace(pixels=150, max_scroll_extent=900, viewport_dimension=600, scroll_delta=150)
+    )
+
+    tasks.clear()
+    for i in range(506, 1502):
+        add(i)
+    await asyncio.gather(*tasks)
+    assert len(history.conversation_records) == 1001
+    assert attached() == [f"turn {i}" for i in range(501, 525)]
+
+    view._history_list.on_scroll(
+        SimpleNamespace(pixels=0, max_scroll_extent=900, viewport_dimension=600, scroll_delta=-150)
+    )
+    assert attached() == [f"turn {i}" for i in range(1478, 1502)]
     await asyncio.gather(*tasks)
     view.will_unmount()
 
