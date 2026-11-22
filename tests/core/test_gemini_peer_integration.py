@@ -289,7 +289,9 @@ async def gemini_peer(request, monkeypatch, preview_timeline):
 
 
 @pytest.mark.asyncio
-async def test_gemini_peer_preview_deadline_preserves_visible_revision_until_native_final(gemini_peer):
+async def test_gemini_peer_preview_deadline_preserves_visible_revision_until_native_final(
+    gemini_peer,
+):
     route = gemini_peer
     partial = await route.start_preview()
     live = route.connections[0]
@@ -300,7 +302,10 @@ async def test_gemini_peer_preview_deadline_preserves_visible_revision_until_nat
     await wait_until(lambda: len(route.deadlines) == 1, timeout_s=3)
     deadline = route.deadlines[0]
     assert _fences(live) == 1
-    assert (deadline.stream, deadline.unit_id) == (partial.identity.stream, partial.identity.unit_id)
+    assert (deadline.stream, deadline.unit_id) == (
+        partial.identity.stream,
+        partial.identity.unit_id,
+    )
     assert deadline.expires_at_s - sealed_at == pytest.approx(0.6)
 
     await route.timeline.advance(0.3)

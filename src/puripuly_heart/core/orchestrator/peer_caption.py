@@ -382,7 +382,8 @@ class PeerCaptionOwner:
             not segment.closed
             and not segment.preview_frozen
             and (
-                segment.preview_deadline_at is None or self.clock.now() < segment.preview_deadline_at
+                segment.preview_deadline_at is None
+                or self.clock.now() < segment.preview_deadline_at
             )
         )
 

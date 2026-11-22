@@ -1341,7 +1341,9 @@ def rolling_peer(harness, stream):
 
 
 @pytest.mark.asyncio
-async def test_gemini_preview_deadline_cancels_refresh_and_preserves_shown_caption(preview_timeline):
+async def test_gemini_preview_deadline_cancels_refresh_and_preserves_shown_caption(
+    preview_timeline,
+):
     harness, backend, events, clock = setup(clock=preview_timeline.clock)
     stream = RecognitionStreamIdentity(
         "peer", 1, 0, "gemini-epoch", ("rolling_free",), "gemini_transcribe"
@@ -1444,7 +1446,10 @@ async def test_gemini_preview_deadline_prevents_pending_caption_from_rendering(p
         )
         await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
         await idle(harness)
-        assert (presenter.snapshot().blocks[-1].id, presenter.snapshot().blocks[-1].primary_text) == (
+        assert (
+            presenter.snapshot().blocks[-1].id,
+            presenter.snapshot().blocks[-1].primary_text,
+        ) == (
             f"peer:{unit_id}",
             f"translated:{settled.text}",
         )
