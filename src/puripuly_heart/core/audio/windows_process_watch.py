@@ -12,7 +12,10 @@ from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 
 _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_ERROR_ACCESS_DENIED = 5
 _ERROR_INVALID_PARAMETER = 87
+_STILL_ACTIVE = 259
+_POLL_INTERVAL_MS = 50
 
 
 @dataclass(slots=True)
@@ -29,26 +32,29 @@ class WindowsProcessIdentityWatch:
 
     def __post_init__(self) -> None:
         try:
-            process = _winapi.OpenProcess(
-                _winapi.SYNCHRONIZE | _PROCESS_QUERY_LIMITED_INFORMATION, False, self.identity.pid
-            )
+            process, can_wait = self._open_process()
         except OSError as exc:
-            if exc.winerror == _ERROR_INVALID_PARAMETER:
+            if getattr(exc, "winerror", None) == _ERROR_INVALID_PARAMETER:
                 self.terminal_reason = "target_exited"
             else:
                 self._unavailable(exc)
             return
         try:
-            if _winapi.WaitForSingleObject(process, 0) == _winapi.WAIT_OBJECT_0:
+            if can_wait and _winapi.WaitForSingleObject(process, 0) == _winapi.WAIT_OBJECT_0:
                 self.terminal_reason = "target_exited"
                 return
             created = windows_process_create_time(process)
             if self.identity.instance_id != f"{self.identity.pid}:{created}":
                 self.terminal_reason = "target_identity_mismatch"
                 return
+            if not can_wait and self._query_only_target_exited(process):
+                self.terminal_reason = "target_exited"
+                return
             stop = _overlapped.CreateEvent(None, True, False, None)
             self._stop = stop
-            self._thread = threading.Thread(target=self._wait, args=(stop, process), daemon=True)
+            self._thread = threading.Thread(
+                target=self._wait, args=(stop, process, can_wait), daemon=True
+            )
             self._thread.start()
             self.identity_verified = True
         except OSError as exc:
@@ -60,6 +66,26 @@ class WindowsProcessIdentityWatch:
                     _winapi.CloseHandle(self._stop)
                     self._stop = None
                 self._thread = None
+
+    def _open_process(self) -> tuple[int, bool]:
+        pid = self.identity.pid
+        try:
+            process = _winapi.OpenProcess(
+                _winapi.SYNCHRONIZE | _PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+            )
+        except OSError as exc:
+            if getattr(exc, "winerror", None) != _ERROR_ACCESS_DENIED:
+                raise
+            process = _winapi.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            return process, False
+        return process, True
+
+    def _query_only_target_exited(self, process: int) -> bool:
+        if _winapi.GetExitCodeProcess(process) != _STILL_ACTIVE:
+            return True
+        from psutil import pids
+
+        return self.identity.pid not in pids()
 
     def _unavailable(self, exc: OSError) -> None:
         self.terminal_reason = "identity_unavailable"
@@ -74,10 +100,13 @@ class WindowsProcessIdentityWatch:
     def watch_thread_alive(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
-    def _wait(self, stop: int, process: int) -> None:
+    def _wait(self, stop: int, process: int, can_wait: bool) -> None:
         try:
-            result = _winapi.WaitForMultipleObjects((stop, process), False, _winapi.INFINITE)
-            if result == _winapi.WAIT_OBJECT_0:
+            if can_wait:
+                result = _winapi.WaitForMultipleObjects((stop, process), False, _winapi.INFINITE)
+                if result == _winapi.WAIT_OBJECT_0:
+                    return
+            elif not self._poll_for_exit(stop, process):
                 return
             self.terminal_reason = "target_exited"
         except OSError as exc:
@@ -90,6 +119,12 @@ class WindowsProcessIdentityWatch:
                 notify = not self._closing
         if notify:
             self.on_terminal(self.terminal_reason, self.failure_diagnostics)
+
+    def _poll_for_exit(self, stop: int, process: int) -> bool:
+        while _winapi.WaitForSingleObject(stop, _POLL_INTERVAL_MS) == _winapi.WAIT_TIMEOUT:
+            if self._query_only_target_exited(process):
+                return True
+        return False
 
     def close(self) -> None:
         with self._lock:
