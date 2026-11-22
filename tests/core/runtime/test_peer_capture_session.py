@@ -3279,6 +3279,65 @@ async def test_unexpected_loop_completion_cleanup_failure_is_observable(
         await owner.close()
 
 
+@pytest.mark.parametrize("interruption", ["disable", "old_close", "candidate_close"])
+async def test_superseded_retirement_keeps_unsettled_sources_until_reactivation(
+    interruption: str,
+) -> None:
+    retarget = interruption != "disable"
+    held_source_index = 1 if interruption == "candidate_close" else 0
+    entered = asyncio.Event()
+    released = False
+    sources = []
+    running = []
+
+    class HeldSource(FakeSource):
+        async def close(self) -> None:
+            self.close_calls += 1
+            if self is sources[held_source_index] and self.close_calls == 1:
+                entered.set()
+                await asyncio.Event().wait()
+            if not released:
+                raise TimeoutError("source has not settled")
+
+    def open_source(_config, _target):
+        source = HeldSource()
+        sources.append(source)
+        return source
+
+    async def run_loop(*, source, **_kwargs):
+        running.append(source)
+        await asyncio.Event().wait()
+
+    owner, *_ = make_owner(source_factory=open_source, run_audio_loop=run_loop)
+    config = make_config()
+    try:
+        await owner.apply_intent(config, enabled=True)
+        await wait_until(lambda: bool(running))
+        old_generation = owner.snapshot.generation
+        retiring = asyncio.create_task(owner.apply_intent(config, enabled=retarget, restart=True))
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        if not retarget:
+            retiring.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await retiring
+        with pytest.raises((TimeoutError, ExceptionGroup)):
+            await owner.apply_intent(config, enabled=True, restart=True)
+        if retarget:
+            await retiring
+        expected = 2 if retarget else 1
+        assert len(sources) == owner.snapshot.cleanup_debt == expected
+        assert not owner.is_current_generation(old_generation)
+        assert not owner.snapshot.effective_active and len(running) == 1
+        released = True
+        await owner.apply_intent(config, enabled=True)
+        await wait_until(lambda: len(running) == 2)
+        assert len(sources) == expected + 1 and running[-1] is sources[-1]
+        assert owner.snapshot.effective_active and owner.snapshot.cleanup_debt == 0
+    finally:
+        released = True
+        await owner.close()
+
+
 async def test_terminal_process_loss_faults_and_allows_retry() -> None:
     target = PeerCaptureTargetIntent(
         kind="process",
@@ -3292,8 +3351,16 @@ async def test_terminal_process_loss_faults_and_allows_retry() -> None:
 
     owner, _admission, _resolver, provider, sources, _sink = make_owner(run_audio_loop=run_loop)
     await owner.apply_intent(make_config(target=target), enabled=True)
+    provider.release_gate = asyncio.Event()
     sources[0].terminal_reason = "target_exited"
     loop_release.set()
+    try:
+        await wait_until(lambda: bool(provider.releases))
+        assert owner.snapshot.state is PeerCaptureSessionState.STOPPING
+        assert not owner.snapshot.retry_available
+        assert not await owner.retry_process_capture()
+    finally:
+        provider.release_gate.set()
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.FAULTED)
 
     assert owner.snapshot.failure_reason.value == "source_lost"
@@ -3752,24 +3819,39 @@ async def test_partial_peer_open_retains_owned_cleanup_debt_and_native_cause():
                 raise OSError(5, "private cleanup detail")
             self.closed = True
 
+    config = make_config(
+        target=PeerCaptureTargetIntent(
+            kind="process", process_kind="vrchat", executable_identity=r"c:\games\vrchat.exe"
+        )
+    )
+
     source = Source()
     calls = []
 
     def create_source(config, target):
         calls.append(config)
+        if source.closed:
+            return FakeSource()
         raise AudioSourceOpenFailure(source, OSError(13, "private open detail"))
 
     owner, *_ = make_owner(source_factory=create_source)
     try:
         with pytest.raises(OSError):
-            await owner.apply_intent(make_config(), enabled=True)
+            await owner.apply_intent(config, enabled=True)
         assert owner.snapshot.cleanup_debt == 1
         assert owner.cleanup_source is source
         assert owner.snapshot.failure_reason.value == "source_open_failed"
         assert "private" not in repr(owner.snapshot.failure_diagnostics)
         with pytest.raises(OSError):
-            await owner.apply_intent(make_config(), enabled=True)
+            await owner.apply_intent(config, enabled=True)
+        with pytest.raises(OSError):
+            await owner.retry_process_capture()
+        assert owner.snapshot.retry_available
         assert len(calls) == 1
+        source.fail_close = False
+        assert await owner.retry_process_capture()
+        assert len(calls) == 2
+        assert owner.snapshot.effective_active and not owner.snapshot.retry_available
     finally:
         source.fail_close = False
         await owner.close()

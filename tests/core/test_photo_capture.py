@@ -241,7 +241,8 @@ async def test_log_supplied_missing_custom_path_is_retried_without_another_event
         await quiet(watcher)
 
 
-async def test_log_chunks_are_drained_without_another_notification(tmp_path):
+@pytest.mark.parametrize("split_marker", [False, True])
+async def test_log_chunks_are_drained_without_another_notification(tmp_path, split_marker):
     photos = tmp_path / "photos"
     logs = tmp_path / "logs"
     photos.mkdir()
@@ -251,9 +252,10 @@ async def test_log_chunks_are_drained_without_another_notification(tmp_path):
     async with watching(photos, logs) as (watcher, source):
         new = tmp_path / "custom.png"
         new.write_bytes(b"new")
-        with log.open("a", encoding="utf-8") as stream:
-            stream.write("unrelated\n" * 16000)
-            stream.write(f"[VRC Camera] Took screenshot to: {new}\n")
+        noise = b"x" * (2 * 65536 - 8) if split_marker else b"unrelated\n" * 16000
+        with log.open("ab") as stream:
+            stream.write(noise)
+            stream.write(f"[VRC Camera] Took screenshot to: {new}\n".encode())
         source.emit(log)
         assert (await capture(watcher)).path == new.resolve()
 

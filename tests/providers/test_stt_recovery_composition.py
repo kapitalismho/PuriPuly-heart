@@ -259,8 +259,8 @@ async def test_canonical_custom_realtime_native_transients_reach_fresh_completed
     recovered = "Recovered canonical custom realtime source."
 
     class Socket(_FakeWebSocket):
-        async def send(self, payload):
-            await super().send(payload)
+        async def send(self, payload, *, text=None):
+            await super().send(payload, text=text)
             event = json.loads(payload)
             if event["type"] != "input_audio_buffer.commit":
                 return
@@ -645,8 +645,8 @@ async def test_cloud_final_timeouts_drop_only_their_utterances_and_keep_capture(
                 await self.push(control(header["task_id"], "task-finished"))
 
     class RealtimeSocket(_FakeWebSocket):
-        async def send(self, payload):
-            await super().send(payload)
+        async def send(self, payload, *, text=None):
+            await super().send(payload, text=text)
             if json.loads(payload)["type"] != "input_audio_buffer.commit":
                 return
             finishes.append(payload)

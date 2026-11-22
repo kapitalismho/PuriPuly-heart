@@ -115,16 +115,8 @@ class ChatboxPaginator:
             self._stream_final_revisions[key] = True
 
     def enqueue(self, message: OSCMessage) -> OSCMessage | None:
-        page_count = (
-            len(
-                self._split_text(
-                    message.text.strip(),
-                    preserve_newlines=message.presentation_revision > 0,
-                )
-            )
-            if message.text.strip()
-            else 0
-        )
+        pages = self._message_pages(message)
+        page_count = len(pages)
         if message.self_turn_key is not None:
             disposition = self._prepare_self_turn_enqueue(message, page_count=page_count)
             if disposition is not None:
@@ -173,7 +165,7 @@ class ChatboxPaginator:
             target_indexes=message.target_indexes,
             target_languages=message.target_languages,
         )
-        self._start_message(message)
+        self._start_message(message, pages)
         if not self._is_paginating():
             self._drain_pending_messages()
         return None
@@ -470,9 +462,14 @@ class ChatboxPaginator:
         self._active_page_count = 0
         return dropped_pages
 
-    def _start_message(self, message: OSCMessage) -> None:
+    def _message_pages(self, message: OSCMessage) -> list[str]:
         text = message.text.strip()
         if not text:
+            return []
+        return self._split_text(text, preserve_newlines=message.presentation_revision > 0)
+
+    def _start_message(self, message: OSCMessage, parts: list[str]) -> None:
+        if not parts:
             self._notify_delivery(message, "output_empty")
             self._record_stage(
                 "message_terminal",
@@ -481,10 +478,6 @@ class ChatboxPaginator:
             )
             return
 
-        parts = self._split_text(
-            text,
-            preserve_newlines=message.presentation_revision > 0,
-        )
         head = parts[0]
         tail = parts[1:]
         self._active_message = message
@@ -519,7 +512,7 @@ class ChatboxPaginator:
                     status="output_timeout",
                 )
                 continue
-            self._start_message(next_message)
+            self._start_message(next_message, self._message_pages(next_message))
 
     def _split_text(self, text: str, *, preserve_newlines: bool = False) -> list[str]:
         if len(text) <= self.max_chars:

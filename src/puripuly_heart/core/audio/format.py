@@ -46,23 +46,17 @@ class AudioCaptureSpan:
             raise ValueError("source range must be non-empty and increasing")
         if self.source_end_monotonic_s < self.source_start_monotonic_s:
             raise ValueError("source monotonic range must be increasing")
-        normalized = (
-            self.normalized_sample_rate_hz,
-            self.normalized_start_sample,
-            self.normalized_end_sample,
-        )
-        if any(value is not None for value in normalized):
-            if any(value is None for value in normalized):
-                raise ValueError("normalized range fields must be provided together")
-            if self.normalized_sample_rate_hz is None or self.normalized_sample_rate_hz <= 0:
-                raise ValueError("normalized sample rate must be positive")
-            if (
-                self.normalized_start_sample is None
-                or self.normalized_end_sample is None
-                or self.normalized_start_sample < 0
-                or self.normalized_end_sample <= self.normalized_start_sample
-            ):
-                raise ValueError("normalized range must be non-empty and increasing")
+        rate = self.normalized_sample_rate_hz
+        start = self.normalized_start_sample
+        end = self.normalized_end_sample
+        if rate is None and start is None and end is None:
+            return
+        if rate is None or start is None or end is None:
+            raise ValueError("normalized range fields must be provided together")
+        if rate <= 0:
+            raise ValueError("normalized sample rate must be positive")
+        if start < 0 or end <= start:
+            raise ValueError("normalized range must be non-empty and increasing")
 
     @property
     def source_sample_count(self) -> int:
@@ -99,6 +93,8 @@ class AudioCaptureSpan:
             or end_sample <= start_sample
         ):
             raise ValueError("slice must be inside the normalized range")
+        if start_sample == normalized_start and end_sample == normalized_end:
+            return self
         normalized_count = normalized_end - normalized_start
         source_count = self.source_sample_count
         left_ratio = (start_sample - normalized_start) / normalized_count
@@ -219,4 +215,5 @@ def float32_to_pcm16le_bytes(samples: np.ndarray) -> bytes:
 
 def pcm16le_bytes_to_float32(data: bytes) -> np.ndarray:
     arr = np.frombuffer(data, dtype="<i2").astype(np.float32)
-    return arr / 32768.0
+    arr /= 32768.0
+    return arr

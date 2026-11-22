@@ -204,6 +204,7 @@ class _Caption:
     history_after: UUID | None = None
     history_removals: tuple[UUID, ...] = ()
     preview_lifetime: PeerPreviewLifetime | None = None
+    translating_task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
 @dataclass(slots=True)
@@ -928,6 +929,7 @@ class PeerCaptionOwner:
         caption.revision += 1
         if caption.scribe_family is not None:
             caption.required_lineage_members = ()
+            self._cancel_scribe_translation(caption)
         self._last = caption
         prepared = self._prepare(caption, source, kind, config)
         self.runtime.translation_history[:] = [
@@ -1244,7 +1246,10 @@ class PeerCaptionOwner:
                 for member in retained.captions:
                     if member.scribe_continues in boundaries:
                         member.scribe_continues = boundaries[member.scribe_continues]
+        for caption in removed:
+            self._cancel_scribe_translation(caption)
         for caption, prepared, admission in repairs:
+            self._cancel_scribe_translation(caption)
             self._start(
                 self._execute_scribe_request(
                     caption,
@@ -1406,6 +1411,13 @@ class PeerCaptionOwner:
         del history[:-5]
 
     @staticmethod
+    def _cancel_scribe_translation(caption: _Caption) -> None:
+        task = caption.translating_task
+        if task is not None and not task.cancelling():
+            caption.translating_task = None
+            task.cancel()
+
+    @staticmethod
     def _settle_scribe_admission(caption: _Caption) -> None:
         caption.admitted.set()
         for admission in caption.final_admissions:
@@ -1554,7 +1566,14 @@ class PeerCaptionOwner:
             )
             try:
                 async with asyncio.timeout(self.request_timeout_s):
-                    result = await self.requests.process(request, prepared=prepared)
+                    task = asyncio.current_task() if scribe_plan and kind != "preview" else None
+                    if task is not None:
+                        caption.translating_task = task
+                    try:
+                        result = await self.requests.process(request, prepared=prepared)
+                    finally:
+                        if task is not None and caption.translating_task is task:
+                            caption.translating_task = None
                 submission = result.output
                 if submission is None:
                     raise RuntimeError("Peer translation completed without output")

@@ -242,28 +242,19 @@ class ControlServer:
                 )
                 self._finish_dispatch()
                 dispatching = False
-                disconnected = asyncio.create_task(
-                    reader.read(1), name="control:subscriber-disconnect"
-                )
-                pending_event = None
                 async with aclosing(subscription):
-                    try:
+                    disconnected = asyncio.create_task(
+                        reader.read(1), name="control:subscriber-disconnect"
+                    )
+
+                    async def forward_events() -> None:
                         while not self._closing:
-                            pending_event = asyncio.create_task(
-                                anext(subscription), name="control:subscriber-event"
-                            )
-                            completed, _ = await asyncio.wait(
-                                (pending_event, disconnected),
-                                return_when=asyncio.FIRST_COMPLETED,
-                            )
-                            if disconnected in completed:
-                                pending_event.cancel()
-                                await asyncio.gather(pending_event, return_exceptions=True)
-                                break
                             try:
-                                event = pending_event.result()
+                                event = await anext(subscription)
                             except StopAsyncIteration:
-                                break
+                                return
+                            if disconnected.done():
+                                return
                             await self._send(
                                 writer,
                                 {
@@ -273,15 +264,21 @@ class ControlServer:
                                     "event": event,
                                 },
                             )
+                            await asyncio.sleep(0)
+
+                    forwarding = asyncio.create_task(
+                        forward_events(), name="control:subscriber-send"
+                    )
+                    try:
+                        done, _ = await asyncio.wait(
+                            (disconnected, forwarding), return_when=asyncio.FIRST_COMPLETED
+                        )
+                        if disconnected not in done:
+                            forwarding.result()
                     finally:
                         disconnected.cancel()
-                        if pending_event is not None:
-                            pending_event.cancel()
-                        await asyncio.gather(
-                            disconnected,
-                            *([pending_event] if pending_event is not None else []),
-                            return_exceptions=True,
-                        )
+                        forwarding.cancel()
+                        await asyncio.gather(disconnected, forwarding, return_exceptions=True)
                 return
             else:
                 raise ControlTransportError("unknown_method", "Unknown control method")

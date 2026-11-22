@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from puripuly_heart.app.ports.osc_control import OSC_PARAMETER_DEFINITIONS
 from puripuly_heart.app.services.osc.state_publisher import (
     OscCanonicalState,
     OscStatePublisher,
@@ -49,6 +50,28 @@ def test_state_publisher_sends_full_snapshot_then_only_deltas() -> None:
 
     changed = publisher.publish_delta(OscCanonicalState(translation=True, mute_sync=True))
     assert {item.parameter for item in changed} == {"PuriPuly_Trans", "PuriPuly_MuteSync"}
+
+
+@pytest.mark.parametrize(
+    ("state_field", "parameter"),
+    [
+        ("self_capture", "PuriPuly_Talk"),
+        ("peer_capture", "PuriPuly_Listen"),
+        ("translation", "PuriPuly_Trans"),
+        ("captions", "PuriPuly_Captions"),
+        ("peer_source_auto", "PuriPuly_PeerAuto"),
+        ("mute_sync", "PuriPuly_MuteSync"),
+        ("chatbox_source", "PuriPuly_ChatboxSource"),
+    ],
+)
+def test_state_projection_preserves_abi_order_and_boolean_fields(
+    state_field: str, parameter: str
+) -> None:
+    state = replace(OscCanonicalState(), **{state_field: True})
+    values = OscStatePublisher.values_for_state(state)
+
+    assert tuple(values) == tuple(OSC_PARAMETER_DEFINITIONS)
+    assert [name for name, value in values.items() if value is True] == [parameter]
 
 
 def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:

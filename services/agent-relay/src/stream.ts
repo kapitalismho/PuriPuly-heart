@@ -6,7 +6,7 @@ type Settlement = (result: unknown) => Promise<void>;
 async function* upstreamEvents(reader: ReadableStreamDefaultReader<Uint8Array>): AsyncGenerator<unknown> {
   const decoder = new TextDecoder();
   let fragments: string[] = [];
-  let data: string[] = [];
+  let data: string | string[] | undefined;
   while (true) {
     const { value, done } = await reader.read();
     const chunk = decoder.decode(value, { stream: !done });
@@ -21,15 +21,19 @@ async function* upstreamEvents(reader: ReadableStreamDefaultReader<Uint8Array>):
         fragments = [];
       }
       if (line.endsWith('\r')) line = line.slice(0, -1);
-      if (line.startsWith('data:')) data.push(line.slice(line.charCodeAt(5) === 32 ? 6 : 5));
-      else if (!line && data.length) {
-        yield JSON.parse(data.join('\n'));
-        data = [];
+      if (line.startsWith('data:')) {
+        const part = line.slice(line.charCodeAt(5) === 32 ? 6 : 5);
+        if (data === undefined) data = part;
+        else if (typeof data === 'string') data = [data, part];
+        else data.push(part);
+      } else if (!line && data !== undefined) {
+        yield JSON.parse(typeof data === 'string' ? data : data.join('\n'));
+        data = undefined;
       }
     }
     if (offset < chunk.length) fragments.push(chunk.slice(offset));
     if (done) {
-      if (fragments.length || data.length) throw new Error('upstream_invalid_response');
+      if (fragments.length || data !== undefined) throw new Error('upstream_invalid_response');
       return;
     }
   }

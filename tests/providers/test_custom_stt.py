@@ -18,6 +18,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTScopedTurnSession,
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.custom import (
@@ -32,7 +33,10 @@ from puripuly_heart.core.stt.custom import (
     sanitize_custom_stt_text,
     sanitize_endpoint_for_display,
 )
-from puripuly_heart.core.stt.custom_connection import validate_custom_stt_connection
+from puripuly_heart.core.stt.custom_connection import (
+    pcm16le_to_wav,
+    validate_custom_stt_connection,
+)
 from puripuly_heart.providers.stt import custom as custom_module
 from puripuly_heart.providers.stt.custom import (
     CustomSTTBackend,
@@ -74,14 +78,15 @@ class _FakeAsyncClient:
 
 class _FakeWebSocket:
     def __init__(self, messages: list[object], *, hang: bool = False) -> None:
-        self.sent: list[str] = []
+        self.sent: list[str | bytes] = []
         self._messages = list(messages)
         self._hang = hang
         self._closed = asyncio.Event()
         self._available = asyncio.Event()
         self.closed = False
 
-    async def send(self, payload: str) -> None:
+    async def send(self, payload: str | bytes, *, text: bool | None = None) -> None:
+        assert text is True or (text is None and isinstance(payload, str))
         self.sent.append(payload)
 
     def __aiter__(self) -> _FakeWebSocket:
@@ -130,6 +135,7 @@ def _scoped_request(
     order: int = 1,
     *,
     channel: str = "peer",
+    provider_epoch_id: str = "epoch-1",
 ) -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
@@ -138,7 +144,7 @@ def _scoped_request(
             segment_id=uuid4(),
             capture_epoch=1,
         ),
-        provider_epoch_id="epoch-1",
+        provider_epoch_id=provider_epoch_id,
         provider_turn_id=f"turn-{order}",
     )
     return STTProviderTurnRequest(
@@ -286,6 +292,91 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
     assert terminal.outcome == "failed"
     assert terminal.failure_reason == "offline_total_timeout"
     await session.close()
+
+
+@pytest.mark.asyncio
+async def test_scoped_offline_cancel_keeps_successor_wav_fresh() -> None:
+    request_started = asyncio.Event()
+    request_cancelled = asyncio.Event()
+    wavs: list[bytes] = []
+
+    async def handler(url: str, **kwargs: Any) -> _FakeResponse:
+        wavs.append(kwargs["files"]["file"][1])
+        if len(wavs) == 1:
+            request_started.set()
+            try:
+                await asyncio.Future()
+            except asyncio.CancelledError:
+                request_cancelled.set()
+                return _FakeResponse(200, {"text": "stale"})
+        return _FakeResponse(200, {"text": "fresh"})
+
+    async def submit(
+        session: STTScopedTurnSession, request: STTProviderTurnRequest, chunks: tuple[bytes, ...]
+    ) -> None:
+        await session.begin_turn(request)
+        for sequence, chunk in enumerate(chunks, start=1):
+            await session.send_turn_audio(
+                request.identity,
+                chunk,
+                payload_sequence=sequence,
+                source_ranges=(),
+                context_only=sequence == 1 and len(chunks) > 1,
+            )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(handler))
+    first_session = await backend.open_session(projection=SCOPED_PROJECTION)
+    assert isinstance(first_session, STTScopedTurnSession)
+    first_request = _scoped_request()
+    first_audio = (b"\x01\x80" * 160, b"\xff\x7f" * 320)
+    first_events = first_session.turn_events()
+    try:
+        await submit(first_session, first_request, first_audio)
+        await asyncio.wait_for(request_started.wait(), timeout=1)
+        await first_session.abort_turn(first_request.identity, reason="toggle_off")
+        terminal = await asyncio.wait_for(anext(first_events), timeout=1)
+        assert isinstance(terminal, STTProviderTurnTerminal)
+        assert (terminal.identity, terminal.outcome, terminal.text) == (
+            first_request.identity,
+            "cancelled",
+            "",
+        )
+        ended = await asyncio.wait_for(anext(first_events), timeout=1)
+        assert isinstance(ended, STTProviderEpochEnded)
+        assert (ended.provider_epoch_id, ended.reason) == ("epoch-1", "toggle_off")
+        await asyncio.wait_for(request_cancelled.wait(), timeout=1)
+    finally:
+        await first_session.close()
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(anext(first_events), timeout=1)
+
+    successor = await backend.open_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-2")
+    )
+    assert isinstance(successor, STTScopedTurnSession)
+    successor_request = _scoped_request(2, provider_epoch_id="epoch-2")
+    successor_audio = b"\x60\x00" * 240
+    try:
+        await submit(successor, successor_request, (successor_audio,))
+        final = await asyncio.wait_for(anext(successor.turn_events()), timeout=1)
+        assert isinstance(final, STTProviderTurnTerminal)
+        assert (final.identity, final.outcome, final.text) == (
+            successor_request.identity,
+            "final",
+            "fresh",
+        )
+    finally:
+        await successor.close()
+    assert wavs == [
+        pcm16le_to_wav(b"".join(first_audio), sample_rate_hz=16000),
+        pcm16le_to_wav(successor_audio, sample_rate_hz=16000),
+    ]
 
 
 @pytest.mark.asyncio
@@ -646,24 +737,42 @@ async def test_offline_session_emits_one_final_transcript() -> None:
 
 @pytest.mark.asyncio
 async def test_offline_session_preserves_utterance_order() -> None:
-    texts = ["first", "second"]
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    pcm = (b"\x10\x00" * 80, b"\x20\x00" * 160, b"\x30\x00" * 240)
+    wavs: list[bytes] = []
 
     async def handler(url: str, **kwargs: Any) -> _FakeResponse:
-        _ = url, kwargs
-        return _FakeResponse(200, {"text": texts.pop(0)})
+        wavs.append(kwargs["files"]["file"][1])
+        index = len(wavs)
+        if index == 1:
+            first_started.set()
+            await release_first.wait()
+        return _FakeResponse(200, {"text": str(index)})
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(handler))
     session = await backend.open_session()
-    await session.send_audio(b"\x00\x00" * 80)
-    await session.on_speech_end()
-    await session.send_audio(b"\x00\x00" * 80)
-    await session.on_speech_end()
-    first = await anext(session.events())
-    second = await anext(session.events())
-    await session.close()
-
-    assert [first.text, second.text] == ["first", "second"]
-    assert first.is_final and second.is_final
+    try:
+        await session.send_audio(pcm[0])
+        async with asyncio.TaskGroup() as boundaries:
+            boundaries.create_task(session.on_speech_end())
+            await asyncio.wait_for(first_started.wait(), timeout=1)
+            await session.send_audio(pcm[1])
+            boundaries.create_task(session.on_speech_end())
+            await asyncio.sleep(0)
+            await session.send_audio(pcm[2])
+            release_first.set()
+        await session.on_speech_end()
+        events = session.events()
+        transcripts = [await asyncio.wait_for(anext(events), timeout=1) for _ in pcm]
+        assert [(event.text, event.is_final) for event in transcripts] == [
+            ("1", True),
+            ("2", True),
+            ("3", True),
+        ]
+    finally:
+        await session.close()
+    assert wavs == [pcm16le_to_wav(chunk, sample_rate_hz=16000) for chunk in pcm]
 
 
 @pytest.mark.asyncio
@@ -875,17 +984,20 @@ async def test_streaming_session_discards_partials_and_keeps_finals() -> None:
         websocket_connect=connect,
     )
     session = await backend.open_session()
-    await session.send_audio(b"\x00\x00" * 80)
+    pcm16le = b"\xfb\xff\x00\x80"
+    await session.send_audio(pcm16le)
     await session.on_speech_end()
     event = await anext(session.events())
     await session.close()
 
     assert event.is_final is True
     assert event.text == "hello"
-    sent_types = [json.loads(item)["type"] for item in ws.sent]
-    assert "session.update" in sent_types
-    assert "input_audio_buffer.append" in sent_types
-    assert "input_audio_buffer.commit" in sent_types
+    assert [json.loads(item)["type"] for item in ws.sent] == [
+        "session.update",
+        "input_audio_buffer.append",
+        "input_audio_buffer.commit",
+    ]
+    assert ws.sent[1] == b'{"type": "input_audio_buffer.append", "audio": "+/8AgA=="}'
 
 
 @pytest.mark.asyncio
@@ -1066,7 +1178,7 @@ class _StartupWebSocket(_FakeWebSocket):
         if not block_close:
             self.close_release.set()
 
-    async def send(self, payload):
+    async def send(self, payload, *, text=None):
         packet = json.loads(payload)
         if packet["type"] == "session.update":
             self.update_started.set()
@@ -1075,7 +1187,7 @@ class _StartupWebSocket(_FakeWebSocket):
             except asyncio.CancelledError:
                 self.update_cancelled.set()
                 raise
-        await super().send(payload)
+        await super().send(payload, text=text)
         if packet["type"] == "input_audio_buffer.append":
             self.audio.extend(base64.b64decode(packet["audio"]))
         if packet["type"] == "input_audio_buffer.commit":
@@ -1182,10 +1294,10 @@ async def test_realtime_failed_startup_cleanup_remains_owned_for_backend_close_r
 
 async def test_commit_failure_retains_transport_cause_and_known_reason() -> None:
     class FailingCommitSocket(_FakeWebSocket):
-        async def send(self, payload):
+        async def send(self, payload, *, text=None):
             if json.loads(payload)["type"] == "input_audio_buffer.commit":
                 raise OSError(10054, "PRIVATE_SOCKET_DETAIL")
-            await super().send(payload)
+            await super().send(payload, text=text)
 
     ws = FailingCommitSocket([], hang=True)
 
