@@ -62,6 +62,8 @@ class _AudioWrite:
     pcm16le: bytes
     source_ranges: tuple[AudioCaptureSpan, ...]
     completion: asyncio.Future[None]
+    turn_identity: STTProviderTurnIdentity | None = None
+    payload_sequence: int = 0
 
 
 @dataclass(slots=True)
@@ -657,6 +659,13 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                             continue
                 else:
                     self._queued_audio_bytes -= len(item.pcm16le)
+                    identity = item.turn_identity
+                    if identity is not None:
+                        try:
+                            self._event_projection.validate_payload(identity, item.payload_sequence)
+                        except (RuntimeError, ValueError) as exc:
+                            self._resolve_write(item.completion, exc)
+                            continue
                     pcm, mapped = (
                         self._input_map.prepare(
                             item.pcm16le,
@@ -675,6 +684,12 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                         self._audio_since_fence = True
                         if mapped is not None:
                             self._input_map.commit(mapped)
+                    if identity is not None and not item.completion.cancelled():
+                        try:
+                            self._event_projection.payload_written(identity, item.payload_sequence)
+                        except (RuntimeError, ValueError) as exc:
+                            self._resolve_write(item.completion, exc)
+                            continue
                 self._resolve_write(item.completion, None)
         except asyncio.CancelledError:
             self._resolve_write(
@@ -1020,15 +1035,15 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._require_scoped_turn(identity)
         if self._sealing:
             raise RuntimeError("Gemini scoped input is sealing")
-        self._event_projection.validate_payload(identity, payload_sequence)
         await self._enqueue(
             _AudioWrite(
                 pcm16le,
                 source_ranges,
                 asyncio.get_running_loop().create_future(),
+                turn_identity=identity,
+                payload_sequence=payload_sequence,
             )
         )
-        self._event_projection.payload_written(identity, payload_sequence)
 
     async def send_stream_audio(
         self, pcm16le: bytes, *, source_ranges: tuple[AudioCaptureSpan, ...]
