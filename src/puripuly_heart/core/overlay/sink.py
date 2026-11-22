@@ -164,6 +164,14 @@ class PeerCaptionRevision:
     is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
 
 
+@dataclass(slots=True, eq=False)
+class PeerPreviewLifetime:
+    deadline_at: float | None = None
+
+    def is_frozen_at(self, now: float | None) -> bool:
+        return self.deadline_at is not None and now is not None and now >= self.deadline_at
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TranslationStreamUpdate(OverlayEvent):
     text: str
@@ -175,6 +183,10 @@ class TranslationStreamUpdate(OverlayEvent):
     peer_caption_revision: int = 0
     peer_superseded_unit_ids: tuple[UUID, ...] = ()
     peer_lineage_revision: PeerCaptionRevision | None = field(default=None, compare=False)
+    peer_preview_is_current: Callable[[], bool] | None = field(
+        default=None, compare=False, repr=False
+    )
+    peer_preview_lifetime: PeerPreviewLifetime | None = field(default=None, compare=False)
 
     EVENT_TYPE: ClassVar[str] = "translation_stream_update"
 

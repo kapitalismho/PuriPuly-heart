@@ -14,7 +14,7 @@ import pytest
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.server import serve
 
-from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.format import AudioCaptureSpan, float32_to_pcm16le_bytes
 from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
@@ -25,10 +25,12 @@ from puripuly_heart.core.audio.ownership import (
     OwnedVadEvent,
     PeerAudioSegmentLedger,
 )
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     STTChannelAvailability,
     STTContributionConsumptionLedger,
     STTNativeProvenance,
+    STTProviderAudioFence,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
     STTProviderTurnEvent,
@@ -36,6 +38,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTSessionProjection,
@@ -223,6 +226,8 @@ def segment_events(
     *,
     start_sample: int,
     now: float,
+    reason: SpeechBoundaryReason = "silence",
+    trailing_silence_ms: int = 224,
 ) -> tuple[OwnedVadEvent, OwnedVadEvent, OwnedVadEvent]:
     segment_id = uuid4()
     pre = span(start_sample, start_sample, start_sample + 2)
@@ -247,7 +252,7 @@ def segment_events(
         now_monotonic_s=now + 0.1,
     )
     end = ledger.observe_vad_event(
-        SpeechEnd(segment_id, trailing_silence_ms=224, reason="silence"),
+        SpeechEnd(segment_id, trailing_silence_ms=trailing_silence_ms, reason=reason),
         now_monotonic_s=now + 0.2,
     )
     return start, chunk, end
@@ -3850,6 +3855,7 @@ class ControlledStreamSession(ControlledScopedSession):
         self.mapping = STTStreamInputMap()
         self.stream: RecognitionStreamIdentity | None = None
         self.audio: list[tuple[bytes, tuple[AudioCaptureSpan, ...]]] = []
+        self._audio_since_fence = False
         self.failure: Exception | None = None
         self.write_entered = asyncio.Event()
         self.write_cancelled = asyncio.Event()
@@ -3895,6 +3901,37 @@ class ControlledStreamSession(ControlledScopedSession):
         if write is not None:
             self.mapping.commit(write)
             self.audio.append((pcm, source_ranges))
+            self._audio_since_fence = True
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        await super().seal_turn(
+            identity,
+            sealed_content_ranges=sealed_content_ranges,
+            seal_reason=seal_reason,
+            observed_trailing_silence_ms=observed_trailing_silence_ms,
+        )
+        request = self.requests[-1]
+        clock = request.recognition_fence_clock
+        if self._audio_since_fence and clock is not None:
+            self.emit(
+                STTProviderInputTerminal(
+                    identity,
+                    "submitted",
+                    request.channel,
+                    independent_recognition=True,
+                    audio_fence=STTProviderAudioFence(
+                        clock(), seal_reason, observed_trailing_silence_ms
+                    ),
+                )
+            )
+        self._audio_since_fence = False
 
     def recognition_source_covers(self, ranges: tuple[AudioCaptureSpan, ...]) -> bool:
         return self.mapping.covers(ranges)
@@ -4436,6 +4473,619 @@ async def test_independent_final_without_observed_source_speech_has_no_estimate(
         await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
         finals = [event for event in emitted if isinstance(event, STTRecognitionUnitTerminal)]
         assert finals[0].unit.estimated_last_speech_at is None
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_independent_seal_logs_open_unit_and_late_final_latency(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    first, chunk, end = segment_events(ledger, start_sample=0, now=100)
+    session = ControlledStreamSession()
+    clock = ControlledMonotonicClock(value=500.0)
+
+    async def factory(_settings, _epoch):
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        channel="peer",
+        event_sink=lambda _event: None,
+        monotonic_clock=clock.now,
+        watchdog_resolver=lambda _: watchdogs(),
+    )
+    with caplog.at_level(logging.INFO, logger="puripuly_heart.core.stt.scoped_engine"):
+        try:
+            await engine.handle_stream_input(stream_input(ledger, 6, 10, speech_observed=True))
+            await engine.handle_owned_vad_event(first)
+            await engine.handle_owned_vad_event(chunk)
+            assert session.stream is not None
+            unit_id = uuid4()
+            for sequence, text in enumerate(("hel", "hello", "hello the"), start=1):
+                session.emit(
+                    STTRecognitionUnit(
+                        RecognitionUnitIdentity(session.stream, unit_id, sequence),
+                        f"private {text}",
+                        is_final=False,
+                    )
+                )
+                await wait_until(
+                    lambda sequence=sequence: engine._last_receipt_sequence == sequence
+                )
+                clock.value += 0.5
+            await engine.handle_stream_input(stream_input(ledger, 10, 14))
+            await engine.handle_owned_vad_event(end)
+            clock.value += 0.42
+            session.emit(
+                STTRecognitionUnit(
+                    RecognitionUnitIdentity(session.stream, unit_id, 4), "private hello there"
+                )
+            )
+            await wait_until(lambda: engine._last_receipt_sequence == 4)
+        finally:
+            await engine.close()
+
+    messages = [record.getMessage() for record in caplog.records]
+    terminal = [line for line in messages if line.startswith("[Recognition] terminal ")]
+    assert len(terminal) == 1
+    assert terminal[0].endswith(
+        "unit_partials=3 unit_finals=0 open_unit_ms=1500 open_unit_receipts=3"
+    )
+    unit_final = [line for line in messages if line.startswith("[Recognition] unit_final ")]
+    assert unit_final == [
+        "[Recognition] unit_final channel=peer provider=gemini_transcribe "
+        f"epoch={session.stream.provider_epoch_id} seal_reason=silence after_seal_ms=420 "
+        "unit_ms=1920 unit_receipts=4"
+    ]
+    assert not any("private" in line for line in messages)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "provider", "member", "reason", "pause_ms", "should_freeze"),
+    [
+        ("peer", "gemini_transcribe", None, "delivery_pause", 512, True),
+        ("peer", "rolling_free", "gemini_transcribe", "silence", 800, True),
+        ("peer", "gemini_transcribe", None, "delivery_pause", 192, False),
+        ("peer", "gemini_transcribe", None, "delivery_deadline", 512, False),
+        ("self", "gemini_transcribe", None, "silence", 800, False),
+        ("peer", "rolling_free", "other", "delivery_pause", 800, False),
+    ],
+)
+async def test_peer_preview_grace_preserves_native_final(
+    channel, provider, member, reason, pause_ms, should_freeze
+) -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings(provider))
+    start, chunk, end = segment_events(
+        ledger, start_sample=0, now=100, reason=reason, trailing_silence_ms=pause_ms
+    )
+    session = ControlledStreamSession()
+    session.recognizer_id = member
+    clock = ControlledMonotonicClock(value=100.0)
+    emitted = []
+
+    async def factory(_settings, _epoch):
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory, channel=channel, event_sink=emitted.append, monotonic_clock=clock.now
+    )
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        uid = uuid4()
+
+        async def send(sequence, text, *, final=False):
+            unit = STTRecognitionUnit(
+                RecognitionUnitIdentity(session.stream, uid, sequence), text, is_final=final
+            )
+            session.emit(unit)
+            await wait_until(lambda: engine._last_receipt_sequence == sequence)
+
+        await send(1, "before pause")
+        session.seal_gate.clear()
+        sealing = asyncio.create_task(engine.handle_owned_vad_event(end))
+        try:
+            await wait_until(lambda: any(call[0] == "seal" for call in session.calls))
+            session.emit(
+                STTProviderInputTerminal(session.requests[-1].identity, "submitted", channel)
+            )
+            await send(2, "during seal")
+            assert not any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted)
+            clock.value += 1.0
+        finally:
+            session.seal_gate.set()
+            await sealing
+        clock.value += 0.599
+        await send(3, "within grace")
+        clock.value += 0.002
+        await send(4, "past grace")
+        await send(5, "corrected ending", final=True)
+        assert [e.text for e in emitted if isinstance(e, STTRecognitionUnit)] == [
+            "before pause",
+            "during seal",
+            "within grace",
+            *([] if should_freeze else ["past grace"]),
+        ]
+        finals = [e.unit for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]
+        assert [(u.identity.unit_id, u.text) for u in finals] == [(uid, "corrected ending")]
+        assert [e.unit_id for e in emitted if isinstance(e, STTRecognitionPreviewDeadline)] == (
+            [uid] if should_freeze else []
+        )
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("final_before_ack", [True, False], ids=["before-ack", "after-ack"])
+async def test_ordered_gemini_fence_resolves_final_before_stall_retirement(
+    monkeypatch, final_before_ack: bool
+) -> None:
+    from puripuly_heart.providers.stt.gemini_transcribe import _GeminiTranscribeLiveSession
+    from tests.helpers.scoped_provider_sessions import (
+        _FakeGeminiLive,
+        _gemini_message,
+        _gemini_session,
+    )
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100.0)
+    wire_entered = asyncio.Event()
+    release_wire = asyncio.Event()
+    receipt_held = asyncio.Event()
+    release_receipt = asyncio.Event()
+    second_end = False
+    emitted: list[STTProviderTurnEvent] = []
+    sessions = []
+    original_send = _FakeGeminiLive.send_realtime_input
+    original_events = _GeminiTranscribeLiveSession.turn_events
+
+    async def send_realtime_input(live, **options):
+        if second_end and options.get("audio_stream_end"):
+            wire_entered.set()
+            await release_wire.wait()
+        await original_send(live, **options)
+
+    async def turn_events(session):
+        async for event in original_events(session):
+            if second_end and (
+                (final_before_ack and isinstance(event, STTRecognitionUnit) and event.is_final)
+                or (
+                    not final_before_ack
+                    and isinstance(event, STTProviderInputTerminal)
+                    and event.audio_fence is not None
+                )
+            ):
+                receipt_held.set()
+                await release_receipt.wait()
+            yield event
+
+    monkeypatch.setattr(_FakeGeminiLive, "send_realtime_input", send_realtime_input)
+    monkeypatch.setattr(_GeminiTranscribeLiveSession, "turn_events", turn_events)
+
+    async def factory(_settings, epoch):
+        session, live = await _gemini_session(epoch=epoch)
+        sessions.append((session, live))
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        event_sink=emitted.append,
+        monotonic_clock=clock.now,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=2.0),
+    )
+    sealing = None
+    try:
+        start, chunk, end = segment_events(ledger, start_sample=0, now=100, trailing_silence_ms=500)
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        session, live = sessions[0]
+        live.push(_gemini_message(interim="first preview"))
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+        partial = next(e for e in emitted if isinstance(e, STTRecognitionUnit))
+        await engine.handle_owned_vad_event(end)
+        await wait_until(lambda: any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted))
+
+        clock.value = 101.0
+        start, chunk, end = segment_events(
+            ledger, start_sample=10, now=101, trailing_silence_ms=500
+        )
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        second_end = True
+        sealing = asyncio.create_task(engine.handle_owned_vad_event(end))
+        await asyncio.wait_for(wire_entered.wait(), 1)
+        final = _gemini_message(final="native result")
+        if final_before_ack:
+            live.push(final)
+            await asyncio.wait_for(receipt_held.wait(), 1)
+        release_wire.set()
+        await asyncio.wait_for(sealing, 1)
+        if final_before_ack:
+            live.push(_gemini_message(interim="opened after acknowledgement"))
+            await wait_until(lambda: session._receipt_sequence == 3)
+        else:
+            await asyncio.wait_for(receipt_held.wait(), 1)
+            live.push(final)
+            await wait_until(lambda: session._receipt_sequence == 2)
+        assert engine._session is session
+        assert not any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted)
+        assert sum(item.get("audio_stream_end", False) for item in live.sent) == 2
+
+        release_receipt.set()
+        if final_before_ack:
+            await wait_until(lambda: engine._last_receipt_sequence == 3)
+            clock.value = 102.0
+            live.push(_gemini_message(interim="independent preview still growing"))
+            await wait_until(lambda: engine._last_receipt_sequence == 4)
+            assert [e.unit_id for e in emitted if isinstance(e, STTRecognitionPreviewDeadline)] == [
+                partial.identity.unit_id
+            ]
+            assert [e.text for e in emitted if isinstance(e, STTRecognitionUnit)][-2:] == [
+                "opened after acknowledgement",
+                "independent preview still growing",
+            ]
+            await engine.handle_stream_input(stream_input(ledger, 20, 24, speech_observed=True))
+            assert len(sessions) == 1 and not live.closed
+            assert [
+                (e.unit.identity.unit_id, e.unit.text)
+                for e in emitted
+                if isinstance(e, STTRecognitionUnitTerminal)
+            ] == [(partial.identity.unit_id, "native result")]
+        else:
+            await wait_until(lambda: live.closed)
+            assert not any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted)
+            await engine.handle_stream_input(stream_input(ledger, 20, 24))
+            assert len(sessions) == 1
+            await engine.handle_stream_input(stream_input(ledger, 24, 28, speech_observed=True))
+            assert len(sessions) == 2
+            assert [item["audio"]["data"] for item in sessions[1][1].sent] == [b"\x33\x33" * 4]
+    finally:
+        release_wire.set()
+        release_receipt.set()
+        if sealing is not None:
+            await asyncio.gather(sealing, return_exceptions=True)
+        await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_ordered_gemini_fence_does_not_arm_first_post_write_interim(monkeypatch) -> None:
+    from tests.helpers.scoped_provider_sessions import (
+        _FakeGeminiLive,
+        _gemini_message,
+        _gemini_session,
+    )
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    start, chunk, end = segment_events(ledger, start_sample=0, now=100, trailing_silence_ms=500)
+    clock = ControlledMonotonicClock(value=100.0)
+    wire_entered = asyncio.Event()
+    release_wire = asyncio.Event()
+    emitted: list[STTProviderTurnEvent] = []
+    connections = []
+    original_send = _FakeGeminiLive.send_realtime_input
+
+    async def send_realtime_input(live, **options):
+        if options.get("audio_stream_end"):
+            wire_entered.set()
+            await release_wire.wait()
+        await original_send(live, **options)
+
+    monkeypatch.setattr(_FakeGeminiLive, "send_realtime_input", send_realtime_input)
+
+    async def factory(_settings, epoch):
+        session, live = await _gemini_session(epoch=epoch)
+        connections.append(live)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        event_sink=emitted.append,
+        monotonic_clock=clock.now,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=2.0),
+    )
+    sealing = None
+    try:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        live = connections[0]
+        sealing = asyncio.create_task(engine.handle_owned_vad_event(end))
+        await asyncio.wait_for(wire_entered.wait(), 1)
+        interim = _gemini_message(interim="first post-write preview")
+        release_wire.set()
+        live.push(interim)
+        await asyncio.wait_for(sealing, 1)
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+
+        clock.value += 0.7
+        live.push(_gemini_message(interim="post-write preview grows"))
+        live.push(_gemini_message(final="native final"))
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
+        assert sum(item.get("audio_stream_end", False) for item in live.sent) == 1
+        assert not any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted)
+        partials = [e for e in emitted if isinstance(e, STTRecognitionUnit)]
+        assert [e.text for e in partials] == [
+            "first post-write preview",
+            "post-write preview grows",
+        ]
+        finals = [e.unit for e in emitted if isinstance(e, STTRecognitionUnitTerminal)]
+        assert [(unit.identity.unit_id, unit.text) for unit in finals] == [
+            (partials[0].identity.unit_id, "native final")
+        ]
+    finally:
+        release_wire.set()
+        if sealing is not None:
+            await asyncio.gather(sealing, return_exceptions=True)
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_unit", [False, True], ids=["first-unit", "successor"])
+async def test_ordered_gemini_fence_arms_unit_open_at_write_with_absolute_grace(
+    monkeypatch, previous_unit: bool
+) -> None:
+    from tests.helpers.scoped_provider_sessions import (
+        _FakeGeminiLive,
+        _gemini_message,
+        _gemini_session,
+    )
+
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100.0)
+    wire_entered = asyncio.Event()
+    release_wire = asyncio.Event()
+    preview_held = asyncio.Event()
+    release_preview = asyncio.Event()
+    hold_wire = False
+    emitted: list[STTProviderTurnEvent] = []
+    sessions = []
+    original_send = _FakeGeminiLive.send_realtime_input
+
+    async def send_realtime_input(live, **options):
+        if hold_wire and options.get("audio_stream_end"):
+            wire_entered.set()
+            await release_wire.wait()
+        await original_send(live, **options)
+
+    monkeypatch.setattr(_FakeGeminiLive, "send_realtime_input", send_realtime_input)
+
+    async def sink(event):
+        emitted.append(event)
+        if isinstance(event, STTRecognitionUnit) and event.text == "opens during write":
+            preview_held.set()
+            await release_preview.wait()
+
+    async def factory(_settings, epoch):
+        session, live = await _gemini_session(epoch=epoch)
+        sessions.append((session, live))
+        return session
+
+    engine = ScopedRecognitionEngine(
+        factory,
+        event_sink=sink,
+        monotonic_clock=clock.now,
+        watchdog_resolver=lambda _: watchdogs(write_timeout_s=2.0),
+    )
+    sealing = None
+    try:
+        if previous_unit:
+            start, chunk, end = segment_events(
+                ledger, start_sample=0, now=99, trailing_silence_ms=500
+            )
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(chunk)
+            sessions[0][1].push(_gemini_message(interim="previous unit"))
+            await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+            await engine.handle_owned_vad_event(end)
+            await wait_until(
+                lambda: any(isinstance(e, STTRecognitionPreviewDeadline) for e in emitted)
+            )
+        clock.value = 101.0
+        start, chunk, end = segment_events(
+            ledger, start_sample=10 if previous_unit else 0, now=101, trailing_silence_ms=500
+        )
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(chunk)
+        hold_wire = True
+        sealing = asyncio.create_task(engine.handle_owned_vad_event(end))
+        await asyncio.wait_for(wire_entered.wait(), 1)
+        session, live = sessions[0]
+        if previous_unit:
+            live.push(_gemini_message(final="previous final"))
+            await wait_until(
+                lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted)
+            )
+        live.push(_gemini_message(interim="opens during write"))
+        await asyncio.wait_for(preview_held.wait(), 1)
+        partial = next(
+            e
+            for e in emitted
+            if isinstance(e, STTRecognitionUnit) and e.text == "opens during write"
+        )
+        assert not sealing.done()
+        assert not any(
+            isinstance(e, STTRecognitionPreviewDeadline) and e.unit_id == partial.identity.unit_id
+            for e in emitted
+        )
+        clock.value = 102.0
+        release_wire.set()
+        await asyncio.wait_for(sealing, 1)
+        clock.value = 103.0
+        live.push(_gemini_message(interim="already past grace"))
+        live.push(_gemini_message(final="new native final"))
+        release_preview.set()
+        await wait_until(
+            lambda: sum(isinstance(e, STTRecognitionUnitTerminal) for e in emitted)
+            == (2 if previous_unit else 1)
+        )
+        deadlines = [e for e in emitted if isinstance(e, STTRecognitionPreviewDeadline)]
+        assert len(deadlines) == (2 if previous_unit else 1)
+        assert deadlines[-1].unit_id == partial.identity.unit_id
+        assert deadlines[-1].expires_at_s == pytest.approx(102.6)
+        assert [e.text for e in emitted if isinstance(e, STTRecognitionUnit)] == [
+            *(["previous unit"] if previous_unit else []),
+            "opens during write",
+        ]
+        assert [
+            (e.unit.identity.unit_id, e.unit.text)
+            for e in emitted
+            if isinstance(e, STTRecognitionUnitTerminal)
+        ][-1] == (partial.identity.unit_id, "new native final")
+        assert engine._session is session and not live.closed
+    finally:
+        release_wire.set()
+        release_preview.set()
+        if sealing is not None:
+            await asyncio.gather(sealing, return_exceptions=True)
+        await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_stalled_gemini_unit_resumes_only_with_fresh_speech() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("gemini_transcribe"))
+    clock = ControlledMonotonicClock(value=100.0)
+    sessions = []
+    emitted = []
+
+    async def factory(_settings, _epoch):
+        session = ControlledStreamSession()
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(factory, event_sink=emitted.append, monotonic_clock=clock.now)
+    try:
+        for start_sample in (0, 10):
+            start, chunk, end = segment_events(
+                ledger, start_sample=start_sample, now=clock.now(), trailing_silence_ms=512
+            )
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(chunk)
+            if start_sample == 0:
+                sessions[0].emit(
+                    STTRecognitionUnit(
+                        RecognitionUnitIdentity(sessions[0].stream, uuid4(), 1),
+                        "open",
+                        is_final=False,
+                    )
+                )
+                await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+            await engine.handle_owned_vad_event(end)
+            clock.value += 1.0
+        await wait_until(lambda: ("close",) in sessions[0].calls)
+        await engine.handle_stream_input(stream_input(ledger, 20, 22))
+        assert len(sessions) == 1
+        fresh = stream_input(ledger, 22, 25, speech_observed=True)
+        pre_roll = np.array([0.1, 0.2, 0.3, 0.5], dtype=np.float32)
+        await engine.handle_stream_input(
+            replace(
+                fresh,
+                event=replace(fresh.event, pre_roll=pre_roll, pre_roll_capture=(span(18, 18, 22),)),
+            )
+        )
+        assert len(sessions) == 2
+        assert sessions[1].audio == [
+            (
+                float32_to_pcm16le_bytes(pre_roll[2:]),
+                (span(18, 18, 22).slice_normalized(20, 22),),
+            ),
+            (float32_to_pcm16le_bytes(fresh.event.chunk), fresh.event.capture),
+        ]
+        sessions[1].emit(
+            STTRecognitionUnit(RecognitionUnitIdentity(sessions[1].stream, uuid4(), 1), "next")
+        )
+        await wait_until(lambda: any(isinstance(e, STTRecognitionUnitTerminal) for e in emitted))
+        assert [e.unit.text for e in emitted if isinstance(e, STTRecognitionUnitTerminal)] == [
+            "next"
+        ]
+    finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("segment_start", "expected_payloads", "expected_content"),
+    [
+        (19, [(22, 25, False), (25, 29, False)], [(22, 29)]),
+        (21, [(22, 23, True), (23, 27, False), (27, 31, False)], [(23, 31)]),
+    ],
+    ids=["overlapping-content", "overlapping-context"],
+)
+async def test_stalled_rolling_gemini_keeps_ready_turn_fallback_without_replay(
+    segment_start, expected_payloads, expected_content
+) -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=3, settings=settings("rolling_free"))
+    clock = ControlledMonotonicClock(value=100.0)
+    gemini = ControlledStreamSession()
+    gemini.recognizer_id = "gemini_transcribe"
+
+    class Fallback(ControlledScopedSession):
+        recognizer_id = "deepgram"
+
+    fallback = Fallback()
+    fallback.terminal_on_seal = ("final", "fresh scoped result")
+    sessions = []
+    emitted: list[STTProviderTurnEvent] = []
+
+    async def factory(_settings, _epoch):
+        session = gemini if not sessions else fallback
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(factory, event_sink=emitted.append, monotonic_clock=clock.now)
+    try:
+        for start_sample in (0, 10):
+            start, chunk, end = segment_events(
+                ledger, start_sample=start_sample, now=clock.now(), trailing_silence_ms=500
+            )
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(chunk)
+            if start_sample == 0:
+                gemini.emit(
+                    STTRecognitionUnit(
+                        RecognitionUnitIdentity(gemini.stream, uuid4(), 1),
+                        "open",
+                        is_final=False,
+                    )
+                )
+                await wait_until(lambda: any(isinstance(e, STTRecognitionUnit) for e in emitted))
+            else:
+                await engine.handle_stream_input(stream_input(ledger, 20, 22))
+            await engine.handle_owned_vad_event(end)
+            clock.value += 1.0
+
+        await wait_until(lambda: ("close",) in gemini.calls)
+        await engine.handle_stream_input(stream_input(ledger, 22, 23))
+        assert sessions == [gemini]
+        await engine.handle_stream_input(
+            stream_input(ledger, segment_start + 2, segment_start + 6, speech_observed=True)
+        )
+        assert sessions == [gemini, fallback]
+        assert fallback.calls == []
+
+        start, chunk, end = segment_events(ledger, start_sample=segment_start, now=clock.now())
+        for event in (start, chunk, end):
+            await engine.handle_owned_vad_event(event)
+        assert sessions == [gemini, fallback]
+        assert len(fallback.requests) == 1
+        assert fallback.requests[0].identity.recognizer_id == "deepgram"
+        assert fallback.requests[0].identity.segment.activation_generation == 3
+        assert [
+            (capture.normalized_start_sample, capture.normalized_end_sample, call[5])
+            for call in fallback.calls
+            if call[0] == "send"
+            for capture in call[4]
+        ] == expected_payloads
+        assert [
+            (capture.normalized_start_sample, capture.normalized_end_sample)
+            for call in fallback.calls
+            if call[0] == "seal"
+            for capture in call[2]
+        ] == expected_content
+        assert [e.text for e in emitted if isinstance(e, STTProviderTurnTerminal)] == [
+            "fresh scoped result"
+        ]
     finally:
         await engine.close()
 

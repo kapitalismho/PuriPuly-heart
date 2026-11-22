@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 from threading import RLock
-from typing import Callable
+from typing import Callable, get_args
 from uuid import uuid4
 
 from puripuly_heart.config.paths import user_config_dir
@@ -72,6 +72,7 @@ from puripuly_heart.core.runtime.logging import (
     LIVE_AUDIENCE_BASIC,
     LIVE_AUDIENCE_RECORD_ATTRIBUTE,
 )
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 
 MAIN_LOG_FILENAME = "puripuly_heart.log"
 MAIN_LOG_BACKUP_FILENAME = "puripuly_heart.backup.log"
@@ -349,6 +350,7 @@ _RECOGNITION_METADATA_EVENTS = {
             "session_retired",
             "receive_failed",
             "source_cancelled",
+            "unit_final",
         }
     ),
     "VAD": frozenset({"window", "committed"}),
@@ -390,6 +392,13 @@ _RECOGNITION_METADATA_INTEGER_KEYS = frozenset(
         "rollovers",
         "start_debounce_chunks",
         "start_commit_chunks",
+        "unit_partials",
+        "unit_finals",
+        "open_unit_ms",
+        "open_unit_receipts",
+        "after_seal_ms",
+        "unit_ms",
+        "unit_receipts",
     }
 )
 _RECOGNITION_METADATA_DECIMAL_KEYS = frozenset(
@@ -450,6 +459,8 @@ def _is_recognition_metadata_text(tag: str, message: str) -> bool:
             valid = value in {"speech", "next_frame", "none"}
         elif key == "kind":
             valid = value in {"onset", "rollover"}
+        elif key == "seal_reason":
+            valid = value in get_args(SpeechBoundaryReason)
         elif key == "reason":
             valid = value in _RECOGNITION_METADATA_REASONS.get(tag, frozenset())
         elif key == "cause_class":

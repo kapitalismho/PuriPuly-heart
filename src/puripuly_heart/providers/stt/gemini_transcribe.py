@@ -21,6 +21,7 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
+    STTProviderAudioFence,
     STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -51,6 +52,9 @@ GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S = 9.0 * 60.0
 class _EndStream:
     reason: str
     completion: asyncio.Future[None]
+    request: STTProviderTurnRequest | None = None
+    sealed_content_ranges: tuple[AudioCaptureSpan, ...] = ()
+    observed_trailing_silence_ms: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +62,8 @@ class _AudioWrite:
     pcm16le: bytes
     source_ranges: tuple[AudioCaptureSpan, ...]
     completion: asyncio.Future[None]
+    turn_identity: STTProviderTurnIdentity | None = None
+    payload_sequence: int = 0
 
 
 @dataclass(slots=True)
@@ -638,11 +644,28 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                         self._queued_audio_bytes -= len(item.pcm16le)
                     continue
                 if isinstance(item, _EndStream):
+                    request = item.request
+                    written_at_s = None
                     if self._audio_since_fence:
                         await self._send_realtime(audio_stream_end=True)
+                        if request is not None and request.recognition_fence_clock is not None:
+                            written_at_s = request.recognition_fence_clock()
                         self._audio_since_fence = False
+                    if request is not None and not item.completion.cancelled():
+                        try:
+                            self._finish_scoped_seal(item, request, written_at_s)
+                        except Exception as exc:
+                            self._resolve_write(item.completion, exc)
+                            continue
                 else:
                     self._queued_audio_bytes -= len(item.pcm16le)
+                    identity = item.turn_identity
+                    if identity is not None:
+                        try:
+                            self._event_projection.validate_payload(identity, item.payload_sequence)
+                        except (RuntimeError, ValueError) as exc:
+                            self._resolve_write(item.completion, exc)
+                            continue
                     pcm, mapped = (
                         self._input_map.prepare(
                             item.pcm16le,
@@ -661,6 +684,12 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                         self._audio_since_fence = True
                         if mapped is not None:
                             self._input_map.commit(mapped)
+                    if identity is not None and not item.completion.cancelled():
+                        try:
+                            self._event_projection.payload_written(identity, item.payload_sequence)
+                        except (RuntimeError, ValueError) as exc:
+                            self._resolve_write(item.completion, exc)
+                            continue
                 self._resolve_write(item.completion, None)
         except asyncio.CancelledError:
             self._resolve_write(
@@ -980,6 +1009,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         try:
             await item.completion
         except asyncio.CancelledError:
+            if (
+                isinstance(item, _EndStream)
+                and item.request is not None
+                and item.completion.done()
+                and not item.completion.cancelled()
+                and item.completion.exception() is None
+            ):
+                raise
             self._scoped_transport_failure("gemini_write_cancelled")
             if self._send_task is not None:
                 self._send_task.cancel()
@@ -998,15 +1035,15 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._require_scoped_turn(identity)
         if self._sealing:
             raise RuntimeError("Gemini scoped input is sealing")
-        self._event_projection.validate_payload(identity, payload_sequence)
         await self._enqueue(
             _AudioWrite(
                 pcm16le,
                 source_ranges,
                 asyncio.get_running_loop().create_future(),
+                turn_identity=identity,
+                payload_sequence=payload_sequence,
             )
         )
-        self._event_projection.payload_written(identity, payload_sequence)
 
     async def send_stream_audio(
         self, pcm16le: bytes, *, source_ranges: tuple[AudioCaptureSpan, ...]
@@ -1032,13 +1069,36 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if self._sealing:
             raise RuntimeError("Gemini scoped input is already sealing")
         self._sealing = True
-        await self._enqueue(_EndStream(seal_reason, asyncio.get_running_loop().create_future()))
-        if sealed_content_ranges and not self._input_map.covers(sealed_content_ranges):
+        await self._enqueue(
+            _EndStream(
+                seal_reason,
+                asyncio.get_running_loop().create_future(),
+                request,
+                sealed_content_ranges,
+                observed_trailing_silence_ms,
+            )
+        )
+
+    def _finish_scoped_seal(
+        self, fence: _EndStream, request: STTProviderTurnRequest, written_at_s: float | None
+    ) -> None:
+        if fence.sealed_content_ranges and not self._input_map.covers(fence.sealed_content_ranges):
             raise RuntimeError("Gemini sealed input contains unsubmitted audio")
+        identity = request.identity
         self._event_projection.seal(identity)
         self._event_projection.terminal(
             STTProviderInputTerminal(
-                identity, "submitted", request.channel, independent_recognition=True
+                identity,
+                "submitted",
+                request.channel,
+                independent_recognition=True,
+                audio_fence=(
+                    STTProviderAudioFence(
+                        written_at_s, fence.reason, fence.observed_trailing_silence_ms
+                    )
+                    if written_at_s is not None
+                    else None
+                ),
             )
         )
         self._scoped_request = None
