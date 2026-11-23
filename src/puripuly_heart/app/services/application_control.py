@@ -2737,6 +2737,10 @@ class ApplicationControlOwner:
                 raise PeerCaptureTargetUnavailable("audio target is unavailable")
             return await app.apply_loopback_capture_option(value)
         if command == "audio.retry":
+            components = getattr(self.pipeline, "current", None)
+            peer_capture = components.peer_capture if components is not None else None
+            if peer_capture is None or peer_capture.snapshot.retry_available is not True:
+                return {"status": "rejected", "reason": "no_faulted_process_capture"}
             return await app.retry_peer_process_capture()
         if command == "accounts.managed.refresh":
             refresh = getattr(app, "refresh_managed_account_usage", None)

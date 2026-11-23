@@ -2451,3 +2451,67 @@ async def test_retired_asr_control_inputs_publish_canonical_choices_and_preserve
         assert persisted["peer_stt"]["provider"] == "local_fun_asr_mlt_nano"
     finally:
         await app.stop()
+
+
+class _PeerRetryApplication(_ManagedStatusApplication):
+    def __init__(self, outcome: bool) -> None:
+        super().__init__(SimpleNamespace(auth=None))
+        self.outcome = outcome
+        self.retries = 0
+
+    async def retry_peer_process_capture(self) -> bool:
+        self.retries += 1
+        return self.outcome
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("retry_available", "outcome", "expected"),
+    [
+        (None, True, ("rejected", "no_faulted_process_capture", 0)),
+        (False, True, ("rejected", "no_faulted_process_capture", 0)),
+        (True, True, ("applied", None, 1)),
+        (True, False, ("failed", None, 1)),
+    ],
+)
+async def test_audio_retry_distinguishes_inapplicable_from_attempted_restart(
+    retry_available, outcome, expected
+) -> None:
+    application = _PeerRetryApplication(outcome)
+    pipeline = SimpleNamespace(
+        current=(
+            None
+            if retry_available is None
+            else SimpleNamespace(
+                peer_capture=SimpleNamespace(
+                    snapshot=SimpleNamespace(retry_available=retry_available)
+                )
+            )
+        )
+    )
+    control = ApplicationControlOwner(
+        application=application,
+        settings=SimpleNamespace(
+            committed_settings=AppSettingsVNext(), observe_commits=lambda _callback: None
+        ),
+        pipeline=pipeline,
+        results=SettingsTransactionResultOwner(),
+        events=ControlEvents(),
+        provisioning=lambda: None,
+        gpu=lambda: None,
+        peer=lambda: None,
+        calibration=lambda: None,
+        gemma=lambda: None,
+        sync_ui=lambda: None,
+        locale_choices=("en",),
+        localize=lambda key: key,
+        gemma_selection=lambda _settings: None,
+    )
+    control.bind_instance("audio-retry-applicability")
+    admitted = await control.submit("audio.retry", {}, request_id="audio-retry")
+    terminal = await control.wait(admitted["operation_id"], timeout=5)
+    status, reason, retries = expected
+    assert terminal["terminal"] is True
+    assert terminal["status"] == status
+    assert terminal.get("reason") == reason
+    assert application.retries == retries

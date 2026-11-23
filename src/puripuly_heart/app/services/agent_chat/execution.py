@@ -24,6 +24,7 @@ CHANNEL_FIELDS = (
     "failure_reason",
     "provider_status",
 )
+CAPTURE_TARGET_KINDS = frozenset({"default_output_device", "named_output_device", "process"})
 OVERLAY_FIELDS = (
     "settings_available",
     "desired_enabled",
@@ -325,7 +326,7 @@ def app_actions() -> tuple[AppAction, ...]:
         "microphone",
         "command",
         {"command": "audio.diagnose"},
-        guidance="Local capture/VAD only; no settings change.",
+        guidance="Self microphone routes only: local capture/VAD, no Peer loopback or recognition; no settings change.",
     )
     add(
         "probe_app",
@@ -334,12 +335,17 @@ def app_actions() -> tuple[AppAction, ...]:
         {"command": "accounts.managed.refresh"},
         guidance="Whether the selected managed credential is still usable; no translation request",
     )
-    for target, command, binding in (
-        ("audio", "audio.retry", {}),
-        ("osc_discovery", "osc.discovery.retry", {}),
-        ("gpu_activation", "models.retry", {"backend": "gpu"}),
+    for target, command, binding, guidance in (
+        (
+            "audio",
+            "audio.retry",
+            {},
+            "Restarts only a faulted Peer app/process capture shown as retry_available; otherwise rejected and nothing restarts",
+        ),
+        ("osc_discovery", "osc.discovery.retry", {}, ""),
+        ("gpu_activation", "models.retry", {"backend": "gpu"}, ""),
     ):
-        add("retry_app", target, "command", {"command": command, **binding})
+        add("retry_app", target, "command", {"command": command, **binding}, guidance=guidance)
     add("open_app", "accounts", "context", {"topic": "accounts"})
     add("open_app", "provider_setup", "provider_setup", fields={"provider": provider})
     add(
@@ -624,6 +630,8 @@ def project_capture_channel(value: object) -> dict:
     source = value if isinstance(value, Mapping) else {}
     capture = source.get("capture")
     capture = capture if isinstance(capture, Mapping) else {}
+    target = capture.get("capture_target")
+    target_kind = target.get("kind") if isinstance(target, Mapping) else None
     result = {
         **safe_fields(source, CHANNEL_FIELDS),
         **project_diagnostic_evidence(source),
@@ -639,8 +647,10 @@ def project_capture_channel(value: object) -> dict:
                     "cleanup_debt",
                     "closed",
                     "source_open_recovered",
+                    "retry_available",
                 ),
             ),
+            **({"target_kind": target_kind} if target_kind in CAPTURE_TARGET_KINDS else {}),
             **project_diagnostic_evidence(capture),
         },
     }

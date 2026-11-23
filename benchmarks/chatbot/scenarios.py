@@ -603,9 +603,73 @@ SCENARIOS = (
             ),
         ),
     ),
+    Scenario(
+        "journey-route-choice",
+        "debugging",
+        "development",
+        "managed_unclaimed",
+        Persona(familiarity="regular", concern="번역이 갑자기 안 돼."),
+        "Anonymized handoff journey. Managed Gemma 4 is selected, but this PC has no managed credential and its trial is not claimed, so translation cannot run. Explain that current state without calling it an app fault or claiming the app changed the setting by itself. Offer the free no-key Index public API and the about-800-translation Gemma 4 trial through Discord sign-in; the user's own key may be mentioned as a paid option. Switch only through an approved card and confirm current normal translation before saying it works. When the user wants to tell the developer, offer the report card with a summary that separates observed facts from unknowns, call it prepared when proposed, and after sending give the X DM contact path for the ticket number without inventing other channels.",
+        explanation_required=True,
+        managed_trial="not_claimed",
+        dialogue=(
+            DialogueBeat(
+                "번역이 갑자기 안 된다고 말해. 원래는 잘 됐고 설정을 바꾼 기억은 없어. 원인은 몰라.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "Puri가 말한 방법 중 로그인 없이 바로 쓸 수 있는 무료 방법을 쓰겠다고 해. 그 방법의 변경 카드가 이미 떠 있으면 먼저 승인해.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "변경 카드가 떠 있으면 승인해. 번역이 다시 되면 설정이 왜 이렇게 됐는지 개발자에게 알리고 싶다고 해.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "보고 카드가 있으면 보내. 보낸 뒤에 개발자한테 따로 연락하려면 어떻게 하냐고 물어봐.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "journey-talk-listen",
+        "debugging",
+        "development",
+        "talk_listen",
+        Persona(familiarity="regular", concern="마이크 번역이 안 돼."),
+        "Anonymized handoff journey. TALK (Self microphone) and LISTEN (Peer device loopback on the NVIDIA speakers the user listens through) are separate channels. Self capture is stopped: restore it and claim recovery only from current Self activity. LISTEN capture is active with a ready provider and recognized Peer text arrives, but no Peer translation is observed. Keep each claim to its channel and scope: microphone measurements cover only the Self microphone, recognition probe timeouts cover only the fixed-audio check, and audio retry does not apply to device loopback, so never describe it as reconnecting LISTEN. Do not tell the user to change the loopback device without Peer evidence. When observations cannot settle the symptom, ask what the user sees. If supported remedies do not restore Peer translation, offer a report whose developer summary separates observed facts, unchecked scope and suspected causes; call the card prepared when proposed, guide the send once it is shown, and after sending give the X DM contact path. An approved Peer recognition change that restores current Peer translation is also acceptable.",
+        explanation_required=True,
+        dialogue=(
+            DialogueBeat("마이크 번역이 안 된다고 말해. 원인은 몰라.", ("work",)),
+            DialogueBeat(
+                "TALK가 다시 되면, 이번엔 상대 목소리 번역(LISTEN)이 안 된다고 말해. 화면에 보이는 자세한 증상은 Puri가 물어볼 때만 말해.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "상대 목소리 번역이 아직 안 되면 계속 안 된다고 해. 질문을 받았으면 화면에 보이는 대로 답하고, 상대 소리는 NVIDIA 스피커로 듣고 있어.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "그래도 안 되면 개발자에게 알리고 싶다고 해. 변경 카드가 떠 있으면 내용을 보고 판단해.",
+                ("work",),
+            ),
+            DialogueBeat(
+                "보고 카드가 있으면 보내. 보낸 뒤에 개발자한테 따로 연락하려면 어떻게 하냐고 물어봐.",
+                ("work",),
+            ),
+        ),
+    ),
+    Scenario(
+        "listen-process-retry",
+        "debugging",
+        "development",
+        "listen_process_lost",
+        Persona(familiarity="regular", concern="디스코드 상대 목소리 번역이 갑자기 멈췄어."),
+        "LISTEN captures the Discord app, and that Peer process capture faulted after its source was lost. Retry the Peer capture or restart LISTEN without changing settings or devices, and claim recovery only from current Peer translation.",
+    ),
 )
 
-SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact."
+SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact. Three development cases then added two anonymized support handoff journeys (translation route choice; TALK recovery followed by LISTEN failure) and a retry-applicable Peer process capture."
 
 
 def select_scenarios(

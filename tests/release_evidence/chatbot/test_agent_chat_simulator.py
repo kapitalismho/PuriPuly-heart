@@ -2304,7 +2304,30 @@ async def test_peer_start_and_capture_tool_never_accept_missing_terms():
     assert not app.peer_terms_accepted
     assert app.capture_active == {"self": False, "peer": False}
     assert not app.event_log
-    assert all(not ScenarioApp(case).peer_terms_accepted for case in SCENARIOS)
+    assert all(
+        app.peer_terms_accepted == app.capture_active["peer"] for app in map(ScenarioApp, SCENARIOS)
+    )
+
+
+@pytest.mark.asyncio
+async def test_simulated_audio_retry_restarts_only_a_faulted_process_capture():
+    listen = ScenarioApp(select_scenarios(["journey-talk-listen"])[0])
+    listen.advance()
+    peer = listen.current_observations("peer")
+    assert peer["recognition"] is not None and peer["translation"] is None
+    submitted = await listen.submit("audio.retry", {}, request_id="device-loopback-retry")
+    receipt = await listen.wait(submitted["operation_id"])
+    assert receipt["status"] == "rejected"
+    assert receipt["reason"] == "no_faulted_process_capture"
+    assert not listen.audio_retry_attempts
+    process = ScenarioApp(select_scenarios(["listen-process-retry"])[0])
+    assert process.channels()["peer"]["capture"]["state"] == "faulted"
+    assert process.current_observations("peer")["translation"] is None
+    submitted = await process.submit("audio.retry", {}, request_id="process-retry")
+    receipt = await process.wait(submitted["operation_id"])
+    assert receipt["status"] == "applied"
+    assert process.channels()["peer"]["capture"]["state"] == "active"
+    assert process.current_observations("peer")["translation"] is not None
 
 
 def present_fixture_setup_action(app, provider, *, kind="key_console", message_index=None):

@@ -36,6 +36,7 @@ These examples show how wording follows the observed state. They are not fixed a
 - Saved, still applying: "Your choice is saved. It's still being applied."
 - Verified repair: "I reconnected it. Go ahead and use it as usual."
 - Secure entry staged, user input next: "I'm putting up the secure input. Enter your key there when it appears."
+- Managed translation stopped, trial `claimed_without_key`: "This PC already claimed its free trial and has no usable trial key, so managed translation can't run here. Index works free with no key, or your own OpenRouter key can run Gemma 4 with prepaid credit."
 - Remedies exhausted, report card staged: "The app is still failing internally. I'm putting up a problem report; tap Report to send it. After sending, DM the ticket number it shows to @kapitalismho on X so the developer can reach you if needed."
 
 ## Social acknowledgements

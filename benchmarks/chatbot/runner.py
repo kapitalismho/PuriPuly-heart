@@ -1084,8 +1084,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
             ],
         }
 
+    tool_calls = 0
+
     def tool(name: str, arguments: dict) -> dict:
-        identity = f"smoke-{len(app.operations)}-{name}"
+        nonlocal tool_calls
+        tool_calls += 1
+        identity = f"smoke-{tool_calls}-{name}"
         return {
             "status": "completed",
             "output": [
@@ -1117,7 +1121,12 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                 else "work"
             )
             cause = app.scenario.cause
-            if cause.startswith("microphone") or cause in {"capture_off", "clipped_speech"}:
+            if cause.startswith("microphone") or cause in {
+                "capture_off",
+                "clipped_speech",
+                "talk_listen",
+                "listen_process_lost",
+            }:
                 modules = {"audio", "recognition"}
             elif cause in {
                 "recognition_auth",
@@ -1230,6 +1239,88 @@ def controlled_transport(app: ScenarioApp) -> AgentRelayTransport:
                     and receipt.get("status") == "applied"
                     else "이번에는 사용할 수 있는 송신 목적지를 찾지 못했어."
                 )
+        elif cause == "managed_unclaimed":
+            continuation = last.get("type") == "function_call_output"
+            if app.intent["translation"]["model"] == "index_translate_35b":
+                result = answer("키 없이 쓰는 Index 공개 API로 번역이 다시 들어왔어.")
+            elif continuation:
+                result = answer(
+                    "카드를 올렸어. 보고를 보낸 뒤 표시되는 티켓 번호를 X의 @kapitalismho에게 DM으로 보내줘."
+                )
+            elif classifications == 3:
+                result = tool(
+                    "manage_proposal",
+                    {
+                        "action": "report",
+                        "summary": "Managed Gemma 4 selected without a credential; trial not claimed.",
+                    },
+                )
+            elif classifications >= 4 and body["allow_tools"]:
+                result = tool(
+                    "manage_proposal",
+                    {
+                        "action": "settings",
+                        "changes": {
+                            "translation.model": "index_translate_35b",
+                            "translation.connection": "public_api",
+                        },
+                    },
+                )
+            else:
+                result = answer(
+                    "관리형 Gemma 4가 선택돼 있지만 이 PC에는 관리형 키가 없고 체험도 아직 받지 않았어. "
+                    "키 없이 쓰는 Index 공개 API나 Discord 로그인으로 받는 약 800회 무료 체험 중에 고를 수 있어."
+                )
+        elif cause == "talk_listen":
+            commands = [operation["command"] for operation in app.operations.values()]
+            retries = [
+                operation.get("receipt", {})
+                for operation in app.operations.values()
+                if operation["command"] == "audio.retry"
+            ]
+            if not app.capture_active["self"]:
+                result = tool("set_app", {"target": "capture.self", "enabled": True})
+            elif classifications == 2 and "recognition.probe" not in commands:
+                result = tool("probe_app", {"target": "recognition.peer"})
+            elif classifications == 2 and not retries:
+                result = tool("retry_app", {"target": "audio"})
+            elif (
+                classifications == 4
+                and not app.report_offers
+                and last.get("type") != "function_call_output"
+            ):
+                result = tool(
+                    "manage_proposal",
+                    {
+                        "action": "report",
+                        "summary": "Observed: Peer device loopback active, provider ready, "
+                        "recognized Peer text arrives, no Peer translation observed. "
+                        "Not checked: live Peer capture signal. Suspected: missing final results.",
+                    },
+                )
+            else:
+                result = answer(
+                    {
+                        1: "TALK를 다시 켰고 지금 내 말 번역이 들어오고 있어.",
+                        2: (
+                            "고정 음원 인식 검사는 시간 초과였고, LISTEN은 장치 루프백이라 재시작은 적용되지 않았어."
+                            if retries and retries[-1].get("status") == "rejected"
+                            else "고정 음원 인식 검사는 시간 초과였고, 재시도 결과는 실패로 나왔어."
+                        ),
+                        3: "상대 소리는 지금 어떤 장치로 듣고 있어? 자막이 아예 없는지, 원문만 뜨고 번역이 안 붙는지도 알려줘.",
+                        4: "보고를 준비했어. 카드가 보이면 보고하기를 눌러줘.",
+                    }.get(
+                        classifications,
+                        "보낸 뒤 표시되는 티켓 번호를 X의 @kapitalismho에게 DM으로 보내주면 돼.",
+                    )
+                )
+        elif cause == "listen_process_lost":
+            if not any(
+                operation["command"] == "audio.retry" for operation in app.operations.values()
+            ):
+                result = tool("retry_app", {"target": "audio"})
+            else:
+                result = answer("LISTEN 캡처를 다시 시작했고 상대 번역이 다시 들어오고 있어.")
         elif cause == "microphone_host" and app.scenario.dialogue and classifications >= 2:
             result = answer(
                 "오디오 호스트는 마이크 자체가 아니라 Windows에서 오디오 장치를 여는 방식이야. "
