@@ -112,7 +112,9 @@ def test_snapshot_identity_is_accepted_by_process_identity_watcher(
     assert callbacks == []
 
 
-def test_query_only_process_identity_watch_reports_exit_code_259(child_process, monkeypatch) -> None:
+def test_query_only_process_identity_watch_reports_exit_code_259(
+    child_process, monkeypatch
+) -> None:
     pid = child_process.pid
     identity = _identity(pid, f"{pid}:{psutil.Process(pid).create_time()}")
     _restrict_process_open(monkeypatch, pid)
