@@ -438,8 +438,8 @@ def test_openrouter_cache_schema_requires_luna_only_routing_and_preserves_custom
 @pytest.mark.parametrize(
     "provider_routing",
     [
-        OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
+        OpenRouterProviderRouting.DEFAULT,
+        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT,
     ],
 )
 async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
@@ -498,104 +498,17 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_40_uses_requested_provider_pool(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-    client = HttpxOpenRouterClient(
-        api_key="test-key",
-        model="deepseek/deepseek-v4-flash-0731",
-        base_url="https://example",
-        provider_routing=OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY,
-    )
-    await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko-KR",
-        target_language="zh-CN",
-    )
-
-    assert fake_client.last_request["json"]["provider"] == {
-        "only": [
-            "makora",
-            "together",
-            "wafer/fast",
-            "baidu/fp8",
-        ],
-        "sort": {"by": "latency", "partition": "none"},
-        "allow_fallbacks": True,
-    }
-
-
-@pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_40_china_pins_baidu(
-    monkeypatch,
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-    client = HttpxOpenRouterClient(
-        api_key="test-key",
-        model="deepseek/deepseek-v4-flash-0731",
-        base_url="https://example",
-        provider_routing=OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA,
-    )
-    await client.translate(
-        text="hello",
-        system_prompt="SYSTEM",
-        source_language="ko-KR",
-        target_language="zh-CN",
-    )
-
-    assert fake_client.last_request["json"]["provider"] == {
-        "only": ["baidu/fp8"],
-        "allow_fallbacks": False,
-    }
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("model", "primary_connection", "expected_route", "expected_preferences"),
-    [
-        (
-            "deepseek_v4_flash",
-            "openrouter",
-            "deepseek_v4_flash_latency",
-            {
-                "only": [
-                    "makora",
-                    "together",
-                    "wafer/fast",
-                    "baidu/fp8",
-                ],
-                "sort": {"by": "latency", "partition": "none"},
-                "allow_fallbacks": True,
-            },
-        ),
-        (
-            "deepseek_v4_flash_41",
-            "managed_china",
-            "deepseek_v4_flash_41_strict",
-            {
-                "only": ["inference-net", "deepseek"],
-                "allow_fallbacks": False,
-            },
-        ),
-    ],
-)
+@pytest.mark.parametrize("primary_connection", ["managed", "managed_china", "openrouter"])
 async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
     monkeypatch,
-    model: str,
     primary_connection: str,
-    expected_route: str,
-    expected_preferences: dict[str, object],
 ) -> None:
     fake_client = FakeAsyncClient()
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
     resolved = resolve_llm_config(
         RuntimeResolutionInput(
             translation=TranslationRuntimeIntent(
-                model=model,
+                model="deepseek_v4_flash_41",
                 connection=primary_connection,
             ),
             openrouter=OpenRouterRuntimeIntent(selected_source="byok"),
@@ -604,7 +517,8 @@ async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
 
     assert resolved.fallback is not None
     fallback = resolved.fallback.target
-    assert fallback.provider_routing == expected_route
+    assert fallback == resolved.primary
+    assert fallback.provider_routing == "deepseek_v4_flash_41_strict"
     client = HttpxOpenRouterClient(
         api_key="test-key",
         model=fallback.model,
@@ -617,7 +531,9 @@ async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
         source_language="ko-KR",
         target_language="zh-CN",
     )
-    assert fake_client.last_request["json"]["provider"] == expected_preferences
+    body = fake_client.last_request["json"]
+    assert body["model"] == "deepseek/deepseek-v4.1-flash-1017"
+    assert body["provider"]["allow_fallbacks"] is False
 
 
 @pytest.mark.asyncio

@@ -111,7 +111,6 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (本地)** | 无限制 | 无限制 | 5,000 次 | 7,260 次 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020 次 | 17,020 次 | 3,860 次 | 5,090 次 |
 | **Qwen 3.8 Flash** | 7,460 次 | 7,460 次 | 2,990 次 | 3,680 次 |
 
 ### 每次发言成本
@@ -130,13 +129,12 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.001 元 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.0014 元 |
 | **Qwen 3.8 Flash** | ~0.001 元 | ~0.001 元 | ~0.002 元 | ~0.002 元 |
 
 *   *(假设输入 900 token + 输出 12 token) × 每次发言平均 LLM 调用次数 1.2 次*
 *   *每 1 美元可用次数以「每次发言成本」表中四舍五入前的计算值为准*
 *   *所有费用与可用次数均为近似计算*
-*   *DeepSeek V4.1 Flash 假设缓存命中率为 70%，V4 Flash（OpenRouter）为 60%*
+*   *DeepSeek V4.1 Flash 假设缓存命中率为 70%*
 *   *GPT-6 Luna 按 OpenAI API 价格计算，假设无缓存折扣；通过 ChatGPT 连接时不产生 API 费用，而是使用 Codex 额度*
 *   *Qwen API 计费以北京区域为准*
 *   *资费标准截至：2026 年 10 月 17 日*

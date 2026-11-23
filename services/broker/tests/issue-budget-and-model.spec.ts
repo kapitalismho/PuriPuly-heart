@@ -23,8 +23,6 @@ const CURATED_MANAGED_MODEL_POOL = [
   'google/gemma-4-26b-a4b-it',
   'google/gemma-4-31b-it',
   'deepseek/deepseek-v4.1-flash-1017',
-  'deepseek/deepseek-v4-flash-0731',
-  'deepseek/deepseek-v4-flash',
 ];
 
 describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
@@ -55,13 +53,15 @@ describe('POST /v1/providers/openrouter/issue policy enforcement', () => {
       },
       message: 'budget_usd must equal 0.07',
     },
-    {
-      name: 'model',
-      overrides: {
-        model: 'openai/gpt-4.1-mini',
-      },
+    ...[
+      'openai/gpt-4.1-mini',
+      'deepseek/deepseek-v4-flash-0731',
+      'deepseek/deepseek-v4-flash',
+    ].map((model) => ({
+      name: `model ${model.replace('/', '-')}`,
+      overrides: { model },
       message: `model must be one of ${CURATED_MANAGED_MODEL_POOL.join(', ')}`,
-    },
+    })),
   ] satisfies PolicyViolationCase[])(
     'rejects invalid $name values without consuming the pending_release entitlement',
     async (testCase: PolicyViolationCase) => {

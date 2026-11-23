@@ -69,13 +69,6 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
     )
-    assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH) == (
-        TranslationConnection.OPENROUTER,
-    )
-    assert (
-        default_translation_connection(TranslationModel.DEEPSEEK_V4_FLASH)
-        == TranslationConnection.OPENROUTER
-    )
     assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH_41) == (
         TranslationConnection.MANAGED,
         TranslationConnection.MANAGED_CHINA,
@@ -243,23 +236,13 @@ def test_encrypted_file_secret_store_does_not_store_plaintext(tmp_path):
     assert "sk-SECRET" not in json.dumps(raw)
 
 
-def test_parse_openrouter_llm_model_accepts_legacy_deepseek_flash() -> None:
-    assert (
-        parse_openrouter_llm_model("deepseek/deepseek-v4-flash")
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    )
-    assert (
-        parse_openrouter_llm_model("  deepseek/deepseek-v4-flash  ")
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    )
-    assert (
-        parse_openrouter_llm_model("deepseek/deepseek-v4-flash-0731")
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    )
-    assert (
-        parse_openrouter_llm_model(OpenRouterLLMModel.DEEPSEEK_V4_FLASH)
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-    )
+@pytest.mark.parametrize(
+    "model",
+    ["deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-flash-0731"],
+)
+def test_parse_openrouter_llm_model_rejects_retired_deepseek_40(model: str) -> None:
+    with pytest.raises(ValueError):
+        parse_openrouter_llm_model(model)
 
 
 @pytest.mark.parametrize(

@@ -976,7 +976,7 @@ def test_update_api_visibility_shows_deepseek_key(
 ) -> None:
     settings = _vnext(
         llm="deepseek",
-        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
 
@@ -1044,7 +1044,7 @@ def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
             True,
         ),
         (
-            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
             TranslationConnection.MANAGED_CHINA,
             OpenRouterCredentialSource.MANAGED,
             None,
@@ -2634,7 +2634,7 @@ def test_on_llm_selected_restores_saved_connection_history(
         apply_provider_intent(
             settings_events.settings, pending
         ).intent.translation.deepseek.llm_model
-        == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
+        == DeepSeekLLMModel.FLASH.value
     )
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash_41")
     assert view._translation_connection_text.content.value == t(
@@ -2837,17 +2837,17 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
     assert view._llm_text.content.value == t("provider.gemma4_26b_31b")
 
 
-def test_saved_deepseek_v4_flash_still_displays_its_openrouter_connection(
+def test_saved_deepseek_41_displays_its_openrouter_connection(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         connection=TranslationConnection.OPENROUTER.value,
     )
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
 
-    assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
+    assert view._llm_text.content.value == t("provider.deepseek_v4_flash_41")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.openrouter"
     )
@@ -3385,12 +3385,24 @@ def test_on_llm_selected_stages_byok_even_when_legacy_openrouter_key_exists(
     )
 
 
+@pytest.mark.parametrize(
+    ("model", "expected_alias"),
+    [
+        (TranslationModel.GPT_6_LUNA, OpenRouterSelectionAlias.GPT_6_LUNA_BYOK),
+        (TranslationModel.DEEPSEEK_V4_FLASH_41, OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK),
+    ],
+)
 def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
-    monkeypatch: pytest.MonkeyPatch, settings_events
+    monkeypatch: pytest.MonkeyPatch,
+    settings_events,
+    model: TranslationModel,
+    expected_alias: OpenRouterSelectionAlias,
 ) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.OPENAI)
-    settings = _vnext(settings, system_prompt="G")
+    settings = _vnext(
+        model=model,
+        connection=TranslationConnection.OFFICIAL_BYOK,
+        system_prompt="G",
+    )
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
     requested: list[object] = []
     view.on_request_openrouter_pkce = requested.append
@@ -3398,7 +3410,7 @@ def test_openrouter_pkce_button_requests_auth_for_current_byok_selection(
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
     view._on_openrouter_pkce_click(None)
 
-    assert requested[0].selection_alias == OpenRouterSelectionAlias.GPT_6_LUNA_BYOK
+    assert requested[0].selection_alias == expected_alias
     assert requested[0].system_prompt == "G"
     assert any(
         isinstance(edit, TranslationSelectionEdit) for edit in requested[0].provider_intent.edits

@@ -2257,9 +2257,9 @@ def test_discord_managed_auth_byok_clears_managed_china_translation_state() -> N
         openrouter_source="managed",
         openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED.value,
         openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value,
-        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT.value,
         connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA.value,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA.value,
         },
     )
     app._ui_application = SimpleNamespace(

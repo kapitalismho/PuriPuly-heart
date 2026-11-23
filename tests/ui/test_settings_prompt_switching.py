@@ -312,7 +312,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
         "settings.translation_model.gpt_6_luna.description"
     )
     assert managed[TranslationModel.GPT_6_LUNA.value].description
-    assert TranslationModel.DEEPSEEK_V4_FLASH.value not in values
+    assert "deepseek_v4_flash" not in values
     deepseek_v4_flash_41 = managed[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
     assert deepseek_v4_flash_41.section == t("settings.translation_model.section.recommended_cloud")
     assert deepseek_v4_flash_41.description == t(
@@ -431,35 +431,9 @@ def test_luna_connection_modal_describes_chatgpt_connection(monkeypatch, setting
     assert descriptions[TranslationConnection.CHATGPT.value]
 
 
-@pytest.mark.parametrize(
-    ("model", "expected_connections"),
-    [
-        (
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            [TranslationConnection.OPENROUTER],
-        ),
-        (
-            TranslationModel.DEEPSEEK_V4_FLASH_41,
-            [
-                TranslationConnection.MANAGED,
-                TranslationConnection.MANAGED_CHINA,
-                TranslationConnection.OPENROUTER,
-                TranslationConnection.OFFICIAL_BYOK,
-            ],
-        ),
-    ],
-)
-def test_deepseek_connection_modal_exposes_version_specific_choices(
-    monkeypatch,
-    model: TranslationModel,
-    expected_connections: list[TranslationConnection],
-    settings_events,
-) -> None:
-    connection = (
-        TranslationConnection.OPENROUTER
-        if model == TranslationModel.DEEPSEEK_V4_FLASH
-        else TranslationConnection.MANAGED
-    )
+def test_deepseek_41_connection_modal_exposes_all_routes(monkeypatch, settings_events) -> None:
+    model = TranslationModel.DEEPSEEK_V4_FLASH_41
+    connection = TranslationConnection.MANAGED
     settings = _settings(
         model=model.value,
         connection=connection.value,
@@ -481,7 +455,10 @@ def test_deepseek_connection_modal_exposes_version_specific_choices(
     view._on_translation_connection_click(None)
 
     assert [option.value for option in captured["options"]] == [
-        connection.value for connection in expected_connections
+        TranslationConnection.MANAGED.value,
+        TranslationConnection.MANAGED_CHINA.value,
+        TranslationConnection.OPENROUTER.value,
+        TranslationConnection.OFFICIAL_BYOK.value,
     ]
     assert captured["current"] == connection.value
 

@@ -1361,6 +1361,32 @@ async def test_declared_extension_secret_roundtrip_is_private_and_revision_safe(
 
         catalog = await control.query("settings.choices", {})
         assert "sample" in catalog["choices"]["translation.http_extension_id"]
+        for field in (
+            "translation.model",
+            "translation.connection",
+            "translation.connection_history",
+            "translation.previous_llm_model",
+        ):
+            assert "deepseek_v4_flash" not in catalog["choices"][field]
+            assert "deepseek_v4_flash_41" in catalog["choices"][field]
+        assert catalog["choices"]["translation.connection"]["deepseek_v4_flash_41"] == [
+            "managed",
+            "managed_china",
+            "openrouter",
+            "official_byok",
+        ]
+        providers = catalog["providers"]
+        assert "deepseek/deepseek-v4-flash-0731" not in providers["openrouter_models"]
+        assert "deepseek/deepseek-v4.1-flash-1017" in providers["openrouter_models"]
+        assert {
+            "deepseek_v4_flash_managed",
+            "deepseek_v4_flash_byok",
+        }.isdisjoint(providers["openrouter_selection_aliases"])
+        assert {
+            "deepseek_v4_flash_41_managed",
+            "deepseek_v4_flash_41_byok",
+        } <= set(providers["openrouter_selection_aliases"])
+        assert "deepseek-flash" in providers["deepseek_llm_models"]
         terms = await control.query("consent.peer_translation", {})
         assert terms["accepted"] is False
         assert terms["terms"] == t("peer_translation_eula.body")
@@ -1412,6 +1438,10 @@ async def test_declared_extension_secret_roundtrip_is_private_and_revision_safe(
             (
                 "settings.apply",
                 {"changes": {"osc.connection": {"mode": "off", "receive_port": True}}},
+            ),
+            (
+                "settings.apply",
+                {"changes": {"translation.model": "deepseek_v4_flash"}},
             ),
             (
                 "settings.apply",

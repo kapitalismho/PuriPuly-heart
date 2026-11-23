@@ -457,7 +457,6 @@
   "provider.openrouter": "OpenRouter",
   "provider.custom_http": "Custom HTTP API",
   "provider.deepseek": "DeepSeek",
-  "provider.deepseek_v4_flash": "DeepSeek V4 Flash",
   "provider.deepseek_v4_flash_41": "DeepSeek V4.1 Flash",
   "provider.gpt_6_luna": "GPT-6 Luna",
   "provider.gemma4_26b_31b": "Gemma 4 26B + 31B",

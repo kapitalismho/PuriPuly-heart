@@ -163,7 +163,7 @@ def test_change_blocks_merge_coupled_settings_and_format_values():
             "peer_expected_languages": ["en", "ja", "ko"],
         },
         "previous": {
-            "translation.model": "deepseek_v4_flash",
+            "translation.model": "deepseek_v4_flash_41",
             "translation.connection": "openrouter",
             "overlay.translation.enabled": True,
             "peer_vad.speech_threshold": 0.5,
@@ -198,7 +198,7 @@ def test_change_blocks_keep_routes_indivisible_and_each_language_separate():
                 "languages": {"source": "en", "target": "de"},
             },
             "previous": {
-                "translation.model": "deepseek_v4_flash",
+                "translation.model": "deepseek_v4_flash_41",
                 "translation.connection": "openrouter",
                 "audio.input_host_api": "MME",
                 "audio.input_device": "Microphone 1",

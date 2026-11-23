@@ -61,15 +61,18 @@ def test_llm_provider_signature_tracks_all_runtime_inputs() -> None:
     assert _signature(direct) == _signature(different_identity)
 
     routed = _with_translation(
-        canonical,
-        openrouter_selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value,
+        baseline,
+        model="deepseek_v4_flash_41",
+        connection="managed",
+        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value,
+        openrouter_selection_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED.value,
         openrouter_provider_routing=OpenRouterProviderRouting.DEFAULT.value,
     )
-    deepseek_only = _with_translation(
+    strict_routing = _with_translation(
         routed,
-        openrouter_provider_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+        openrouter_provider_routing=OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT.value,
     )
-    assert _signature(routed) != _signature(deepseek_only)
+    assert _signature(routed) != _signature(strict_routing)
 
     local = replace(
         baseline,

@@ -337,7 +337,6 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
     TranslationModel.MANAGED_GEMMA_26B: "provider.managed_gemma_26b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
-    TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
     TranslationModel.GPT_6_LUNA: "provider.gpt_6_luna",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
@@ -448,10 +447,10 @@ def _derive_openrouter_selection_alias(
         if selected_source == OpenRouterCredentialSource.MANAGED:
             return OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
         return OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
-    if llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
+    if llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41:
         if selected_source == OpenRouterCredentialSource.MANAGED:
-            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-        return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
+            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED
+        return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
     if selected_source == OpenRouterCredentialSource.MANAGED:
         return OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
     return OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
@@ -3214,8 +3213,8 @@ class SettingsView(ft.Column):
             return OpenRouterSelectionAlias.GPT_6_LUNA_BYOK
         if settings.openrouter_llm_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
             return OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-        if settings.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
-            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+        if settings.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41:
+            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED
         return OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
 
     def _openrouter_selection_profile(self, settings: ProviderSettingsSnapshot | None):
@@ -5046,20 +5045,6 @@ class SettingsView(ft.Column):
                 OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
                 if openrouter_source == OpenRouterCredentialSource.MANAGED
                 else OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
-            )
-        elif model == TranslationModel.DEEPSEEK_V4_FLASH:
-            llm_provider = LLMProviderName.OPENROUTER
-            openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-            openrouter_source = (
-                OpenRouterCredentialSource.MANAGED
-                if connection
-                in {TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA}
-                else OpenRouterCredentialSource.BYOK
-            )
-            openrouter_alias = (
-                OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-                if openrouter_source == OpenRouterCredentialSource.MANAGED
-                else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
             )
         elif model == TranslationModel.DEEPSEEK_V4_FLASH_41:
             llm_provider = (

@@ -18,6 +18,7 @@ from puripuly_heart.app import wiring
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.config import resolved as resolved_config
 from puripuly_heart.config import runtime_resolution
+from puripuly_heart.config.llm_profiles import OPENROUTER_MAIN_SELECTION_ALIASES
 from puripuly_heart.config.prompts import load_prompt, load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
@@ -272,7 +273,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             broker_base_url=None,
         ),
         direct=runtime_resolution.DirectProviderRuntimeIntent(
-            deepseek_v4_flash_model="deepseek-v4-flash",
             qwen_38_flash_model="qwen3.8-flash",
             qwen_region=QwenRegion.BEIJING,
             local_llm_backend="openai",
@@ -624,6 +624,11 @@ def test_prompt_loader_prefers_named_files_then_defaults(
         load_prompt_for_provider("openai")
 
 
+def test_openrouter_selection_aliases_match_snapshot() -> None:
+    expected = _load_snapshot()["provider_aliases"]["openrouter_main_selection_aliases"]
+    assert tuple(expected) == OPENROUTER_MAIN_SELECTION_ALIASES
+
+
 def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() -> None:
     snapshot = _load_snapshot()["provider_runtime_public_config"]
 
@@ -635,6 +640,9 @@ def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() ->
     )
     assert tuple(snapshot["openrouter_runtime_intent_fields"]) == tuple(
         field.name for field in fields(runtime_resolution.OpenRouterRuntimeIntent)
+    )
+    assert tuple(snapshot["direct_provider_runtime_intent_fields"]) == tuple(
+        field.name for field in fields(runtime_resolution.DirectProviderRuntimeIntent)
     )
     assert tuple(snapshot["resolved_llm_config_fields"]) == tuple(
         field.name for field in fields(resolved_config.ResolvedLLMConfig)

@@ -110,7 +110,6 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | 無制限 | 無制限 | 5,000回 | 7,260回 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020回 | 17,020回 | 3,860回 | 5,090回 |
 | **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 3,680回 |
 
 ### 発話あたりのコスト
@@ -129,13 +128,12 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | 0円 | 0円 | ~0.03円 | ~0.02円 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
 
 *   *（入力 900トークン + 出力 12トークン）× 発話1回あたりの平均LLM呼び出し回数 1.2回と仮定*
 *   *1ドルあたりの使用可能回数は、発話あたりのコスト表の四捨五入前の値を基準に算出*
 *   *すべてのコストと使用可能回数は概算*
-*   *DeepSeek V4.1 Flashはキャッシュヒット率70%、V4 Flash（OpenRouter）は60%を仮定しています*
+*   *DeepSeek V4.1 Flashはキャッシュヒット率70%を仮定しています*
 *   *GPT-6 LunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
 *   *Qwen APIコストは北京リージョン基準*
 *   *料金表基準: 2026年10月17日*

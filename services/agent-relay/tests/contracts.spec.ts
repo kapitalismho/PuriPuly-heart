@@ -47,6 +47,23 @@ describe('app protocol contracts', () => {
     expect(currentInstructions).not.toContain('execute_app');
   });
 
+  it.each([
+    [6, 'propose_app'],
+    [7, 'manage_proposal'],
+  ] as const)('offers DeepSeek V4.1 but not V4.0 in protocol %i', (protocol, settingsTool) => {
+    const { tools } = contracts.get(protocol)!;
+    expect(JSON.stringify(tools)).not.toContain('"deepseek_v4_flash"');
+    const parameters = tools.find(({ name }) => name === settingsTool)?.parameters;
+    expect(parameters).toHaveProperty(
+      ['$defs', 'translation_model', 'enum'],
+      expect.arrayContaining(['deepseek_v4_flash_41']),
+    );
+    expect(parameters).toHaveProperty(
+      ['properties', 'changes', 'properties', 'translation.connection_history', 'properties', 'deepseek_v4_flash_41', 'enum'],
+      ['managed', 'managed_china', 'openrouter', 'official_byok'],
+    );
+  });
+
   it.each(supportedProtocols)('serves recorded protocol %i app requests with that protocol contract', async (protocol) => {
     const contract = contracts.get(protocol)!;
     const names = contract.tools.map((tool) => tool.name);

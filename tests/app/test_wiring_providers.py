@@ -129,7 +129,7 @@ from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "qwen": ("qwen38_flash", "official_byok"),
-    "deepseek": ("deepseek_v4_flash", "official_byok"),
+    "deepseek": ("deepseek_v4_flash_41", "official_byok"),
     "local_llm": ("local_llm", "ollama"),
     "openrouter": ("gemma4_26b_31b", "openrouter"),
     "managed_gemma": ("managed_gemma", "cpu"),
@@ -602,7 +602,13 @@ def test_create_llm_provider_openrouter_uses_secret_and_model() -> None:
 
 
 @pytest.mark.parametrize(
-    "model", ["google/gemini-3.8-flash", "google/gemini-3.1-flash-lite", "unknown"]
+    "model",
+    [
+        "google/gemini-3.8-flash",
+        "google/gemini-3.1-flash-lite",
+        "deepseek/deepseek-v4-flash-0731",
+        "unknown",
+    ],
 )
 @pytest.mark.parametrize("pooled", [False, True], ids=["primary", "pool-member"])
 def test_resolved_openrouter_target_rejects_retired_or_unknown_models(
@@ -652,26 +658,27 @@ def test_create_llm_provider_canonical_qwen_byok_uses_selected_model() -> None:
     assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEFAULT
 
 
-def test_create_llm_provider_openrouter_qwen_byok_deepseek_only_keeps_identity_hedge() -> None:
-    settings = _vnext(
-        llm="openrouter",
-        model="openrouter_qwen35_flash",
-        connection="openrouter",
-        openrouter_model="qwen/qwen3.5-flash-02-23",
-        openrouter_source="byok",
-        openrouter_alias=OpenRouterSelectionAlias.QWEN35_FLASH_BYOK.value,
-        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+@pytest.mark.parametrize(
+    "route", ["deepseek_only", "deepseek_v4_flash_latency", "deepseek_v4_flash_china"]
+)
+def test_resolved_openrouter_target_rejects_retired_deepseek_routes(route: str) -> None:
+    resolved = ResolvedLLMConfig(
+        primary=ResolvedLLMTarget(
+            provider="openrouter",
+            model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value,
+            credential=ResolvedCredentialRequirement(
+                source=CREDENTIAL_SOURCE_SECRET_STORE,
+                required=True,
+                reference="openrouter:byok",
+            ),
+            provider_routing=route,
+        )
     )
     secrets = InMemorySecretStore()
-    secrets.set("openrouter_api_key", "qwen-byok-key")
+    secrets.set("openrouter_api_key", "synthetic-byok-key")
 
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
-    assert provider.inner.primary.model == OpenRouterLLMModel.QWEN_35_FLASH_02_23.value
-    assert provider.inner.primary.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    with pytest.raises(ValueError, match="OpenRouterProviderRouting"):
+        create_llm_provider_from_resolved_config(resolved, secrets=secrets)
 
 
 def test_create_llm_provider_openrouter_uses_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -707,7 +714,7 @@ def test_create_llm_provider_openrouter_uses_selected_managed_key() -> None:
     assert provider.inner.primary.api_key == "managed-key"
 
 
-def test_create_llm_provider_openrouter_deepseek_only_keeps_identity_hedge() -> None:
+def test_create_llm_provider_openrouter_deepseek_41_managed_china_keeps_strict_route() -> None:
     settings = _vnext(
         llm="openrouter",
         model="deepseek_v4_flash_41",
@@ -737,15 +744,15 @@ def test_create_llm_provider_openrouter_deepseek_only_keeps_identity_hedge() -> 
     )
 
 
-def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_keeps_identity_hedge() -> None:
+def test_create_llm_provider_openrouter_deepseek_41_byok_keeps_strict_route() -> None:
     settings = _vnext(
         llm="openrouter",
-        model="deepseek_v4_flash",
+        model="deepseek_v4_flash_41",
         connection="openrouter",
-        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+        openrouter_model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value,
         openrouter_source="byok",
-        openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value,
-        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_ONLY.value,
+        openrouter_alias=OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK.value,
+        openrouter_routing=OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT.value,
     )
     secrets = InMemorySecretStore()
     secrets.set("openrouter_api_key", "byok-key")
@@ -756,10 +763,10 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_keeps_identi
     assert isinstance(provider.inner, FallbackRacingLLMProvider)
     assert isinstance(provider.inner.primary, OpenRouterLLMProvider)
     assert provider.inner.primary.api_key == "byok-key"
-    assert provider.inner.primary.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    assert provider.inner.primary.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value
     assert (
         provider.inner.primary.provider_routing
-        == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
+        == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT
     )
 
 
@@ -779,14 +786,14 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
         fallback=ResolvedLLMFallbackPlan(
             target=ResolvedLLMTarget(
                 provider="openrouter",
-                model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+                model=OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value,
                 credential=ResolvedCredentialRequirement(
                     source=CREDENTIAL_SOURCE_SECRET_STORE,
                     required=True,
                     reference="openrouter:byok",
                 ),
                 routing_mode=OpenRouterRoutingMode.LATENCY.value,
-                provider_routing="deepseek_v4_flash_latency",
+                provider_routing="deepseek_v4_flash_41_strict",
             )
         ),
         concurrency_limit=3,
@@ -810,16 +817,16 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
     assert provider.inner.attempts[1].log_summary == (
-        "provider=openrouter, model=deepseek/deepseek-v4-flash-0731, mode=latency, "
-        "route=deepseek_v4_flash_latency, delay=1300ms"
+        "provider=openrouter, model=deepseek/deepseek-v4.1-flash-1017, mode=latency, "
+        "route=deepseek_v4_flash_41_strict, delay=1300ms"
     )
 
     fallback_provider = provider.inner.fallback.factory()
 
     assert isinstance(fallback_provider, OpenRouterLLMProvider)
-    assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
+    assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
+    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT
     assert_bounded_concurrency(provider, 3)
 
 

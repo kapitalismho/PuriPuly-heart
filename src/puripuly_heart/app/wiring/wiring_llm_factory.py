@@ -204,7 +204,7 @@ def runtime_resolution_input_from_vnext(settings: AppSettingsVNext) -> RuntimeRe
         ),
         openrouter=openrouter_intent,
         direct=DirectProviderRuntimeIntent(
-            deepseek_v4_flash_model=translation.deepseek.llm_model,
+            deepseek_flash_model=translation.deepseek.llm_model,
             qwen_38_flash_model=translation.qwen.llm_model,
             qwen_region=translation.qwen.region,
             qwen_connection=(

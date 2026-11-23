@@ -857,7 +857,6 @@ class SettingsOwner:
 
 def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> AppSettingsVNext:
     from puripuly_heart.config.llm_profiles import (
-        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
         OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         OPENROUTER_MODEL_GPT_6_LUNA,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
@@ -890,36 +889,6 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     if model == "gpt_6_luna" and connection not in {"chatgpt", "openrouter", "official_byok"}:
         connection = "chatgpt"
         translation = replace(translation, connection=connection)
-    retired_managed_connections = {"managed", "managed_china"}
-    history = dict(translation.connection_history)
-    if model == "deepseek_v4_flash" and connection in retired_managed_connections:
-        history["deepseek_v4_flash_41"] = connection
-        if history.get("deepseek_v4_flash") in retired_managed_connections:
-            history.pop("deepseek_v4_flash", None)
-        previous_llm_model = translation.previous_llm_model
-        if previous_llm_model == "deepseek_v4_flash":
-            previous_llm_model = "deepseek_v4_flash_41"
-        translation = replace(
-            translation,
-            model="deepseek_v4_flash_41",
-            connection_history=history,
-            previous_llm_model=previous_llm_model,
-        )
-        model = "deepseek_v4_flash_41"
-    elif history.get("deepseek_v4_flash") in retired_managed_connections:
-        saved_connection = history.pop("deepseek_v4_flash")
-        history.setdefault("deepseek_v4_flash_41", saved_connection)
-        previous_llm_model = translation.previous_llm_model
-        if previous_llm_model == "deepseek_v4_flash":
-            previous_llm_model = "deepseek_v4_flash_41"
-        translation = replace(
-            translation,
-            connection_history=history,
-            previous_llm_model=previous_llm_model,
-        )
-    if model == "deepseek_v4_flash" and connection == "official_byok":
-        translation = replace(translation, model="deepseek_v4_flash_41")
-        model = "deepseek_v4_flash_41"
     if model == "custom_http":
         if connection == "custom_http":
             return settings
@@ -941,17 +910,6 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
                 OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED
                 if connection == "managed"
                 else OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK
-            ),
-        }
-    elif model == "deepseek_v4_flash":
-        openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-        updates = {
-            "openrouter_model": openrouter_model,
-            "openrouter_provider_routing": "deepseek_v4_flash_latency",
-            "openrouter_selected_source": "byok",
-            "openrouter_selection_alias": openrouter_alias_for_fields(
-                model=openrouter_model,
-                source="byok",
             ),
         }
     elif model == "deepseek_v4_flash_41":

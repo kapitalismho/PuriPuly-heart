@@ -111,7 +111,6 @@ It works in many environments, including VRChat and Discord.
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 5,090 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 3,680 |
 
 ### Cost per Utterance
@@ -130,13 +129,12 @@ It works in many environments, including VRChat and Discord.
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.00027 |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
-*   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
+*   *DeepSeek V4.1 Flash assumes a 70% cache hit rate.*
 *   *GPT-6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of October 17, 2026.*

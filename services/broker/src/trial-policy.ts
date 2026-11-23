@@ -2,8 +2,6 @@ export const MANAGED_TRIAL_ALLOWED_MODELS = [
   'google/gemma-4-26b-a4b-it',
   'google/gemma-4-31b-it',
   'deepseek/deepseek-v4.1-flash-1017',
-  'deepseek/deepseek-v4-flash-0731',
-  'deepseek/deepseek-v4-flash',
 ] as const;
 
 const MANAGED_FREE_TRIAL_POLICY = {

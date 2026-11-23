@@ -87,7 +87,7 @@ def _managed_china_settings() -> AppSettingsVNext:
             settings.intent,
             translation=replace(
                 settings.intent.translation,
-                model="deepseek_v4_flash",
+                model="deepseek_v4_flash_41",
                 connection="managed_china",
                 openrouter_selected_source="managed",
             ),
@@ -128,13 +128,13 @@ def _managed_china_resolved_config() -> ResolvedLLMConfig:
     return ResolvedLLMConfig(
         primary=ResolvedLLMTarget(
             provider="openrouter",
-            model="deepseek/deepseek-v4-flash-0731",
+            model="deepseek/deepseek-v4.1-flash-1017",
             credential=ResolvedCredentialRequirement(
                 source=CREDENTIAL_SOURCE_MANAGED,
                 required=True,
                 reference="openrouter:managed_qq",
             ),
-            provider_routing="deepseek_only",
+            provider_routing="deepseek_v4_flash_41_strict",
         )
     )
 

@@ -2456,7 +2456,6 @@ async def test_new_microphone_causes_require_measured_approved_working_pair(iden
 @pytest.mark.parametrize(
     ("identity", "replacement"),
     [
-        ("quality-openrouter-gemma", "deepseek_v4_flash"),
         ("quality-openrouter-gemma", "deepseek_v4_flash_41"),
         ("fixture-slow-deepseek", "gemma4_26b_31b"),
     ],
@@ -2506,9 +2505,7 @@ async def test_openrouter_model_timeout_is_route_scoped_and_reuses_verified_acco
         ("quality-openrouter-gemma", "gpt_6_luna", "openrouter", False),
         ("fixture-slow-deepseek", "index_translate_35b", "public_api", False),
         ("quality-slow-route", "gemma4_26b_31b", "openrouter", True),
-        ("quality-slow-route", "deepseek_v4_flash", "openrouter", True),
         ("quality-slow-route", "deepseek_v4_flash_41", "openrouter", True),
-        ("quality-openrouter-gemma", "deepseek_v4_flash", "openrouter", True),
         ("quality-openrouter-gemma", "deepseek_v4_flash_41", "openrouter", True),
         ("fixture-slow-deepseek", "gemma4_26b_31b", "openrouter", True),
     ],
@@ -4356,6 +4353,8 @@ async def test_simulator_catalog_and_agent_context_preserve_production_route_cho
     assert catalog["providers"]["stt"] == choices["stt.provider"]
     assert choices["translation.model"] == [model.value for model in TranslationModel]
     assert not any(model.startswith("gemini") for model in choices["translation.model"])
+    assert "deepseek_v4_flash" not in choices["translation.model"]
+    assert "deepseek_v4_flash_41" in choices["translation.model"]
     assert choices["translation.connection"] == {
         model.value: [connection.value for connection in supported_translation_connections(model)]
         for model in TranslationModel

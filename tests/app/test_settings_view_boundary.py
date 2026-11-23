@@ -293,7 +293,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
             AppSettingsVNext().intent.translation,
             connection_history={
                 TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED.value,
-                TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA.value,
+                TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA.value,
             },
         ),
     )
@@ -311,7 +311,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
             gpu_device_id="latest-llm-gpu",
             connection_history={
                 TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.OPENROUTER.value,
-                TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK.value,
+                TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.OFFICIAL_BYOK.value,
             },
         ),
         stt=replace(
@@ -350,7 +350,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert translation.connection_history[TranslationModel.GEMMA4_26B_31B.value] == (
         TranslationConnection.OPENROUTER.value
     )
-    assert translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value] == (
+    assert translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value] == (
         TranslationConnection.OFFICIAL_BYOK.value
     )
     assert translation.connection_history[TranslationModel.GPT_6_LUNA.value] == (
@@ -609,50 +609,3 @@ def test_rolling_free_provider_selection_persists_self_and_peer() -> None:
     )
     assert peer_updated.intent.stt.provider == STTProviderName.ROLLING_FREE.value
     assert peer_updated.intent.peer_stt.provider == STTProviderName.ROLLING_FREE.value
-
-
-def test_legacy_deepseek_openrouter_model_still_builds_provider_snapshot() -> None:
-    from puripuly_heart.config.provider_values import OpenRouterLLMModel
-
-    baseline = AppSettingsVNext()
-    legacy = replace(
-        baseline,
-        intent=replace(
-            baseline.intent,
-            translation=replace(
-                baseline.intent.translation,
-                openrouter_model="deepseek/deepseek-v4-flash",
-                openrouter_selected_source="byok",
-                openrouter_selection_alias="deepseek_v4_flash_byok",
-            ),
-        ),
-    )
-
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(legacy)
-
-    assert provider.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-
-
-def test_legacy_deepseek_openrouter_model_builds_release_runtime_config() -> None:
-    from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
-        build_openrouter_release_runtime_config_from_vnext,
-    )
-    from puripuly_heart.config.provider_values import OpenRouterLLMModel
-
-    baseline = AppSettingsVNext()
-    legacy = replace(
-        baseline,
-        intent=replace(
-            baseline.intent,
-            translation=replace(
-                baseline.intent.translation,
-                openrouter_model="deepseek/deepseek-v4-flash",
-                openrouter_selected_source="byok",
-                openrouter_selection_alias="deepseek_v4_flash_byok",
-            ),
-        ),
-    )
-
-    config = build_openrouter_release_runtime_config_from_vnext(legacy)
-
-    assert config.llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH

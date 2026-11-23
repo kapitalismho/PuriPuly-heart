@@ -23,8 +23,6 @@ const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
 );
 const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
   'deepseek/deepseek-v4.1-flash-1017',
-  'deepseek/deepseek-v4-flash-0731',
-  'deepseek/deepseek-v4-flash',
 ]);
 const BOOTSTRAP_PLACEHOLDER = '__BOOTSTRAP_REQUIRED__';
 const OPENROUTER_API_BASE_URL = new URL('https://openrouter.ai');
@@ -163,19 +161,15 @@ describe('broker deploy smoke helpers', () => {
         true,
       ),
     ).toThrow(/must differ from the managed allowlisted models/i);
+  });
+
+  it.each([
+    'deepseek/deepseek-v4-flash-0731',
+    'deepseek/deepseek-v4-flash',
+  ])('accepts retired model %s as a disallowed probe under the source policy', (model) => {
+    expect(normalizeDisallowedModel(model, MANAGED_ALLOWLIST_MODELS, true)).toBe(model);
     expect(() =>
-      normalizeDisallowedModel(
-        'deepseek/deepseek-v4-flash-0731',
-        MANAGED_ALLOWLIST_MODELS,
-        true,
-      ),
-    ).toThrow(/must differ from the managed allowlisted models/i);
-    expect(() =>
-      normalizeDisallowedModel(
-        'deepseek/deepseek-v4-flash',
-        MANAGED_ALLOWLIST_MODELS,
-        true,
-      ),
+      normalizeDisallowedModel(model, [...MANAGED_ALLOWLIST_MODELS, model], true),
     ).toThrow(/must differ from the managed allowlisted models/i);
   });
 
@@ -183,10 +177,7 @@ describe('broker deploy smoke helpers', () => {
     expect(POSITIVE_ROUTING_PROBE_MODELS).toEqual([
       'google/gemma-4-31b-it',
       'deepseek/deepseek-v4.1-flash-1017',
-      'deepseek/deepseek-v4-flash-0731',
-      'deepseek/deepseek-v4-flash',
     ]);
-    expect(MANAGED_ALLOWLIST_MODELS).toEqual(MANAGED_TRIAL_ALLOWED_MODELS);
   });
 
   it('computes QQ assertion credentials as lowercase HMAC-SHA256 hex', async () => {
@@ -401,9 +392,10 @@ describeDeploySmoke('broker direct deploy smoke', () => {
     expect(foundation.body.trialProviderPolicy?.managedFreeTrial?.provider).toBe(
       'OpenRouter',
     );
-    expect(foundation.body.trialProviderPolicy?.managedFreeTrial?.models).toEqual(
-      expect.arrayContaining([...MANAGED_ALLOWLIST_MODELS]),
-    );
+    expect(
+      foundation.body.trialProviderPolicy?.managedFreeTrial?.models,
+      'Deployed broker allowlist must match the source policy before live issuance',
+    ).toEqual(MANAGED_ALLOWLIST_MODELS);
 
     const qqIdentity = `deploy-smoke-qq-${crypto.randomUUID()}`;
     const qqCredential = await computeHmacSha256Hex(
