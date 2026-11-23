@@ -52,7 +52,7 @@ describe('entry classification relay', () => {
       { name: 'context_general', type: 'choice' }, { name: 'context_relation', type: 'choice' },
     ]);
     expect(sent.questions[0].choices.map(({ value }: { value: string }) => value)).toEqual(['work', 'social', 'out_of_scope', 'unclear']);
-    expect(sent.questions[1].choices.map(({ value }: { value: string }) => value)).toEqual(['low', 'medium', 'high']);
+    expect(sent.questions[1].choices.map(({ value }: { value: string }) => value)).toEqual(['medium', 'high']);
     for (const question of sent.questions.slice(2, -1)) {
       expect(question.choices.map(({ value }: { value: string }) => value)).toEqual(['include', 'omit', 'unclear']);
     }

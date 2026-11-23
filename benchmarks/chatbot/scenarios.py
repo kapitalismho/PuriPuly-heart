@@ -181,7 +181,7 @@ SCENARIOS = (
             ),
             DialogueBeat(
                 "승인은 미루고 '오늘 회의는 세 시로 미뤄졌습니다'를 일본어로 번역해 달라고 해. 앱 질문은 아니고 카드도 아직 누르지 마.",
-                ("out_of_scope",),
+                ("out_of_scope", "work"),
             ),
             DialogueBeat(
                 "유료 말고 지금 무료 설정을 그대로 쓰겠다고 해. 남아 있는 카드는 거절해.", ("work",)

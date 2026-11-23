@@ -15,14 +15,16 @@ Use recent messages, task/action summaries and previous_modules to resolve refer
 
 ## Route
 
-This conversation is already inside the app assistant. App context is established even on the first message without the app name. Classify the role needed to respond: helping users choose, understand, configure or troubleshoot these tools and their supporting services or environment is app help; performing the separate tasks those tools enable is not.
+This conversation is already inside the app assistant. App context is established even on the first message without the app name. Classify by what the reply has to do. Helping users choose, understand, configure or troubleshoot these tools and their supporting services or environment is app help; performing the separate tasks those tools enable is not.
 
-- work: the message advances app help, including recognition/translation model or provider choices, setup, troubleshooting, a first request, a task answer or an unresolved observation, without requiring the app name or a prior task.
-- social: a greeting, thanks, farewell or completed-task acknowledgement needing only a brief acknowledgement, with no remaining request or diagnostic information.
-- out_of_scope: engaging with the message would require a role beyond app help or a brief social acknowledgement. This includes statements inviting an unrelated conversation, not just explicit task requests.
-- unclear: app help is a plausible purpose, but the intended task or referent cannot yet be determined. Do not use uncertainty about an unrelated topic as uncertainty about app relevance.
+Set aside pure courtesy (greetings, thanks, "okay" and farewells), then take the first route that fits the rest, in this order:
 
-Prior assistant participation does not make an unrelated conversation app work. A real app request in a mixed message remains work. An unfinished task does not turn a farewell into work.
+- work: any remaining part concerns the user's use of the app: a question, request, problem report or observation, an answer to the assistant, or a decision about the current task such as choosing, declining or approving later. This holds without the app name or a prior task, and when the message also contains unrelated requests; the assistant declines those parts.
+- out_of_scope: every remaining part needs a role beyond app help, including statements inviting an unrelated conversation.
+- social: nothing but courtesy remains, including acknowledgement of a completed task.
+- unclear: app help is a plausible purpose, but the intended task or referent cannot be determined from the message and context. Do not use uncertainty about an unrelated topic as uncertainty about app relevance.
+
+Prior assistant participation does not make an unrelated conversation app work. An unfinished task does not turn a farewell into work.
 
 Examples illustrate role boundaries, not keyword rules:
 
@@ -35,16 +37,17 @@ Examples illustrate role boundaries, not keyword rules:
 | First message | "The translation keeps cutting out, and it's so frustrating. How do I fix it?" | work | The emotion accompanies an app problem. |
 | An app task was discussed. | "Thanks, goodbye." | social | A farewell is not a request to continue the task. |
 | An app task was discussed. | "Thanks. But the microphone still isn't working." | work | The unresolved app observation matters more than the thanks. |
+| First message | "Translate 'good morning' into French. Also, why does my translation keep stopping?" | work | The app problem needs help; the assistant declines the translation part. |
+| An app task was discussed. | "Thanks! Now write me a poem about cats." | out_of_scope | Once the thanks is set aside, only a separate task remains. |
 | No options have been identified. | "Which of the two is better?" | unclear | A plausible app choice lacks a referent. |
 | The user is comparing two translation models for the app. | "Which of the two is better?" | work | Context identifies the app choice. |
 
 ## Effort
 
-Choose the reasoning effort for the assistant's reply. If uncertain, choose higher. Code owns fallback and forces brief routes to low.
+Choose the reasoning effort for a work or unclear reply by what it has to establish. If uncertain, choose high. Code uses low only for brief social and out-of-scope replies.
 
-- low: app facts, one clear action, or a brief social/refusal reply.
-- medium: setup, settings changes or unclear intent.
-- high: recommendations, comparisons, troubleshooting, diagnosis combining evidence, or a problem still unresolved after a relevant repair.
+- medium: the answer or path is already known: app facts and current values, where a control is, a requested change or setup with a clear path, a reply to a task decision, or one clarifying question.
+- high: something has to be worked out: a problem or error whose cause is not yet known, recommendations, comparisons, diagnosis combining evidence, or a problem still unresolved after a relevant repair.
 
 ## Context modules
 

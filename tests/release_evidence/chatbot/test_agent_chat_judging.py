@@ -684,7 +684,6 @@ def test_pending_card_survival_is_checked_at_the_scripted_detour_on_any_route(wi
         app.confirmation_observations[-1]["confirmation"] = None
     result = code_judgment(app, transcript, archive, model_calls=calls, actions=actions)
     assert result["pending_card_preserved"] is not withdrawn
-    assert not result["routing"]["required_pass"]
 
 
 def report_evidence_calls(*, inspection_first=True, source="initial_context"):
