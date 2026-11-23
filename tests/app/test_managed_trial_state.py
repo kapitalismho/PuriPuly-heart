@@ -69,24 +69,40 @@ def test_puri_accounts_context_carries_only_known_trial_states(trial, expected):
 
 
 @pytest.mark.parametrize("selected", [True, False])
-async def test_translation_context_carries_trial_only_for_selected_managed_connection(selected):
+async def test_translation_context_carries_access_without_accounts_module(selected):
     control = Records()
     control.values["accounts.status"] = {
+        "chatgpt": {"available": True, "signed_in": True, "sign_in_required": False},
         "managed": {
-            "provider": "discord",
+            "provider": "discord" if selected else None,
             "available": True,
             "selected": selected,
-            "credential_present": False,
-            "trial": "claimed_without_key",
-        }
+            "credential_present": False if selected else None,
+            "trial": "claimed_without_key" if selected else "claimed",
+        },
     }
     snapshot = await collect_agent_context(control, activity=AgentActivity(), topic="translation")
     context = model_context(snapshot, topic="translation")
     assert context["missing"] == []
 
     assert "accounts" not in context
-    if selected:
-        assert context["translation"]["managed"]["trial"] == "claimed_without_key"
-        assert context["translation"]["managed"]["credential_present"] is False
-    else:
-        assert "managed" not in context["translation"]
+    assert "languages" not in context
+    assert context["translation"]["managed"]["trial"] == (
+        "claimed_without_key" if selected else "claimed"
+    )
+    assert context["translation"]["managed"]["selected"] is selected
+    assert context["translation"]["chatgpt"]["signed_in"] is True
+    assert context["translation"]["input_languages"]["languages.source"] == "ko"
+
+
+async def test_translation_and_recognition_keep_failed_queries_unknown():
+    control = Records()
+    control.fail = {"accounts.status", "settings.current"}
+    snapshot = await collect_agent_context(control, activity=AgentActivity())
+    context = model_context(snapshot, modules=("translation", "recognition"))
+
+    assert {"accounts.status", "settings.current"} <= set(context["missing"])
+    assert context["translation"]["managed"]["trial"] == "unknown"
+    assert context["translation"]["chatgpt"]["signed_in"] is None
+    for module in ("translation", "recognition"):
+        assert set(context[module]["input_languages"].values()) == {None}

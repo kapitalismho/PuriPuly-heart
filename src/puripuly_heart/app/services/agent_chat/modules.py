@@ -435,14 +435,30 @@ def _module(snapshot: Mapping, module: str, localize: Callable[[str], str]) -> t
     result, catalog = _settings(snapshot, MODULE_FIELDS[module], localize)
     if module in MODULE_KEYS:
         result.update(_keys(snapshot, module))
-    if module == "translation":
-        managed = _mapping(_mapping(snapshot.get("accounts")).get("managed"))
-        if managed.get("selected") is True:
-            result["managed"] = {
-                key: deepcopy(managed[key])
-                for key in ("provider", "credential_present", "trial", "budget")
-                if key in managed
-            }
+    if module == "translation" and "accounts" in snapshot:
+        accounts = _mapping(snapshot.get("accounts"))
+        managed = _mapping(accounts.get("managed"))
+        chatgpt = _mapping(accounts.get("chatgpt"))
+        result["managed"] = {
+            key: deepcopy(managed[key])
+            for key in ("provider", "selected", "credential_present", "trial", "budget")
+            if key in managed
+        }
+        result["chatgpt"] = {
+            key: chatgpt[key]
+            for key in ("signed_in", "sign_in_required", "in_progress")
+            if key in chatgpt
+        }
+    if module in {"translation", "recognition"}:
+        values = (
+            _mapping(snapshot.get("settings"))
+            if "settings.current" not in snapshot.get("missing", ())
+            else {}
+        )
+        result["input_languages"] = {
+            field: deepcopy(values.get(_SETTING_VALUE_PATHS[field]))
+            for field in ("languages.source", "languages.peer_source", "languages.peer_source_mode")
+        }
     if module == "audio" and isinstance(snapshot.get("audio"), Mapping):
         result["devices"] = {
             key: deepcopy(value)
