@@ -501,7 +501,9 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             self.managed: _AsyncioOverlayProcess | None = None
             self.overlay_instance_id = "overlay-test"
 
-        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
+        def configure_runtime(
+            self, *, quiet_tail_profile: str | None, handoff_experiment: str
+        ) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -633,7 +635,9 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         def __init__(self) -> None:
             self.managed: _AsyncioOverlayProcess | None = None
 
-        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
+        def configure_runtime(
+            self, *, quiet_tail_profile: str | None, handoff_experiment: str
+        ) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
@@ -1678,7 +1682,9 @@ async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_
             self.spawn_calls = 0
             self.last_process: FakeOverlayManagedProcess | None = None
 
-        def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
+        def configure_runtime(
+            self, *, quiet_tail_profile: str | None, handoff_experiment: str
+        ) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
