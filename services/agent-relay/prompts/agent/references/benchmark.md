@@ -1,6 +1,6 @@
 # Model comparison evidence
 
-Korean dialogue → English/Japanese/Simplified Chinese; Astra-high MQM penalty, lower is better. Quality evidence, not speed or default recommendations.
+Source: the Korean multi-turn translation benchmark linked from the README, recorded here 2026-11-07. Korean dialogue translated into English, Japanese and Simplified Chinese, scored as GEMBA-MQM penalty by a GPT-6 Astra judge at high effort; lower is better. The README reports 216 multi-turn samples for Experiment 2. These are quality results for that language set and these exact pipelines only, not speed, cost, other input languages or the product's recommendation policy, which the guide states separately. Name those conditions when citing a result.
 
 ## Experiment 1: Translation
 

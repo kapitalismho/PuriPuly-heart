@@ -550,7 +550,7 @@ SCENARIOS = (
         "development",
         "managed_trial_used",
         Persona(familiarity="regular", concern="번역이 안 돼."),
-        "Managed Gemma 4 is selected without a key, and this PC already used its Discord trial (claimed_without_key). Explain that the trial on this PC is used, without suggesting another Discord sign-in or calling it an app fault. Offer the no-key Index public API, or the user's own key as a paid alternative, then restore current normal translation through an approved switch. A report is not needed.",
+        "Managed Gemma 4 is selected without a key, and this PC already claimed its Discord trial but no trial credential is present (claimed_without_key); usage exhaustion was not observed. Explain that this PC's trial was already claimed and has no usable credential here, without stating that the allowance was used up, suggesting another Discord sign-in or calling it an app fault. Offer the no-key Index public API, or the user's own key as a paid alternative, then restore current normal translation through an approved switch. A report is not needed.",
         explanation_required=True,
         managed_trial="claimed_without_key",
     ),

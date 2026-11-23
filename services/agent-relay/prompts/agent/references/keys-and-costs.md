@@ -1,6 +1,6 @@
 # Keys and costs
 
-Approximate counts per US\$1. Translation-only counts API requests, including retries/speculation; Subscription limits are separate.
+Source: the README cost estimates as of 2026-10-17, checked 2026-10-30 and recorded here 2026-11-07. Prices and offers change, so present these figures as dated estimates, never as account balances or billing. Counts are approximate per US\$1. The ASR columns count utterances including recognition. Translation-only counts API translation requests, about 1.2 per utterance including retries/speculation, at about 900 input and 12 output tokens each. Subscription limits are separate.
 
 | Translation route | Translation-only requests | Local / Cloud Free Tier ASR | Soniox | Qwen Audio |
 | --- | ---: | ---: | ---: | ---: |
@@ -12,4 +12,4 @@ Approximate counts per US\$1. Translation-only counts API requests, including re
 | DeepSeek V4 Flash, OpenRouter | 20,400 | 17,020 | 3,860 | 5,090 |
 | Qwen 3.8 Flash, Beijing | 9,000 | 7,460 | 2,990 | 3,680 |
 
-**Free credit or generous allowance:** Deepgram \$200 trial, no expiry/card; ElevenLabs Scribe 10,000 credits/month, no card; Gemini Transcribe default Free tier. These dated offers do not establish remaining credit or account billing. Alibaba: Singapore 1M tokens/model for 90 days; eligible students in China ¥300/year.
+**Free credit or generous allowance, recorded 2026-11-07:** Deepgram \$200 trial, no expiry/card; ElevenLabs Scribe 10,000 credits/month, no card; Gemini Transcribe default Free tier. These offers say nothing about a user's remaining credit or account billing. Alibaba: Singapore 1M tokens/model for 90 days; eligible students in China ¥300/year.
