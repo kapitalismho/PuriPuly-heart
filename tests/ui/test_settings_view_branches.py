@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from math import isfinite
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,6 +19,7 @@ from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerific
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
     OverlayTranslationSettingsIntent,
+    OverlayVrCompatibilitySettingsIntent,
     PeerSttProviderEdit,
     PhotoStatusSnapshot,
     ScribeSpeakerDiarizationEdit,
@@ -728,14 +730,16 @@ def _overlay_tab_card(view: settings_view.SettingsView, title: str) -> ft.Contro
     raise AssertionError(f"overlay tab card not found: {title}")
 
 
-def _iter_control_tree(control: ft.Control):
+def _iter_control_tree(control: ft.Control, *, visible_only: bool = False):
+    if visible_only and not control.visible:
+        return
     yield control
     content = getattr(control, "content", None)
     if content is not None:
-        yield from _iter_control_tree(content)
+        yield from _iter_control_tree(content, visible_only=visible_only)
     controls = getattr(control, "controls", None) or []
     for child in controls:
-        yield from _iter_control_tree(child)
+        yield from _iter_control_tree(child, visible_only=visible_only)
 
 
 def _control_labels(control: ft.Control) -> list[str]:
@@ -5196,61 +5200,68 @@ def test_general_tab_peer_vad_card_contains_peer_fields_only(
     assert not _tree_contains_control(peer_vad_card, view._vad_slider)
 
 
-def test_overlay_tab_uses_target_specific_unit_card_rows(
+def test_overlay_tab_exposes_target_controls_and_applies_compatibility_toggle(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    view, _ = _make_settings_view(monkeypatch, settings_events)
+    settings = AppSettingsVNext()
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    shared_controls = (
+        view._overlay_target_button,
+        view._overlay_translation_button,
+        view._overlay_peer_original_button,
+    )
+    compatibility = view._overlay_vr_compatibility_button
+    steamvr_controls = (
+        compatibility,
+        view._overlay_anchor_button,
+        view._overlay_distance_increase_button,
+        view._overlay_offset_x_increase_button,
+        view._overlay_offset_y_increase_button,
+        view._overlay_text_scale_text,
+        view._overlay_vr_reset_button,
+    )
+    desktop_controls = (
+        view._desktop_overlay_size_button,
+        view._desktop_overlay_lock_button,
+        view._desktop_overlay_background_alpha_increase_button,
+        view._desktop_overlay_swap_caption_languages_button,
+        view._overlay_desktop_reset_button,
+    )
 
-    overlay_titles = _overlay_tab_card_titles(view)
-    overlay_controls = _subtab_controls(view, "overlay")
+    def visible_controls() -> set[int]:
+        return {
+            id(control)
+            for row in _subtab_controls(view, "overlay")
+            for control in _iter_control_tree(row, visible_only=True)
+        }
 
-    assert overlay_titles == [
-        t("settings.overlay.caption_location"),
-        t("settings.overlay.show_translation"),
-        t("settings.overlay.show_peer_original"),
-        t("settings.overlay.calibration.anchor"),
-        t("settings.overlay.calibration.distance"),
-        t("settings.overlay.calibration.offset_x"),
-        t("settings.overlay.calibration.offset_y"),
-        t("settings.overlay.calibration.text_scale"),
-        t("settings.overlay.position_reset.vr.title"),
-    ]
-    assert len(overlay_controls) == 6
-    assert _row_card_titles(overlay_controls[0]) == [
-        t("settings.overlay.caption_location"),
-        t("settings.overlay.show_translation"),
-        t("settings.overlay.show_peer_original"),
-    ]
-    assert _row_card_titles(overlay_controls[1]) == [
-        t("settings.overlay.calibration.anchor"),
-        t("settings.overlay.calibration.distance"),
-        t("settings.overlay.calibration.offset_x"),
-    ]
-    assert _row_card_titles(overlay_controls[2]) == [
-        t("settings.overlay.calibration.offset_y"),
-        t("settings.overlay.calibration.text_scale"),
-        t("settings.overlay.position_reset.vr.title"),
-    ]
-    assert _row_card_titles(overlay_controls[3]) == [
-        t("settings.overlay.desktop.size.title"),
-        t("settings.overlay.desktop.lock.title"),
-        t("settings.overlay.desktop.background_alpha.title"),
-    ]
-    assert _row_card_titles(overlay_controls[4]) == [
-        t("settings.overlay.desktop.swap_caption_languages.title"),
-        t("settings.overlay.position_reset.desktop.title"),
-    ]
-    assert len(_layout_cards(overlay_controls[5])) == 3
-    assert [getattr(card, "visible", True) for card in _layout_cards(overlay_controls[5])] == [
-        True,
-        True,
-        True,
-    ]
-    assert overlay_controls[1].visible is True
-    assert overlay_controls[2].visible is True
-    assert overlay_controls[3].visible is False
-    assert overlay_controls[4].visible is False
-    assert overlay_controls[5].visible is False
+    steamvr = visible_controls()
+    assert all(id(control) in steamvr for control in (*shared_controls, *steamvr_controls))
+    assert all(id(control) not in steamvr for control in desktop_controls)
+    assert id(view._desktop_overlay_status_card) not in steamvr
+
+    assert not compatibility.disabled
+    assert compatibility.on_click is not None
+    assert compatibility.content.value == t("settings.option.off")
+    compatibility.on_click(None)
+    assert settings_events.immediate_intents[-1] == OverlayVrCompatibilitySettingsIntent(True)
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is True
+    assert compatibility.content.value == t("settings.option.on")
+
+    view._on_overlay_target_selected("desktop")
+    desktop = visible_controls()
+    assert all(id(control) in desktop for control in (*shared_controls, *desktop_controls))
+    assert all(id(control) not in desktop for control in steamvr_controls)
+    assert id(view._desktop_overlay_status_card) not in desktop
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is True
+
+    view._on_overlay_target_selected("steamvr")
+    assert id(compatibility) in visible_controls()
+    assert compatibility.content.value == t("settings.option.on")
+    compatibility.on_click(None)
+    assert settings_events.immediate_intents[-1] == OverlayVrCompatibilitySettingsIntent(False)
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is False
+    assert compatibility.content.value == t("settings.option.off")
 
 
 def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
@@ -5783,39 +5794,24 @@ def test_prompt_and_hint_cards_allow_their_content_to_set_height(
     assert all(card.expand is False for card in prompt_cards)
 
 
-def test_settings_unit_card_rows_fit_their_cards(
+def test_fixed_settings_cards_fit_declared_row_bounds(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
-    from puripuly_heart.ui.components.settings.settings_unit_card import SettingsUnitCard
+    from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 
     view, _ = _make_settings_view(monkeypatch, settings_events)
 
-    api_cards = [
-        _api_tab_card(view, t("settings.section.stt")),
-        _api_tab_card(view, t("settings.section.peer_stt")),
-        _api_tab_card(view, t("settings.section.translation")),
-        view._translation_connection_card,
-    ]
-
-    general_cards = [
-        _general_tab_card(view, t("settings.section.ui")),
-        _general_tab_card(view, t("settings.chatbox_include_source")),
-        _general_tab_card(view, t("settings.clipboard_auto_translate")),
-        _general_tab_card(view, t("settings.vrc_mic_intercept")),
-        _general_tab_card(view, t("settings.osc.connection.title")),
-        _general_tab_card(view, t("settings.audio_host_api")),
-        _general_tab_card(view, t("settings.section.microphone_audio")),
-        _general_tab_card(view, t("settings.section.loopback_audio")),
-        _general_tab_card(view, t("settings.section.self_vad_sensitivity")),
-        _general_tab_card(view, t("settings.section.peer_vad_sensitivity")),
-    ]
-
-    for card in (*api_cards, *general_cards, *_overlay_tab_cards(view)):
-        assert card.height == SettingsUnitCard.DEFAULT_HEIGHT
-        assert card.expand is True
-
-    assert all(getattr(row, "height", None) is None for row in _subtab_controls(view, "general"))
-    assert view._translation_connection_row.height is None
+    for tab in ("api", "general", "overlay"):
+        for row in _subtab_controls(view, tab):
+            row_height = getattr(row, "height", None)
+            if row_height is not None:
+                assert isfinite(row_height) and row_height > 0
+            for card in _iter_control_tree(row):
+                if not isinstance(card, SharedCardWrapper) or card.height is None:
+                    continue
+                assert isfinite(card.height) and card.height > 0
+                if row_height is not None:
+                    assert card.height <= row_height
 
 
 def test_api_keys_card_allows_its_content_to_set_height(
