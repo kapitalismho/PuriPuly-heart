@@ -426,16 +426,18 @@ class OverlayRuntimeHandle:
         self,
         failures: list[Exception],
         operation: object,
-    ) -> None:
+    ) -> object:
         try:
             if callable(operation):
                 result = operation()
             else:
                 result = operation
             if inspect.isawaitable(result):
-                await result
+                return await result
+            return result
         except Exception as exc:
             failures.append(exc)
+            return None
 
     def _mark_process_shutdown_requested(self) -> None:
         manager = self._process_manager
@@ -548,7 +550,9 @@ class OverlayRuntimeHandle:
         if manager is None:
             return True
         before = len(failures)
-        await self._attempt(failures, getattr(manager, "stop", None))
+        reason = await self._attempt(failures, getattr(manager, "stop", None))
+        if isinstance(reason, str):
+            failures.append(RuntimeError(f"Overlay process stop failed: {reason}"))
         if len(failures) != before:
             return False
         self._process_manager = None

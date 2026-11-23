@@ -875,12 +875,13 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
     class FailingOnceTerminateProcess:
         def __init__(self) -> None:
             self.terminate_calls = 0
+            self.returncode: int | None = None
 
         async def next_event(self) -> OverlayProcessEvent:
             raise AssertionError("next_event should not be called")
 
         async def wait_for_exit(self) -> int | None:
-            return None
+            return self.returncode
 
         async def finish_readers(self) -> None:
             return None
@@ -889,6 +890,7 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
             self.terminate_calls += 1
             if self.terminate_calls == 1:
                 raise RuntimeError("terminate failed SYNTHETIC_PRIVATE_CREDENTIAL_PATH")
+            self.returncode = 0
 
     manager = OverlayProcessManager()
     process = FailingOnceTerminateProcess()
@@ -903,13 +905,15 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
     assert manager._primary_diagnostics.fields["exception_class"] == "RuntimeError"
     assert "SYNTHETIC_PRIVATE" not in caplog.text
 
-    await manager.stop()
+    assert await manager.stop() == "shutdown_forced"
 
     assert process.terminate_calls == 2
     assert manager._process is None
     receipt = manager.shutdown_receipt()
     assert receipt["terminal_cause"] == "termination_unconfirmed"
     assert receipt["cleanup_succeeded"] is False
+    assert await manager.stop() is None
+    assert manager.shutdown_receipt()["terminal_cause"] == "termination_unconfirmed"
 
 
 @pytest.mark.asyncio
@@ -1718,6 +1722,58 @@ async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_
         assert manager._process is None
     finally:
         release_prepare.set()
+
+
+@pytest.mark.asyncio
+async def test_late_spawn_reap_preserves_handle_until_exit_is_confirmed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class UnconfirmedExit(FakeOverlayManagedProcess):
+        async def terminate(self) -> None:
+            self.terminated = True
+
+    manager = OverlayProcessManager()
+    child = UnconfirmedExit()
+    manifest_path = tmp_path / "overlay.json"
+    manifest_path.touch()
+    spawning = asyncio.Event()
+    release_spawn = asyncio.Event()
+
+    async def spawn(_manager, _manifest):
+        spawning.set()
+        await release_spawn.wait()
+        return tmp_path / "overlay.exe", manifest_path, child
+
+    monkeypatch.setattr(OverlayProcessManager, "_prepare_and_spawn", spawn)
+    start = asyncio.create_task(manager.start())
+    try:
+        await asyncio.wait_for(spawning.wait(), 1.0)
+        start.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await start
+        assert await manager.stop() == "termination_unconfirmed"
+        release_spawn.set()
+        reaper = manager._late_spawn_reaper
+        assert reaper is not None
+        await asyncio.wait_for(asyncio.shield(reaper), 1.0)
+        assert child.terminated and child.returncode is None
+        assert manager._process is child and manifest_path.exists()
+        assert await manager.stop() == "termination_unconfirmed"
+        assert manager._process is child and manifest_path.exists()
+
+        child._exit_future.set_result(0)
+        assert await manager.stop() is None
+        assert manager._process is None and not manifest_path.exists()
+        receipt = manager.shutdown_receipt()
+        assert receipt["exit_confirmed"] and receipt["reader_cleanup"] == "complete"
+        assert receipt["terminal_cause"] == "termination_unconfirmed"
+    finally:
+        release_spawn.set()
+        if child.returncode is None:
+            child._exit_future.set_result(0)
+        if manager._late_spawn_reaper is not None:
+            await asyncio.wait_for(asyncio.shield(manager._late_spawn_reaper), 1.0)
+        await manager.stop()
 
 
 @pytest.mark.asyncio

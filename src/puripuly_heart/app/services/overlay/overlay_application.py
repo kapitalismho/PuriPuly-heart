@@ -871,7 +871,12 @@ class OverlayApplicationOwner:
     def _fail_vr_mode_switch_cleanup(self) -> None:
         runtime = self._runtime
         manager = runtime.process_manager if runtime is not None else None
-        reason = getattr(manager, "failure_reason", None)
+        reason = getattr(manager, "stop_failure_reason", None) or getattr(
+            manager, "failure_reason", None
+        )
+        diagnostics = getattr(manager, "failure_diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics):
+            self._failure_diagnostics = diagnostics
         self.on_start_failed(reason or "shutdown_cleanup_failed")
 
     async def _retire_fallback_runtime(self) -> object | None:

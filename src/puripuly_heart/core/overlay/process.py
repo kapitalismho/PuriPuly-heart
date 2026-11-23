@@ -226,7 +226,7 @@ class OverlayProcessManager:
         default=None,
         repr=False,
     )
-    _late_spawn_cleanup_failure: str | None = field(init=False, default=None, repr=False)
+    stop_failure_reason: str | None = field(init=False, default=None)
     _shutdown_graceful_request: str = field(init=False, default="not_attempted", repr=False)
     _shutdown_terminate_requested: bool = field(init=False, default=False, repr=False)
     _shutdown_kill_requested: bool = field(init=False, default=False, repr=False)
@@ -332,6 +332,8 @@ class OverlayProcessManager:
         diagnostics: ErrorDiagnostics | None = None,
         exception: BaseException | None = None,
     ) -> None:
+        if self._current_phase == "stopping" and self.stop_failure_reason is None:
+            self.stop_failure_reason = cause
         if self._shutdown_terminal_cause is None:
             self._shutdown_terminal_cause = cause
         if self.failure_reason is None:
@@ -450,24 +452,22 @@ class OverlayProcessManager:
     async def start(self) -> None:
         if self.state in {"starting", "connected"}:
             return
-        if self._pending_failure_cleanup is not None:
-            await self.stop()
-        if self._late_spawn_reaper is not None:
-            if not self._late_spawn_reaper.done():
-                self.state = "failed"
-                self.failure_reason = "termination_unconfirmed"
-                return
-            await asyncio.gather(self._late_spawn_reaper, return_exceptions=True)
-            self._late_spawn_reaper = None
-            if self._late_spawn_cleanup_failure is not None:
-                self.state = "failed"
-                self.failure_reason = self._late_spawn_cleanup_failure
-                return
+        if not self._late_spawn_settled():
+            self.state = "failed"
+            self.failure_reason = "termination_unconfirmed"
+            return
+        if (
+            self._pending_failure_cleanup is not None
+            or self._process is not None
+            or self._manifest_path is not None
+        ) and await self.stop() is not None:
+            return
 
         self.state = "starting"
         self._current_phase = "startup"
         self._last_transition = "spawn"
         self._last_exit_code = None
+        self.stop_failure_reason = None
         self._failure_dumped = False
         self._shutdown_requested = False
         self._shutdown_request_sent = False
@@ -537,7 +537,7 @@ class OverlayProcessManager:
                     self._reap_late_spawn(spawn_task),
                     name="OverlayProcessManager:late-spawn-reaper",
                 )
-                await self._fail("startup_timeout", terminate_process=False)
+                await self._fail("startup_timeout", terminate_process=False, cleanup_manifest=False)
             else:
                 await self._fail("startup_timeout")
         except asyncio.CancelledError:
@@ -584,10 +584,21 @@ class OverlayProcessManager:
             experiment_only=self.handoff_experiment != HANDOFF_EXPERIMENT_OFF,
         )
         manifest_path = await asyncio.to_thread(self._write_manifest, manifest)
+        self._manifest_path = manifest_path
         self._record_process("manifest_written", manifest_path=manifest_path)
         process = await self.process_runner.spawn(executable_path, manifest_path)
         self._attach_process_diagnostics(process)
         return executable_path, manifest_path, process
+
+    def _late_spawn_settled(self) -> bool:
+        reaper = self._late_spawn_reaper
+        if reaper is None:
+            return True
+        if not reaper.done() or reaper.cancelled():
+            return False
+        reaper.result()
+        self._late_spawn_reaper = None
+        return True
 
     async def _reap_late_spawn(
         self,
@@ -615,26 +626,31 @@ class OverlayProcessManager:
                 )
             if not graceful_shutdown_complete:
                 await process.terminate()
+            returncode = getattr(process, "returncode", None)
+            if not isinstance(returncode, int) and self._last_exit_code is None:
+                self._set_shutdown_failure("termination_unconfirmed")
+                self.state = "failed"
+                return
+            if isinstance(returncode, int):
+                self._last_exit_code = returncode
+            self._shutdown_exit_confirmed = True
             await self._finish_process_readers(process)
             await self._drain_process_events(process)
+            self._detach_process_lifecycle_sink(process)
+            self._process = None
+            self._cleanup_manifest()
         except Exception as exc:
-            self._late_spawn_cleanup_failure = (
+            reason = (
                 "shutdown_cleanup_failed"
-                if self._shutdown_reader_cleanup == "failed"
+                if self._shutdown_exit_confirmed or self._shutdown_reader_cleanup == "failed"
                 else "termination_unconfirmed"
             )
             self._set_shutdown_failure(
-                self._late_spawn_cleanup_failure,
+                reason,
                 fields={"cleanup_stage": "cleanup"},
                 exception=exc,
             )
             self.state = "failed"
-            return
-        finally:
-            self._detach_process_lifecycle_sink(process)
-        if self._process is process:
-            self._process = None
-        self._cleanup_manifest()
 
     async def _settle_diagnostic_dump(self) -> None:
         task = self._diagnostic_dump_task
@@ -671,8 +687,16 @@ class OverlayProcessManager:
             receipt.get("native_terminal_delivery_completeness"),
         )
 
-    async def stop(self) -> None:
+    async def stop(self) -> str | None:
+        retrying = self.stop_failure_reason is not None
+        self.stop_failure_reason = None
+        self.restart_scheduled = False
         try:
+            if not self._late_spawn_settled():
+                self._current_phase = "stopping"
+                self._set_shutdown_failure("termination_unconfirmed")
+                self.state = self._current_phase = "failed"
+                return self.stop_failure_reason
             pending = self._pending_failure_cleanup
             if pending is not None:
                 await self._complete_failure(
@@ -680,7 +704,12 @@ class OverlayProcessManager:
                     cleanup_manifest=pending[1],
                 )
                 self._pending_failure_cleanup = None
-            await self._stop_owned_process()
+            await self._stop_owned_process(retrying=retrying)
+            return self.stop_failure_reason
+        except Exception:
+            self.stop_failure_reason = self.stop_failure_reason or "shutdown_cleanup_failed"
+            self.state = self._current_phase = "failed"
+            raise
         finally:
             await self._settle_diagnostic_dump()
             receipt = self.shutdown_receipt()
@@ -700,7 +729,7 @@ class OverlayProcessManager:
                 receipt["terminal_cause"],
             )
 
-    async def _stop_owned_process(self) -> None:
+    async def _stop_owned_process(self, *, retrying: bool) -> None:
         self.state = "stopping"
         self._current_phase = "stopping"
         self._shutdown_requested = True
@@ -715,13 +744,20 @@ class OverlayProcessManager:
 
         process = self._process
         if process is not None:
+            settling_previous_exit = retrying and (
+                self._last_exit_code is not None
+                or isinstance(getattr(process, "returncode", None), int)
+            )
+            forced_this_attempt = False
             graceful_shutdown_complete = False
-            if self.graceful_shutdown_request is not None or self.runtime_stop_reason is not None:
+            if not settling_previous_exit and (
+                self.graceful_shutdown_request is not None or self.runtime_stop_reason is not None
+            ):
                 graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(
                     process,
                     request_already_sent=self._shutdown_request_sent,
                 )
-            else:
+            elif not settling_previous_exit:
                 self._shutdown_graceful_request = "unavailable"
             if (
                 not graceful_shutdown_complete
@@ -730,6 +766,7 @@ class OverlayProcessManager:
             ):
                 self._shutdown_terminate_requested = True
                 self._shutdown_forced = True
+                forced_this_attempt = True
                 self._record_process("terminate_requested", pid=getattr(process, "pid", None))
                 try:
                     await process.terminate()
@@ -758,7 +795,11 @@ class OverlayProcessManager:
             returncode = getattr(process, "returncode", None)
             if isinstance(returncode, int):
                 self._last_exit_code = returncode
-                self._shutdown_exit_confirmed = True
+            if self._last_exit_code is None:
+                self._set_shutdown_failure("termination_unconfirmed")
+                self.state = self._current_phase = "failed"
+                return
+            self._shutdown_exit_confirmed = True
             try:
                 await self._finish_process_readers(process)
             except Exception:
@@ -772,15 +813,18 @@ class OverlayProcessManager:
                 pid=getattr(process, "pid", None),
                 returncode=returncode,
             )
-            if not self._shutdown_exit_confirmed:
-                self._set_shutdown_failure("termination_unconfirmed")
-            elif self._shutdown_forced:
+            if forced_this_attempt:
                 self._set_shutdown_failure("shutdown_forced")
-            elif self._last_exit_code != 0:
+            elif not settling_previous_exit and self._last_exit_code != 0:
                 self._set_shutdown_failure("runtime_exit_nonzero")
             elif (
-                self.graceful_shutdown_request is not None or self.runtime_stop_reason is not None
-            ) and not self._shutdown_graceful_completed:
+                not settling_previous_exit
+                and (
+                    self.graceful_shutdown_request is not None
+                    or self.runtime_stop_reason is not None
+                )
+                and not self._shutdown_terminal_received()
+            ):
                 self.native_evidence_state = "incomplete"
                 self._set_shutdown_failure(
                     "shutdown_terminal_unavailable"
@@ -2107,6 +2151,9 @@ class OverlayProcessManager:
         terminate_process: bool,
         cleanup_manifest: bool,
     ) -> None:
+        if self._late_spawn_reaper is not None:
+            self.state = "failed"
+            return
         process = self._process
         if terminate_process and process is not None:
             graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(
