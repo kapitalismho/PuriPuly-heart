@@ -25,11 +25,9 @@
 
 ## デモ
 
-![PuriPuly（Deepgram + Gemini 3 Flash）と VRCT（Google Web Speech + Google Translate）の翻訳比較。PuriPuly 音声認識：「진짜한개도없어서완전허탈했어.」、翻訳：「（本当に一つもなくて、すごくがっかりしちゃった。）」 | VRCT 音声認識：「진짜 한 개도 없어서 완전 허탈했다」、翻訳：「本当の犬もいませんでした。」](../images/demo/ko-jp_screenshot.png)
-
----
-
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
 
 PuriPulyを通じて他の外国人の友達と実際に交流している様子をもっと見たい方は：
 - [デモ 1](https://www.youtube.com/watch?v=3p0CamYui0o)
@@ -58,8 +56,9 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 - **LLMベースのローカライズ** — スラング、口語、タメ口/敬語まで自然に
 - **文脈の記憶** — 前後の流れを踏まえた自然な会話を維持
 - **双方向の音声翻訳** — 相手の音声も一緒に翻訳、VR字幕オーバーレイ対応
+- **写真翻訳** — VR内で撮った写真をすぐ翻訳、毎日無料で利用可能
 - **設定なしですぐ使える** — 自分で複雑に設定しなくても、内蔵エージェントが最適な体験を提供します。
-- **最強のローカルフルスタック** — Granite Speech 5.0からGemma 4 E4Bまで、今一番効率的なモデルだけを搭載。
+- **最強のローカルフルスタック** — Granite Speech 5.0からGemma 4まで、今一番効率的なモデルだけを搭載。
 
 ## よくある質問
 
@@ -76,7 +75,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 → ローカルASRを使用している際、マシンスペックが不足していると処理が遅くなることがあります。その場合はクラウドSTTサービスへの切り替えをおすすめします。
 
 - **個人データはどのように扱われますか？**
-→ Puripulyのサーバーに音声や会話の内容が送信されることはありません。また、すべてのコードがこのリポジトリで公開されているため、ネットワークの動作を直接確認・検証できます。
+→ PuriPulyのサーバーに音声や会話の内容が送信されることはありません。また、すべてのコードがこのリポジトリで公開されているため、ネットワークの動作を直接確認・検証できます。
 
 ### [📥 ダウンロード](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -215,11 +214,10 @@ Soniox / Gemini / Deepgramへのアクセスがブロックされている地域
 翻訳用LLMは、OpenRouter経由でGemma 4モデルを使うことをおすすめします。
 
 もしよければ、設定するついでに、ASR側も一緒に設定しませんか？
-PuriPulyはクラウドSTTと組み合わせると最良の体験になります。
-たとえば同じQwen ASRでも、ローカルとクラウドでは音声認識性能にかなり差があります。
+PuriPulyはクラウドASRと組み合わせると最良の体験になります。
+また、Cloud Free Tierオプションを使えば無料で利用できます。
 
-まずはDeepgramから始めるのをおすすめします。
-登録するだけで200ドル分の無料クレジットがもらえます。
+クラウドASRは、まず **Gemini 3.5 Transcribe** から始めるのをおすすめします。
 
 <details>
 <summary><h3>OpenRouter</h3></summary>
@@ -286,27 +284,15 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 </details>
 
 <details>
-<summary><h3>Deepgram</h3></summary>
+<summary><h3>Cloud Free Tier ASR (Gemini, Deepgram, ElevenLabs)</h3></summary>
 
-1. [Deepgram Console](https://console.deepgram.com/)にアクセスしてログインします。
-   ![step1](../images/deepgram/1.png)
+1. 2つのASRオプションをスクリーンショットのとおりに設定してください。
+   ![step1](../images/ASR_freetier/1.png)
 
-2. 歓迎メッセージとアンケートが表示されたら、**Skip** を押してスキップします。
-   ![step2](../images/deepgram/2.png)
+2. （任意）利用したいASRプロバイダーを選択してください。
+   ![step2](../images/ASR_freetier/2.png)
 
-3. サービス選択画面で **STT (Speech-to-Text)** を選択します。
-   ![step3](../images/deepgram/3.png)
-
-4. API Keysメニューで **Create a New API Key** をクリックします。
-   ![step4](../images/deepgram/4.png)
-
-5. キーの名前を入力し（例：`puripuly`）、作成します。
-   ![step5](../images/deepgram/5.png)
-
-6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
-   ![step6](../images/deepgram/6.png)
-
-</details>
+3. 下のガイドを参考にAPIキーを発行し、APIキー入力欄に貼り付けてください。
 
 <details>
 <summary><h3>Gemini</h3></summary>
@@ -337,6 +323,63 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 
 8. 有料プランのプロジェクトを選択してください。
    ![step9](../images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. [Deepgram Console](https://console.deepgram.com/)にアクセスしてログインします。
+   ![step1](../images/deepgram/1.png)
+
+2. 歓迎メッセージとアンケートが表示されたら、**Skip** を押してスキップします。
+   ![step2](../images/deepgram/2.png)
+
+3. サービス選択画面で **STT (Speech-to-Text)** を選択します。
+   ![step3](../images/deepgram/3.png)
+
+4. API Keysメニューで **Create a New API Key** をクリックします。
+   ![step4](../images/deepgram/4.png)
+
+5. キーの名前を入力し（例：`puripuly`）、作成します。
+   ![step5](../images/deepgram/5.png)
+
+6. 作成されたキーをコピーして、PuriPulyの設定に貼り付けます。
+   ![step6](../images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>ElevenLabs</h3></summary>
+
+1. [ElevenLabs](https://elevenlabs.io)にアクセスし、**Sign up** ボタンを押します。
+   ![step1](../images/elevenlabs/1.png)
+
+2. **Continue** ボタンを押します。
+   ![step2](../images/elevenlabs/2.png)
+
+3. 名前を入力してチェックボックスにチェックを入れ、**Next** ボタンを押します。
+   ![step3](../images/elevenlabs/3.png)
+
+4. そのまま **Skip** ボタンを押し続けます。
+   ![step4](../images/elevenlabs/4.png)
+
+5. 決済画面が表示されたら **Skip** ボタンを押します。
+   ![step5](../images/elevenlabs/5.png)
+
+6. 左下の **Switch** ボタンを押して **ElevenAPI** に切り替えます。
+   ![step6](../images/elevenlabs/6.png)
+
+7. 左のタブから **API keys** を開き、中央の **Create Key** を押します。
+   ![step7](../images/elevenlabs/7.png)
+
+8. **Speech to Text** の権限を付与してから **Create Key** ボタンを押します。
+   ![step8](../images/elevenlabs/8.png)
+
+9. APIキーをコピーして、PuriPulyに貼り付けます。
+   ![step9](../images/elevenlabs/9.png)
 
 </details>
 
@@ -445,7 +488,7 @@ uv run --locked python scripts/ci/check_test_selection.py
 
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, KOZ39
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
 
 ---
 

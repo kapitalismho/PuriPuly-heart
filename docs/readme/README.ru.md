@@ -25,11 +25,9 @@
 
 ## Демо
 
-![Сравнение результатов перевода между PuriPuly (Deepgram + Gemini 3 Flash) и VRCT (Google Web Speech + Google Translate). PuriPuly распознавание: «아역시혼자기대하면안된다니깐», перевод: «(See, I knew I shouldn't have gotten my hopes up.)» | VRCT распознавание: «아 역시 혼자 기대하면 안 된다니까», перевод: «Oh, I guess you shouldn't expect it alone.»](../images/demo/ko-en_screenshot.png)
-
----
-
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
 
 Если хотите увидеть больше примеров реального общения с друзьями из других стран через PuriPuly:
 - [Демо 1](https://www.youtube.com/watch?v=3p0CamYui0o)
@@ -38,7 +36,7 @@
 
 ---
 
-## Наконец-то говори как настоящий друг.
+## Finally, talk like real friends.
 
 Бывало же.
 Хочешь поддержать друга,
@@ -59,8 +57,9 @@ PuriPuly — двусторонний голосовой переводчик д
 - **Перевод на основе LLM** — сленг, разговорная речь, твои и ваши — всё звучит естественно.
 - **Память контекста** — перевод помнит, о чём вы говорили раньше, и не теряет нить беседы.
 - **Голосовой перевод в обе стороны** — переводит и вашу речь, и речь собеседника. Есть субтитры в VR.
+- **Перевод фото** — мгновенно переводит фотографии, снятые в VR, бесплатно каждый день.
 - **Без настройки** — Не нужно самому делать сложные настройки: встроенный агент предоставит лучший опыт.
-- **Самый мощный локальный стек** — от Granite Speech 5.0 до Gemma 4 E4B: только самые эффективные модели на сегодня.
+- **Самый мощный локальный стек** — от Granite Speech 5.0 до Gemma 4: только самые эффективные модели на сегодня.
 
 ## Вопросы и ответы
 
@@ -77,7 +76,7 @@ PuriPuly — двусторонний голосовой переводчик д
 → При использовании локального ASR нехватка вычислительных ресурсов может замедлить обработку. В таком случае рекомендуем переключиться на облачный сервис STT.
 
 - **Как обрабатываются личные данные?**
-→ Голос и текст разговоров не отправляются на серверы Puripuly. Кроме того, весь исходный код открыт в этом репозитории, поэтому вы можете напрямую проверить сетевую активность программы.
+→ Голос и текст разговоров не отправляются на серверы PuriPuly. Кроме того, весь исходный код открыт в этом репозитории, поэтому вы можете напрямую проверить сетевую активность программы.
 
 ### [📥 Скачать](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -216,10 +215,10 @@ GPU-инференс работает на Vulkan. Подходит для лю�
 Для перевода рекомендуем Gemma 4 через OpenRouter.
 
 А заодно настройте и распознавание речи!
-PuriPuly работает лучше всего с облачным STT.
-Даже один и тот же Qwen ASR на локале и в облаке заметно отличается по качеству.
+PuriPuly работает лучше всего с облачным ASR.
+Кроме того, с опцией Cloud Free Tier им можно пользоваться бесплатно.
 
-Начните с Deepgram — при регистрации дают $200.
+Для облачного ASR рекомендуем начать с **Gemini 3.5 Transcribe**.
 
 <details>
 <summary><h3>OpenRouter</h3></summary>
@@ -286,27 +285,15 @@ PuriPuly работает лучше всего с облачным STT.
 </details>
 
 <details>
-<summary><h3>Deepgram</h3></summary>
+<summary><h3>Cloud Free Tier ASR (Gemini, Deepgram, ElevenLabs)</h3></summary>
 
-1. Войдите в [Deepgram Console](https://console.deepgram.com/).
-   ![step1](../images/deepgram/1.png)
+1. Установите оба параметра ASR так, как показано на скриншоте.
+   ![step1](../images/ASR_freetier/1.png)
 
-2. Если видите приветствие — нажмите **Skip**.
-   ![step2](../images/deepgram/2.png)
+2. *(Необязательно)* Выберите провайдеров ASR, которых хотите использовать.
+   ![step2](../images/ASR_freetier/2.png)
 
-3. Выберите **STT (Speech-to-Text)**.
-   ![step3](../images/deepgram/3.png)
-
-4. В меню API Keys нажмите **Create a New API Key**.
-   ![step4](../images/deepgram/4.png)
-
-5. Введите имя ключа (например, `puripuly`) и создайте.
-   ![step5](../images/deepgram/5.png)
-
-6. Скопируйте ключ и вставьте в настройки PuriPuly.
-   ![step6](../images/deepgram/6.png)
-
-</details>
+3. Получите API-ключи по инструкциям ниже и введите их в поля для API-ключей.
 
 <details>
 <summary><h3>Gemini</h3></summary>
@@ -337,6 +324,63 @@ PuriPuly работает лучше всего с облачным STT.
 
 8. Выберите проект с платным тарифом.
    ![step9](../images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. Войдите в [Deepgram Console](https://console.deepgram.com/).
+   ![step1](../images/deepgram/1.png)
+
+2. Если видите приветствие — нажмите **Skip**.
+   ![step2](../images/deepgram/2.png)
+
+3. Выберите **STT (Speech-to-Text)**.
+   ![step3](../images/deepgram/3.png)
+
+4. В меню API Keys нажмите **Create a New API Key**.
+   ![step4](../images/deepgram/4.png)
+
+5. Введите имя ключа (например, `puripuly`) и создайте.
+   ![step5](../images/deepgram/5.png)
+
+6. Скопируйте ключ и вставьте в настройки PuriPuly.
+   ![step6](../images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>ElevenLabs</h3></summary>
+
+1. Перейдите на [ElevenLabs](https://elevenlabs.io) и нажмите **Sign up**.
+   ![step1](../images/elevenlabs/1.png)
+
+2. Нажмите **Continue**.
+   ![step2](../images/elevenlabs/2.png)
+
+3. Введите имя, отметьте флажок и нажмите **Next**.
+   ![step3](../images/elevenlabs/3.png)
+
+4. Нажимайте **Skip** на следующих экранах.
+   ![step4](../images/elevenlabs/4.png)
+
+5. Если появится экран оплаты, нажмите **Skip**.
+   ![step5](../images/elevenlabs/5.png)
+
+6. Нажмите **Switch** в левом нижнем углу и переключитесь на **ElevenAPI**.
+   ![step6](../images/elevenlabs/6.png)
+
+7. Откройте **API keys** в левой панели и нажмите **Create Key** по центру.
+   ![step7](../images/elevenlabs/7.png)
+
+8. Выдайте разрешение **Speech to Text** и нажмите **Create Key**.
+   ![step8](../images/elevenlabs/8.png)
+
+9. Скопируйте API-ключ и вставьте его в PuriPuly.
+   ![step9](../images/elevenlabs/9.png)
 
 </details>
 
@@ -445,7 +489,7 @@ uv run --locked python scripts/ci/check_test_selection.py
 
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, KOZ39
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
 
 ---
 
