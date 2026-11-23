@@ -174,7 +174,7 @@ SCENARIOS = (
             familiarity="regular",
             concern="인식을 Soniox로 바꿔줘.",
         ),
-        "A pending paid-change card survives a standalone translation detour without applying; rejection preserves the original free provider, and closing thanks receives a brief social response.",
+        "A verified Soniox key is already saved, so Puri proposes the paid recognition switch card with its cost. The pending card survives a standalone translation detour without applying; rejection preserves the original free provider, and closing thanks receives a brief social response.",
         dialogue=(
             DialogueBeat(
                 "음성 인식을 Soniox로 바꿔 달라고 해. 카드가 떠도 아직 누르지는 마.", ("work",)

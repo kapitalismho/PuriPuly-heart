@@ -737,24 +737,24 @@ def code_judgment(
     card_dispositions = None
     if app.scenario.cause == "pending_approval":
         detours = [
-            call
-            for call in calls
-            if call.get("method") == "classify" and call.get("effective_route") == "out_of_scope"
+            item["turn"]
+            for item in routing["expectations"]
+            if "out_of_scope" in item["allowed_routes"] and item["turn"] is not None
         ]
         observations = state.get("confirmation_observations", [])
         card_dispositions = []
         withdrawals = _tool_exchanges(archive, "manage_proposal.withdraw")
         card_preserved = bool(detours)
-        for call in detours:
+        for turn in detours:
             before = [
                 item.get("confirmation")
                 for item in observations
-                if item.get("turn") == call["turn"] and item.get("phase") == "before"
+                if item.get("turn") == turn and item.get("phase") == "before"
             ]
             after = [
                 item.get("confirmation")
                 for item in observations
-                if item.get("turn") == call["turn"] and item.get("phase") == "after"
+                if item.get("turn") == turn and item.get("phase") == "after"
             ]
             preserved = bool(
                 before
@@ -769,7 +769,7 @@ def code_judgment(
             if preserved:
                 disposition = _pending_card_disposition(
                     before[-1],
-                    call["turn"],
+                    turn,
                     actions,
                     {row["turn"] for row in refusal_words},
                     withdrawals,

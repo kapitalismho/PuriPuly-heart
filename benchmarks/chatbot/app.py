@@ -264,6 +264,9 @@ class ScenarioApp:
             )
         if scenario.cause == "osc_discovery":
             self.add_diagnostic("oscquery_unavailable", "network")
+        if scenario.cause == "pending_approval":
+            self.presence["soniox_api_key"] = True
+            self.verified.add("soniox")
         if scenario.cause == "chatgpt_signin_failed":
             intent["translation"].update(model="gpt_6_luna", connection="chatgpt")
             for _ in range(2):
