@@ -257,6 +257,31 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.desktop_audio.output_device == "latest output"
 
 
+def test_overlay_target_intent_updates_compatibility_mode_atomically_when_specified() -> None:
+    current = AppSettingsVNext()
+
+    compat_enabled = materialize_immediate_settings_intent(
+        current,
+        OverlayTargetSettingsIntent("steamvr", vr_compatibility_mode=True),
+    )
+    assert compat_enabled.intent.overlay.target == "steamvr"
+    assert compat_enabled.intent.overlay.vr_compatibility_mode is True
+
+    desktop_without_compat_override = materialize_immediate_settings_intent(
+        compat_enabled,
+        OverlayTargetSettingsIntent("desktop"),
+    )
+    assert desktop_without_compat_override.intent.overlay.target == "desktop"
+    assert desktop_without_compat_override.intent.overlay.vr_compatibility_mode is True
+
+    desktop_with_compat_cleared = materialize_immediate_settings_intent(
+        compat_enabled,
+        OverlayTargetSettingsIntent("desktop", vr_compatibility_mode=False),
+    )
+    assert desktop_with_compat_cleared.intent.overlay.target == "desktop"
+    assert desktop_with_compat_cleared.intent.overlay.vr_compatibility_mode is False
+
+
 def test_vad_threshold_intents_enforce_shared_range_and_independent_values() -> None:
     current = AppSettingsVNext()
 

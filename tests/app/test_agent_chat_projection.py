@@ -9,6 +9,7 @@ from puripuly_heart.app.services.agent_chat.execution import project_catalog
 from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.agent_chat.tools import LANGUAGE_FIELD_PATHS, SETTINGS_FIELD_PATHS
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.ui.i18n import t_for_locale
 from tests.app.test_agent_chat import Records
 
 
@@ -119,6 +120,24 @@ def test_projection_preserves_values_labels_units_and_nested_static_choices():
     }
     assert view["core"]["revision"] == 17
     assert view["observed_at"] == snapshot["observed_at"]
+
+
+def test_output_catalog_names_the_localized_overlay_picker_and_compatibility_option():
+    def localize(key: str) -> str:
+        return t_for_locale("ko", key)
+
+    snapshot = _snapshot(
+        values={"overlay.target": "steamvr", "overlay.vr_compatibility_mode": True},
+        choices={"overlay.target": ["steamvr", "desktop"]},
+        localize=localize,
+    )
+    view = model_context(snapshot, "output", localize=localize)
+
+    overlay = view["catalogs"]["output"][localize("settings.subtab.overlay")]
+    assert overlay["overlay.target"]["label"] == localize("settings.overlay.caption_location")
+    assert overlay["overlay.vr_compatibility_mode"]["label"] == localize(
+        "settings.overlay.target.steamvr_compatibility"
+    )
 
 
 def test_static_choices_share_module_local_references_and_keep_subset_labels():

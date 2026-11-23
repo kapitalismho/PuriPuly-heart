@@ -18,8 +18,8 @@ from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
 from puripuly_heart.app.ports.provider_verifier import ProviderCredentialVerificationOutcome
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
+    OverlayTargetSettingsIntent,
     OverlayTranslationSettingsIntent,
-    OverlayVrCompatibilitySettingsIntent,
     PeerSttProviderEdit,
     PhotoStatusSnapshot,
     ScribeSpeakerDiarizationEdit,
@@ -4267,22 +4267,70 @@ def test_desktop_gui_caption_location_selector_updates_settings_with_localized_c
 
     assert captured["title"] == t("settings.overlay.caption_location")
     assert captured["show_description"] is True
-    assert [option.value for option in captured["options"]] == ["steamvr", "desktop"]
+    assert [option.value for option in captured["options"]] == [
+        "steamvr",
+        "steamvr_compatibility",
+        "desktop",
+    ]
     assert [option.label for option in captured["options"]] == [
         t("settings.overlay.target.steamvr"),
+        t("settings.overlay.target.steamvr_compatibility"),
         t("settings.overlay.target.desktop"),
     ]
+    assert [option.description for option in captured["options"]] == ["", "", ""]
     assert captured["current"] == "steamvr"
+
+    captured_on_select = captured["on_select"]
+    assert callable(captured_on_select)
+    captured_on_select("steamvr_compatibility")
+
+    assert settings.intent.overlay.target == "steamvr"
+    assert settings.intent.overlay.vr_compatibility_mode is False
+    assert settings_events.settings.intent.overlay.target == "steamvr"
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is True
+    assert view._overlay_target_button.content.value == t(
+        "settings.overlay.target.steamvr_compatibility"
+    )
+    assert len(changed) == 1
+    assert changed[0].intent.overlay.target == "steamvr"
+    assert changed[0].intent.overlay.vr_compatibility_mode is True
+
+    view._on_overlay_target_click(None)
+    assert captured["current"] == "steamvr_compatibility"
 
     captured_on_select = captured["on_select"]
     assert callable(captured_on_select)
     captured_on_select("desktop")
 
-    assert settings.intent.overlay.target == "steamvr"
     assert settings_events.settings.intent.overlay.target == "desktop"
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is False
     assert view._overlay_target_button.content.value == t("settings.overlay.target.desktop")
+    assert len(changed) == 2
+    assert changed[1].intent.overlay.target == "desktop"
+    assert changed[1].intent.overlay.vr_compatibility_mode is False
+
+
+def test_desktop_reselection_clears_saved_vr_compatibility(
+    monkeypatch: pytest.MonkeyPatch, settings_events
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            overlay=replace(settings.intent.overlay, target="desktop", vr_compatibility_mode=True),
+        ),
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    changed: list[AppSettingsVNext] = []
+    settings_events.on_change = changed.append
+
+    view._on_overlay_target_selected("desktop")
+    view._on_overlay_target_selected("desktop")
+
     assert len(changed) == 1
     assert changed[0].intent.overlay.target == "desktop"
+    assert changed[0].intent.overlay.vr_compatibility_mode is False
 
 
 def test_desktop_gui_product_standard_cards_show_current_values_and_desktop_only_controls(
@@ -5177,19 +5225,21 @@ def test_general_tab_peer_vad_card_contains_peer_fields_only(
     assert not _tree_contains_control(peer_vad_card, view._vad_slider)
 
 
-def test_overlay_tab_exposes_target_controls_and_applies_compatibility_toggle(
+def test_overlay_tab_exposes_target_controls_and_applies_compatibility_mode_option(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+    assert not hasattr(view, "_overlay_vr_compatibility_card")
+    assert not hasattr(view, "_overlay_vr_compatibility_button")
+    assert t("settings.overlay.target.steamvr_compatibility") not in _overlay_tab_card_titles(view)
+
     shared_controls = (
         view._overlay_target_button,
         view._overlay_translation_button,
         view._overlay_peer_original_button,
     )
-    compatibility = view._overlay_vr_compatibility_button
     steamvr_controls = (
-        compatibility,
         view._overlay_anchor_button,
         view._overlay_distance_increase_button,
         view._overlay_offset_x_increase_button,
@@ -5216,29 +5266,50 @@ def test_overlay_tab_exposes_target_controls_and_applies_compatibility_toggle(
     assert all(id(control) in steamvr for control in (*shared_controls, *steamvr_controls))
     assert all(id(control) not in steamvr for control in desktop_controls)
     assert id(view._desktop_overlay_status_card) not in steamvr
+    assert view._overlay_target_button.content.value == t("settings.overlay.target.steamvr")
 
-    assert not compatibility.disabled
-    assert compatibility.on_click is not None
-    assert compatibility.content.value == t("settings.option.off")
-    compatibility.on_click(None)
-    assert settings_events.immediate_intents[-1] == OverlayVrCompatibilitySettingsIntent(True)
+    view._on_overlay_target_selected("steamvr_compatibility")
+    assert settings_events.immediate_intents[-1] == OverlayTargetSettingsIntent(
+        "steamvr", vr_compatibility_mode=True
+    )
+    assert settings_events.settings.intent.overlay.target == "steamvr"
     assert settings_events.settings.intent.overlay.vr_compatibility_mode is True
-    assert compatibility.content.value == t("settings.option.on")
+    assert view._overlay_target_button.content.value == t(
+        "settings.overlay.target.steamvr_compatibility"
+    )
+    steamvr_compat = visible_controls()
+    assert all(id(control) in steamvr_compat for control in (*shared_controls, *steamvr_controls))
+    assert all(id(control) not in steamvr_compat for control in desktop_controls)
 
     view._on_overlay_target_selected("desktop")
+    assert settings_events.immediate_intents[-1] == OverlayTargetSettingsIntent(
+        "desktop", vr_compatibility_mode=False
+    )
     desktop = visible_controls()
     assert all(id(control) in desktop for control in (*shared_controls, *desktop_controls))
     assert all(id(control) not in desktop for control in steamvr_controls)
     assert id(view._desktop_overlay_status_card) not in desktop
+    assert settings_events.settings.intent.overlay.target == "desktop"
+    assert settings_events.settings.intent.overlay.vr_compatibility_mode is False
+    assert view._overlay_target_button.content.value == t("settings.overlay.target.desktop")
+
+    view._on_overlay_target_selected("steamvr_compatibility")
+    assert settings_events.immediate_intents[-1] == OverlayTargetSettingsIntent(
+        "steamvr", vr_compatibility_mode=True
+    )
+    assert settings_events.settings.intent.overlay.target == "steamvr"
     assert settings_events.settings.intent.overlay.vr_compatibility_mode is True
+    assert view._overlay_target_button.content.value == t(
+        "settings.overlay.target.steamvr_compatibility"
+    )
 
     view._on_overlay_target_selected("steamvr")
-    assert id(compatibility) in visible_controls()
-    assert compatibility.content.value == t("settings.option.on")
-    compatibility.on_click(None)
-    assert settings_events.immediate_intents[-1] == OverlayVrCompatibilitySettingsIntent(False)
+    assert settings_events.immediate_intents[-1] == OverlayTargetSettingsIntent(
+        "steamvr", vr_compatibility_mode=False
+    )
+    assert settings_events.settings.intent.overlay.target == "steamvr"
     assert settings_events.settings.intent.overlay.vr_compatibility_mode is False
-    assert compatibility.content.value == t("settings.option.off")
+    assert view._overlay_target_button.content.value == t("settings.overlay.target.steamvr")
 
 
 def test_apply_locale_updates_general_clickable_value_fonts_to_zh_cn(
@@ -5793,7 +5864,6 @@ def test_fixed_settings_cards_fit_declared_row_bounds(
     for card, action in (
         (view._overlay_vr_reset_card, view._overlay_vr_reset_button),
         (view._overlay_desktop_reset_card, view._overlay_desktop_reset_button),
-        (view._overlay_vr_compatibility_card, view._overlay_vr_compatibility_button),
     ):
         body = card.content
         assert _tree_contains_control(body, action)

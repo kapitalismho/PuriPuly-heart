@@ -197,7 +197,6 @@ def compose_settings_overlay_surface(
     return SettingsOverlaySurfaceRegions(
         rows=(
             target_row,
-            slots.vr_compatibility,
             vr_anchor_row,
             vr_offset_row,
             desktop_controls_row,
@@ -205,7 +204,7 @@ def compose_settings_overlay_surface(
             recovery_row,
         ),
         target_row=target_row,
-        vr_rows=(slots.vr_compatibility, vr_anchor_row, vr_offset_row),
+        vr_rows=(vr_anchor_row, vr_offset_row),
         desktop_rows=(desktop_controls_row, desktop_reset_row),
         desktop_controls_row=desktop_controls_row,
         recovery_row=recovery_row,

@@ -290,6 +290,7 @@ class CustomVocabularySettingsIntent:
 @dataclass(frozen=True, slots=True)
 class OverlayTargetSettingsIntent:
     target: str
+    vr_compatibility_mode: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

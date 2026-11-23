@@ -29,7 +29,7 @@ _DEFINITIONS = {
     "overlay.translation.enabled": ("settings.overlay.show_translation", "boolean", "overlay"),
     "overlay.peer_original.enabled": ("settings.overlay.show_peer_original", "boolean", "overlay"),
     "overlay.vr_compatibility_mode": (
-        "settings.overlay.vr_compatibility_mode",
+        "settings.overlay.target.steamvr_compatibility",
         "boolean",
         "overlay",
     ),

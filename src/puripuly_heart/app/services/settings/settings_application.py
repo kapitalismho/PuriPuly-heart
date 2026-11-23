@@ -598,9 +598,12 @@ def materialize_immediate_settings_intent(
             ),
         )
     elif isinstance(intent, OverlayTargetSettingsIntent):
+        overlay_updates: dict[str, object] = {"target": intent.target}
+        if intent.vr_compatibility_mode is not None:
+            overlay_updates["vr_compatibility_mode"] = intent.vr_compatibility_mode
         updated = _with_intent(
             updated,
-            overlay=replace(updated.intent.overlay, target=intent.target),
+            overlay=replace(updated.intent.overlay, **overlay_updates),
         )
     elif isinstance(intent, OverlayTranslationSettingsIntent):
         updated = _with_intent(

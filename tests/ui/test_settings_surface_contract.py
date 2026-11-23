@@ -343,16 +343,15 @@ def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> 
         placeholder_factory=lambda: _track(placeholders),
     )
 
-    assert len(surface.rows) == 7
+    assert len(surface.rows) == 6
     assert len(placeholders) == 1
     assert surface.rows[0] is surface.target_row
-    assert surface.vr_rows == (slots.vr_compatibility, surface.rows[2], surface.rows[3])
-    assert surface.rows[1] is slots.vr_compatibility
-    assert surface.desktop_rows == (surface.rows[4], surface.rows[5])
-    assert surface.desktop_controls_row is surface.rows[4]
-    assert surface.recovery_row is surface.rows[6]
+    assert surface.vr_rows == (surface.rows[1], surface.rows[2])
+    assert surface.desktop_rows == (surface.rows[3], surface.rows[4])
+    assert surface.desktop_controls_row is surface.rows[3]
+    assert surface.recovery_row is surface.rows[5]
     assert surface.recovery_row.visible is False
-    for row in surface.rows[:6]:
+    for row in surface.rows[:5]:
         assert row.visible is True
 
     assert surface.target_row.content.controls == [
@@ -360,14 +359,14 @@ def test_overlay_surface_preserves_target_specific_and_recovery_visibility() -> 
         slots.overlay_translation,
         slots.overlay_peer_original,
     ]
-    assert surface.rows[2].content.controls == [slots.anchor, slots.distance, slots.offset_x]
-    assert surface.rows[3].content.controls == [slots.offset_y, slots.text_scale, slots.vr_reset]
-    assert surface.rows[4].content.controls == [
+    assert surface.rows[1].content.controls == [slots.anchor, slots.distance, slots.offset_x]
+    assert surface.rows[2].content.controls == [slots.offset_y, slots.text_scale, slots.vr_reset]
+    assert surface.rows[3].content.controls == [
         slots.desktop_size,
         slots.desktop_lock,
         slots.desktop_background_alpha,
     ]
-    assert surface.rows[5].content.controls == [
+    assert surface.rows[4].content.controls == [
         slots.desktop_swap_caption_languages,
         slots.desktop_reset,
         slots.desktop_reset_spacer,
