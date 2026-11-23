@@ -259,6 +259,7 @@ class SubscriptionConnectGate:
     def __init__(self, min_interval_s: float = 1.25) -> None:
         self._min_interval_s = min_interval_s
         self._lock = asyncio.Lock()
+        self.credentials = asyncio.Lock()
         self._last_start: float | None = None
 
     async def wait(self) -> None:
@@ -697,7 +698,8 @@ class SimulatorModels:
         try:
             connection = self._subscription_sockets.get(role)
             if connection is None:
-                token = await self._session.access_token()
+                async with self._subscription_gate.credentials:
+                    token = await self._session.access_token()
                 connector = network_clients.external_websocket_connect(
                     _WS_URL,
                     additional_headers={"Authorization": f"Bearer {token}"},

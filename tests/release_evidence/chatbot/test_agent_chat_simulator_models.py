@@ -586,6 +586,9 @@ async def test_subscription_uses_role_specific_deadlines_and_safe_phase_timings(
         return original_timeout(delay)
 
     class AdmissionGate:
+        def __init__(self):
+            self.credentials = asyncio.Lock()
+
         async def wait(self):
             now[0] += 2.5
 
@@ -629,6 +632,9 @@ async def test_subscription_timeout_distinguishes_connection_admission_from_prov
     now = [100.0]
 
     class AdmissionGate:
+        def __init__(self):
+            self.credentials = asyncio.Lock()
+
         async def wait(self):
             now[0] += 2.5
             if phase == "admission":
@@ -878,6 +884,36 @@ async def test_shared_subscription_gate_paces_new_connections_across_clients(
         await first.close()
         await second.close()
     assert all(socket.closed for socket in state.sockets)
+
+
+async def test_shared_subscription_gate_serializes_token_refresh_across_clients(
+    subscription_boundary, monkeypatch
+):
+    state = subscription_boundary
+    state.reply = lambda request: [
+        {"type": "response.completed", "response": response(request["model"])}
+    ]
+    active = []
+    overlaps = []
+
+    async def rotating_access_token(session):
+        active.append(session)
+        overlaps.append(len(active))
+        for _ in range(3):
+            await asyncio.sleep(0)
+        active.remove(session)
+        return "synthetic-subscription-token"
+
+    monkeypatch.setattr(models.ChatGptSession, "access_token", rotating_access_token)
+    gate = SubscriptionConnectGate(0)
+    first = SimulatorModels(api_key="", sign_in=True, subscription_gate=gate)
+    second = SimulatorModels(api_key="", sign_in=True, subscription_gate=gate)
+    try:
+        await asyncio.gather(complete(first), complete(second))
+        assert overlaps == [1, 1]
+    finally:
+        await first.close()
+        await second.close()
 
 
 async def test_subscription_send_error_closes_socket_without_replay(subscription_boundary):
