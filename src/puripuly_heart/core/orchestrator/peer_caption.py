@@ -33,7 +33,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     _translation_turn_child_id,
 )
 from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
-from puripuly_heart.core.overlay.sink import PeerCaptionLineage, PeerCaptionRevision
+from puripuly_heart.core.overlay.sink import (
+    PeerCaptionLineage,
+    PeerCaptionRevision,
+    PeerPreviewLifetime,
+)
 from puripuly_heart.core.speaker_identity import (
     PeerSpeakerIdentityAllocator,
     native_peer_attribution,
@@ -199,6 +203,8 @@ class _Caption:
     required_lineage_members: tuple[UUID, ...] = ()
     history_after: UUID | None = None
     history_removals: tuple[UUID, ...] = ()
+    preview_lifetime: PeerPreviewLifetime | None = None
+    translating_task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
 @dataclass(slots=True)
@@ -214,6 +220,12 @@ class _Segment:
     timer: asyncio.Task[None] | None = None
     pending: str | None = None
     closed: bool = False
+    preview_frozen: bool = False
+
+    @property
+    def preview_deadline_at(self) -> float | None:
+        lifetime = self.caption.preview_lifetime
+        return lifetime.deadline_at if lifetime is not None else None
 
 
 @dataclass(slots=True)
@@ -230,6 +242,7 @@ class PeerCaptionOwner:
     max_requests: int = 32
     request_timeout_s: float = 30.0
     _segments: dict[UUID, _Segment] = field(default_factory=dict)
+    _preview_deadlines: dict[UUID, tuple[tuple[object, ...], float]] = field(default_factory=dict)
     _last: _Caption | None = None
     _tail: asyncio.Event | None = None
     _completed: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
@@ -264,6 +277,7 @@ class PeerCaptionOwner:
         await self._scope.close()
         self._scope = LifecycleScope("PeerCaptionOwner")
         self._segments.clear()
+        self._preview_deadlines.clear()
         self._last = None
         self._tail = None
         self._completed.clear()
@@ -273,6 +287,7 @@ class PeerCaptionOwner:
     async def drain(self) -> None:
         for utterance_id in tuple(self._segments):
             self.abandon(utterance_id)
+        self._preview_deadlines.clear()
         await self.wait_for_idle()
 
     async def wait_for_idle(self) -> None:
@@ -347,6 +362,57 @@ class PeerCaptionOwner:
             return None
         return replace(prepared, provider_generation=self.requests.provider_generation)
 
+    async def set_preview_deadline(
+        self, utterance_id: UUID, *, scope: tuple[object, ...], expires_at_s: float
+    ) -> None:
+        if self.is_completed(utterance_id):
+            return
+        segment = self._segments.get(utterance_id)
+        if segment is None:
+            self._preview_deadlines.setdefault(utterance_id, (scope, expires_at_s))
+            return
+        lifetime = segment.caption.preview_lifetime
+        if (
+            lifetime is None
+            or segment.caption.scope != scope
+            or segment.closed
+            or lifetime.deadline_at is not None
+        ):
+            return
+        lifetime.deadline_at = expires_at_s
+        if not self._preview_is_current(segment):
+            await self._freeze_preview(segment)
+            return
+        if expires_at_s < segment.next_check_at:
+            if segment.timer is not None:
+                segment.timer.cancel()
+            self._start_preview_timer(segment)
+
+    def _preview_is_current(self, segment: _Segment) -> bool:
+        return (
+            not segment.closed
+            and not segment.preview_frozen
+            and (
+                segment.preview_deadline_at is None
+                or self.clock.now() < segment.preview_deadline_at
+            )
+        )
+
+    def _start_preview_timer(self, segment: _Segment) -> None:
+        phase = "refresh" if segment.preview_deadline_at is None else "deadline"
+        segment.timer = self._start(
+            self._timer(segment), f"peer:timer:{segment.caption.utterance_id}:{phase}"
+        )
+
+    async def _freeze_preview(self, segment: _Segment) -> None:
+        segment.preview_frozen = True
+        segment.pending = None
+        if segment.timer is not None and segment.timer is not asyncio.current_task():
+            segment.timer.cancel()
+        if segment.preview_task is not None:
+            segment.preview_task.cancel()
+        await self.output.output_runtime.freeze_peer_caption_preview(segment.caption.utterance_id)
+
     async def partial(
         self,
         transcript: Transcript,
@@ -361,9 +427,19 @@ class PeerCaptionOwner:
             return
         if transcript.utterance_id in self._completed:
             return
+        segment = self._segments.get(transcript.utterance_id)
+        deadline = None
+        if segment is not None:
+            if not self._preview_is_current(segment):
+                return
+        elif provider_id == "gemini_transcribe":
+            remembered = self._preview_deadlines.get(transcript.utterance_id)
+            if remembered is not None and remembered[0] == scope:
+                deadline = remembered[1]
+                if self.clock.now() >= deadline:
+                    return
         if len(transcript.text) > self.max_source_chars:
             raise ValueError("Peer partial text capacity exceeded")
-        segment = self._segments.get(transcript.utterance_id)
         if not transcript.text.strip():
             if segment is not None and provider_id != "qwen_audio":
                 segment.caption.revision += 1
@@ -386,6 +462,8 @@ class PeerCaptionOwner:
                 scope,
                 track_scribe_lineage=provider_id == _SCRIBE_SOURCE and diarization,
             )
+            if provider_id == "gemini_transcribe":
+                caption.preview_lifetime = PeerPreviewLifetime(deadline)
             if not diarization:
                 caption.speaker_assignment = SpeakerAssignment(
                     SpeakerAttribution("non_diarized"),
@@ -399,47 +477,61 @@ class PeerCaptionOwner:
                 config,
             )
             self._segments[transcript.utterance_id] = segment
-            segment.timer = self._start(
-                self._timer(segment), f"peer:timer:{transcript.utterance_id}"
-            )
+            self._preview_deadlines.pop(transcript.utterance_id, None)
+            self._start_preview_timer(segment)
         segment.partial = transcript.text
 
     async def _timer(self, segment: _Segment) -> None:
-        while not segment.closed:
-            await asyncio.sleep(max(0.0, segment.next_check_at - self.clock.now()))
-            await self.check_previews()
+        while not segment.closed and not segment.preview_frozen:
+            wake_at = segment.next_check_at
+            if segment.preview_deadline_at is not None:
+                wake_at = min(wake_at, segment.preview_deadline_at)
+            await asyncio.sleep(max(0.0, wake_at - self.clock.now()))
+            await self._check_preview(segment)
 
     def _translation_active(self) -> bool:
         return self.requests.provider_available and self.requests.translation_enabled_for("peer")
 
     async def check_previews(self) -> None:
         for segment in tuple(self._segments.values()):
-            if segment.closed or self.clock.now() < segment.next_check_at:
-                continue
-            segment.next_check_at = self.clock.now() + 4.0
-            if not self._translation_active():
-                continue
-            source = preview_source(segment.partial)
-            if len(segment.partial) > segment.last_partial_length and len(source) > len(
-                segment.last_preview_source
-            ):
-                segment.last_partial_length = len(segment.partial)
-                segment.last_preview_source = source
-                segment.pending = source
-            if segment.pending is not None and (
-                segment.preview_task is None or segment.preview_task.done()
-            ):
-                segment.preview_task = self._start(
-                    self._previews(segment), f"peer:preview:{segment.caption.utterance_id}"
-                )
+            await self._check_preview(segment)
+
+    async def _check_preview(self, segment: _Segment) -> None:
+        if segment.closed or segment.preview_frozen:
+            return
+        if not self._preview_is_current(segment):
+            await self._freeze_preview(segment)
+            return
+        now = self.clock.now()
+        if now < segment.next_check_at:
+            return
+        segment.next_check_at = now + 4.0
+        if not self._translation_active():
+            return
+        source = preview_source(segment.partial)
+        if len(segment.partial) > segment.last_partial_length and len(source) > len(
+            segment.last_preview_source
+        ):
+            segment.last_partial_length = len(segment.partial)
+            segment.last_preview_source = source
+            segment.pending = source
+        if segment.pending is not None and (
+            segment.preview_task is None or segment.preview_task.done()
+        ):
+            segment.preview_task = self._start(
+                self._previews(segment), f"peer:preview:{segment.caption.utterance_id}"
+            )
 
     async def _previews(self, segment: _Segment) -> None:
-        while segment.pending is not None and not segment.closed:
+        while segment.pending is not None and self._preview_is_current(segment):
             if not self._translation_active():
                 return
             source, segment.pending = segment.pending, None
             prepared = self._prepare(segment.caption, source, "preview", segment.config)
             await self._slots.acquire()
+            if not self._preview_is_current(segment):
+                self._slots.release()
+                return
             if not self._translation_active():
                 self._slots.release()
                 if segment.pending is None:
@@ -460,9 +552,11 @@ class PeerCaptionOwner:
                 assignment=segment.caption.speaker_assignment,
                 admitted=segment.caption.admitted,
                 predecessor=segment.caption.predecessor,
+                peer_preview_lifetime=segment.caption.preview_lifetime,
             )
 
     def abandon(self, utterance_id: UUID) -> None:
+        self._preview_deadlines.pop(utterance_id, None)
         segment = self._segments.pop(utterance_id, None)
         if segment is None:
             return
@@ -481,6 +575,7 @@ class PeerCaptionOwner:
         await self.output.supersede_peer_caption_previews((utterance_id,))
 
     def _complete(self, utterance_id: UUID) -> None:
+        self._preview_deadlines.pop(utterance_id, None)
         self._completed[utterance_id] = None
         while len(self._completed) > 4096:
             self._completed.popitem(last=False)
@@ -511,10 +606,14 @@ class PeerCaptionOwner:
                 peer_caption_revision=caption.revision,
                 peer_superseded_unit_ids=caption.superseded,
                 speaker_assignment=caption.speaker_assignment,
-            )
+            ),
+            peer_preview_lifetime=caption.preview_lifetime,
         )
 
     async def retire_epoch(self, provider_epoch_id: str) -> None:
+        for utterance_id, (scope, _deadline) in tuple(self._preview_deadlines.items()):
+            if scope[-1:] == (provider_epoch_id,):
+                self._complete(utterance_id)
         for utterance_id, segment in tuple(self._segments.items()):
             if segment.caption.scope[-1:] == (provider_epoch_id,):
                 await self.retire(utterance_id)
@@ -830,6 +929,7 @@ class PeerCaptionOwner:
         caption.revision += 1
         if caption.scribe_family is not None:
             caption.required_lineage_members = ()
+            self._cancel_scribe_translation(caption)
         self._last = caption
         prepared = self._prepare(caption, source, kind, config)
         self.runtime.translation_history[:] = [
@@ -898,6 +998,11 @@ class PeerCaptionOwner:
                 detected_language=request_language,
                 admitted=request_admission,
                 predecessor=request_predecessor,
+                peer_preview_lifetime=(
+                    caption.preview_lifetime
+                    if caption.provider_id == provider_id and caption.scope == scope
+                    else None
+                ),
             ),
             f"peer:{kind}:{caption.utterance_id}:{revision}",
         )
@@ -1141,7 +1246,10 @@ class PeerCaptionOwner:
                 for member in retained.captions:
                     if member.scribe_continues in boundaries:
                         member.scribe_continues = boundaries[member.scribe_continues]
+        for caption in removed:
+            self._cancel_scribe_translation(caption)
         for caption, prepared, admission in repairs:
+            self._cancel_scribe_translation(caption)
             self._start(
                 self._execute_scribe_request(
                     caption,
@@ -1303,6 +1411,13 @@ class PeerCaptionOwner:
         del history[:-5]
 
     @staticmethod
+    def _cancel_scribe_translation(caption: _Caption) -> None:
+        task = caption.translating_task
+        if task is not None and not task.cancelling():
+            caption.translating_task = None
+            task.cancel()
+
+    @staticmethod
     def _settle_scribe_admission(caption: _Caption) -> None:
         caption.admitted.set()
         for admission in caption.final_admissions:
@@ -1407,13 +1522,18 @@ class PeerCaptionOwner:
         *,
         admitted: asyncio.Event,
         predecessor: asyncio.Event | None,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         epoch = self._epoch
         scribe_plan = caption.scribe_family is not None
         required_members = caption.required_lineage_members
 
         def is_current() -> bool:
-            return epoch == self._epoch and (not scribe_plan or caption.revision == revision)
+            return (
+                epoch == self._epoch
+                and (not scribe_plan or caption.revision == revision)
+                and (segment is None or self._preview_is_current(segment))
+            )
 
         source_language = prepared.source_language if prepared is not None else detected_language
         target_language = self.requests.target_language_for("peer", config.value)
@@ -1446,7 +1566,14 @@ class PeerCaptionOwner:
             )
             try:
                 async with asyncio.timeout(self.request_timeout_s):
-                    result = await self.requests.process(request, prepared=prepared)
+                    task = asyncio.current_task() if scribe_plan and kind != "preview" else None
+                    if task is not None:
+                        caption.translating_task = task
+                    try:
+                        result = await self.requests.process(request, prepared=prepared)
+                    finally:
+                        if task is not None and caption.translating_task is task:
+                            caption.translating_task = None
                 submission = result.output
                 if submission is None:
                     raise RuntimeError("Peer translation completed without output")
@@ -1492,11 +1619,7 @@ class PeerCaptionOwner:
             )
             if submission.failure_code == "stale_provider_completion":
                 return
-            if (
-                not is_current()
-                or (segment is not None and segment.closed)
-                or revision < caption.displayed_revision
-            ):
+            if not is_current() or revision < caption.displayed_revision:
                 return
             if kind == "preview" and (
                 submission.translation is None or revision < caption.revision
@@ -1507,7 +1630,15 @@ class PeerCaptionOwner:
             ):
                 return
             caption.displayed_revision = revision
-            await self.output.project_peer_overlay(submission)
+            await self.output.project_peer_overlay(
+                submission,
+                peer_preview_is_current=(
+                    is_current
+                    if segment is not None and caption.provider_id == "gemini_transcribe"
+                    else None
+                ),
+                peer_preview_lifetime=peer_preview_lifetime,
+            )
             if predecessor is not None and not admitted.is_set():
                 await predecessor.wait()
             if (

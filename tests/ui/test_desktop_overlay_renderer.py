@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -5133,11 +5134,52 @@ def test_desktop_overlay_parent_monitor_factory_prefers_windows_handle() -> None
     monitor = desktop_overlay.create_parent_monitor(
         4321,
         is_windows=True,
-        open_windows_handle=lambda pid: f"handle-{pid}",
+        open_windows_handle=lambda pid: pid + 1,
     )
 
     assert isinstance(monitor, desktop_overlay.WindowsParentHandleMonitor)
-    assert monitor.handle == "handle-4321"
+    assert monitor.handle == 4322
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process handles")
+@pytest.mark.asyncio
+async def test_parent_monitor_keeps_handle_until_cancelled_wait_settles(monkeypatch) -> None:
+    import _winapi
+
+    monitor = desktop_overlay.create_parent_monitor(os.getpid())
+    assert isinstance(monitor, desktop_overlay.WindowsParentHandleMonitor)
+    process_handle = monitor.handle
+    assert process_handle is not None
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    interrupted = asyncio.Event()
+    release = threading.Event()
+    native_wait = _winapi.WaitForMultipleObjects
+
+    def hold_after_interrupt(handles, *args):
+        loop.call_soon_threadsafe(entered.set)
+        result = native_wait(handles, *args)
+        loop.call_soon_threadsafe(interrupted.set)
+        assert release.wait(5)
+        return result
+
+    monkeypatch.setattr(_winapi, "WaitForMultipleObjects", hold_after_interrupt)
+    watch = asyncio.create_task(monitor.wait_for_parent_exit(asyncio.Event()))
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        watch.cancel()
+        await asyncio.wait_for(interrupted.wait(), 5)
+        watch.cancel()
+        await asyncio.sleep(0)
+        assert not watch.done()
+        assert _winapi.WaitForSingleObject(process_handle, 0) == _winapi.WAIT_TIMEOUT
+    finally:
+        release.set()
+        watch.cancel()
+        await asyncio.gather(watch, return_exceptions=True)
+        monitor.close()
+    assert watch.cancelled()
+    assert monitor.handle is None
 
 
 @pytest.mark.asyncio

@@ -126,6 +126,10 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
     ]
     assert history.query({"diagnostic_id": causes[0].diagnostic_id})["lookup"] == "not_retained"
     assert history.query({"diagnostic_id": causes[-1].diagnostic_id})["records"] == [replay]
+    filters = {"diagnostic_id": replay["diagnostic_id"], "operation_id": operation}
+    assert history.query({**filters, "after": 4})["records"] == [replay]
+    assert history.query({**filters, "after": 5})["lookup"] == "not_retained"
+    assert history.query({**filters, "operation_id": uuid4().hex})["records"] == []
     assert history.query({"after": 99})["lookup"] == "invalid_cursor"
     other = DiagnosticHistory()
     other.bind_instance(str(uuid4()))
@@ -143,6 +147,22 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
     ):
         with pytest.raises(ValueError):
             history.query(arguments)
+
+
+def test_mutating_nested_failure_receipts_and_pages_cannot_change_retained_evidence():
+    history = DiagnosticHistory()
+    original = diagnostic(causes=(diagnostic(fields={"errno": 13}),))
+    receipt, fresh = history.retain(original, severity="error", disposition="failed")
+    assert fresh
+    receipt["causes"][0]["fields"]["errno"] = 0
+    duplicate, fresh = history.retain(original, severity="warning", disposition="recovered")
+    assert not fresh
+    assert duplicate["severity"] == "error"
+    assert duplicate["causes"][0]["fields"] == {"errno": 13}
+    duplicate["causes"].clear()
+    page = history.query({})
+    page["records"][0]["causes"][0]["fields"].clear()
+    assert history.query({})["records"][0]["causes"][0]["fields"] == {"errno": 13}
 
 
 def test_caught_up_cursor_distinguishes_new_records_from_missing_identity():

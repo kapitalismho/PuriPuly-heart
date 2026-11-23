@@ -21,22 +21,23 @@ const developerMessage = (text: string, breakpoint: Record<string, string> = { m
   content: [{ type: 'input_text', text, prompt_cache_breakpoint: breakpoint }],
 });
 const prepared = new Map([...contracts].map(([protocol, contract]) => {
-  const work = new Map<number, ReturnType<typeof developerMessage>>();
+  const work = new Map<number, string>();
+  const workOptions = JSON.stringify({
+    tools: contract.tools,
+    reasoning: { effort: 'high' },
+    prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+  }).slice(1, -1);
   return [protocol, {
     classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
     questions: classifierQuestions(contract),
-    workDeveloperMessage(photoAllowance: number) {
-      let message = work.get(photoAllowance);
-      if (!message) {
-        message = developerMessage(workInstructions(contract, photoAllowance), { mode: 'explicit', ttl: '12h' });
-        work.set(photoAllowance, message);
+    workRequestPrefix(photoAllowance: number) {
+      let prefix = work.get(photoAllowance);
+      if (prefix === undefined) {
+        const message = developerMessage(workInstructions(contract, photoAllowance), { mode: 'explicit', ttl: '12h' });
+        prefix = `,${workOptions},"input":[${JSON.stringify(message)}`;
+        work.set(photoAllowance, prefix);
       }
-      return message;
-    },
-    workOptions: {
-      tools: contract.tools,
-      reasoning: { effort: 'high' },
-      prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+      return prefix;
     },
   }];
 }));
@@ -133,24 +134,38 @@ export default {
     const social = !classification && responseBody.route === 'social';
     const outOfScope = !classification && responseBody.route === 'out_of_scope';
     const noTools = social || outOfScope;
-    const upstreamBody = classification ? {
-      model: 'gpt-6-luna',
-      input: [contract.classifierDeveloperMessage, ...input],
-      safety_identifier: installation,
-      questions: contract.questions,
-      prompt_cache_options: { mode: 'explicit', ttl: '30m' },
-    } : {
-      model: accounting.model,
-      safety_identifier: installation,
-      ...(outOfScope ? outOfScopeOptions : social ? socialOptions : contract.workOptions),
-      input: noTools ? input : [contract.workDeveloperMessage(photoAllowance(env)), ...input],
-      store: false,
-      stream: true,
-      parallel_tool_calls: !noTools,
-      tool_choice: responseBody.allow_tools && !noTools && !accounting.finalAdmission ? 'auto' : 'none',
-      max_output_tokens: 25000,
-      include: ['reasoning.encrypted_content'],
-    };
+    let serializeBody: () => string;
+    if (classification) {
+      serializeBody = () => JSON.stringify({
+        model: 'gpt-6-luna',
+        input: [contract.classifierDeveloperMessage, ...input],
+        safety_identifier: installation,
+        questions: contract.questions,
+        prompt_cache_options: { mode: 'explicit', ttl: '30m' },
+      });
+    } else {
+      const identity = { model: accounting.model, safety_identifier: installation };
+      const responseOptions = {
+        store: false,
+        stream: true,
+        parallel_tool_calls: !noTools,
+        tool_choice: responseBody.allow_tools && !noTools && !accounting.finalAdmission ? 'auto' : 'none',
+        max_output_tokens: 25000,
+        include: ['reasoning.encrypted_content'],
+      };
+      if (noTools) {
+        const options = outOfScope ? outOfScopeOptions : socialOptions;
+        serializeBody = () => JSON.stringify({ ...identity, ...options, input, ...responseOptions });
+      } else {
+        const prefix = contract.workRequestPrefix(photoAllowance(env));
+        serializeBody = () => {
+          const head = JSON.stringify(identity).slice(0, -1);
+          const history = JSON.stringify(input).slice(1);
+          const tail = JSON.stringify(responseOptions).slice(1);
+          return `${head}${prefix}${input.length ? ',' : ''}${history},${tail}`;
+        };
+      }
+    }
     let text = '';
     let result: unknown;
     let upstream: Response | undefined;
@@ -163,7 +178,7 @@ export default {
           authorization: `Bearer ${env.OPENAI_API_KEY}`,
           'content-type': 'application/json',
         },
-        body: JSON.stringify(upstreamBody),
+        body: serializeBody(),
         signal: abort.signal,
       }));
       if (!classification && upstream.ok) {

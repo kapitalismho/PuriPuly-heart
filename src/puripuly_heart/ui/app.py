@@ -579,7 +579,7 @@ class TranslatorApp:
             AgentChatHooks(
                 open_folder=open_log_folder,
                 show_snackbar=self._show_snackbar,
-                conversation_records=lambda: self.conversation_history.conversation_records,
+                conversation_history=self.conversation_history,
                 dictation=_AgentDictationSource(self),
             ),
         )

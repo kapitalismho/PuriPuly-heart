@@ -4,6 +4,8 @@ import sys
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from functools import partial
+from typing import TYPE_CHECKING
 
 from puripuly_heart.config.process_capture_resolution import (
     CurrentUserProcessSnapshotPort,
@@ -17,12 +19,23 @@ from puripuly_heart.core.audio.windows_process_table import (
 from puripuly_heart.core.diagnostics import exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
 
+if TYPE_CHECKING:
+    from puripuly_heart.core.audio.windows_process_watch import WindowsProcessIdentityWatch
+
 _WATCH_POLL_INTERVAL_S = 0.05
 _WATCH_JOIN_TIMEOUT_S = 0.5
 
 
-def default_current_user_process_snapshots() -> CurrentUserProcessSnapshotPort:
+def default_current_user_process_snapshots(
+    *, windows_executable_basename: str | None = None
+) -> CurrentUserProcessSnapshotPort:
     if sys.platform == "win32":
+        if windows_executable_basename is not None:
+            return WindowsCurrentUserProcessSnapshots(
+                scan=partial(
+                    snapshot_windows_processes, executable_basename=windows_executable_basename
+                )
+            )
         return WindowsCurrentUserProcessSnapshots()
     return PsutilCurrentUserProcessSnapshots()
 
@@ -166,12 +179,16 @@ class _PsutilProcessIdentityWatch:
 
 
 @dataclass(frozen=True, slots=True)
-class PsutilProcessIdentityWatcher:
+class SystemProcessIdentityWatcher:
     def watch(
         self,
         identity: ResolvedProcessCaptureIdentity,
         on_terminal: Callable[[str, ErrorDiagnostics | None], None],
-    ) -> _PsutilProcessIdentityWatch:
+    ) -> _PsutilProcessIdentityWatch | WindowsProcessIdentityWatch:
+        if sys.platform == "win32":
+            from puripuly_heart.core.audio.windows_process_watch import WindowsProcessIdentityWatch
+
+            return WindowsProcessIdentityWatch(identity, on_terminal)
         psutil = _import_psutil()
         try:
             process = psutil.Process(identity.pid)

@@ -115,7 +115,7 @@ def _targets(command: str) -> list[str]:
     return targets
 
 
-def _discover(root: Path) -> dict[str, ast.Module]:
+def _discover(root: Path, node_targets: set[str]) -> dict[str, ast.Module | None]:
     protected = root / "tests"
     if not protected.is_dir():
         raise SelectionError(f"Missing protected test root: {protected}")
@@ -140,13 +140,15 @@ def _discover(root: Path) -> dict[str, ast.Module]:
                 raise SelectionError(f"Symlinked test source is unsupported: {path}")
             with tokenize.open(path) as source:
                 tree = ast.parse(source.read(), filename=str(path))
-            sources[path.relative_to(root).as_posix()] = tree
+            relative = path.relative_to(root).as_posix()
+            sources[relative] = tree if relative in node_targets else None
+            del tree
     if not sources:
         raise SelectionError("Protected test root is unexpectedly empty")
     return sources
 
 
-def _target_files(root: Path, target: str, sources: dict[str, ast.Module]) -> set[str]:
+def _target_files(root: Path, target: str, sources: dict[str, ast.Module | None]) -> set[str]:
     filename, *nodes = target.split("::")
     path = PurePosixPath(filename)
     if (
@@ -168,7 +170,9 @@ def _target_files(root: Path, target: str, sources: dict[str, ast.Module]) -> se
     if not matches:
         raise SelectionError(f"Declared test target is unexpectedly empty: {target}")
     if nodes:
-        body = sources[filename].body
+        tree = sources[filename]
+        assert tree is not None
+        body = tree.body
         for node_name in nodes:
             matches_node = [
                 node
@@ -187,11 +191,24 @@ def check_selection(root: Path = REPO_ROOT) -> SelectionReport:
     try:
         with (root / WORKFLOW).open(encoding="utf-8") as stream:
             workflow = yaml.load(stream, Loader=_UniqueKeyLoader)
-        sources = _discover(root)
+        targets: list[str] = []
+        command_error: SelectionError | None = None
+        try:
+            for command in _pytest_commands(workflow):
+                targets.extend(_targets(command))
+        except SelectionError as error:
+            command_error = error
+        node_targets = {
+            target.split("::", 1)[0]
+            for target in (*targets, *INTENTIONAL_EXCLUSIONS)
+            if "::" in target
+        }
+        sources = _discover(root, node_targets)
         selected = set()
-        for command in _pytest_commands(workflow):
-            for target in _targets(command):
-                selected.update(_target_files(root, target, sources))
+        for target in targets:
+            selected.update(_target_files(root, target, sources))
+        if command_error is not None:
+            raise command_error
         excluded = set()
         for directory, reason in INTENTIONAL_EXCLUSIONS.items():
             if not reason.strip():

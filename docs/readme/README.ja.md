@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.11.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.11.3-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -194,6 +194,8 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
    > 相手の音声翻訳機能がきちんと動作するには、騒がしくない環境が必要です。VRChatで使う場合は、Earmuff機能を使って環境をコントロールしてください。
 
 7. VRChatでOSCを有効化: Action menu → Settings → OSC → Enable
+
+双方向コントロールの設定と安定したパラメーターABIについては、[VRChat OSCコントロール](../vrchat-osc.md)を参照してください。
 
 ---
 
@@ -403,12 +405,12 @@ PuriPulyはクラウドSTTと組み合わせると最良の体験になります
 
 ## 開発
 
-Windows x64、通常のGIL有効CPython 3.14、[uv](https://docs.astral.sh/uv/)が必要です。リポジトリのルートで実行してください。
+Windows x64、通常のGIL有効CPython **3.14.10**、[uv](https://docs.astral.sh/uv/) **0.13.6**が必要です。CIで固定されているバージョンと同じです。環境を同期する前に、指定のPythonを明示的にインストールしてください。リポジトリのルートで実行してください。
 
 ### セットアップ
 
 ```powershell
-uv sync --frozen --extra dev
+uv sync --locked --extra dev --python 3.14.10
 ```
 
 ### GUI
@@ -428,9 +430,9 @@ uv run python -m puripuly_heart.main cli --help
 ### 検証
 
 ```powershell
-uv run black --check src tests
-uv run ruff check src tests
-uv run python -m pytest
+uv run --locked black --check .
+uv run --locked ruff check .
+uv run --locked python scripts/ci/check_test_selection.py
 ```
 
 ---

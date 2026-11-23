@@ -334,7 +334,7 @@ class _DirectoryWatch:
                     rescan_pending = True
                     continue
                 recoveries = 0
-                changes = self._changes(anchor, buffer.raw[: transferred.value])
+                changes = self._changes(anchor, buffer[: transferred.value])
                 if changes.paths:
                     self._publish(changes, None)
         except BaseException as error:

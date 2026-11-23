@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import ntpath
 import string
 from dataclasses import dataclass
 from functools import cache
@@ -57,14 +58,22 @@ def list_windows_processes() -> tuple[WindowsProcessEntry, ...]:
     return tuple(entries)
 
 
-def snapshot_windows_processes() -> tuple[WindowsProcessRecord, ...]:
+def snapshot_windows_processes(
+    *, executable_basename: str | None = None
+) -> tuple[WindowsProcessRecord, ...]:
     api = _api()
     current_user_sid = _token_user_sid(api, api.kernel32.GetCurrentProcess())
     device_prefixes = _dos_device_prefixes(api)
     path_buffer = ctypes.create_unicode_buffer(_MAX_PATH_CHARS + 1)
+    folded_basename = executable_basename.casefold() if executable_basename is not None else None
     records: list[WindowsProcessRecord] = []
     for entry in list_windows_processes():
         executable_path = _executable_path(api, entry.pid, path_buffer, device_prefixes)
+        if folded_basename is not None and (
+            executable_path is None
+            or ntpath.basename(executable_path).casefold() != folded_basename
+        ):
+            continue
         is_current_user = False
         create_time = None
         handle = api.kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, entry.pid)
@@ -150,6 +159,13 @@ def _token_user_sid(api: _WindowsApi, process_handle: int) -> bytes | None:
         return ctypes.string_at(sid, api.advapi32.GetLengthSid(sid))
     finally:
         api.kernel32.CloseHandle(token)
+
+
+def windows_process_create_time(process_handle: int) -> float:
+    created = _create_time(_api(), process_handle)
+    if created is None:
+        raise ctypes.WinError(ctypes.get_last_error())
+    return created
 
 
 def _create_time(api: _WindowsApi, process_handle: int) -> float | None:
@@ -266,4 +282,5 @@ __all__ = [
     "WindowsProcessRecord",
     "list_windows_processes",
     "snapshot_windows_processes",
+    "windows_process_create_time",
 ]

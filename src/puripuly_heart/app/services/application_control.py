@@ -606,10 +606,10 @@ def _json(
     return str(value)
 
 
-def _private_settings_presence(canonical: object | None) -> dict[str, bool]:
-    if canonical is None:
+def _private_settings_presence(snapshot: dict | None) -> dict[str, bool]:
+    if snapshot is None:
         return {}
-    intent = canonical_snapshot_values(canonical)["intent"]
+    intent = snapshot["intent"]
     result = {}
     for name, descriptor in SETTINGS_PRESENTATION.items():
         if not descriptor.local_only:
@@ -1574,12 +1574,11 @@ class ApplicationControlOwner:
         canonical = self.settings.committed_settings
         base = {"instance_id": self.instance_id, "revision": revision}
         if name == "settings.current":
+            snapshot = canonical_snapshot_values(canonical) if canonical is not None else None
             return {
                 **base,
-                "private_presence": _private_settings_presence(canonical),
-                "settings": (
-                    _redact(canonical_snapshot_values(canonical)) if canonical is not None else None
-                ),
+                "private_presence": _private_settings_presence(snapshot),
+                "settings": _redact(snapshot),
             }
         if name == "settings.choices":
             return await self._settings_choice_catalog(base, canonical)

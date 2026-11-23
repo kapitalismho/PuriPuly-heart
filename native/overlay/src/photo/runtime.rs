@@ -515,10 +515,6 @@ impl PhotoRuntime {
                     "attempt_id": photo.map_or(0, |photo| photo.attempt_id), "revision": snapshot.revision,
                     "block_count": photo.map_or(0, |photo| photo.blocks.len()),
                 })).await?;
-                #[cfg(windows)]
-                if let Some(compositor) = &mut self.compositor {
-                    compositor.invalidate();
-                }
                 self.render_frame(bridge).await?;
             }
             PhotoIncoming::Prepare(request) => {

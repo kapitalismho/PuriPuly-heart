@@ -20,10 +20,12 @@ from puripuly_heart.core.conversation_history import (
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionRuntimeLoggingService
 from puripuly_heart.core.translation_backend import TranslationBackend
-from puripuly_heart.domain.events import UIEvent, UIEventType
-from puripuly_heart.domain.models import Transcript, Translation
+from puripuly_heart.domain.events import STTFinalEvent, UIEvent, UIEventType
+from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import EventProjectionContext, EventProjectionService
+from puripuly_heart.ui.fonts import font_for_language, locale_body_letter_spacing
+from puripuly_heart.ui.i18n import get_locale, set_locale
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from tests.helpers.fakes import RecordingOscQueue
@@ -58,7 +60,7 @@ def history_destination(tmp_path):
         conversation_history=logs,
         view_dashboard=DashboardView(),
         add_history_entry=lambda *args, **kwargs: legacy_entries.append((args, kwargs)),
-        get_event_language_codes=lambda: ("en", "ko"),
+        get_event_language_codes=lambda: ("ko", "zh-CN"),
     )
     adapter = FletUiPresentationAdapter(host)
     adapter.bind_conversation_history(runtime)
@@ -67,6 +69,7 @@ def history_destination(tmp_path):
         runtime=runtime,
         session=session,
         logs=logs,
+        dashboard=host.view_dashboard,
         bridge=bridge,
         audit=records,
         pending=pending,
@@ -296,14 +299,21 @@ def test_history_model_merges_each_revision_pair_and_retains_genuine_repetition(
 
 
 class HistoryBackend(TranslationBackend):
-    def __init__(self):
+    def __init__(self, *, source_language=None):
         self.fail_next = False
+        self.source_language = source_language
+        self.request_source_languages = []
 
     async def translate(self, request):
+        self.request_source_languages.append(request.source_language)
         if self.fail_next:
             self.fail_next = False
             raise RuntimeError("controlled history translation failure")
-        return Translation(request.utterance_id, f"translated:{request.text}")
+        return Translation(
+            request.utterance_id,
+            f"translated:{request.text}",
+            source_language=self.source_language,
+        )
 
     async def close(self):
         return None
@@ -320,8 +330,11 @@ async def test_composed_cloud_caption_history_smoke(history_destination):
         osc=RecordingOscQueue(),
         clock=clock,
         runtime_logging=destination.runtime,
-        source_language="en",
-        target_language="ko",
+        source_language="ko",
+        target_language="zh-CN",
+        peer_source_mode="manual",
+        peer_source_language="en",
+        peer_target_language="ko",
         system_prompt=get_default_prompt(),
         peer_translation_enabled=True,
     )
@@ -375,6 +388,13 @@ async def test_composed_cloud_caption_history_smoke(history_destination):
             "translated:A, b, c.",
             4,
         )
+        display = destination.dashboard.display_card._display_text
+        assert (record.source_language, record.target_language) == ("en", "ko")
+        assert (display.value, display.font_family) == (
+            record.translated_text,
+            font_for_language("ko"),
+        )
+        assert display.style.letter_spacing == 0
         assert [record.metadata["peer_caption_revision"] for record in destination.audit] == [
             2,
             2,
@@ -395,6 +415,11 @@ async def test_composed_cloud_caption_history_smoke(history_destination):
             None,
             5,
         )
+        assert (display.value, display.font_family) == (
+            record.source_text,
+            font_for_language("en"),
+        )
+        assert display.style.letter_spacing == 0
         assert destination.audit[-1].transcript_text == "A, b, c. and d."
         assert destination.audit[-1].translation_text is None
         clock.advance(2)
@@ -411,6 +436,132 @@ async def test_composed_cloud_caption_history_smoke(history_destination):
             "A, b, c. and d.",
         ]
         assert destination.legacy_entries == []
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("detected", "reported", "fails", "translated_source"),
+    [
+        pytest.param(None, None, False, None, id="unknown-success"),
+        pytest.param(None, None, True, None, id="unknown-failure"),
+        pytest.param(None, "zh-CN", False, "zh-CN", id="provider-reported"),
+        pytest.param("zh-CN", "auto", False, "zh-CN", id="detected-over-placeholder"),
+        pytest.param("zh-CN", None, True, None, id="detected-failure"),
+    ],
+)
+async def test_composed_cloud_automatic_caption_source_language(
+    history_destination, detected, reported, fails, translated_source
+):
+    destination = history_destination
+    backend = HistoryBackend(source_language=reported)
+    backend.fail_next = fails
+    harness = compose_translation_test_harness(
+        llm=backend,
+        osc=RecordingOscQueue(),
+        clock=FakeClock(),
+        runtime_logging=destination.runtime,
+        source_language="ko",
+        target_language="zh-CN",
+        peer_source_mode="auto",
+        peer_source_language="en",
+        peer_target_language="ko",
+        system_prompt=get_default_prompt(),
+        peer_translation_enabled=True,
+    )
+    transcript = Transcript(
+        uuid4(),
+        "共通",
+        True,
+        channel="peer",
+        final_language_runs=(FinalLanguageRun("共通", detected),) if detected else (),
+        publication_generation=1,
+        source_order=1,
+    )
+    previous_locale = get_locale()
+    set_locale("ja")
+    try:
+        await harness.start()
+        await harness.peer_owner.cloud_captions.final(
+            transcript,
+            provider_id="soniox",
+            scope=(1, 0, "history-auto"),
+            config=harness.configuration.snapshot(),
+        )
+        await harness.peer_owner.cloud_captions.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        while not harness.ui_events.empty():
+            await destination.bridge._handle_event(harness.ui_events.get_nowait())
+        await drain_audit(destination)
+
+        assert backend.request_source_languages == [detected or "auto"]
+        translation = None if fails else f"translated:{transcript.text}"
+        display_language = (detected or "ja") if fails else "ko"
+        display = destination.dashboard.display_card._display_text
+        assert (display.value, display.font_family, display.style.letter_spacing) == (
+            translation or transcript.text,
+            font_for_language(display_language),
+            locale_body_letter_spacing(display_language) or 0,
+        )
+        (record,) = destination.logs.conversation_records
+        assert (record.source_text, record.translated_text) == (transcript.text, translation)
+        assert (record.source_language, record.target_language) == (
+            detected if fails else translated_source,
+            None if fails else "ko",
+        )
+        assert [item.source_language for item in destination.audit] == (
+            [detected] if fails else [detected, translated_source]
+        )
+    finally:
+        set_locale(previous_locale)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "detected", "expected"),
+    [("manual", None, "zh-CN"), ("auto", "ja", "ja"), ("auto", None, None)],
+)
+async def test_untranslated_peer_final_uses_its_source_language(
+    history_destination, mode, detected, expected
+):
+    destination = history_destination
+    harness = compose_translation_test_harness(
+        osc=RecordingOscQueue(),
+        runtime_logging=destination.runtime,
+        source_language="ko",
+        target_language="zh-CN",
+        peer_source_mode=mode,
+        peer_source_language="zh-CN",
+        peer_target_language="ko",
+        peer_translation_enabled=False,
+    )
+    transcript = Transcript(
+        uuid4(),
+        "共通",
+        True,
+        channel="peer",
+        final_language_runs=(FinalLanguageRun("共通", detected),) if detected else (),
+        publication_generation=1,
+        source_order=1,
+    )
+    try:
+        await harness.start()
+        await harness.peer_owner.handle_stt_event(
+            STTFinalEvent(transcript.utterance_id, transcript)
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        while not harness.ui_events.empty():
+            await destination.bridge._handle_event(harness.ui_events.get_nowait())
+        await drain_audit(destination)
+        (record,) = destination.logs.conversation_records
+        assert (record.source_text, record.source_language) == (transcript.text, expected)
+        display = destination.dashboard.display_card._display_text
+        face = destination.dashboard._typeface(expected)
+        assert (display.value, display.font_family) == (transcript.text, face.font_family)
+        assert display.style.letter_spacing == (face.letter_spacing or 0)
     finally:
         await harness.stop()
 

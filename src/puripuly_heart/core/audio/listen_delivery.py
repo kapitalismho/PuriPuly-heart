@@ -120,7 +120,7 @@ class ListenDeliveryController:
         if isinstance(event, SpeechEnd) and event.utterance_id == self._segment_id:
             if self._sample_rate_hz > 0:
                 delivery_pause_s = self._pause_samples / self._sample_rate_hz
-            snapshot = self._current_snapshot(event.utterance_id)
+            snapshot = self._ledger.segment_snapshot(event.utterance_id)
             if snapshot is not None:
                 smart_turn_incomplete = self._timely_incomplete(
                     snapshot.settings.delivery_threshold
@@ -199,18 +199,10 @@ class ListenDeliveryController:
             await self._seal(segment_id, reason="delivery_deadline", rollover=True)
             return
         pause_ms = self._observed_pause_ms()
-        if self._ledger.is_segment_terminal(segment_id):
-            if not speech_observed:
-                receipt = next(
-                    (
-                        item
-                        for item in self._ledger.terminal_receipts
-                        if item.identity.segment_id == segment_id
-                    ),
-                    None,
-                )
-                if receipt is not None and pause_ms >= receipt.segment.settings.vad_hangover_ms:
-                    await self._seal(segment_id, reason="delivery_pause", rollover=False)
+        receipt = self._ledger.terminal_receipt(segment_id)
+        if receipt is not None:
+            if not speech_observed and pause_ms >= receipt.segment.settings.vad_hangover_ms:
+                await self._seal(segment_id, reason="delivery_pause", rollover=False)
             return
         if not speech_observed and age_s >= self.FIVE_SECOND_AGE_S:
             if pause_ms >= self._five_second_pause_ms:
@@ -222,7 +214,7 @@ class ListenDeliveryController:
             return
         if speech_observed:
             return
-        snapshot = self._current_snapshot(segment_id)
+        snapshot = self._ledger.segment_snapshot(segment_id)
         if snapshot is None:
             return
         if snapshot.settings.delivery_profile_effective != "on":
@@ -373,7 +365,7 @@ class ListenDeliveryController:
             self._run_hard_timer(segment_id, max(0.0, opened_at_s + self._hard_limit_s - now)),
             name="listen-deadline",
         )
-        snapshot = self._current_snapshot(segment_id)
+        snapshot = self._ledger.segment_snapshot(segment_id)
         generation = snapshot.identity.activation_generation if snapshot is not None else None
         for task in (self._four_second_task, self._five_second_task, self._hard_task):
             self._timer_tasks.add(task)
@@ -519,16 +511,6 @@ class ListenDeliveryController:
         if self._sample_rate_hz <= 0 or self._pause_samples <= 0:
             return 0
         return int(math.floor(self._pause_samples * 1000 / self._sample_rate_hz))
-
-    def _current_snapshot(self, segment_id: UUID):
-        return next(
-            (
-                snapshot
-                for snapshot in self._ledger.snapshots
-                if snapshot.identity.segment_id == segment_id
-            ),
-            None,
-        )
 
     @staticmethod
     def _capture_frontier(capture: tuple[AudioCaptureSpan, ...]) -> float | None:

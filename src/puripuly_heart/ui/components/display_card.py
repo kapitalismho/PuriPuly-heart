@@ -317,12 +317,26 @@ class DisplayCard(ft.Container):
         translation_face: TypeFace,
         new_turn: bool,
     ) -> None:
+        translation_text = translation_text or None
+        visible_translation_face = translation_face if translation_text is not None else None
+        if (
+            not new_turn
+            and self._turn_size_cap is not None
+            and not self._showing_status
+            and not self._source_as_message
+            and self._debug_prefix is None
+            and self._source_value == source_text
+            and self._source_face == source_face
+            and self._translation_value == translation_text
+            and self._translation_face == visible_translation_face
+        ):
+            return
         self._showing_status = False
         self._source_as_message = False
         self._source_value = source_text
         self._source_face = source_face
-        self._translation_value = translation_text or None
-        self._translation_face = translation_face if translation_text else None
+        self._translation_value = translation_text
+        self._translation_face = visible_translation_face
         self._debug_prefix = None
         if new_turn or self._turn_size_cap is None:
             self._turn_size_cap = _display_layout_for_length(_weighted_len(source_text))[0]

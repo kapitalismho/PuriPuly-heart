@@ -21,6 +21,24 @@
     "fun-asr-mlt": {
       "adapter": "app",
       "model_id": "fun-asr-mlt-nano-2512-q8-0-transcribe-cpu"
+    },
+    "fourier-2b": {
+      "adapter": "gguf",
+      "languages": [
+        "en"
+      ],
+      "repository": "oruk/oruk-fourier-2b",
+      "revision": "8bcce21695e4ba13569c48de6cedffcb8a7576f5",
+      "license": "CC-BY-NC-4.0",
+      "files": [
+        {
+          "root": "model",
+          "path": "Fourier-2B-Q8_0.gguf",
+          "bytes": 2185030848,
+          "sha256": "6a7c419bd571f7b0e21da2d5ab1e3a1a3938a83470d622be57427af98f322981",
+          "url": "https://huggingface.co/oruk/oruk-fourier-2b/resolve/8bcce21695e4ba13569c48de6cedffcb8a7576f5/Fourier-2B-Q8_0.gguf"
+        }
+      ]
     }
   }
 }

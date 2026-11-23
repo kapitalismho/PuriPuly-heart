@@ -6,10 +6,11 @@ from collections.abc import AsyncIterator, Callable
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from uuid import UUID
+from weakref import WeakKeyDictionary
 
 from puripuly_heart.core.diagnostics import normalize_diagnostic
 from puripuly_heart.core.messages import UserErrorReport
-from puripuly_heart.domain.events import STTSessionState, UIEvent, UIEventType
+from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent, UIEventType
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 
 
@@ -24,10 +25,19 @@ class ControlEvents:
     diagnostic_recorder: Callable[..., dict] | None = None
     subscriber_gaps: int = 0
     disconnected_consumers: int = 0
+    _published_self_targets: WeakKeyDictionary[UUID, set[int] | None] = field(
+        default_factory=WeakKeyDictionary, init=False, repr=False
+    )
 
     def publish(self, event: dict) -> None:
+        self._publish(event, owned=False)
+
+    def _publish(self, entry: dict, *, owned: bool) -> None:
         self.sequence += 1
-        entry = {**deepcopy(event), "sequence": self.sequence, "instance_id": self.instance_id}
+        if not owned:
+            entry = {**deepcopy(entry)}
+        entry["sequence"] = self.sequence
+        entry["instance_id"] = self.instance_id
         self.history.append(entry)
         for subscriber in self.subscribers:
             if subscriber.empty():
@@ -48,6 +58,14 @@ class ControlEvents:
 
     def publish_ui(self, event: UIEvent) -> None:
         payload = event.payload
+        if event.type is UIEventType.SELF_TURN_UPDATED:
+            if (
+                isinstance(payload, SelfTurnPresentation)
+                and event.channel == "self"
+                and (event.delivery_authority is None or event.delivery_authority.is_current())
+            ):
+                self._publish_self_turn(payload)
+            return
         kind = {
             UIEventType.TRANSCRIPT_PARTIAL: "transcript",
             UIEventType.TRANSCRIPT_FINAL: "transcript",
@@ -124,7 +142,56 @@ class ControlEvents:
                 utterance_id = payload.utterance_id
             if isinstance(utterance_id, UUID):
                 item["utterance_id"] = str(utterance_id)
-        self.publish(item)
+        scalar_only = all(type(value) is str or value is None for value in item.values())
+        self._publish(item, owned=scalar_only)
+
+    def _publish_self_turn(self, snapshot: SelfTurnPresentation) -> None:
+        turn = snapshot.utterance_id
+        if snapshot.status in ("cancelled", "expired"):
+            self._published_self_targets[turn] = None
+            return
+        if not snapshot.source_closed:
+            return
+
+        if turn in self._published_self_targets:
+            published = self._published_self_targets[turn]
+            if published is None:
+                return
+        else:
+            published = set()
+            self._published_self_targets[turn] = published
+            self._publish(
+                {
+                    "topic": "transcript",
+                    "channel": "self",
+                    "source": "capture",
+                    "utterance_id": str(turn),
+                    "text": snapshot.source_text,
+                },
+                owned=True,
+            )
+        for index, target in enumerate(snapshot.targets):
+            if (
+                index not in published
+                and target.status == "ready"
+                and target.source_revision == snapshot.source_revision
+                and target.translation is not None
+                and target.translation.text.strip()
+            ):
+                self._publish(
+                    {
+                        "topic": "translation",
+                        "channel": "self",
+                        "source": "translation",
+                        "utterance_id": str(turn),
+                        "target_index": index,
+                        "text": target.translation.text,
+                    },
+                    owned=True,
+                )
+                published.add(index)
+        if snapshot.status != "active":
+            self._published_self_targets[turn] = None
 
     async def subscribe(
         self,

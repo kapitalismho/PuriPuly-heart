@@ -263,3 +263,27 @@ def test_reused_prefix_is_accounted_as_context_without_duplicate_content() -> No
     assert owned.segment.content_sample_count == 8
     assert owned.segment.context_ranges == (prefix,)
     assert owned.segment.content_ranges == (content,)
+
+
+def test_failure_claims_only_gaps_between_previously_delivered_ranges() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=_settings())
+    segment_id = uuid4()
+    samples = np.ones(4, dtype=np.float32)
+    ledger.observe_vad_event(
+        SpeechStart(segment_id, samples[:0], samples, chunk_capture=(_span(12, 16),)),
+        now_monotonic_s=0.0,
+    )
+    ledger.observe_vad_event(
+        SpeechChunk(segment_id, samples, chunk_capture=(_span(4, 8),)),
+        now_monotonic_s=0.1,
+    )
+    ledger.claim_open_content_for_failure((_span(2, 18), _span(0, 20), _span(2, 18)))
+    receipt = ledger.terminalize_for_failure(
+        segment_id, now_monotonic_s=0.2, failure_reason="source_discontinuity"
+    )
+
+    assert receipt.segment.content_sample_count == 8
+    assert receipt.segment.failed_normalized_sample_count == 12
+    assert [
+        (span.source_start_sample, span.source_end_sample) for span in receipt.segment.failed_ranges
+    ] == [(2, 4), (8, 12), (16, 18), (0, 2), (18, 20)]

@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.11.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.11.3-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -197,18 +197,6 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 
 For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
 
-SELF translations can appear in the chatbox while a speech turn is still in progress and update as more speech arrives. The app marks previews separately from completed turns. See [progressive Self chatbox translations](docs/vrchat-osc.md#progressive-self-chatbox-translations) for correction, ordering, and pagination behavior.
-
-On the merged SELF speech route, captions advance with closed-source units or sentence-complete cumulative source whose matching translation is ready. During ongoing speech, source and translation appear together; stable recognition updates, grace restarts, and speculative completions alone are not display boundaries. Existing translated coverage is retained while newer coverage is pending; closed source still has a source-only fallback when translation is disabled, unavailable, or fails. An untranslated successor is staged only when ordinary shared-window selection would evict translated SELF. Eligible late results update retained captions without refocusing newer speech; expired or displaced captions are not revived. Chatbox progression and PEER policy remain independent. Punctuation-free continuous speech can wait for closure, and finite shared slots do not guarantee a minimum reading interval.
-
-Cloud PEER captions do not publish late preview translations after recognition fully retracts the provisional text. Qwen's empty partial updates deliberately retain the last nonempty hypothesis instead. Retraction does not prevent a later valid replacement or authoritative final from being translated.
-
-### If audio capture does not work
-If audio capture does not work, open **Settings > General** and follow these steps.
-
-1. Change **Audio Host API** to **Auto** or **MME**.
-2. Select the correct microphone.
-3. Restart the app.
 ---
 
 ### Note for Users in China

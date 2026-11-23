@@ -5,6 +5,7 @@ import json
 import math
 import unicodedata
 from collections import Counter
+from functools import cache, partial
 from pathlib import Path
 
 
@@ -45,16 +46,20 @@ def bucket(duration):
     return "0.5-2s" if duration <= 2 else ">2-5s" if duration <= 5 else ">5-15s"
 
 
-def aggregate(rows, language):
+def accuracy(reference_text, hypothesis_text, language):
+    reference = units(reference_text, language)
+    hypothesis = units(hypothesis_text, language)
+    return len(reference), distance(reference, hypothesis)
+
+
+def aggregate(rows, score):
     speech = [r for r in rows if r["variant"] != "control"]
-    reference_units = sum(len(units(r["reference"], language)) for r in speech)
-    edits = sum(
-        distance(
-            units(r["reference"], language),
-            units(r.get("text", "") if r["status"] == "ok" else "", language),
-        )
-        for r in speech
-    )
+    reference_units = edits = 0
+    for row in speech:
+        hypothesis = row.get("text") if row["status"] == "ok" else ""
+        count, errors = score(row["reference"] or "", hypothesis or "")
+        reference_units += count
+        edits += errors
     successful = [r for r in rows if r["status"] == "ok"]
     return {
         "rows": len(rows),
@@ -95,25 +100,25 @@ def summarize(results: Path):
         rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
         if not rows:
             continue
-        language = rows[0]["language"]
+        score = cache(partial(accuracy, language=rows[0]["language"]))
         parents = {r["noise_pair_id"] for r in rows if r["variant"] in ("noise15", "noise5")}
         groups = {
-            variant: aggregate([r for r in rows if r["variant"] == variant], language)
+            variant: aggregate([r for r in rows if r["variant"] == variant], score)
             for variant in ("clean", "noise15", "noise5", "control")
         }
-        groups["paired-clean"] = aggregate([r for r in rows if r["id"] in parents], language)
+        groups["paired-clean"] = aggregate([r for r in rows if r["id"] in parents], score)
         durations = {
             variant: {
                 b: aggregate(
                     [r for r in rows if r["variant"] == variant and bucket(r["duration_s"]) == b],
-                    language,
+                    score,
                 )
                 for b in ("0.5-2s", ">2-5s", ">5-15s")
             }
             for variant in ("clean", "noise15", "noise5")
         }
         cells[path.stem.removesuffix("-primary")] = {
-            "overall": aggregate(rows, language),
+            "overall": aggregate(rows, score),
             "groups": groups,
             "duration_groups": durations,
         }

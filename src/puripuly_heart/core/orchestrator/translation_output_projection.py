@@ -39,6 +39,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     OverlayPublicationScope,
     OverlaySink,
+    PeerPreviewLifetime,
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputPublicationResult, OutputRuntime
@@ -99,6 +100,7 @@ class TranslationUiMessage:
     presentation_is_current: Callable[[], bool] | None = field(
         default=None, repr=False, compare=False
     )
+    transcript_language: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -1240,11 +1242,17 @@ class TranslationOutputProjectionOwner:
         *,
         early: bool = False,
         cancellation_requested: Callable[[], bool] | None = None,
+        peer_preview_is_current: Callable[[], bool] | None = None,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.peer_caption_revision > 0:
             if cancellation_requested is not None and cancellation_requested():
                 raise asyncio.CancelledError
-            await self._project_peer_caption_overlay(submission)
+            await self._project_peer_caption_overlay(
+                submission,
+                peer_preview_is_current=peer_preview_is_current,
+                peer_preview_lifetime=peer_preview_lifetime,
+            )
             return
         key = (submission.parent_utterance_id, submission.sequence)
         if not early and key in self._early_peer_overlays:
@@ -1734,6 +1742,7 @@ class TranslationOutputProjectionOwner:
             operation_id=message.operation_id,
             request_id=message.request_id,
             peer_caption_revision=message.peer_caption_revision,
+            transcript_language=message.transcript_language,
         )
         if (
             scoped_peer_event
@@ -2561,7 +2570,13 @@ class TranslationOutputProjectionOwner:
             request_id=submission.request_id,
         )
 
-    async def _project_peer_caption_overlay(self, submission: TranslationOutputSubmission) -> None:
+    async def _project_peer_caption_overlay(
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        peer_preview_is_current: Callable[[], bool] | None,
+        peer_preview_lifetime: PeerPreviewLifetime | None,
+    ) -> None:
         preview = submission.peer_request_kind == "preview"
         translation = submission.translation
         if translation is not None or not preview:
@@ -2595,13 +2610,22 @@ class TranslationOutputProjectionOwner:
                 ),
             )
             await self.publish_overlay_event(
-                replace(event, peer_lineage_revision=submission.peer_lineage_revision),
+                replace(
+                    event,
+                    peer_lineage_revision=submission.peer_lineage_revision,
+                    peer_preview_is_current=peer_preview_is_current,
+                    peer_preview_lifetime=peer_preview_lifetime,
+                ),
                 publication_generation=submission.publication_generation,
                 source_order=submission.source_order,
             )
 
     async def project_peer_caption(
-        self, submission: TranslationOutputSubmission, *, overlay_projected: bool = False
+        self,
+        submission: TranslationOutputSubmission,
+        *,
+        overlay_projected: bool = False,
+        peer_preview_lifetime: PeerPreviewLifetime | None = None,
     ) -> None:
         if submission.channel != "peer" or submission.peer_caption_revision < 1:
             raise ValueError("Peer caption publication requires revision identity")
@@ -2610,7 +2634,7 @@ class TranslationOutputProjectionOwner:
         if not preview and submission.source_text.strip():
             self._record_conversation_submission(submission)
         if not overlay_projected:
-            await self.project_peer_overlay(submission)
+            await self.project_peer_overlay(submission, peer_preview_lifetime=peer_preview_lifetime)
         if not preview and submission.source_text.strip():
             transcript = Transcript(
                 utterance_id=submission.child_utterance_id,
@@ -2626,6 +2650,9 @@ class TranslationOutputProjectionOwner:
                     utterance_id=submission.child_utterance_id,
                     payload=transcript,
                     source="Peer",
+                    transcript_language=self.conversation_source_language(
+                        "peer", submission.source_language, submission.config_snapshot.value
+                    ),
                     peer_caption_revision=submission.peer_caption_revision,
                 )
             )
@@ -2990,7 +3017,7 @@ class TranslationOutputProjectionOwner:
             channel=child.channel,
             source_text=child.transcript.text,
             translation_text=None,
-            source_language=self._conversation_source_language(
+            source_language=self.conversation_source_language(
                 child.channel,
                 child.detected_language,
                 child.config_snapshot.value,
@@ -3027,15 +3054,16 @@ class TranslationOutputProjectionOwner:
             disposition = "overloaded"
         translation = submission.translation
         origin_wall_clock_ms = translation.origin_wall_clock_ms if translation is not None else None
+        configuration = submission.config_snapshot.value
         segment_index = self._conversation_segment_index(
             sequence=submission.sequence,
             channel=submission.channel,
-            configuration=submission.config_snapshot.value,
+            configuration=configuration,
         )
-        source_language = self._conversation_source_language(
+        source_language = self.conversation_source_language(
             submission.channel,
             submission.source_language,
-            submission.config_snapshot.value,
+            configuration,
         )
         self._record_conversation(
             utterance_id=submission.parent_utterance_id,
@@ -3073,7 +3101,12 @@ class TranslationOutputProjectionOwner:
             channel=submission.channel,
             source_text=None,
             translation_text=translation.text,
-            source_language=translation.source_language or source_language,
+            source_language=self.conversation_source_language(
+                submission.channel,
+                submission.source_language,
+                configuration,
+                translation_source_language=translation.source_language,
+            ),
             target_language=translation.target_language or submission.target_language,
             source=submission.source,
             turn_kind=submission.turn_kind or submission.channel,
@@ -3307,16 +3340,23 @@ class TranslationOutputProjectionOwner:
         return fallback
 
     @classmethod
-    def _conversation_source_language(
+    def conversation_source_language(
         cls,
         channel: ChannelId,
         detected_language: str | None,
         configuration: TranslationRuntimeConfig,
+        *,
+        translation_source_language: str | None = None,
     ) -> str | None:
+        if channel == "peer" and configuration.peer_source_mode == "auto":
+            for language in (translation_source_language, detected_language):
+                if language is not None and language.strip() not in ("", "auto"):
+                    return language
+            return None
+        if translation_source_language:
+            return translation_source_language
         if detected_language is not None and detected_language.strip():
             return detected_language
-        if channel == "peer" and configuration.peer_source_mode == "auto":
-            return None
         return cls._source_language_for(channel, configuration)
 
     @staticmethod

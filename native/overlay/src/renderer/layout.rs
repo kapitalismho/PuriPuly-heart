@@ -6,6 +6,8 @@ use super::font_resolver::{
     FontLanguageBucket, FontSource, FontWeight, ResolvedFontStyle, WindowsBundledFontCollection,
 };
 use super::font_resolver::{FontResolver, TextStyleKey};
+#[cfg(windows)]
+use super::types::RenderDiagnostics;
 use super::types::{
     BlockBounds, CaptionBlock, CaptionBlockVariant, CaptionFitScales, CaptionLayoutResult,
     CaptionPresentation, LayoutCacheKey, LineRole, ResolvedBlockLayout, ResolvedFrameLayout,
@@ -191,33 +193,6 @@ impl CaptionLayoutPolicy {
             presentation,
         )
         .into()
-    }
-
-    #[cfg(windows)]
-    pub(crate) fn layout_cache_key_for_block_windows(
-        &self,
-        block: &CaptionBlock,
-        surface_width_px: u32,
-        presentation: &CaptionPresentation,
-        engine: &DirectWriteLayoutEngine,
-    ) -> LayoutCacheKey {
-        let primary_style_key =
-            engine.line_style_key(self, block.primary_language.as_deref(), &block.primary_text);
-        let secondary_style_key = engine.line_style_key(
-            self,
-            block.secondary_language.as_deref(),
-            &block.secondary_text,
-        );
-        layout_cache_key_for_block(
-            block,
-            self.content_width_px(surface_width_px),
-            presentation.text_scale.max(0.1),
-            primary_style_key,
-            secondary_style_key,
-            block.fit_scales.unwrap_or_else(|| {
-                self.fit_scales_for_block(block, surface_width_px, presentation)
-            }),
-        )
     }
 
     pub fn resolve_blocks_for_presentation(
@@ -481,12 +456,11 @@ impl CaptionLayoutPolicy {
         block: &CaptionBlock,
         content_width_px: f32,
         text_scale: f32,
-        primary_style: &DirectWriteResolvedTextStyle,
-        secondary_style: &DirectWriteResolvedTextStyle,
+        prepared: &PreparedWindowsBlockLayout,
     ) -> Result<CachedBlockLayoutTemplate, windows::core::Error> {
         let secondary_row_reserved = self.reserves_secondary_row(block);
         let primary_budget = self.primary_line_budget(block);
-        let fit_scales = block.fit_scales.expect("caption fitting resolved");
+        let fit_scales = prepared.fit_scales;
         let primary_font_size_px = DEFAULT_FONT_SIZE_PX * text_scale * fit_scales.primary;
         let secondary_font_size_px =
             DEFAULT_FONT_SIZE_PX * text_scale * SECONDARY_FONT_SCALE * fit_scales.secondary;
@@ -507,7 +481,7 @@ impl CaptionLayoutPolicy {
 
         let (primary_lines_text, truncated_primary) = engine.wrap_primary_text(
             self,
-            primary_style,
+            &prepared.primary_style,
             &block.primary_text,
             content_width_px,
             primary_font_size_px,
@@ -519,7 +493,7 @@ impl CaptionLayoutPolicy {
             .map(|(index, text)| {
                 let measured = engine.measure_centered_line_for_resolved_style(
                     self,
-                    primary_style,
+                    &prepared.primary_style,
                     text,
                     content_width_px,
                     primary_font_size_px,
@@ -543,7 +517,7 @@ impl CaptionLayoutPolicy {
         let (secondary_line, truncated_secondary) = if block.secondary_enabled {
             let (text, truncated) = engine.ellipsize_secondary_text(
                 self,
-                secondary_style,
+                &prepared.secondary_style,
                 &block.secondary_text,
                 content_width_px,
                 secondary_font_size_px,
@@ -553,7 +527,7 @@ impl CaptionLayoutPolicy {
                 .map(|text| {
                     let measured = engine.measure_centered_line_for_resolved_style(
                         self,
-                        secondary_style,
+                        &prepared.secondary_style,
                         text,
                         content_width_px,
                         secondary_font_size_px,
@@ -600,86 +574,102 @@ impl CaptionLayoutPolicy {
     #[cfg(windows)]
     pub(crate) fn resolve_blocks_for_presentation_windows_cached(
         &self,
-        blocks: Vec<CaptionBlock>,
+        blocks: &[CaptionBlock],
         surface_width_px: u32,
         surface_height_px: u32,
         presentation: &CaptionPresentation,
         engine: &DirectWriteLayoutEngine,
-        mut layout_cache: Option<&mut LayoutCache>,
+        mut cache: Option<(&mut LayoutCache, &mut RenderDiagnostics)>,
     ) -> Result<ResolvedFrameLayout, windows::core::Error> {
         let content_width_px = self.content_width_px(surface_width_px);
         let text_scale = presentation.text_scale.max(0.1);
         let strip_left_px = self.horizontal_padding_px as f32;
         let mut top_px = self.vertical_padding_px as f32;
         let mut resolved_blocks = Vec::with_capacity(blocks.len());
-        let speaker_divider = self.speaker_divider_band(&blocks, surface_width_px, presentation);
-
-        for mut block in blocks {
-            if block.fit_scales.is_none() {
-                block.fit_scales =
-                    Some(self.fit_scales_for_block(&block, surface_width_px, presentation));
-            }
-            let primary_style = engine.resolve_text_style(
-                self,
-                block.primary_language.as_deref(),
-                &block.primary_text,
-            );
-            let secondary_style = engine.resolve_text_style(
-                self,
-                block.secondary_language.as_deref(),
-                &block.secondary_text,
-            );
-            let primary_style_key = primary_style.style_key;
-            let secondary_style_key = secondary_style.style_key;
-            let layout_cache_key = layout_cache_key_for_block(
-                &block,
-                content_width_px,
-                text_scale,
-                primary_style_key,
-                secondary_style_key,
-                block.fit_scales.expect("caption fitting resolved"),
-            );
-            let template = if let Some(cache) = layout_cache.as_deref_mut() {
-                if let Some(cached) = cache.get(&layout_cache_key) {
-                    cached.clone()
-                } else {
-                    let template = self.build_windows_block_template(
-                        engine,
-                        &block,
-                        content_width_px,
-                        text_scale,
-                        &primary_style,
-                        &secondary_style,
-                    )?;
-                    cache.insert(layout_cache_key.clone(), template.clone());
-                    template
-                }
-            } else {
-                self.build_windows_block_template(
-                    engine,
-                    &block,
+        let speaker_divider = self.speaker_divider_band(blocks, surface_width_px, presentation);
+        let prepared_blocks: Vec<_> = blocks
+            .iter()
+            .map(|block| {
+                let fit_scales = block.fit_scales.unwrap_or_else(|| {
+                    self.fit_scales_for_block(block, surface_width_px, presentation)
+                });
+                let primary_style = engine.resolve_text_style(
+                    self,
+                    block.primary_language.as_deref(),
+                    &block.primary_text,
+                );
+                let secondary_style = engine.resolve_text_style(
+                    self,
+                    block.secondary_language.as_deref(),
+                    &block.secondary_text,
+                );
+                let key = layout_cache_key_for_block(
+                    block,
                     content_width_px,
                     text_scale,
-                    &primary_style,
-                    &secondary_style,
-                )?
+                    primary_style.style_key,
+                    secondary_style.style_key,
+                    fit_scales,
+                );
+                if let Some((cache, diagnostics)) = cache.as_mut() {
+                    if cache.contains_key(&key) {
+                        diagnostics.layout_cache_hits += 1;
+                    } else {
+                        diagnostics.layout_cache_misses += 1;
+                    }
+                }
+                PreparedWindowsBlockLayout {
+                    key,
+                    fit_scales,
+                    primary_style,
+                    secondary_style,
+                }
+            })
+            .collect();
+
+        for (block, prepared) in blocks.iter().zip(prepared_blocks) {
+            let mut materialize = |key, template: &CachedBlockLayoutTemplate| {
+                let block_top_px = if block.slot_assigned {
+                    block.slot_top_px
+                } else {
+                    top_px
+                };
+                let resolved = materialize_resolved_block_layout(
+                    block,
+                    key,
+                    template,
+                    strip_left_px,
+                    block_top_px,
+                );
+                if !block.slot_assigned {
+                    top_px += template.bounds.bottom_px - template.bounds.top_px
+                        + self.block_spacing_px as f32;
+                }
+                resolved
             };
-            let stable_block_height_px = template.bounds.bottom_px - template.bounds.top_px;
-            let block_top_px = if block.slot_assigned {
-                block.slot_top_px
+            let build = || {
+                self.build_windows_block_template(
+                    engine,
+                    block,
+                    content_width_px,
+                    text_scale,
+                    &prepared,
+                )
+            };
+            let resolved = if let Some((cache, _)) = cache.as_mut() {
+                if let Some(template) = cache.get(&prepared.key) {
+                    materialize(prepared.key, template)
+                } else {
+                    let template = build()?;
+                    let resolved = materialize(prepared.key.clone(), &template);
+                    cache.insert(prepared.key, template);
+                    resolved
+                }
             } else {
-                top_px
+                let template = build()?;
+                materialize(prepared.key, &template)
             };
-            resolved_blocks.push(materialize_resolved_block_layout(
-                &block,
-                layout_cache_key,
-                &template,
-                strip_left_px,
-                block_top_px,
-            ));
-            if !block.slot_assigned {
-                top_px += stable_block_height_px + self.block_spacing_px as f32;
-            }
+            resolved_blocks.push(resolved);
         }
 
         Ok(ResolvedFrameLayout {
@@ -691,6 +681,14 @@ impl CaptionLayoutPolicy {
             speaker_divider,
         })
     }
+}
+
+#[cfg(windows)]
+struct PreparedWindowsBlockLayout {
+    key: LayoutCacheKey,
+    fit_scales: CaptionFitScales,
+    primary_style: DirectWriteResolvedTextStyle,
+    secondary_style: DirectWriteResolvedTextStyle,
 }
 
 #[cfg(windows)]
@@ -790,15 +788,6 @@ impl DirectWriteLayoutEngine {
             )),
             wrapping_boundaries: RefCell::new(Vec::with_capacity(WRAPPING_BOUNDARY_CAP)),
         }
-    }
-
-    fn line_style_key(
-        &self,
-        policy: &CaptionLayoutPolicy,
-        language: Option<&str>,
-        text: &str,
-    ) -> TextStyleKey {
-        self.resolve_text_style(policy, language, text).style_key
     }
 
     #[cfg(test)]
@@ -1804,15 +1793,16 @@ mod tests {
             ),
         );
         let mut cache = super::LayoutCache::with_capacity(4);
+        let mut diagnostics = super::RenderDiagnostics::default();
 
         let first = policy
             .resolve_blocks_for_presentation_windows_cached(
-                vec![block.clone()],
+                std::slice::from_ref(&block),
                 1100,
                 900,
                 &presentation,
                 &engine,
-                Some(&mut cache),
+                Some((&mut cache, &mut diagnostics)),
             )
             .expect("DirectWrite layout should initialize on Windows");
         assert!(
@@ -1820,27 +1810,30 @@ mod tests {
             "test text must wrap so lookup and measured-line style can diverge"
         );
 
-        let lookup_key =
-            policy.layout_cache_key_for_block_windows(&block, 1100, &presentation, &engine);
+        let lookup_key = &first.visible_blocks[0].layout_cache_key;
         assert!(
-            cache.get(&lookup_key).is_some(),
+            cache.get(lookup_key).is_some(),
             "first resolve should insert using the same key the second resolve will look up"
         );
-        let cache_len_after_first = cache.len();
+        assert_eq!(diagnostics.layout_cache_misses, 1);
+        assert_eq!(diagnostics.layout_cache_hits, 0);
+        diagnostics = super::RenderDiagnostics::default();
 
-        let _ = policy
+        let second = policy
             .resolve_blocks_for_presentation_windows_cached(
-                vec![block],
+                &[block],
                 1100,
                 900,
                 &presentation,
                 &engine,
-                Some(&mut cache),
+                Some((&mut cache, &mut diagnostics)),
             )
             .expect("DirectWrite layout should initialize on Windows");
 
-        assert_eq!(cache.len(), cache_len_after_first);
-        assert!(cache.get(&lookup_key).is_some());
+        assert_eq!(cache.len(), 1);
+        assert_eq!(diagnostics.layout_cache_hits, 1);
+        assert_eq!(diagnostics.layout_cache_misses, 0);
+        assert_eq!(first, second);
     }
 
     #[test]

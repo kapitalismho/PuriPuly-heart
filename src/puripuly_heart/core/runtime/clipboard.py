@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from contextvars import copy_context
 from dataclasses import replace
 from typing import Any
 
 from puripuly_heart.core.diagnostics import emit_failure, exception_diagnostics
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import wait_for_owned_future
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,7 @@ class ClipboardRuntime:
 
     resource_fields = (
         "_watcher",
+        "_retiring_watcher",
         "_loop",
         "_generation",
         "_submit_tasks",
@@ -45,6 +48,7 @@ class ClipboardRuntime:
         self._failure_sink = failure_sink
         self.failure_diagnostics: ErrorDiagnostics | None = None
         self._watcher: object | None = None
+        self._retiring_watcher: object | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._generation = 0
         self._submit_tasks: set[asyncio.Task[Any]] = set()
@@ -101,6 +105,14 @@ class ClipboardRuntime:
                 if strict_runtime_errors:
                     raise RuntimeError("ClipboardRuntime is closed to new watcher work")
                 return
+            if self._retiring_watcher is not None:
+                try:
+                    await self._stop_watcher(self._retiring_watcher)
+                except Exception as exc:
+                    diagnostics = self.record_failure(exc, "watcher_stop")
+                    if strict_runtime_errors:
+                        raise
+                    return diagnostics
             self._generation += 1
             generation = self._generation
             self._loop = asyncio.get_running_loop()
@@ -126,15 +138,28 @@ class ClipboardRuntime:
                     raise
                 return diagnostics
             try:
-                await asyncio.to_thread(watcher.start)
+                starting = asyncio.get_running_loop().run_in_executor(
+                    None, copy_context().run, watcher.start
+                )
+                await wait_for_owned_future(starting, on_cancel=self._revoke_ingress)
+            except asyncio.CancelledError:
+                if not starting.cancelled() and isinstance(
+                    error := starting.exception(), Exception
+                ):
+                    self.record_failure(error, "watcher_start")
+                try:
+                    await self._stop_watcher(watcher)
+                except Exception as exc:
+                    self.record_failure(exc, "watcher_stop")
+                raise
             except Exception as exc:
                 diagnostics = exception_diagnostics(
                     exc, component="clipboard", operation="watcher_start", code="clipboard_failed"
                 )
-                self._loop = None
+                self._revoke_ingress()
                 self._notify_state_changed()
                 try:
-                    await asyncio.to_thread(watcher.stop)  # type: ignore[attr-defined]
+                    await self._stop_watcher(watcher)
                 except Exception as cleanup_exc:
                     cleanup = exception_diagnostics(
                         cleanup_exc,
@@ -150,29 +175,53 @@ class ClipboardRuntime:
                     raise
                 return diagnostics
             if generation != self._generation or self._closing or self._closed:
-                await asyncio.to_thread(watcher.stop)  # type: ignore[attr-defined]
+                await self._stop_watcher(watcher)
                 return
             self._watcher = watcher
             self._notify_state_changed()
 
+    async def _stop_watcher(self, watcher: object) -> None:
+        self._retiring_watcher = watcher
+        stopping = asyncio.get_running_loop().run_in_executor(
+            None, copy_context().run, watcher.stop
+        )
+        try:
+            await wait_for_owned_future(stopping)
+        except asyncio.CancelledError:
+            if not stopping.cancelled():
+                error = stopping.exception()
+                if error is None:
+                    self._retiring_watcher = None
+                elif isinstance(error, Exception):
+                    self.record_failure(error, "watcher_stop")
+            raise
+        self._retiring_watcher = None
+
     async def stop(self, *, strict_runtime_errors: bool = False) -> ErrorDiagnostics | None:
-        async with self._lock:
-            self._generation += 1
-            watcher = self._watcher
-            self._watcher = None
-            self._loop = None
-            self._notify_state_changed()
         stop_failure: Exception | None = None
         stop_diagnostics: ErrorDiagnostics | None = None
-        if watcher is not None:
-            try:
-                await asyncio.to_thread(watcher.stop)  # type: ignore[attr-defined]
-            except Exception as exc:
-                stop_failure = exc
-                stop_diagnostics = exception_diagnostics(
-                    exc, component="clipboard", operation="watcher_stop", code="clipboard_failed"
-                )
-        drain_diagnostics = await self._gather_submit_tasks_bounded()
+        async with self._lock:
+            self._revoke_ingress()
+            watcher = self._watcher if self._watcher is not None else self._retiring_watcher
+            self._watcher = None
+            self._notify_state_changed()
+            if watcher is not None:
+                try:
+                    await self._stop_watcher(watcher)
+                except Exception as exc:
+                    stop_failure = exc
+                    stop_diagnostics = exception_diagnostics(
+                        exc,
+                        component="clipboard",
+                        operation="watcher_stop",
+                        code="clipboard_failed",
+                    )
+        try:
+            drain_diagnostics = await self._gather_submit_tasks_bounded()
+        except asyncio.CancelledError:
+            if stop_failure is not None and stop_diagnostics is not None:
+                self._retain_failure(stop_failure, stop_diagnostics)
+            raise
         if stop_failure is not None and stop_diagnostics is not None:
             if drain_diagnostics is not None:
                 stop_diagnostics = replace(
@@ -185,7 +234,12 @@ class ClipboardRuntime:
         return stop_diagnostics or drain_diagnostics
 
     async def close(self) -> ErrorDiagnostics | None:
-        if self._closed and self._watcher is None and not self._submit_tasks:
+        if (
+            self._closed
+            and self._watcher is None
+            and self._retiring_watcher is None
+            and not self._submit_tasks
+        ):
             return
         self._closing = True
         try:
@@ -223,6 +277,10 @@ class ClipboardRuntime:
         self._submit_tasks.add(task)
         task.add_done_callback(self._on_submit_done)
         self._notify_state_changed()
+
+    def _revoke_ingress(self) -> None:
+        self._generation += 1
+        self._loop = None
 
     def _is_current_generation(self, generation: int) -> bool:
         return not self._closing and not self._closed and generation == self._generation

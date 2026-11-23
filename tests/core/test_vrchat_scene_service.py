@@ -3,18 +3,25 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from puripuly_heart.config.process_capture_resolution import ProcessSnapshot
+from puripuly_heart.core.audio import process_identity, windows_process_table
+from puripuly_heart.core.diagnostics import exception_diagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 
 _USER_A = "usr_11111111-1111-4111-8111-111111111111"
 _USER_B = "usr_22222222-2222-4222-8222-222222222222"
 _USER_C = "usr_33333333-3333-4333-8333-333333333333"
+
+_WatchTerminal = Callable[[str, ErrorDiagnostics | None], None]
 
 
 def _line(payload: str) -> str:
@@ -78,13 +85,13 @@ class FakeWatcherFactory:
         self.terminals: list[Callable[[], None]] = []
         self.handles: list[FakeWatchHandle] = []
 
-    def watch(self, identity: object, on_terminal: Callable[[], None]) -> FakeWatchHandle:
+    def watch(self, identity: object, on_terminal: _WatchTerminal) -> FakeWatchHandle:
         handle = FakeWatchHandle()
         self.handles.append(handle)
 
         def terminal() -> None:
             self.snapshots.items = ()
-            on_terminal()
+            on_terminal("target_exited", None)
 
         self.terminals.append(terminal)
         return handle
@@ -123,6 +130,113 @@ async def _wait_for_status(service: VrchatSceneService, status: str) -> None:
             return
         await asyncio.sleep(0.02)
     raise AssertionError(f"scene never reached {status}: {service.snapshot()}")
+
+
+def test_default_windows_scene_uses_resolved_paths_before_process_enrichment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inventory = {
+        10: ("VRChat.exe", r"C:\Other.exe"),
+        20: ("", r"C:\Older\VRChat.exe"),
+        30: ("PriorImage.exe", r"D:\Replacement\vRcHaT.ExE"),
+        40: ("VRChat.exe", None),
+        50: ("VRChat.exe", r"C:\OtherUser\VRChat.exe"),
+        60: ("VRChat.exe", r"C:\NoHandle\VRChat.exe"),
+        70: ("VRChat.exe", r"C:\NoTime\VRChat.exe"),
+        80: ("VRChat.exe", r"C:\NoSid\VRChat.exe"),
+    }
+    paths = {pid: path for pid, (_, path) in inventory.items()}
+    entries = tuple(
+        windows_process_table.WindowsProcessEntry(pid, 1, name)
+        for pid, (name, _) in inventory.items()
+    )
+    opened: list[int] = []
+
+    def resolve(_api, pid, _buffer, _prefixes):
+        return paths[pid]
+
+    def open_process(_access, _inherit, pid):
+        opened.append(pid)
+        return None if pid == 60 else pid
+
+    def token_sid(_api, handle):
+        return {50: b"other", 80: None}.get(handle, b"owner")
+
+    def create_time(_api, handle):
+        return None if handle == 70 else float(handle)
+
+    api = SimpleNamespace(
+        kernel32=SimpleNamespace(
+            GetCurrentProcess=lambda: -1,
+            OpenProcess=open_process,
+            CloseHandle=lambda _handle: None,
+        )
+    )
+    monkeypatch.setattr(process_identity.sys, "platform", "win32")
+    monkeypatch.setattr(windows_process_table, "_api", lambda: api)
+    monkeypatch.setattr(windows_process_table, "_dos_device_prefixes", lambda _api: ())
+    monkeypatch.setattr(windows_process_table, "list_windows_processes", lambda: entries)
+    monkeypatch.setattr(windows_process_table, "_executable_path", resolve)
+    monkeypatch.setattr(windows_process_table, "_token_user_sid", token_sid)
+    monkeypatch.setattr(windows_process_table, "_create_time", create_time)
+
+    service = VrchatSceneService(log_directory=tmp_path)
+    identity = service._find_vrchat_identity()
+    assert identity is not None
+    assert (identity.pid, identity.instance_id) == (30, "30:30.0")
+    assert identity.target.executable_identity == r"d:\replacement\vrchat.exe"
+    assert set(opened) == {20, 30, 50, 60, 70, 80}
+
+    paths[30] = r"D:\Replacement\Other.exe"
+    identity = service._find_vrchat_identity()
+    assert identity is not None and identity.pid == 20
+
+    opened.clear()
+    generic = tuple(process_identity.default_current_user_process_snapshots().snapshots())
+    assert [item.executable_path for item in generic] == list(paths.values())
+    assert opened == list(paths)
+
+
+@pytest.mark.parametrize("fail_path_query", [False, True])
+async def test_default_windows_scene_scan_failure_is_not_process_absence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_path_query: bool
+) -> None:
+    failed = True
+
+    def inventory():
+        if not failed:
+            return ()
+        if fail_path_query:
+            return (windows_process_table.WindowsProcessEntry(10, 1, "PriorImage.exe"),)
+        raise OSError(5, "synthetic process enumeration failure")
+
+    def resolve(*_args):
+        raise OSError(5, "synthetic full path query failure")
+
+    monkeypatch.setattr(process_identity.sys, "platform", "win32")
+    api = SimpleNamespace(kernel32=SimpleNamespace(GetCurrentProcess=lambda: -1))
+    monkeypatch.setattr(windows_process_table, "_api", lambda: api)
+    monkeypatch.setattr(windows_process_table, "_token_user_sid", lambda *_args: b"owner")
+    monkeypatch.setattr(windows_process_table, "_dos_device_prefixes", lambda _api: ())
+    monkeypatch.setattr(windows_process_table, "list_windows_processes", inventory)
+    monkeypatch.setattr(windows_process_table, "_executable_path", resolve)
+    service = VrchatSceneService(log_directory=tmp_path)
+    service._started = True
+    try:
+        await service._poll_once(service.generation)
+        observation = service.lifecycle_owner_snapshot()
+        assert observation["process_observation_succeeded"] is False
+        assert observation["process_present"] is None
+        assert observation["observation_diagnostic_id"] is not None
+
+        failed = False
+        await service._poll_once(service.generation)
+        observation = service.lifecycle_owner_snapshot()
+        assert observation["process_observation_succeeded"] is True
+        assert observation["process_present"] is False
+        assert observation["observation_diagnostic_id"] is None
+    finally:
+        await service.close()
 
 
 async def test_no_process_means_unavailable(tmp_path: Path) -> None:
@@ -776,10 +890,10 @@ class PinnedWatcherFactory:
         self.identity_verified = identity_verified
         self.alive = alive
         self.raise_on_watch = raise_on_watch
-        self.terminals: list[Callable[[], None]] = []
+        self.terminals: list[_WatchTerminal] = []
         self.handles: list[PinnedWatchHandle] = []
 
-    def watch(self, identity: object, on_terminal: Callable[[], None]) -> PinnedWatchHandle:
+    def watch(self, identity: object, on_terminal: _WatchTerminal) -> PinnedWatchHandle:
         if self.raise_on_watch:
             raise RuntimeError("watch registration failed")
         handle = PinnedWatchHandle(identity_verified=self.identity_verified, alive=self.alive)
@@ -870,6 +984,52 @@ async def test_pinned_service_ignores_newer_second_process(tmp_path: Path) -> No
         await service.close()
 
 
+async def test_exit_while_appended_join_is_being_read_cannot_republish_old_roster(tmp_path):
+    create_time = time.time() - 5
+    path = tmp_path / _log_name(create_time)
+    path.write_text("\n".join(_roster_block(("Self",), (_USER_A,), "Self")) + "\n")
+    snapshots = CountingSnapshots()
+    snapshots.items = (_snapshot(4242, "C:\\VRChat\\VRChat.exe", create_time),)
+    watcher = PinnedWatcherFactory()
+    service = VrchatSceneService(
+        snapshots=snapshots,
+        watcher_factory=watcher,
+        log_directory=tmp_path,
+        poll_interval_s=3600,
+        quiescence_s=0,
+    )
+    entered = asyncio.Event()
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    await service.start()
+    try:
+        await _wait_for_status(service, "ready")
+        parse = service._tailer.project_line
+
+        def held_parse(line):
+            event = parse(line)
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(5)
+            return event
+
+        service._tailer.project_line = held_parse
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(_join("Peer", _USER_B) + "\n")
+        async with asyncio.TaskGroup() as group:
+            group.create_task(service._poll_once(service.generation))
+            try:
+                await asyncio.wait_for(entered.wait(), timeout=5)
+                snapshots.items = ()
+                watcher.terminals[-1]("target_exited", None)
+                await _wait_for_status(service, "unavailable")
+            finally:
+                release.set()
+        assert service.snapshot().status == "unavailable"
+        assert service.snapshot().participant_count is None
+    finally:
+        await service.close()
+
+
 async def test_terminal_resumes_discovery_and_reused_pid_restart_rebuilds(
     tmp_path: Path,
 ) -> None:
@@ -883,7 +1043,7 @@ async def test_terminal_resumes_discovery_and_reused_pid_restart_rebuilds(
         for _ in range(5):
             await service._poll_once(service._generation)
         snapshots.items = ()
-        watcher.terminals[-1]()
+        watcher.terminals[-1]("target_exited", None)
         await _wait_for_status(service, "unavailable")
         snapshots.calls = 0
         new_start = time.time()
@@ -896,6 +1056,68 @@ async def test_terminal_resumes_discovery_and_reused_pid_restart_rebuilds(
         assert snapshots.calls > 0
         assert service._instance_id == f"4242:{new_start}"
         assert service.snapshot().participant_count == 1
+    finally:
+        await service.close()
+
+
+@pytest.mark.parametrize("reason", ["target_exited", "target_identity_mismatch"])
+async def test_watch_rejects_obsolete_process_before_scene_log_replay(tmp_path, reason):
+    class Rejected(PinnedWatcherFactory):
+        def watch(self, identity, on_terminal):
+            handle = super().watch(identity, on_terminal)
+            handle.terminal_reason = reason
+            return handle
+
+    snapshots = CountingSnapshots()
+    created = time.time() - 1
+    snapshots.items = (_snapshot(42, r"C:\VRChat\VRChat.exe", created),)
+    (tmp_path / _log_name(created)).write_text(
+        "\n".join(_roster_block(("Self",), (_USER_A,), "Self")) + "\n", encoding="utf-8"
+    )
+    watcher = Rejected(identity_verified=False)
+    service = _pinned_service(snapshots, watcher, tmp_path)
+    service.quiescence_s = 0
+    service._started = True
+    try:
+        await service._poll_once(service.generation)
+        assert service.snapshot().status == "unavailable"
+        assert watcher.handles[0].closed
+        service.watcher_factory = PinnedWatcherFactory()
+        await service._poll_once(service.generation)
+        assert service.snapshot().participant_count == 1
+    finally:
+        await service.close()
+
+
+@pytest.mark.parametrize("at_registration", [False, True])
+async def test_watch_error_reports_cause_and_keeps_process_discovery(tmp_path, at_registration):
+    cause = exception_diagnostics(
+        PermissionError(13, "private process path"),
+        component="capture.peer",
+        operation="process_watch",
+        code="capture.peer.identity_unavailable",
+    )
+
+    class FailedWatch(PinnedWatcherFactory):
+        def watch(self, identity, on_terminal):
+            handle = super().watch(identity, on_terminal)
+            if at_registration:
+                handle.terminal_reason = "identity_unavailable"
+                handle.failure_diagnostics = cause
+            return handle
+
+    watcher = FailedWatch(identity_verified=not at_registration)
+    snapshots, service, _ = await _ready_pinned(tmp_path, ("Self",), (_USER_A,), watcher)
+    try:
+        if not at_registration:
+            watcher.terminals[0]("identity_unavailable", cause)
+            await asyncio.sleep(0)
+        assert service.failure_diagnostics is cause
+        assert service.snapshot().participant_count == 1
+        assert watcher.handles[0].closed
+        snapshots.items = ()
+        await service._poll_once(service.generation)
+        assert service.snapshot().status == "unavailable"
     finally:
         await service.close()
 

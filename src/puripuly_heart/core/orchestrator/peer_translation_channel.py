@@ -61,6 +61,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
@@ -563,6 +564,28 @@ class PeerTranslationChannelOwner:
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
 
+    async def handle_recognition_preview_deadline(
+        self, event: STTRecognitionPreviewDeadline
+    ) -> None:
+        stream = event.stream
+        provider_id = stream.recognizer_id or (
+            str(stream.settings_scope[0]) if stream.settings_scope else ""
+        )
+        if (
+            not self._accepting_events
+            or stream.channel != "peer"
+            or provider_id != "gemini_transcribe"
+        ):
+            return
+        remembered = self._native_caption_orders.get(event.unit_id)
+        if remembered is not None and remembered[0] != stream:
+            return
+        await self.cloud_captions.set_preview_deadline(
+            event.unit_id,
+            scope=(stream.activation_generation, stream.capture_epoch, stream.provider_epoch_id),
+            expires_at_s=event.expires_at_s,
+        )
+
     async def handle_recognition_unit_terminal(self, event: STTRecognitionUnitTerminal) -> None:
         if event.unit.identity.stream.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer recognition unit")
@@ -835,34 +858,6 @@ class PeerTranslationChannelOwner:
         if not self._accepting_events:
             raise RuntimeError("Peer translation ingress is closed")
 
-    async def _handle_peer_final_transcript(
-        self,
-        transcript: Transcript,
-        *,
-        parent_utterance_id: UUID,
-        source: str,
-    ) -> None:
-        runtime = self.runtime
-        bundle = runtime.get_or_create_bundle(transcript.utterance_id)
-        bundle.with_transcript(transcript)
-        self._remember_source(transcript.utterance_id, source, channel="peer")
-        await self.output_projection.publish_ui(
-            TranslationUiMessage(
-                event_type=UIEventType.TRANSCRIPT_FINAL,
-                utterance_id=transcript.utterance_id,
-                payload=transcript,
-                source=source,
-                publication_generation=transcript.publication_generation,
-                source_order=transcript.source_order,
-                parent_utterance_id=parent_utterance_id,
-            )
-        )
-        self._record_latency_stage(
-            channel="peer",
-            utterance_id=transcript.utterance_id,
-            stage="stt_final",
-        )
-
     async def on_child_created(self, child: TranslationTurnChild) -> None:
         if child.channel != "peer":
             raise ValueError("Peer translation owner received a non-Peer child")
@@ -870,10 +865,29 @@ class PeerTranslationChannelOwner:
             parent_utterance_id=child.parent_utterance_id,
             peer_turn_id=child.utterance_id,
         )
-        await self._handle_peer_final_transcript(
-            child.transcript,
-            parent_utterance_id=child.parent_utterance_id,
-            source=child.source,
+        transcript = child.transcript
+        runtime = self.runtime
+        bundle = runtime.get_or_create_bundle(transcript.utterance_id)
+        bundle.with_transcript(transcript)
+        self._remember_source(transcript.utterance_id, child.source, channel="peer")
+        await self.output_projection.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.TRANSCRIPT_FINAL,
+                utterance_id=transcript.utterance_id,
+                payload=transcript,
+                source=child.source,
+                transcript_language=self.output_projection.conversation_source_language(
+                    "peer", child.detected_language, child.config_snapshot.value
+                ),
+                publication_generation=transcript.publication_generation,
+                source_order=transcript.source_order,
+                parent_utterance_id=child.parent_utterance_id,
+            )
+        )
+        self._record_latency_stage(
+            channel="peer",
+            utterance_id=transcript.utterance_id,
+            stage="stt_final",
         )
 
     async def process_child(

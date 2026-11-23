@@ -571,7 +571,7 @@ async def test_offer_expires_and_retention_cleans_up_without_policy_notification
             lambda: owner.lifecycle.snapshot["photo"] is not None
             and owner.lifecycle.snapshot["photo"]["phase"] == "expired"
         )
-        watcher.emit(captured(tmp_path, "translated.png"))
+        watcher.emit(captured(tmp_path, "translated.png", observed=int(time.monotonic())))
         await eventually(
             lambda: owner.lifecycle.snapshot["photo"]["path"].endswith("translated.png")
         )
@@ -582,6 +582,7 @@ async def test_offer_expires_and_retention_cleans_up_without_policy_notification
         owner.lifecycle._clock = lambda: retained.capture.observed_monotonic + 599.9
         owner.lifecycle.hidden(photo_id)
         await eventually(lambda: not owner.lifecycle._changed_event.is_set())
+        assert owner.lifecycle.snapshot["photo"]["photo_id"] == photo_id
         owner.lifecycle._clock = lambda: retained.capture.observed_monotonic + 600
         await eventually(lambda: owner.lifecycle.snapshot["photo"] is None)
         await eventually(lambda: discarded.await_count == 1)

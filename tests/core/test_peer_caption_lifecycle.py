@@ -17,7 +17,10 @@ from puripuly_heart.core.orchestrator.peer_caption import join_action, preview_s
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
-from puripuly_heart.core.overlay.peer_caption_layout import estimate_peer_translation_lines
+from puripuly_heart.core.overlay.peer_caption_layout import (
+    estimate_peer_translation_lines,
+    peer_translation_fragments,
+)
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
@@ -25,6 +28,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionPreviewDeadline,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
@@ -1337,6 +1341,316 @@ def rolling_peer(harness, stream):
         is_current_recognition_stream=lambda _channel, identity: identity == stream,
     )
     return callbacks
+
+
+@pytest.mark.asyncio
+async def test_gemini_preview_deadline_cancels_refresh_and_preserves_shown_caption(
+    preview_timeline,
+):
+    harness, backend, events, clock = setup(clock=preview_timeline.clock)
+    stream = RecognitionStreamIdentity(
+        "peer", 1, 0, "gemini-epoch", ("rolling_free",), "gemini_transcribe"
+    )
+    callbacks = rolling_peer(harness, stream)
+    owner = harness.peer_owner.cloud_captions
+    unit_id = uuid4()
+    initial = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 1), "Initial preview", is_final=False
+    )
+    refreshed = replace(
+        initial, identity=RecognitionUnitIdentity(stream, unit_id, 2), text="Initial preview grows"
+    )
+    settled = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 3), "Corrected final source."
+    )
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(initial)
+        await preview_timeline.advance(5)
+        await idle(harness)
+        assert [event.source_text for event in events] == [initial.text]
+
+        await callbacks.retired_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() - 1)
+        )
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(
+                replace(stream, capture_epoch=1), unit_id, clock.now() - 1
+            )
+        )
+        await callbacks.peer_event_handler(refreshed)
+        await preview_timeline.advance(3.75)
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        )
+        backend.block = True
+        await preview_timeline.advance(0.25)
+        assert [request.text for request in backend.calls] == [initial.text, refreshed.text]
+
+        await preview_timeline.advance(0.35)
+        await idle(harness)
+        assert backend.completions[0].cancelled()
+        assert owner._tasks == set()
+        assert [event.source_text for event in events] == [initial.text]
+        assert harness.peer_runtime.translation_history == []
+
+        backend.block = False
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert [(event.type, event.utterance_id, event.source_text) for event in events] == [
+            ("translation_stream_update", unit_id, initial.text),
+            ("translation_final", unit_id, settled.text),
+        ]
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_gemini_preview_deadline_prevents_pending_caption_from_rendering(preview_timeline):
+    surface = Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=preview_timeline.clock,
+        sleep=preview_timeline.sleep,
+        bridge=surface,
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=preview_timeline.clock)
+    stream = RecognitionStreamIdentity("peer", 1, 0, "gemini-epoch", ("gemini_transcribe",))
+    callbacks = rolling_peer(harness, stream)
+    unit_id = uuid4()
+    unit = STTRecognitionUnit(
+        RecognitionUnitIdentity(stream, unit_id, 1), "Pending preview", is_final=False
+    )
+    occupant = uuid4()
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(unit)
+        await preview_timeline.advance(4.75)
+        await presenter.emit(caption(1, occupant, "가" * 64))
+        await callbacks.peer_event_handler(
+            STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        )
+        await preview_timeline.advance(0.25)
+        await idle(harness)
+        assert [request.text for request in backend.calls] == [unit.text]
+        assert presenter.peer_fragment_state(unit_id, 0).pending
+
+        await preview_timeline.advance(1)
+        assert all(
+            block.id != f"peer:{unit_id}"
+            for snapshot in surface.snapshots
+            for block in snapshot.blocks
+        )
+
+        settled = STTRecognitionUnit(
+            RecognitionUnitIdentity(stream, unit_id, 2), "Settled late source."
+        )
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert (
+            presenter.snapshot().blocks[-1].id,
+            presenter.snapshot().blocks[-1].primary_text,
+        ) == (
+            f"peer:{unit_id}",
+            f"translated:{settled.text}",
+        )
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "preview_size", [10, 64, 130], ids=["single", "split", "split-with-pending-tail"]
+)
+async def test_frozen_gemini_preview_expires_visually_then_native_final_renders_once(
+    preview_timeline, preview_size
+):
+    surface = Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=preview_timeline.clock,
+        sleep=preview_timeline.sleep,
+        bridge=surface,
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=preview_timeline.clock)
+    preview = transcript("The train", 1)
+    settled = replace(preview, text="The train has arrived.")
+    preview_text = "가" * preview_size
+    final_text = "나" * min(preview_size, 64)
+    backend.translations.update({preview.text: preview_text, settled.text: final_text})
+    unit_id = preview.utterance_id
+    block_id = f"peer:{unit_id}"
+    try:
+        await harness.start()
+        await partial(harness, preview, provider="gemini_transcribe")
+        await preview_timeline.advance(5)
+        await idle(harness)
+        preview_fragments = peer_translation_fragments(preview_text)
+        original = [(block.id, block.primary_text) for block in presenter.snapshot().blocks]
+        assert [text for _, text in original] == list(preview_fragments[:2])
+        assert original[0][0] == block_id
+        assert set(surface.expirations.values()) == {13.0}
+        if len(preview_fragments) > 2:
+            assert presenter.peer_fragment_state(unit_id, 2).pending
+
+        await harness.peer_owner.cloud_captions.set_preview_deadline(
+            unit_id, scope=(1, 0, "epoch"), expires_at_s=clock.now() + 0.6
+        )
+        await preview_timeline.advance(0.6)
+        await preview_timeline.advance(7.39)
+        assert [(block.id, block.primary_text) for block in presenter.snapshot().blocks] == original
+        await preview_timeline.advance(0.02)
+        assert presenter.snapshot().blocks == []
+        assert presenter.peer_fragment_states(unit_id) == ()
+        assert harness.peer_runtime.translation_history == []
+        stale_preview = await presenter.emit(
+            caption(100, unit_id, "stale", revision=99, final=False)
+        )
+        assert stale_preview.outcome == "stale"
+
+        await final(harness, settled, provider="gemini_transcribe")
+        await idle(harness)
+        blocks = presenter.snapshot().blocks
+        assert [block.primary_text for block in blocks] == list(
+            peer_translation_fragments(final_text)
+        )
+        assert blocks[0].id == block_id
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
+        shown = len(surface.snapshots)
+        await final(harness, settled, provider="gemini_transcribe")
+        stale_preview = await presenter.emit(
+            caption(101, unit_id, "stale", revision=99, final=False)
+        )
+        await idle(harness)
+        assert stale_preview.outcome == "stale"
+        assert len(surface.snapshots) == shown
+        assert [request.text for request in backend.calls] == [preview.text, settled.text]
+
+        await preview_timeline.advance(8.01)
+        assert presenter.snapshot().blocks == []
+        await final(harness, settled, provider="gemini_transcribe")
+        stale_preview = await presenter.emit(
+            caption(102, unit_id, "stale", revision=99, final=False)
+        )
+        await idle(harness)
+        assert stale_preview.outcome == "stale"
+        assert presenter.snapshot().blocks == []
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [settled.text]
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_expired_frozen_gemini_preview_renders_joined_final_with_reversed_completions(
+    preview_timeline,
+):
+    surface = Surface()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=preview_timeline.clock,
+        sleep=preview_timeline.sleep,
+        bridge=surface,
+    )
+    harness, backend, _, clock = setup(overlay_sink=presenter, clock=preview_timeline.clock)
+    first = transcript("Turn left", 1)
+    first_final = replace(first, text="Turn left,")
+    second = transcript("then stop.", 2)
+    joined = f"{first_final.text} {second.text}"
+    backend.translations.update(
+        {first.text: "preview", first_final.text: "older final", joined: "merged final"}
+    )
+    block_id = f"peer:{first.utterance_id}"
+    try:
+        await harness.start()
+        await partial(harness, first, provider="gemini_transcribe")
+        await preview_timeline.advance(5)
+        await idle(harness)
+        assert [(block.id, block.primary_text) for block in presenter.snapshot().blocks] == [
+            (block_id, "preview")
+        ]
+        await harness.peer_owner.cloud_captions.set_preview_deadline(
+            first.utterance_id, scope=(1, 0, "epoch"), expires_at_s=clock.now() + 0.6
+        )
+        await preview_timeline.advance(0.6)
+        await preview_timeline.advance(7.41)
+        assert presenter.snapshot().blocks == []
+
+        backend.block = True
+        await final(harness, first_final, provider="gemini_transcribe")
+        await turn_loop()
+        await partial(harness, second, provider="gemini_transcribe")
+        await final(harness, second, provider="gemini_transcribe")
+        await turn_loop()
+        assert [(request.utterance_id, request.text) for request in backend.calls] == [
+            (first.utterance_id, first.text),
+            (first.utterance_id, first_final.text),
+            (first.utterance_id, joined),
+        ]
+        assert presenter.snapshot().blocks == []
+
+        older, merged = backend.completions
+        merged.set_result(None)
+        await turn_loop()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        assert not older.done()
+        assert [(block.id, block.primary_text) for block in presenter.snapshot().blocks] == [
+            (block_id, "merged final")
+        ]
+        shown = len(surface.snapshots)
+        older.set_result(None)
+        await idle(harness)
+        assert len(surface.snapshots) == shown
+        assert [entry.text for entry in harness.peer_runtime.translation_history] == [joined]
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_gemini_delayed_deadline_prevents_first_preview_after_empty_partial():
+    harness, backend, events, clock = setup()
+    stream = RecognitionStreamIdentity("peer", 1, 0, "gemini-epoch", ("gemini_transcribe",))
+    callbacks = rolling_peer(harness, stream)
+    owner = harness.peer_owner.cloud_captions
+    unit_id = uuid4()
+    try:
+        await harness.start()
+        await callbacks.peer_event_handler(
+            STTRecognitionUnit(
+                RecognitionUnitIdentity(stream, unit_id, 1), "", is_final=False, observed_at=0.0
+            )
+        )
+        deadline = STTRecognitionPreviewDeadline(stream, unit_id, clock.now() + 0.6)
+        clock.advance(6)
+        await callbacks.peer_event_handler(deadline)
+        await callbacks.peer_event_handler(
+            STTRecognitionUnit(
+                RecognitionUnitIdentity(stream, unit_id, 2),
+                "Became available during grace",
+                is_final=False,
+                observed_at=0.3,
+            )
+        )
+        await idle(harness)
+        assert backend.calls == []
+        assert owner._segments == {}
+        assert owner._tasks == set()
+
+        settled = STTRecognitionUnit(
+            RecognitionUnitIdentity(stream, unit_id, 3), "Settled without a preview."
+        )
+        await callbacks.peer_event_handler(STTRecognitionUnitTerminal(settled, "final"))
+        await idle(harness)
+        assert [(event.type, event.utterance_id, event.source_text) for event in events] == [
+            ("translation_final", unit_id, settled.text)
+        ]
+        assert owner._preview_deadlines == {}
+    finally:
+        await harness.stop()
 
 
 @pytest.mark.asyncio

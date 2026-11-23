@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -63,12 +64,28 @@ def test_full_validation_rejects_checksum_mismatch(tmp_path, monkeypatch) -> Non
         assets.validate_gemma_install(tmp_path)
 
 
-def test_inspection_reports_ready_without_hashing_valid_sized_assets(tmp_path, monkeypatch) -> None:
+def test_inspection_resolves_install_dir_once_without_hashing_assets(tmp_path, monkeypatch) -> None:
     _write_install(tmp_path, monkeypatch)
 
-    state = assets.inspect_gemma_install(tmp_path)
+    install_dir = tmp_path / ".." / tmp_path.name
+    expected_dir = install_dir.resolve()
+    resolve = Path.resolve
+    resolved_paths: list[Path] = []
+
+    def track_resolution(path: Path, *, strict: bool = False) -> Path:
+        resolved_paths.append(path)
+        return resolve(path, strict=strict)
+
+    def reject_hashing(_path, _check_cancelled):
+        pytest.fail("asset inspection must not hash files")
+
+    monkeypatch.setattr(Path, "resolve", track_resolution)
+    monkeypatch.setattr(assets, "_sha256_file", reject_hashing)
+    state = assets.inspect_gemma_install(install_dir)
 
     assert state.status == "ready"
+    assert state.install_dir == expected_dir
+    assert resolved_paths == [install_dir]
     assert state.manifest == assets.InstalledGemmaManifest.expected()
 
 

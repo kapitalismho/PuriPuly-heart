@@ -735,11 +735,8 @@ class SelfCaptureSessionOwner:
     def note_input_terminal(self, terminal: STTProviderInputTerminal) -> None:
         segment = terminal.identity.segment
         for ledger in reversed(self._segment_ledgers):
-            if not ledger.contains_segment(segment.segment_id):
-                continue
-            if not any(item.identity == segment for item in ledger.snapshots) and not any(
-                receipt.identity == segment for receipt in ledger.terminal_receipts
-            ):
+            snapshot = ledger.segment_snapshot(segment.segment_id)
+            if snapshot is None or snapshot.identity != segment:
                 continue
             if terminal.outcome == "submitted":
                 ledger.terminalize(
@@ -766,11 +763,7 @@ class SelfCaptureSessionOwner:
         for ledger in reversed(self._segment_ledgers):
             if not ledger.contains_segment(segment_id):
                 continue
-            snapshot = next(
-                (item for item in ledger.snapshots if item.identity.segment_id == segment_id),
-                None,
-            )
-            if snapshot is not None and snapshot.state == "open":
+            if ledger.current_open_segment_id == segment_id:
                 ledger.terminalize_for_failure(
                     segment_id,
                     now_monotonic_s=asyncio.get_running_loop().time(),

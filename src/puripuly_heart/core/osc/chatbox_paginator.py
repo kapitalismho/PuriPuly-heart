@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import textwrap
 from collections.abc import Callable
@@ -37,6 +38,7 @@ class ChatboxPaginator:
     _pending_pages: list[str] | None = None
     _pending_messages: list[OSCMessage] | None = None
     _next_page_at: float = 0.0
+    _schedule_changed: asyncio.Event = field(default_factory=asyncio.Event, init=False, repr=False)
     _active_message: OSCMessage | None = field(default=None, init=False, repr=False)
     _active_page_index: int = field(default=0, init=False, repr=False)
     _active_page_count: int = field(default=0, init=False, repr=False)
@@ -74,7 +76,12 @@ class ChatboxPaginator:
         self._delivery_observer = observer
 
     def _notify_delivery(
-        self, message: OSCMessage, status: str, diagnostics: ErrorDiagnostics | None = None
+        self,
+        message: OSCMessage,
+        status: str,
+        diagnostics: ErrorDiagnostics | None = None,
+        *,
+        forget_revision: bool = True,
     ) -> None:
         if self._delivery_observer is not None:
             try:
@@ -98,14 +105,17 @@ class ChatboxPaginator:
                     disposition="degraded",
                     stage="routing_observer",
                 )
-        if status not in {"first_page_sent", "output_send_failed", "page_send_failed"}:
+        if forget_revision and status not in {
+            "first_page_sent",
+            "output_send_failed",
+            "page_send_failed",
+        }:
             self._stream_final_revisions.pop(
                 (message.utterance_id, message.presentation_revision), None
             )
 
     def enqueue_self_turn(self, message: OSCMessage, *, final: bool) -> OSCMessage | None:
-        self._stream_final_revisions[(message.utterance_id, message.presentation_revision)] = final
-        return self.enqueue(message)
+        return self._enqueue(message, final=final)
 
     def promote_self_turn(self, utterance_id: UUID, revision: int) -> None:
         key = (utterance_id, revision)
@@ -113,22 +123,22 @@ class ChatboxPaginator:
             self._stream_final_revisions[key] = True
 
     def enqueue(self, message: OSCMessage) -> OSCMessage | None:
-        page_count = (
-            len(
-                self._split_text(
-                    message.text.strip(),
-                    preserve_newlines=message.presentation_revision > 0,
-                )
-            )
-            if message.text.strip()
-            else 0
-        )
+        return self._enqueue(message, final=None)
+
+    def _enqueue(self, message: OSCMessage, *, final: bool | None) -> OSCMessage | None:
+        pages = self._message_pages(message)
+        page_count = len(pages)
+        disposition = None
         if message.self_turn_key is not None:
             disposition = self._prepare_self_turn_enqueue(message, page_count=page_count)
-            if disposition is not None:
-                if disposition == "rejected":
-                    self._notify_delivery(message, "output_superseded")
+            if disposition == "rejected":
+                self._notify_delivery(message, "output_superseded", forget_revision=False)
                 return None
+        if final is not None:
+            key = (message.utterance_id, message.presentation_revision)
+            self._stream_final_revisions[key] = final
+        if disposition == "queued":
+            return None
         if self._is_paginating():
             evicted: OSCMessage | None = None
             if message.self_speech:
@@ -171,10 +181,21 @@ class ChatboxPaginator:
             target_indexes=message.target_indexes,
             target_languages=message.target_languages,
         )
-        self._start_message(message)
+        self._start_message(message, pages)
         if not self._is_paginating():
             self._drain_pending_messages()
         return None
+
+    async def run_flush_loop(self) -> None:
+        while True:
+            self.process_due()
+            self._schedule_changed.clear()
+            delay = self._next_page_at - self.clock.now() if self._pending_pages else None
+            try:
+                async with asyncio.timeout(delay):
+                    await self._schedule_changed.wait()
+            except TimeoutError:
+                pass
 
     def process_due(self) -> None:
         if not self._is_paginating():
@@ -185,10 +206,7 @@ class ChatboxPaginator:
         if now < self._next_page_at:
             return
 
-        page = self._pending_pages.pop(0)
-        remaining_parts = len(self._pending_pages)
-        self._active_page_index += 1
-        self._send_page(mode="queued", text=page, remaining_parts=remaining_parts)
+        self._send_next_page()
 
         if self._pending_pages:
             self._next_page_at = now + self.page_interval_s
@@ -204,6 +222,12 @@ class ChatboxPaginator:
         self._active_page_index = 0
         self._active_page_count = 0
         self._drain_pending_messages()
+
+    def _send_next_page(self) -> None:
+        assert self._pending_pages is not None
+        page = self._pending_pages.pop(0)
+        self._active_page_index += 1
+        self._send_page(mode="queued", text=page, remaining_parts=len(self._pending_pages))
 
     def send_immediate(self, text: str) -> tuple[bool, ErrorDiagnostics | None]:
         """Return local send outcome and safe cause without changing pagination."""
@@ -283,6 +307,7 @@ class ChatboxPaginator:
         self._pending_messages.clear()
         self._stream_final_revisions.clear()
         self._next_page_at = 0.0
+        self._schedule_changed.set()
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
@@ -353,15 +378,24 @@ class ChatboxPaginator:
                 target_indexes=message.target_indexes,
                 target_languages=message.target_languages,
             )
-        elif active_key is not None and active_key < incoming_key:
-            self._notify_delivery(active, "output_superseded")
+        elif active is not None and active_key is not None and active_key < incoming_key:
+            if (
+                self._stream_final_revisions.get(
+                    (active.utterance_id, active.presentation_revision), True
+                )
+                and self.clock.now() >= self._next_page_at
+            ):
+                self._send_next_page()
+            active_pruned = self._is_paginating()
+            if active_pruned:
+                self._notify_delivery(active, "output_superseded")
             dropped_pages = self._clear_active_message()
-            active_pruned = True
-            self._record_stage(
-                "message_terminal",
-                utterance_id=str(active.utterance_id),
-                status="output_superseded",
-            )
+            if active_pruned:
+                self._record_stage(
+                    "message_terminal",
+                    utterance_id=str(active.utterance_id),
+                    status="output_superseded",
+                )
 
         replaced_pending_revision: int | None = None
         replacement_index: int | None = None
@@ -445,6 +479,7 @@ class ChatboxPaginator:
         dropped_pages = len(self._pending_pages)
         self._pending_pages.clear()
         self._next_page_at = 0.0
+        self._schedule_changed.set()
         if self._active_message is not None:
             self._stream_final_revisions.pop(
                 (self._active_message.utterance_id, self._active_message.presentation_revision),
@@ -455,9 +490,14 @@ class ChatboxPaginator:
         self._active_page_count = 0
         return dropped_pages
 
-    def _start_message(self, message: OSCMessage) -> None:
+    def _message_pages(self, message: OSCMessage) -> list[str]:
         text = message.text.strip()
         if not text:
+            return []
+        return self._split_text(text, preserve_newlines=message.presentation_revision > 0)
+
+    def _start_message(self, message: OSCMessage, parts: list[str]) -> None:
+        if not parts:
             self._notify_delivery(message, "output_empty")
             self._record_stage(
                 "message_terminal",
@@ -466,10 +506,6 @@ class ChatboxPaginator:
             )
             return
 
-        parts = self._split_text(
-            text,
-            preserve_newlines=message.presentation_revision > 0,
-        )
         head = parts[0]
         tail = parts[1:]
         self._active_message = message
@@ -481,6 +517,7 @@ class ChatboxPaginator:
         if tail:
             self._pending_pages.extend(tail)
             self._next_page_at = self.clock.now() + self.page_interval_s
+            self._schedule_changed.set()
             return
         self._stream_final_revisions.pop(
             (message.utterance_id, message.presentation_revision), None
@@ -503,7 +540,7 @@ class ChatboxPaginator:
                     status="output_timeout",
                 )
                 continue
-            self._start_message(next_message)
+            self._start_message(next_message, self._message_pages(next_message))
 
     def _split_text(self, text: str, *, preserve_newlines: bool = False) -> list[str]:
         if len(text) <= self.max_chars:

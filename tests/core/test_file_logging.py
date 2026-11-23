@@ -104,6 +104,24 @@ def test_configure_main_logging_reuses_existing_root_stream_handler(tmp_path):
         sinks.close()
 
 
+def test_main_file_rollover_preserves_utf8_byte_boundaries(tmp_path):
+    root = logging.Logger("file-rollover")
+    root.addHandler(logging.StreamHandler(io.StringIO()))
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    sinks.file_handler.setFormatter(logging.Formatter("%(message)s"))
+    sinks.file_handler.maxBytes = 24
+    session = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    try:
+        for message in ("first α", "中文中文", "third"):
+            session.emit_basic(message)
+    finally:
+        session.close_terminal_owner()
+
+    (backup,) = tmp_path.glob("*.backup.log")
+    assert backup.read_text(encoding="utf-8").splitlines() == ["first α", "中文中文"]
+    assert sinks.log_file.read_text(encoding="utf-8").splitlines() == ["third"]
+
+
 def test_default_session_runtime_logging_services_do_not_share_session_logger(tmp_path):
     root_logger_one = logging.getLogger(f"test.runtime.default.root.one.{uuid4()}")
     root_logger_one.handlers.clear()

@@ -145,6 +145,7 @@ class SmartTurnOnnxInference:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         options.inter_op_num_threads = 1
         options.intra_op_num_threads = 2
+        options.add_session_config_entry("session.force_spinning_stop", "1")
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         self._session = ort.InferenceSession(
             str(model_path), sess_options=options, providers=["CPUExecutionProvider"]

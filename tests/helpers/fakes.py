@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 from puripuly_heart.domain.models import OSCMessage
@@ -26,14 +27,12 @@ class RecordingOscQueue:
     messages: list[OSCMessage]
     typing: list[bool]
     immediate_messages: list[str]
-    process_due_calls: int
     immediate_result: bool
 
     def __init__(self, *, immediate_result: bool = True) -> None:
         self.messages = []
         self.typing = []
         self.immediate_messages = []
-        self.process_due_calls = 0
         self.immediate_result = immediate_result
 
     def enqueue(self, message: OSCMessage) -> None:
@@ -49,5 +48,5 @@ class RecordingOscQueue:
         self.immediate_messages.append(text)
         return self.immediate_result, None
 
-    def process_due(self) -> None:
-        self.process_due_calls += 1
+    async def run_flush_loop(self) -> None:
+        await asyncio.Event().wait()

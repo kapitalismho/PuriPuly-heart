@@ -9,6 +9,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from datetime import datetime
 from itertools import islice
@@ -1773,6 +1774,13 @@ class DiagnosticQueryArgumentsError(ValueError):
     """Deliberate diagnostic query argument rejection, never an execution defect."""
 
 
+@dataclass(frozen=True, slots=True)
+class _RetainedDiagnostic:
+    sequence: int
+    operation_id: str | None
+    payload: str
+
+
 class DiagnosticHistory:
     """Current-run metadata only, independent of file delivery and event subscribers."""
 
@@ -1787,7 +1795,7 @@ class DiagnosticHistory:
         self.instance_id: str | None = None
         self.max_records = max_records
         self.max_bytes = max_bytes
-        self.records: OrderedDict[str, tuple[dict, int]] = OrderedDict()
+        self._records: OrderedDict[str, _RetainedDiagnostic] = OrderedDict()
         self.sequence = 0
         self.retained_bytes = 0
         self.evicted = 0
@@ -1811,23 +1819,27 @@ class DiagnosticHistory:
     def retain(self, diagnostics: ErrorDiagnostics, **kwargs) -> tuple[dict, bool]:
         record = normalize_diagnostic(diagnostics, instance_id=self.instance_id, **kwargs)
         with self._lock:
-            existing = self.records.get(record["diagnostic_id"])
+            existing = self._records.get(record["diagnostic_id"])
             if existing is not None:
                 self.duplicates += 1
-                return json.loads(json.dumps(existing[0])), False
+                return json.loads(existing.payload), False
             self.sequence += 1
             record["diagnostic_sequence"] = self.sequence
-            size = len(json.dumps(record, separators=(",", ":")).encode())
-            while self.records and (
-                len(self.records) >= self.max_records or self.retained_bytes + size > self.max_bytes
+            payload = json.dumps(record, separators=(",", ":"), ensure_ascii=True)
+            size = len(payload)
+            while self._records and (
+                len(self._records) >= self.max_records
+                or self.retained_bytes + size > self.max_bytes
             ):
-                _, (_, removed_size) = self.records.popitem(last=False)
-                self.retained_bytes -= removed_size
+                _, removed = self._records.popitem(last=False)
+                self.retained_bytes -= len(removed.payload)
                 self.evicted += 1
-            self.records[record["diagnostic_id"]] = (record, size)
+            self._records[record["diagnostic_id"]] = _RetainedDiagnostic(
+                self.sequence, record["operation_id"], payload
+            )
             self.retained_bytes += size
             self.rejected_fields += record["detail"]["rejected_fields"]
-            return json.loads(json.dumps(record)), True
+        return json.loads(payload), True
 
     def query(self, arguments: dict) -> dict:
         allowed = {"operation_id", "diagnostic_id", "instance_id", "after", "limit"}
@@ -1854,26 +1866,31 @@ class DiagnosticHistory:
                 raise DiagnosticQueryArgumentsError("invalid diagnostic identity")
         with self._lock:
             oldest = (
-                next(iter(self.records.values()))[0]["diagnostic_sequence"]
-                if self.records
-                else self.sequence + 1
+                next(iter(self._records.values())).sequence if self._records else self.sequence + 1
             )
             foreign = arguments.get("instance_id", self.instance_id) != self.instance_id
             invalid = after > self.sequence
-            matched = (
-                []
-                if foreign or invalid
-                else [
-                    record
-                    for record, _ in self.records.values()
-                    if record["diagnostic_sequence"] > after
-                    and all(
-                        record.get(key) == arguments[key]
-                        for key in ("operation_id", "diagnostic_id")
-                        if key in arguments
+            diagnostic_id = arguments.get("diagnostic_id")
+            operation_id = arguments.get("operation_id")
+            if foreign or invalid or after == self.sequence:
+                matched = []
+            else:
+                if diagnostic_id is None:
+                    candidates = self._records.values()
+                else:
+                    candidate = self._records.get(diagnostic_id)
+                    candidates = (candidate,) if candidate is not None else ()
+                matched = list(
+                    islice(
+                        (
+                            record
+                            for record in candidates
+                            if record.sequence > after
+                            and (operation_id is None or record.operation_id == operation_id)
+                        ),
+                        limit + 1,
                     )
-                ]
-            )
+                )
             selected = matched[:limit]
             result = {
                 "schema_version": DIAGNOSTIC_SCHEMA_VERSION,
@@ -1903,10 +1920,10 @@ class DiagnosticHistory:
                         )
                     )
                 ),
-                "records": selected,
+                "records": [],
                 "oldest_sequence": oldest,
                 "latest_sequence": self.sequence,
-                "next_after": selected[-1]["diagnostic_sequence"] if selected else after,
+                "next_after": selected[-1].sequence if selected else after,
                 "gap": foreign or invalid or after < oldest - 1,
                 "evicted_records": self.evicted,
                 "truncated": len(matched) > limit,
@@ -1919,7 +1936,9 @@ class DiagnosticHistory:
                     "restart_resets_history": True,
                 },
             }
-            return json.loads(json.dumps(result))
+        if selected:
+            result["records"] = json.loads(f"[{','.join(record.payload for record in selected)}]")
+        return result
 
     def health(self) -> dict:
         with self._lock:
@@ -1928,7 +1947,7 @@ class DiagnosticHistory:
                 "instance_id": self.instance_id,
                 "history": {
                     "availability": "retained_current_run" if self.instance_id else "unbound",
-                    "retained_records": len(self.records),
+                    "retained_records": len(self._records),
                     "retained_bytes": self.retained_bytes,
                     "evicted_records": self.evicted,
                     "rejected_fields": self.rejected_fields,

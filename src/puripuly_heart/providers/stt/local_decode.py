@@ -85,6 +85,7 @@ class LocalDecodeCoordinator:
     _scope: LifecycleScope = field(init=False, repr=False)
     _worker_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _reaper_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _pending_work: asyncio.Event = field(init=False, default_factory=asyncio.Event, repr=False)
     _active_job: LocalDecodeJob | None = field(init=False, default=None, repr=False)
     _next_sequence: int = field(init=False, default=1, repr=False)
     _worker_generation: int = field(init=False, default=0, repr=False)
@@ -153,6 +154,8 @@ class LocalDecodeCoordinator:
         self._queue.append(job)
         self._queued_audio_ms += audio_ms
         self._update_backlog_warning()
+        if self.pending_ttl_s is not None and len(self._queue) == 1:
+            self._pending_work.set()
         self._ensure_worker()
         self._ensure_reaper()
         return job
@@ -227,6 +230,10 @@ class LocalDecodeCoordinator:
         assert self.pending_ttl_s is not None
         interval_s = min(0.25, max(0.01, self.pending_ttl_s / 2.0))
         while not self._closed:
+            if not self._queue:
+                self._pending_work.clear()
+                await self._pending_work.wait()
+                continue
             await asyncio.sleep(interval_s)
             now = self.queue_clock()
             expired: list[LocalDecodeExpired] = []

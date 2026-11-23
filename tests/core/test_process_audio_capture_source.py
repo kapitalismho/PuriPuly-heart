@@ -13,7 +13,8 @@ import pytest
 
 from puripuly_heart.config.process_capture_platform import ProcessCapturePlatformAvailability
 from puripuly_heart.config.settings_vnext.schema import ProcessCaptureTargetIntent
-from puripuly_heart.core.audio.process_identity import PsutilProcessIdentityWatcher
+from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
+from puripuly_heart.core.audio.process_identity import SystemProcessIdentityWatcher
 from puripuly_heart.core.audio.process_source import (
     PROCESS_CAPTURE_CHANNELS,
     PROCESS_CAPTURE_SAMPLE_RATE_HZ,
@@ -22,7 +23,9 @@ from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureUnavailableError,
     ProcTapProcessAudioCaptureFactory,
     ResolvedProcessCaptureIdentity,
+    verify_proctap_process_specific,
 )
+from puripuly_heart.core.audio.source import AudioSourceOpenFailure
 
 
 @dataclass
@@ -122,26 +125,29 @@ async def test_process_source_bridges_fixed_stereo_float32_frames_and_drops_with
         max_queue_frames=1,
     )
     capture = factory.captures[0][1]
-    first = np.array([[0.1, -0.1]], dtype=np.float32)
+    first = np.array([[0.1, -0.1], [0.3, -0.3]], dtype=np.float32)
+    first_packet = _frame_bytes(first)
     second = np.array([[0.2, -0.2]], dtype=np.float32)
 
-    capture.on_data(_frame_bytes(first), -1)
+    capture.on_data(first_packet, -1)
     capture.on_data(_frame_bytes(second), 1)
     frame = await source.frames().__anext__()
 
     assert factory.captures[0][0] == 100
     assert capture.started is True
     np.testing.assert_array_equal(frame.samples, first)
+    assert frame.samples.base is first_packet
+    assert not frame.samples.flags.writeable
     assert frame.sample_rate_hz == PROCESS_CAPTURE_SAMPLE_RATE_HZ
     assert frame.channels == PROCESS_CAPTURE_CHANNELS
     assert frame.capture is not None
     assert frame.capture.source_start_sample == 0
-    assert frame.capture.source_end_sample == 1
+    assert frame.capture.source_end_sample == 2
     capture.on_data(_frame_bytes(second), 1)
     successor = await source.frames().__anext__()
     assert successor.capture is not None
-    assert successor.capture.source_start_sample == 2
-    assert successor.capture.source_end_sample == 3
+    assert successor.capture.source_start_sample == 3
+    assert successor.capture.source_end_sample == 4
     assert successor.capture.discontinuity_before is not None
     assert successor.capture.discontinuity_before.kind == "known_loss"
     assert successor.capture.discontinuity_before.lost_source_samples == 1
@@ -368,6 +374,7 @@ def test_proctap_factory_lazily_uses_public_capture_constructor(monkeypatch) -> 
         def __init__(self, pid: int, on_data) -> None:
             created["pid"] = pid
             created["on_data"] = on_data
+            self._thread = None
             self._backend = SimpleNamespace(
                 _native=SimpleNamespace(is_process_specific=lambda: True)
             )
@@ -398,7 +405,7 @@ def test_proctap_factory_lazily_uses_public_capture_constructor(monkeypatch) -> 
         on_data=callback,
     )
 
-    assert isinstance(capture, PublicCapture)
+    assert verify_proctap_process_specific(capture) is True
     assert imported == ["proctap"]
     assert created == {"pid": 102, "on_data": callback}
     assert "DesktopLoopback" not in source_module.__dict__
@@ -415,6 +422,7 @@ def test_proctap_factory_rejects_unverified_native_mode_and_closes(
             _ = on_data
             self.closed = False
             self.started = False
+            self._thread = None
             if native_state == "missing":
                 self._backend = SimpleNamespace(_native=SimpleNamespace())
             elif native_state == "throws":
@@ -459,6 +467,45 @@ def test_proctap_factory_rejects_unverified_native_mode_and_closes(
 
 
 @pytest.mark.asyncio
+async def test_proctap_source_retains_cleanup_when_started_worker_is_unobservable(
+    monkeypatch,
+) -> None:
+    class PublicCapture(FakeCapture):
+        _thread = None
+        _backend = SimpleNamespace(_native=SimpleNamespace(is_process_specific=lambda: True))
+
+        def __init__(self, _pid: int, on_data) -> None:
+            super().__init__(on_data=on_data)
+            captures.append(self)
+
+    import puripuly_heart.core.audio.process_source as source_module
+
+    captures: list[PublicCapture] = []
+    monkeypatch.setattr(
+        source_module.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(ProcessAudioCapture=PublicCapture),
+    )
+    watcher = FakeWatcher()
+    with pytest.raises(AudioSourceOpenFailure) as raised:
+        ProcessAudioCaptureSource(
+            identity=_identity(),
+            watcher=watcher,
+            capture_factory=ProcTapProcessAudioCaptureFactory(platform_availability=_supported),
+            platform_availability=_supported,
+        )
+    source = raised.value.source
+    assert captures[0].started and captures[0].closed
+    assert watcher.watches[0].closed is True
+    assert source._capture is not None
+    with pytest.raises(ExceptionGroup) as retry:
+        await source.close()
+    assert str(retry.value.exceptions[0]) == "ProcTap worker settlement could not be verified"
+    assert len(captures[0].close_threads) == 1
+    assert source._capture is not None
+
+
+@pytest.mark.asyncio
 async def test_silence_does_not_signal_terminal_state() -> None:
     factory = FakeFactory()
     watcher = FakeWatcher()
@@ -500,13 +547,126 @@ def _spawn_live_process_identity() -> (
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("target_exits", [False, True], ids=["explicit_close", "target_exit"])
+async def test_proctap_source_retries_settlement_after_vendor_join_timeout(
+    monkeypatch, target_exits: bool
+) -> None:
+    if sys.platform != "win32":
+        pytest.skip("requires the pinned Windows ProcTap backend")
+    native = pytest.importorskip("proctap._native")
+    child, identity = _spawn_live_process_identity()
+    read_entered = threading.Event()
+    release_read = threading.Event()
+    callback_delivered = threading.Event()
+    workers: list[threading.Thread] = []
+    stop_calls = 0
+
+    class HeldNative:
+        def __init__(self, pid: int) -> None:
+            assert pid == child.pid
+            self.send_tail = target_exits
+
+        def get_format(self) -> dict[str, int]:
+            return {"sample_rate": 48000, "channels": 2, "bits_per_sample": 32}
+
+        def is_process_specific(self) -> bool:
+            return True
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            nonlocal stop_calls
+            stop_calls += 1
+
+        def read(self) -> bytes | None:
+            if self.send_tail:
+                self.send_tail = False
+                return bytes(8 * 48)
+            workers.append(threading.current_thread())
+            read_entered.set()
+            return bytes(8) if release_read.wait(10) else None
+
+    original_callback = ProcessAudioCaptureSource._on_data
+
+    def observe_callback(source: ProcessAudioCaptureSource, data: bytes, frames: int) -> None:
+        original_callback(source, data, frames)
+        if len(data) == 8:
+            callback_delivered.set()
+
+    monkeypatch.setattr(native, "ProcessLoopback", HeldNative)
+    monkeypatch.setattr(ProcessAudioCaptureSource, "_on_data", observe_callback)
+    source = None
+    try:
+        source = ProcessAudioCaptureSource(
+            identity=identity,
+            watcher=SystemProcessIdentityWatcher(),
+            capture_factory=ProcTapProcessAudioCaptureFactory(platform_availability=_supported),
+            platform_availability=_supported,
+        )
+        assert await asyncio.to_thread(read_entered.wait, 3)
+        capture = source._capture
+        worker = workers[0]
+        progression = source.capture_progression_snapshot
+        if target_exits:
+            child.terminate()
+            await asyncio.to_thread(child.wait, 5)
+            pipeline = DesktopPeerPipeline(source=source)
+            async with asyncio.timeout(5):
+                assert [frame async for frame in pipeline.frames()] == []
+            assert pipeline.terminal_reason == "target_exited"
+            (discarded,) = pipeline.terminal_discarded_capture
+            assert (discarded.source_start_sample, discarded.source_end_sample) == (0, 48)
+            terminal = source.terminal_diagnostics
+            assert terminal is not None and terminal.code == "capture.peer.target_exited"
+            (cleanup,) = terminal.causes
+            assert cleanup.code == "capture.peer.cleanup_failed"
+            assert cleanup.fields["cleanup_confirmed"] is False
+            assert cleanup.causes[0].fields["exception_class"] == "TimeoutError"
+            assert worker.is_alive()
+            assert source._capture is capture
+            assert stop_calls == 1
+        for _ in range(2):
+            with pytest.raises(ExceptionGroup) as raised:
+                await source.close()
+            assert isinstance(raised.value.exceptions[0], TimeoutError)
+            assert raised.value.failure_diagnostics.fields["cleanup_confirmed"] is False
+            assert source._capture is capture
+            assert source._watch is None
+            assert worker.is_alive()
+            assert stop_calls == 1
+        assert not callback_delivered.is_set()
+
+        release_read.set()
+        await asyncio.to_thread(worker.join, 3)
+        assert not worker.is_alive()
+        assert callback_delivered.is_set()
+        assert source.capture_progression_snapshot == progression
+        await source.close()
+        assert source._capture is None
+        assert stop_calls == 1
+        assert (child.poll() is not None) == target_exits
+    finally:
+        release_read.set()
+        try:
+            if workers:
+                await asyncio.to_thread(workers[0].join, 3)
+            if source is not None:
+                await source.close()
+        finally:
+            if child.poll() is None:
+                child.terminate()
+            child.wait(timeout=5)
+
+
+@pytest.mark.asyncio
 async def test_process_source_close_stops_real_identity_watch_thread_while_target_alive() -> None:
     child, identity = _spawn_live_process_identity()
     factory = FakeFactory()
     try:
         source = ProcessAudioCaptureSource(
             identity=identity,
-            watcher=PsutilProcessIdentityWatcher(),
+            watcher=SystemProcessIdentityWatcher(),
             capture_factory=factory,
             platform_availability=_supported,
         )

@@ -25,7 +25,7 @@ from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterUserFacingError,
 )
 from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent
-from puripuly_heart.domain.models import OSCMessage, Translation
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import (
     EventProjectionContext,
@@ -347,12 +347,19 @@ class UIEventBridge:
             return bool(self._is_translation_enabled_callback())
         return False
 
-    def _projection_context(self) -> EventProjectionContext:
+    def _projection_context(
+        self, event: UIEvent, *, include_translation_enabled: bool = False
+    ) -> EventProjectionContext:
+        if event.channel == "peer":
+            if isinstance(event.payload, Transcript):
+                return EventProjectionContext(source_language=event.transcript_language)
+            if isinstance(event.payload, Translation):
+                return EventProjectionContext(target_language=event.payload.target_language)
         source_lang, target_lang = self._get_language_codes()
         return EventProjectionContext(
             source_language=source_lang,
             target_language=target_lang,
-            translation_enabled=self._translation_enabled(),
+            translation_enabled=include_translation_enabled and self._translation_enabled(),
         )
 
     def _emit_dashboard_translation_applied_diagnostic(
@@ -456,7 +463,7 @@ class UIEventBridge:
             return
 
         if mapped.kind == "self_turn":
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(mapped, EventProjectionContext())
             snapshot = projection.self_turn
             if snapshot is None:
                 return
@@ -474,7 +481,7 @@ class UIEventBridge:
             return
 
         if mapped.kind == "transcript":
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(mapped, self._projection_context(event))
             if projection.transcript is None:
                 return
             transcript_projection = projection.transcript
@@ -503,7 +510,7 @@ class UIEventBridge:
             return
 
         if mapped.kind == "translation":
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(mapped, self._projection_context(event))
             if projection.translation is None:
                 return
             translation_projection = projection.translation
@@ -540,7 +547,9 @@ class UIEventBridge:
             return
 
         if mapped.kind == "osc" and isinstance(mapped.payload, OSCMessage):
-            projection = self.projection_service.project(mapped, self._projection_context())
+            projection = self.projection_service.project(
+                mapped, self._projection_context(event, include_translation_enabled=True)
+            )
             self.history_destination.append_entry(
                 "VRChat",
                 mapped.payload.text,

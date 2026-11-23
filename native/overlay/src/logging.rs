@@ -1,3 +1,4 @@
+use crossbeam_channel::{bounded, select_biased, Receiver, Sender, TrySendError};
 use parking_lot::{Condvar, Mutex};
 use serde_json::Value;
 use std::io::{self, Write};
@@ -58,8 +59,8 @@ struct WriterOwner {
 }
 
 pub struct OverlayLogger {
-    diagnostic_sender: Option<std_mpsc::SyncSender<LogRecord>>,
-    reliable_sender: Option<std_mpsc::SyncSender<LogRecord>>,
+    diagnostic_sender: Option<Sender<LogRecord>>,
+    reliable_sender: Option<Sender<LogRecord>>,
     dropped_records: Arc<AtomicU64>,
     reliable_delivery_failures: Arc<AtomicU64>,
     shutting_down: Arc<AtomicBool>,
@@ -107,9 +108,8 @@ impl OverlayLogger {
 
 
     pub fn from_streams(stdout: LogStream, stderr: LogStream) -> Self {
-        let (diagnostic_sender, diagnostic_receiver) =
-            std_mpsc::sync_channel(DIAGNOSTIC_QUEUE_CAPACITY);
-        let (reliable_sender, reliable_receiver) = std_mpsc::sync_channel(RELIABLE_QUEUE_CAPACITY);
+        let (diagnostic_sender, diagnostic_receiver) = bounded(DIAGNOSTIC_QUEUE_CAPACITY);
+        let (reliable_sender, reliable_receiver) = bounded(RELIABLE_QUEUE_CAPACITY);
         let dropped_records = Arc::new(AtomicU64::new(0));
         let shutting_down = Arc::new(AtomicBool::new(false));
         let watch = Arc::new(WriteWatch::default());
@@ -204,17 +204,17 @@ impl OverlayLogger {
         loop {
             match sender.try_send(record.take().expect("reliable record present")) {
                 Ok(()) => break,
-                Err(std_mpsc::TrySendError::Full(returned)) if Instant::now() < deadline => {
+                Err(TrySendError::Full(returned)) if Instant::now() < deadline => {
                     record = Some(returned);
                     tokio::task::yield_now().await;
                 }
-                Err(std_mpsc::TrySendError::Full(_)) => {
+                Err(TrySendError::Full(_)) => {
                     return Err(io::Error::new(
                         io::ErrorKind::TimedOut,
                         "overlay control queue blocked",
                     ));
                 }
-                Err(std_mpsc::TrySendError::Disconnected(_)) => {
+                Err(TrySendError::Disconnected(_)) => {
                     return Err(io::Error::new(
                         io::ErrorKind::BrokenPipe,
                         "overlay writer stopped",
@@ -328,31 +328,19 @@ fn increment_saturating(counter: &AtomicU64) {
 fn run_writer(
     mut stdout: LogStream,
     mut stderr: LogStream,
-    diagnostics: std_mpsc::Receiver<LogRecord>,
-    reliable: std_mpsc::Receiver<LogRecord>,
+    diagnostics: Receiver<LogRecord>,
+    reliable: Receiver<LogRecord>,
     dropped_records: Arc<AtomicU64>,
     shutting_down: Arc<AtomicBool>,
     watch: Arc<WriteWatch>,
 ) {
     while !shutting_down.load(Ordering::Acquire) {
-        let (record, reliable_disconnected) = match reliable.try_recv() {
-            Ok(record) => (Some(record), false),
-            Err(std_mpsc::TryRecvError::Disconnected) => (None, true),
-            Err(std_mpsc::TryRecvError::Empty) => (None, false),
+        let record = select_biased! {
+            recv(reliable) -> record => record,
+            recv(diagnostics) -> record => record,
         };
-        let (record, diagnostics_disconnected) = match record {
-            Some(record) => (Some(record), false),
-            None => match diagnostics.recv_timeout(Duration::from_millis(1)) {
-                Ok(record) => (Some(record), false),
-                Err(std_mpsc::RecvTimeoutError::Disconnected) => (None, true),
-                Err(std_mpsc::RecvTimeoutError::Timeout) => (None, false),
-            },
-        };
-        let Some(record) = record else {
-            if reliable_disconnected && diagnostics_disconnected {
-                break;
-            }
-            continue;
+        let Ok(record) = record else {
+            break;
         };
         let stream = if record.stdout {
             &mut stdout
@@ -572,6 +560,54 @@ mod tests {
             "[overlay][ERROR] failed\n"
         );
     }
+
+    #[tokio::test]
+    async fn queued_control_records_precede_diagnostic_backlog() {
+        let (diagnostic_tx, diagnostics) = bounded(DIAGNOSTIC_QUEUE_CAPACITY);
+        let (control_tx, reliable) = bounded(RELIABLE_QUEUE_CAPACITY);
+        let (completion, delivered) = oneshot::channel();
+        diagnostic_tx
+            .try_send(LogRecord {
+                stdout: true,
+                line: "diagnostic".into(),
+                completion: Some(completion),
+            })
+            .unwrap();
+        for index in 0..RELIABLE_QUEUE_CAPACITY {
+            control_tx
+                .try_send(LogRecord {
+                    stdout: true,
+                    line: index.to_string(),
+                    completion: None,
+                })
+                .unwrap();
+        }
+        let sink = RecordingSink::new();
+        let stdout = Box::new(sink.clone());
+        let writer = thread::spawn(move || {
+            run_writer(
+                stdout,
+                Box::new(io::sink()),
+                diagnostics,
+                reliable,
+                Arc::default(),
+                Arc::default(),
+                Arc::default(),
+            )
+        });
+        tokio::time::timeout(Duration::from_secs(2), delivered)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        drop((control_tx, diagnostic_tx));
+        writer.join().unwrap();
+        let mut expected: Vec<_> = (0..RELIABLE_QUEUE_CAPACITY).map(|i| i.to_string()).collect();
+        expected.push("diagnostic".into());
+        let output = String::from_utf8(sink.bytes()).unwrap();
+        assert!(output.lines().eq(expected.iter().map(String::as_str)));
+    }
+
     struct GatedSink {
         released: Arc<AtomicBool>,
     }

@@ -790,18 +790,13 @@ class ManagedGemmaRuntimeOwner:
         target: str,
         backend: EffectiveGemmaBackend,
     ) -> str:
-        executable = (
-            self._runtime_paths.vulkan_server
-            if backend == "vulkan"
-            else self._runtime_paths.cpu_server
-        )
         return _prefix_identity(
             spec=spec,
             system_prompt=prompt,
             source_language=source,
             target_language=target,
             effective_backend=backend,
-            profile_identity=self._profile_identity + "\0" + str(executable.resolve()),
+            profile_identity=self._profile_identity,
         )
 
     async def _prepare_prefix(
@@ -1012,7 +1007,9 @@ class ManagedGemmaRuntimeOwner:
             spec=spec,
         )
         port_index = command.index("--port")
-        self._profile_identity = "\0".join(command[1:port_index] + command[port_index + 2 :])
+        self._profile_identity = "\0".join(
+            (*command[1:port_index], *command[port_index + 2 :], str(executable.resolve()))
+        )
         self._unsettled = False
         process = await self._process_factory(command, process_cwd)
         self._process = process

@@ -10,6 +10,7 @@ from .sink import (
     OverlayApplicationReceipt,
     OverlayEventUnion,
     PeerActiveUpdate,
+    PeerPreviewLifetime,
     PeerTranscriptFinal,
     SelfActiveClear,
     SelfActiveUpdate,
@@ -34,12 +35,21 @@ PRESENTER_RECEIPT_LIMIT = 4096
 EntryKey = tuple[str, UUID]
 
 
+@dataclass(frozen=True, slots=True)
+class ExpiredPeerPreview:
+    lifetime: PeerPreviewLifetime
+    ordering: tuple[str, int, int, int]
+    revision: int
+    seq: int
+
+
 @dataclass(slots=True)
 class PresenterAcceptanceLedger:
     """Bookkeeping for local presenter acceptance and semantic retirement."""
 
     terminal_registry: OrderedDict[EntryKey, int] = field(default_factory=OrderedDict)
     scene_terminal_keys: OrderedDict[EntryKey, str] = field(default_factory=OrderedDict)
+    expired_peer_previews: dict[EntryKey, ExpiredPeerPreview] = field(default_factory=dict)
     receipts: OrderedDict[tuple[object, ...], OverlayApplicationReceipt] = field(
         default_factory=OrderedDict
     )
@@ -52,6 +62,7 @@ class PresenterAcceptanceLedger:
     def reset(self) -> None:
         self.terminal_registry.clear()
         self.scene_terminal_keys.clear()
+        self.expired_peer_previews.clear()
         self.receipts.clear()
         self.receipts_by_id.clear()
         self.entry_ordering.clear()
@@ -106,6 +117,7 @@ class PresenterAcceptanceLedger:
         *,
         closed: bool,
         peer_fragments: PeerFragmentPlan | None = None,
+        replaces_expired_preview: bool = False,
     ) -> str | None:
         if closed:
             return "closed"
@@ -120,6 +132,7 @@ class PresenterAcceptanceLedger:
         if (
             key is not None
             and entry is None
+            and not replaces_expired_preview
             and event.turn_generation is not None
             and event.turn_order is not None
         ):
@@ -128,7 +141,12 @@ class PresenterAcceptanceLedger:
                 (scope, event.turn_generation), (-1, -1)
             ):
                 return "stale"
-        if key is not None and entry is None and self.terminal_reason(key) is not None:
+        if (
+            key is not None
+            and entry is None
+            and not replaces_expired_preview
+            and self.terminal_reason(key) is not None
+        ):
             return "stale"
         if entry is not None and event.seq <= entry.last_updated_seq:
             return "stale"
@@ -223,8 +241,42 @@ class PresenterAcceptanceLedger:
     def remember_scene_terminal(self, key: EntryKey, reason: str) -> None:
         self.scene_terminal_keys.pop(key, None)
         self.scene_terminal_keys[key] = reason
+        self.expired_peer_previews.pop(key, None)
         while len(self.scene_terminal_keys) > CLOSED_TOMBSTONE_LIMIT:
-            self.scene_terminal_keys.popitem(last=False)
+            evicted, _ = self.scene_terminal_keys.popitem(last=False)
+            self.expired_peer_previews.pop(evicted, None)
+
+    def remember_expired_peer_preview(
+        self, key: EntryKey, lifetime: PeerPreviewLifetime, *, revision: int, seq: int
+    ) -> None:
+        ordering = self.entry_ordering.get(key)
+        if ordering is not None:
+            self.expired_peer_previews[key] = ExpiredPeerPreview(lifetime, ordering, revision, seq)
+
+    def can_replace_expired_peer_preview(self, event: OverlayEventUnion) -> bool:
+        if not (
+            isinstance(event, TranslationFinal)
+            and event.channel == "peer"
+            and event.utterance_id is not None
+            and event.peer_preview_lifetime is not None
+        ):
+            return False
+        expired = self.expired_peer_previews.get(("peer", event.utterance_id))
+        if expired is None or event.peer_preview_lifetime is not expired.lifetime:
+            return False
+        scope, generation, order, index = expired.ordering
+        return (
+            (event.turn_kind or "peer", event.turn_generation, event.turn_order, event.target_index)
+            == expired.ordering
+            and event.peer_caption_revision > expired.revision
+            and event.seq > expired.seq
+            and (order, index) >= self.retired_turn_frontiers.get((scope, generation), (-1, -1))
+        )
+
+    def consume_expired_peer_preview(self, key: EntryKey) -> None:
+        self.expired_peer_previews.pop(key)
+        self.scene_terminal_keys.pop(key)
+        self.terminal_registry.pop(key, None)
 
     def remember_tombstone(self, key: EntryKey, closed_seq: int) -> None:
         self.terminal_registry.pop(key, None)

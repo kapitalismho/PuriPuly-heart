@@ -18,6 +18,7 @@ from puripuly_heart.core.overlay.protocol import (
 from puripuly_heart.core.overlay.sink import (
     PeerActiveUpdate,
     PeerCaptionLineage,
+    PeerPreviewLifetime,
     PeerTranscriptFinal,
     SelfActiveClear,
     SelfActiveUpdate,
@@ -106,6 +107,9 @@ class OverlayLogicalTurnEntry:
     peer_protected_until: float | None = None
     peer_publication_generation: int | None = None
     peer_is_current: Callable[[], bool] | None = None
+    peer_preview_is_current: Callable[[], bool] | None = None
+    peer_preview_lifetime: PeerPreviewLifetime | None = None
+    peer_preview_was_evicted: bool = False
     peer_partition_is_source: bool = False
     peer_source_index: int | None = None
     peer_translation_index: int | None = None
@@ -177,6 +181,10 @@ class PeerFragmentRegistration:
     @property
     def peer_caption_revision(self) -> int:
         return self.parent.peer_caption_revision
+
+    @property
+    def peer_preview_is_current(self) -> Callable[[], bool] | None:
+        return self.parent.peer_preview_is_current
 
 
 @dataclass(frozen=True, slots=True)
@@ -540,6 +548,18 @@ class OverlayPresentationState:
             translation_departed=frozenset(mode_departed[1]),
         )
 
+    def _has_remaining_peer_fragments(
+        self, parent: OverlayLogicalTurnEntry, *, expired_at: float | None
+    ) -> bool:
+        lifetime = parent.peer_preview_lifetime
+        frozen = lifetime is not None and lifetime.is_frozen_at(expired_at)
+        return any(
+            child.parent is parent
+            and not child.peer_dormant
+            and not (frozen and child.peer_pending)
+            for child in self.peer_registrations.values()
+        )
+
     def remove_entry(
         self,
         key: OverlayEntryKey,
@@ -550,9 +570,12 @@ class OverlayPresentationState:
         retire_parent: bool = True,
     ) -> OverlayEntryRemovalRecord | None:
         entry = self.display_entry(key)
+        expired_at = now if reason == "expired" else None
         if entry is not None and entry.channel == "peer":
             parent = self.logical_entry(key)
             parent_id = parent.utterance_id
+            if parent.peer_preview_lifetime is not None and reason == "evicted_by_newer_turn":
+                parent.peer_preview_was_evicted = True
             parent.peer_departed_indices.add(entry.peer_fragment_index)
             if entry.peer_source_index is not None:
                 parent.peer_source_departed_indices.add(entry.peer_source_index)
@@ -567,9 +590,8 @@ class OverlayPresentationState:
                 entry.peer_departed = True
                 entry.peer_pending = False
                 entry.peer_protected_until = None
-                if retire_parent and not any(
-                    child.parent is parent and not child.peer_dormant
-                    for child in self.peer_registrations.values()
+                if retire_parent and not self._has_remaining_peer_fragments(
+                    parent, expired_at=expired_at
                 ):
                     self.remove_peer_caption(
                         ("peer", parent_id),
@@ -600,10 +622,7 @@ class OverlayPresentationState:
                 retire_parent
                 and parent is not None
                 and (parent.peer_departed or parent.peer_dormant)
-                and not any(
-                    candidate.parent is parent and not candidate.peer_dormant
-                    for candidate in self.peer_registrations.values()
-                )
+                and not self._has_remaining_peer_fragments(parent, expired_at=expired_at)
             ):
                 self.remove_peer_caption(
                     parent_key, reason=reason, now=now, seq=parent.last_updated_seq
@@ -1436,6 +1455,9 @@ class OverlayPresentationState:
         entry.translation_text = event.text
         entry.peer_caption_revision = event.peer_caption_revision
         entry.peer_caption_final = isinstance(event, TranslationFinal)
+        entry.peer_preview_lifetime = (
+            None if entry.peer_caption_final else event.peer_preview_lifetime
+        )
         entry.peer_publication_id = event.event_id
         if revision is not None:
             entry.peer_lineage = revision.lineage

@@ -334,13 +334,13 @@ def _validate_required_model_files(
 ) -> None:
     for asset in manifest.files:
         asset_path = model_dir / asset.relative_path
-        if not asset_path.exists():
+        if not asset_path.is_file():
+            if asset_path.exists():
+                raise LocalSTTManifestInvalidError(
+                    f"required model path is not a file: {asset.relative_path}"
+                )
             raise LocalSTTManifestInvalidError(
                 f"missing required model file: {asset.relative_path}"
-            )
-        if not asset_path.is_file():
-            raise LocalSTTManifestInvalidError(
-                f"required model path is not a file: {asset.relative_path}"
             )
         if verify_checksums and _sha256_file(asset_path) != asset.sha256:
             raise LocalSTTManifestInvalidError(

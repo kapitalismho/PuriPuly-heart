@@ -770,17 +770,15 @@ class _ElevenLabsScribeSession(STTBackendSession):
                     self._protocol_failure("scribe_overlapping_manual_commits")
                     raise RuntimeError("Scribe already has an outstanding manual commit")
                 self._commit = commit
-            await self._connection.send(
-                json.dumps(
-                    {
-                        "message_type": "input_audio_chunk",
-                        "audio_base_64": base64.b64encode(pcm16le).decode("ascii"),
-                        "sample_rate": self.sample_rate_hz,
-                        "commit": commit is not None,
-                    },
-                    separators=(",", ":"),
-                )
+            frame = (
+                b'{"message_type":"input_audio_chunk","audio_base_64":"%s",'
+                b'"sample_rate":%d,"commit":%s}'
+            ) % (
+                base64.b64encode(pcm16le),
+                self.sample_rate_hz,
+                b"true" if commit is not None else b"false",
             )
+            await self._connection.send(frame, text=True)
             self._uncommitted_bytes += len(pcm16le)
             self._last_send_at = time.monotonic()
 

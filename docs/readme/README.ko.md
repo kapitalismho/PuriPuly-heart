@@ -10,7 +10,7 @@
 
 <p align="center">
 
-  <img src="https://img.shields.io/badge/version-2.11.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.11.3-blue" alt="Version" />
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 
@@ -214,6 +214,8 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
 
+양방향 제어 설정과 안정적인 파라미터 ABI는 [VRChat OSC 컨트롤](../vrchat-osc.md)을 참고하세요.
+
 ---
 
 ### 중국 사용자를 위한 안내
@@ -402,6 +404,8 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
 
 </details>
 
+</details>
+
 <details>
 <summary><h3>Qwen</h3></summary>
 
@@ -409,22 +413,22 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
    - [중국 본토](https://bailian.console.aliyun.com/cn-beijing)
    - [중국 본토 외 다른 지역](https://bailian.console.alibabacloud.com)
 
-2 [Alibaba Cloud Model Studio](https://bailian.console.alibabacloud.com)접속한 주소에서 로그인 하세요. 본인이 API 키를 발급받으려는 리전(Region)을 정확히 선택해주세요. (예: Beijing)
+2. 위에서 접속한 주소에서 로그인하세요. 본인이 API 키를 발급받으려는 리전(Region)을 정확히 선택해주세요. (예: Beijing)
    ![step2](../images/qwen/1.png)
 
-3 우측 상단의 **톱니바퀴 아이콘**을 클릭하세요.
+3. 우측 상단의 **톱니바퀴 아이콘**을 클릭하세요.
    ![step3](../images/qwen/2.png)
 
-4 워크스페이스를 생성하고 **API-KEY** 페이지로 넘어가세요.
+4. 워크스페이스를 생성하고 **API-KEY** 페이지로 넘어가세요.
    ![step4](../images/qwen/3.png)
 
-5 **Create API Key**를 클릭하세요.
+5. **Create API Key**를 클릭하세요.
    ![step5](../images/qwen/4.png)
 
-6 어카운트와 워크스페이스를 할당하고 OK 버튼을 눌러주세요
+6. 어카운트와 워크스페이스를 할당하고 OK 버튼을 눌러주세요.
    ![step6](../images/qwen/5.png)
 
-7 동그라미 친 곳을 눌러 key를 복사하세요.
+7. 동그라미 친 곳을 눌러 key를 복사하세요.
    ![step7](../images/qwen/6.png)
 
 </details>
@@ -464,12 +468,12 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
 
 ## 개발
 
-Windows x64, 일반 GIL 활성 CPython 3.14, [uv](https://docs.astral.sh/uv/)가 필요해요. 저장소 루트에서 실행하세요.
+Windows x64, 일반 GIL 활성 CPython **3.14.10**, [uv](https://docs.astral.sh/uv/) **0.13.6**이 필요해요. CI에 고정된 버전과 같아요. 환경을 동기화하기 전에 해당 Python을 먼저 설치하세요. 저장소 루트에서 실행하세요.
 
 ### 설치
 
 ```powershell
-uv sync --frozen --extra dev
+uv sync --locked --extra dev --python 3.14.10
 ```
 
 ### GUI
@@ -489,9 +493,9 @@ uv run python -m puripuly_heart.main cli --help
 ### 검증
 
 ```powershell
-uv run black --check src tests
-uv run ruff check src tests
-uv run python -m pytest
+uv run --locked black --check .
+uv run --locked ruff check .
+uv run --locked python scripts/ci/check_test_selection.py
 ```
 
 ---

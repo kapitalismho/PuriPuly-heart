@@ -189,12 +189,46 @@ def test_scan_candidates_skips_unparseable_names() -> None:
         root = Path(raw)
         _write(root / "output_log_2026-09-07_01-48-37.txt", "known\n")
         _write(root / "output_log_scratch.txt", "scratch\n")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
 
-        found = tailer.scan_candidates()
+        start = log_start_time("output_log_2026-09-07_01-48-37.txt")
+        assert start is not None
+        found = tailer.scan_candidates(create_time=start)
 
         assert [item.path.name for item in found] == ["output_log_2026-09-07_01-48-37.txt"]
         assert found[0].name_time == log_start_time("output_log_2026-09-07_01-48-37.txt")
+
+
+def test_scan_checks_metadata_only_for_potentially_owned_names(tmp_path, monkeypatch) -> None:
+    stale = tmp_path / "output_log_2026-09-07_01-48-31.txt"
+    boundary = tmp_path / "output_log_2026-09-07_01-48-32.txt"
+    missing = tmp_path / "output_log_2026-09-07_01-48-37.txt"
+    denied = tmp_path / "output_log_2026-09-07_01-48-38.txt"
+    for path in (stale, boundary, missing):
+        _write(path, "synthetic\n")
+    name_time = log_start_time(boundary.name)
+    assert name_time is not None
+    create_time = name_time + 5.75
+    status = boundary.stat()
+    original_stat = Path.stat
+    error = PermissionError(13, "private scene log path")
+
+    def stat(path, **kwargs):
+        if path in (stale, denied):
+            raise error
+        if path == missing:
+            raise FileNotFoundError
+        return original_stat(path, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    tailer = VrchatSceneLogTailer(tmp_path, str)
+    assert tailer.scan_candidates(create_time=create_time) == (
+        _candidate(boundary, name_time, status.st_ctime, status.st_mtime),
+    )
+    _write(denied, "synthetic\n")
+    with pytest.raises(PermissionError) as caught:
+        tailer.scan_candidates(create_time=create_time)
+    assert caught.value is error
 
 
 def test_replay_returns_complete_lines_and_holds_partial_tail() -> None:
@@ -202,7 +236,7 @@ def test_replay_returns_complete_lines_and_holds_partial_tail() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "first\nsecond\npartial")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
 
         assert tailer.begin_replay(path) == ["first", "second"]
         assert tailer.read_new_lines() == []
@@ -218,7 +252,7 @@ def test_incremental_read_survives_split_multibyte_characters() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "alpha\n")
-        tailer = VrchatSceneLogTailer(root, read_chunk_bytes=3)
+        tailer = VrchatSceneLogTailer(root, str, read_chunk_bytes=3)
 
         assert tailer.begin_replay(path) == ["alpha"]
 
@@ -233,7 +267,7 @@ def test_truncation_raises_and_replay_recovers() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "first\nsecond\n")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
 
         assert tailer.begin_replay(path) == ["first", "second"]
 
@@ -249,7 +283,7 @@ def test_same_path_replacement_with_equal_size_is_detected() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "aaaa\n")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
 
         assert tailer.begin_replay(path) == ["aaaa"]
         assert tailer.read_new_lines() == []
@@ -269,7 +303,7 @@ def test_same_size_in_place_rewrite_is_detected() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "aaaa\n")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
 
         assert tailer.begin_replay(path) == ["aaaa"]
 
@@ -286,7 +320,7 @@ def test_missing_file_read_raises_os_error() -> None:
         root = Path(raw)
         path = root / "output_log_2026-09-07_01-48-37.txt"
         _write(path, "first\n")
-        tailer = VrchatSceneLogTailer(root)
+        tailer = VrchatSceneLogTailer(root, str)
         tailer.begin_replay(path)
         path.unlink()
 
@@ -295,8 +329,8 @@ def test_missing_file_read_raises_os_error() -> None:
 
 
 def test_scan_distinguishes_missing_directory_from_failed_observation(tmp_path, monkeypatch):
-    missing = VrchatSceneLogTailer(tmp_path / "missing")
-    assert missing.scan_candidates() == ()
+    missing = VrchatSceneLogTailer(tmp_path / "missing", str)
+    assert missing.scan_candidates(create_time=1788767641.0) == ()
     original = PermissionError(13, "private scene log directory")
 
     def unavailable(_path):
@@ -304,5 +338,5 @@ def test_scan_distinguishes_missing_directory_from_failed_observation(tmp_path, 
 
     monkeypatch.setattr(Path, "iterdir", unavailable)
     with pytest.raises(PermissionError) as caught:
-        VrchatSceneLogTailer(tmp_path).scan_candidates()
+        VrchatSceneLogTailer(tmp_path, str).scan_candidates(create_time=1788767641.0)
     assert caught.value is original

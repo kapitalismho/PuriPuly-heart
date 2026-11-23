@@ -1101,17 +1101,16 @@ impl WindowsCaptionRenderer {
         &mut self,
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
-        role: LineRole,
+        key: &LineCacheKey,
         diagnostics: &mut RenderDiagnostics,
     ) -> Result<ID2D1CommandList, CaptionRenderError> {
-        let key = self.line_cache_key(block, line, role);
-        if let Some(cached) = self.caches.line_cache.get(&key) {
+        if let Some(cached) = self.caches.line_cache.get(key) {
             diagnostics.line_cache_hits += 1;
             return Ok(cached.clone());
         }
         diagnostics.line_cache_misses += 1;
         let cached = self.build_cached_line_visual(block, line)?;
-        self.caches.line_cache.insert(key, cached.clone());
+        self.caches.line_cache.insert(key.clone(), cached.clone());
         Ok(cached)
     }
 
@@ -1305,7 +1304,7 @@ impl WindowsCaptionRenderer {
                     continue;
                 }
                 let visual = self
-                    .cached_line_visual(block, line, role, diagnostics)
+                    .cached_line_visual(block, line, &key, diagnostics)
                     .map_err(|error| prefix_render_error("line_cache_build", error))?;
                 prepared.lines.insert(key, visual);
             }
@@ -1373,26 +1372,13 @@ impl WindowsCaptionRenderer {
         self.frame_text_format_cache_hits = 0;
         self.frame_text_format_cache_misses = 0;
         let mut diagnostics = RenderDiagnostics::default();
-        for block in &blocks {
-            let key = policy.layout_cache_key_for_block_windows(
-                block,
-                width,
-                presentation,
-                &self.layout_engine,
-            );
-            if self.caches.layout_cache.contains_key(&key) {
-                diagnostics.layout_cache_hits += 1;
-            } else {
-                diagnostics.layout_cache_misses += 1;
-            }
-        }
         let layout = match policy.resolve_blocks_for_presentation_windows_cached(
-            blocks.clone(),
+            &blocks,
             width,
             height,
             presentation,
             &self.layout_engine,
-            Some(&mut self.caches.layout_cache),
+            Some((&mut self.caches.layout_cache, &mut diagnostics)),
         ) {
             Ok(layout) => {
                 diagnostics.directwrite_layout_success_count += 1;
@@ -2713,10 +2699,11 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn windows_graphics_cache_rejection_and_eviction_preserve_current_pixels_and_target() {
-        use crate::renderer::cache::BoundedLruCache;
+        use crate::renderer::cache::{BoundedLruCache, LayoutCache};
         for entries in [0, 1, 2] {
             let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
             let mut reference = super::WindowsCaptionRenderer::new(None).unwrap();
+            renderer.caches.layout_cache = LayoutCache::with_capacity(entries);
             renderer.caches.line_cache = BoundedLruCache::with_capacity(entries);
             renderer.caches.block_cache = BoundedLruCache::with_capacity(entries);
             let mut previous_target = None;
@@ -2731,10 +2718,11 @@ mod tests {
                         .with_channel(CaptionChannel::PeerChannel)
                         .with_variant(CaptionBlockVariant::Finalized)
                         .with_secondary_text(if revision % 2 == 0 { &text } else { "" }, true);
+                let self_revision = revision / 2;
                 let blocks = vec![
-                    CaptionBlock::new("self:one", format!("self {revision}"))
+                    CaptionBlock::new("self:one", format!("self {self_revision} e\u{301} ☕"))
                         .with_channel(CaptionChannel::SelfChannel)
-                        .with_variant(if revision % 2 == 0 {
+                        .with_variant(if self_revision % 2 == 0 {
                             CaptionBlockVariant::ActiveSelf
                         } else {
                             CaptionBlockVariant::Finalized
@@ -2757,7 +2745,7 @@ mod tests {
                         .await,
                     ReadinessOutcome::Ready
                 );
-                reference
+                let unchanged_reference = reference
                     .render(
                         &CaptionLayoutPolicy::default(),
                         &CaptionPresentation::default(),
@@ -2773,6 +2761,12 @@ mod tests {
                         .await,
                     ReadinessOutcome::Ready
                 );
+                assert_eq!(frame.layout(), unchanged_reference.layout());
+                assert_eq!(frame.diagnostics().directwrite_layout_success_count, 1);
+                let expected_hits = u32::from(entries == 2 && revision % 2 == 1);
+                assert_eq!(frame.diagnostics().layout_cache_hits, expected_hits);
+                assert_eq!(frame.diagnostics().layout_cache_misses, 2 - expected_hits);
+                assert!(frame.diagnostics().layout_cache_size <= entries);
                 assert!(frame.diagnostics().line_cache_size <= entries);
                 assert!(frame.diagnostics().block_cache_size <= entries);
                 if let Some(target) = previous_target {
@@ -2796,7 +2790,7 @@ mod tests {
         let policy = CaptionLayoutPolicy::default();
         let layout = policy
             .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("large", "hello")],
+                &[CaptionBlock::new("large", "hello")],
                 4096,
                 1056,
                 &CaptionPresentation::default(),
@@ -2812,8 +2806,9 @@ mod tests {
         for channel in [CaptionChannel::SelfChannel, CaptionChannel::PeerChannel] {
             block.channel = Some(channel);
             for role in [LineRole::Primary, LineRole::Secondary] {
+                let key = renderer.line_cache_key(&block, &line, role);
                 let visual = renderer
-                    .cached_line_visual(&block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, &key, &mut diagnostics)
                     .unwrap();
                 let bounds = unsafe { renderer.d2d_context.GetImageLocalBounds(&visual) }.unwrap();
                 let pixel_equivalent_bytes = f64::from(bounds.right - bounds.left)
@@ -2821,7 +2816,7 @@ mod tests {
                     * 4.0;
                 assert!(pixel_equivalent_bytes > 64.0 * 1024.0 * 1024.0);
                 renderer
-                    .cached_line_visual(&block, &line, role, &mut diagnostics)
+                    .cached_line_visual(&block, &line, &key, &mut diagnostics)
                     .unwrap();
             }
         }
@@ -3011,7 +3006,7 @@ mod tests {
         let policy = CaptionLayoutPolicy::default();
         let layout = policy
             .resolve_blocks_for_presentation_windows_cached(
-                vec![CaptionBlock::new("latin", "hello style identity")],
+                &[CaptionBlock::new("latin", "hello style identity")],
                 3840,
                 1024,
                 &CaptionPresentation::default(),

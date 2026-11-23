@@ -138,8 +138,6 @@ class TranslationRequestPort(Protocol):
 
     def get_valid_context(self) -> list[ContextEntry]: ...
 
-    def format_context(self, context: list[ContextEntry]) -> str: ...
-
     def remember_context(
         self,
         text: str,
@@ -422,9 +420,6 @@ class TranslationRequestOwner:
             configuration=configuration,
         )
 
-    def format_context(self, context: list[ContextEntry]) -> str:
-        return self.context_resolver.format_entries(context)
-
     def remember_context(
         self,
         text: str,
@@ -478,26 +473,23 @@ class TranslationRequestOwner:
         source_specified = source_name != UNSPECIFIED_SOURCE_TEXT_REF
         if context_policy != "integrated_preferred":
             raise ValueError("unsupported translation context policy")
-        runtime = self.runtime_for_channel(channel)
         target_language = target_language or self.target_language_for(channel, configuration)
-        other_channel: ChannelId = "self" if channel == "peer" else "peer"
-        other_runtime = self.runtime_for_channel(other_channel)
-        context_texts, context, applied_mode = self.context_resolver.resolve_selected_for_request(
-            runtime=runtime,
-            other_runtime=other_runtime,
-            source_language=source_language,
-            target_language=target_language,
-            other_source_language=self.source_language_for(other_channel, configuration),
-            other_target_language=self.target_language_for(other_channel, configuration),
-            configuration=configuration,
-        )
         if channel == "peer" and peer_context_texts is not None:
-            context_texts = peer_context_texts
-            context = self.format_context(
-                [
-                    ContextEntry(item, source_language, target_language, self.clock.now(), "peer")
-                    for item in context_texts
-                ]
+            context_texts, context, applied_mode = self.context_resolver.frozen_peer_context(
+                peer_context_texts
+            )
+        else:
+            other_channel: ChannelId = "self" if channel == "peer" else "peer"
+            context_texts, context, applied_mode = (
+                self.context_resolver.resolve_selected_for_request(
+                    runtime=self.runtime_for_channel(channel),
+                    other_runtime=self.runtime_for_channel(other_channel),
+                    source_language=source_language,
+                    target_language=target_language,
+                    other_source_language=self.source_language_for(other_channel, configuration),
+                    other_target_language=self.target_language_for(other_channel, configuration),
+                    configuration=configuration,
+                )
             )
         return PreparedTranslationRequest(
             system_prompt=render_translation_system_prompt(

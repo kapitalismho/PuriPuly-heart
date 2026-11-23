@@ -28,8 +28,8 @@ class RecordingChatbox:
     def set_typing_reason(self, reason: str, active: bool) -> None:
         _ = (reason, active)
 
-    def process_due(self) -> None:
-        return
+    async def run_flush_loop(self) -> None:
+        await asyncio.Event().wait()
 
     def send_immediate(self, text: str) -> tuple[bool, None]:
         _ = text

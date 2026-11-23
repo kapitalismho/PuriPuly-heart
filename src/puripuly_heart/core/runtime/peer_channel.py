@@ -839,7 +839,7 @@ class PeerCaptureSessionOwner:
             failure_reason=(self._last_failure.reason if self._last_failure is not None else None),
             admission_reason=self._admission_reason,
             target_reason=self._last_failure_unavailable_reason,
-            retry_available=self._retry_required_capture_target is not None,
+            retry_available=self._can_retry_process_capture(self._config),
             has_source=self._audio_source is not None,
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
@@ -948,20 +948,9 @@ class PeerCaptureSessionOwner:
         )
         if ledger is None:
             return ()
-        snapshot = next(
-            (item for item in ledger.snapshots if item.identity.segment_id == identity.segment_id),
-            None,
-        )
-        existing_receipt = next(
-            (
-                receipt
-                for receipt in ledger.terminal_receipts
-                if receipt.identity.segment_id == identity.segment_id
-            ),
-            None,
-        )
-        if existing_receipt is not None:
+        if ledger.is_segment_terminal(identity.segment_id):
             return ()
+        snapshot = ledger.segment_snapshot(identity.segment_id)
         if snapshot is None or snapshot.identity != identity:
             return ()
         self._provider_terminal_events[identity.segment_id] = terminal
@@ -994,11 +983,8 @@ class PeerCaptureSessionOwner:
     ) -> tuple[tuple[AudioSegmentTerminalReceipt, STTProviderTurnTerminal], ...]:
         segment = terminal.identity.segment
         for ledger in reversed(self._segment_ledgers):
-            if not ledger.contains_segment(segment.segment_id):
-                continue
-            if not any(item.identity == segment for item in ledger.snapshots) and not any(
-                receipt.identity == segment for receipt in ledger.terminal_receipts
-            ):
+            snapshot = ledger.segment_snapshot(segment.segment_id)
+            if snapshot is None or snapshot.identity != segment:
                 continue
             if terminal.outcome == "submitted":
                 ledger.terminalize(
@@ -1220,7 +1206,7 @@ class PeerCaptureSessionOwner:
                 )
                 return self.snapshot
         except asyncio.CancelledError:
-            if self._is_superseded(generation):
+            if generation != self._generation or self._closed:
                 return self.snapshot
             raise
         finally:
@@ -1356,6 +1342,13 @@ class PeerCaptureSessionOwner:
             self._notify_state_changed()
             return self.snapshot
 
+    def _can_retry_process_capture(self, config: PeerCaptureSessionConfig | None) -> bool:
+        return (
+            self._state is PeerCaptureSessionState.FAULTED
+            and config is not None
+            and config.capture_target == self._retry_required_capture_target
+        )
+
     async def retry_process_capture(
         self,
         *,
@@ -1376,11 +1369,7 @@ class PeerCaptureSessionOwner:
         if target_config is None:
             return False
         async with self._lock:
-            if (
-                target_config.capture_target.kind != "process"
-                or self._retry_required_capture_target != target_config.capture_target
-                or self._state is not PeerCaptureSessionState.FAULTED
-            ):
+            if not self._can_retry_process_capture(target_config):
                 return False
             self._generation += 1
             generation = self._generation
@@ -1388,7 +1377,6 @@ class PeerCaptureSessionOwner:
             self._generation_operation = (generation, provider_operation)
             self._config = target_config
             self._desired_active = True
-            self._retry_required_capture_target = None
             self._mutation_observations[asyncio.current_task()] = _MutationObservation(
                 generation, True, requires_setup_authority=False
             )
@@ -1688,6 +1676,7 @@ class PeerCaptureSessionOwner:
                 return
         source = None
         provider_ready = False
+        startup_failure_reason = PeerCaptureFailureReason.PROVIDER_FAILED
         load_started_at = self.clock.now()
         try:
             admission = await self._admission.admit(config)
@@ -1721,9 +1710,8 @@ class PeerCaptureSessionOwner:
             self._target_status = PeerCaptureTargetStatus.RESOLVED
             self._emit_event(PeerCaptureDiagnosticEvent.TARGET_CHANGED)
             try:
-                source = self._source_factory(config, resolution.target)
-                if inspect.isawaitable(source):
-                    source = await source
+                opening = self._source_factory(config, resolution.target)
+                source = await opening if inspect.isawaitable(opening) else opening
             except asyncio.CancelledError:
                 raise
             except AudioSourceOpenFailure as exc:
@@ -1755,10 +1743,16 @@ class PeerCaptureSessionOwner:
             if superseded:
                 await self._close_if_possible(source)
                 return
-            await self._cancel_loop(old_loop)
-            if old_segment_ledger is not None:
-                self._cancel_segment_ledger(old_segment_ledger)
-            await self._close_if_possible(old_source)
+            startup_failure_reason = PeerCaptureFailureReason.CLEANUP_FAILED
+            try:
+                await self._cancel_loop(old_loop)
+                if old_segment_ledger is not None:
+                    self._cancel_segment_ledger(old_segment_ledger)
+                await self._close_if_possible(old_source)
+            except BaseException:
+                self._retain_retired_source(old_source)
+                raise
+            startup_failure_reason = PeerCaptureFailureReason.PROVIDER_FAILED
             async with self._lock:
                 superseded = self._is_superseded(generation)
                 if not superseded:
@@ -1885,6 +1879,7 @@ class PeerCaptureSessionOwner:
                 if not should_release:
                     self._provider_signature = config.provider_signature
                     self._provider_status = PeerCaptureProviderStatus.READY
+                    self._retry_required_capture_target = None
                     self._state = PeerCaptureSessionState.RUNNING
                     self._last_failure = None
                     provider_ingress_ready.set()
@@ -1893,6 +1888,17 @@ class PeerCaptureSessionOwner:
                 return
             self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
             self._notify_state_changed()
+        except asyncio.CancelledError:
+            if source is not None and self._audio_source is not source:
+                try:
+                    await self._close_if_possible(source)
+                except asyncio.CancelledError:
+                    self._retain_retired_source(source)
+                    raise
+                except Exception as exc:
+                    self._retain_retired_source(source)
+                    self._log_loop_exception("cleanup_failed", exc, generation=generation)
+            raise
         except Exception as exc:
             if isinstance(
                 exc,
@@ -1907,7 +1913,7 @@ class PeerCaptureSessionOwner:
             elif provider_ready:
                 reason = self._failure_reason_from_startup_exception(config, exc)
             else:
-                reason = PeerCaptureFailureReason.PROVIDER_FAILED
+                reason = startup_failure_reason
             await self._fault_current_generation_locked(
                 generation,
                 config=config,
@@ -2140,6 +2146,7 @@ class PeerCaptureSessionOwner:
         detached_source: object | None = None,
         failure_observed: bool = False,
     ) -> None:
+        self._retain_retired_source(detached_source)
         current_task = asyncio.current_task()
         defer_diagnostic = current_task is not None and self._loop_task is current_task
         diagnostic = None
@@ -2226,11 +2233,7 @@ class PeerCaptureSessionOwner:
             except Exception as exc:
                 failures.append(exc)
         if detached_source is not None:
-            await self._attempt_cleanup(
-                failures,
-                lambda: self._close_if_possible(detached_source),
-                retain_on_failure=lambda: self._retain_retired_source(detached_source),
-            )
+            await self._retry_retired_cleanup_debt(failures, (detached_source,))
         try:
             await self._attempt_cleanup(
                 failures,
@@ -2289,12 +2292,16 @@ class PeerCaptureSessionOwner:
         if release_mode != "drain" and segment_ledger is not None:
             self._retire_publication_generation(segment_ledger.activation_generation)
         prior_cleanup_debt = tuple(self._retired_sources)
-        await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
-        await self._attempt_cleanup(
-            failures,
-            lambda: self._close_if_possible(source),
-            retain_on_failure=lambda: self._retain_retired_source(source),
-        )
+        try:
+            await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
+            await self._attempt_cleanup(
+                failures,
+                lambda: self._close_if_possible(source),
+                retain_on_failure=lambda: self._retain_retired_source(source),
+            )
+        except asyncio.CancelledError:
+            self._retain_retired_source(source)
+            raise
         if cancel_segments and segment_ledger is not None:
             self._cancel_segment_ledger(segment_ledger)
         await self._retry_retired_cleanup_debt(failures, prior_cleanup_debt)
@@ -2551,12 +2558,9 @@ class PeerCaptureSessionOwner:
 
     def _effective_segment_settings(self) -> AudioSegmentSettingsSnapshot | None:
         ledger = self._segment_ledger
-        if ledger is None:
+        if ledger is None or ledger.current_open_segment_id is None:
             return None
-        open_segment = next(
-            (snapshot for snapshot in ledger.snapshots if snapshot.state == "open"),
-            None,
-        )
+        open_segment = ledger.segment_snapshot(ledger.current_open_segment_id)
         return open_segment.settings if open_segment is not None else None
 
     def _effective_delivery_profile(self) -> str | None:
