@@ -324,7 +324,7 @@ class _TestProcessRunner:
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
     overlay_instance_id: str = "overlay-test"
 
-    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+    def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
         _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:
@@ -348,7 +348,7 @@ class _GatedProcessRunner:
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
     overlay_instance_id: str = "overlay-test"
 
-    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+    def configure_runtime(self, *, quiet_tail_profile: str | None, handoff_experiment: str) -> None:
         _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:

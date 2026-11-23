@@ -3923,7 +3923,7 @@ async def test_native_retry_epoch_replays_valid_caption_with_fresh_intent_only()
     presenter._retry_projection.generations = NativeFreshRenderGenerations(self=4)
     await presenter._publish_if_changed(force_protocol_publish=True)
 
-    await presenter.begin_native_retry_epoch(enabled=True)
+    await presenter.begin_runtime_epoch(native_fresh_retry=True)
 
     snapshot = presenter.snapshot()
     assert snapshot.blocks[0].primary_text == "preserved caption"
@@ -3931,12 +3931,12 @@ async def test_native_retry_epoch_replays_valid_caption_with_fresh_intent_only()
     assert snapshot.native_fresh_render_targets.self == "scene:self"
     assert snapshot.native_quiet_tail_episodes.self.generation == 1
 
-    await presenter.begin_native_retry_epoch(enabled=False)
-    desktop_snapshot = presenter.snapshot()
-    assert desktop_snapshot.blocks[0].primary_text == "preserved caption"
-    assert desktop_snapshot.native_fresh_render_generations is None
-    assert desktop_snapshot.native_fresh_render_targets is None
-    assert desktop_snapshot.native_quiet_tail_episodes is None
+    await presenter.begin_runtime_epoch()
+    normal_snapshot = presenter.snapshot()
+    assert normal_snapshot.blocks[0].primary_text == "preserved caption"
+    assert normal_snapshot.native_fresh_render_generations is None
+    assert normal_snapshot.native_fresh_render_targets is None
+    assert normal_snapshot.native_quiet_tail_episodes is None
     await presenter.close()
 
 

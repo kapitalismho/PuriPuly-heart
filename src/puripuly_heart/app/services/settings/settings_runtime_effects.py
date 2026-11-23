@@ -551,6 +551,10 @@ class SettingsRuntimeEffectsAdapter:
 
         if transition.previous_overlay_enabled != self._settings.overlay_enabled():
             await self._overlay.set_enabled(self._settings.overlay_enabled())
+        elif self._settings.overlay_enabled():
+            await self._overlay.apply_vr_compatibility_mode(
+                settings.intent.overlay.vr_compatibility_mode
+            )
 
         configure_connection = getattr(self._vrc_mic_sync, "configure_connection", None)
         if callable(configure_connection):

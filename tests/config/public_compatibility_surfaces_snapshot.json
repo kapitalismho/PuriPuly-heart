@@ -43,7 +43,7 @@
         "--config",
         "{manifest_path}"
       ],
-      "explicit_env_overrides": [
+      "stripped_production_env": [
         "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE",
         "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
       ],

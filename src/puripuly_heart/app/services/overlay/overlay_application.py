@@ -208,6 +208,7 @@ class OverlayApplicationOwner:
     _recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _normal_stop_pending: bool = field(init=False, default=False, repr=False)
     _shutting_down: bool = field(init=False, default=False, repr=False)
+    _vr_mode_switch_cleanup_pending: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _intent_generation: int = field(init=False, default=0, repr=False)
@@ -326,6 +327,9 @@ class OverlayApplicationOwner:
             "desired_enabled": intent.overlay_intent_enabled,
             "configured_target": intent.configured_target,
             "effective_target": snapshot.active_target if ready else None,
+            "effective_vr_compatibility_mode": (
+                runtime.vr_compatibility_mode if ready and runtime is not None else None
+            ),
             "attempting_target": snapshot.active_target,
             "lifecycle": snapshot.state,
             "runtime_active": self.runtime_is_active(),
@@ -533,6 +537,35 @@ class OverlayApplicationOwner:
             if self._pending_enable_generation == generation:
                 self._pending_enable_generation = None
                 self.publish_presentation()
+
+    async def apply_vr_compatibility_mode(self, enabled: bool) -> None:
+        runtime = self._runtime
+        generation = self._intent_generation
+        if (
+            runtime is None
+            or runtime.vr_compatibility_mode is None
+            or runtime.vr_compatibility_mode == enabled
+            or self._normal_stop_pending
+            or self._shutting_down
+            or self._state not in {"starting", "connected"}
+            or not self._intent_is_current(generation, enabled=True)
+        ):
+            return
+        await self._cancel_recovery()
+        self._recovering_from_crash = False
+        status = await self._transition_owner.begin_start(
+            lambda: self._start_execution(
+                replace_starting=True,
+                replace_connected=True,
+                intent_generation=generation,
+            )
+        )
+        if status == "started":
+            result = await self.wait_start_outcome()
+            if result["effective_vr_compatibility_mode"] is enabled:
+                return
+        if self._intent_is_current(generation, enabled=True):
+            raise RuntimeError("SteamVR caption compatibility mode was not applied")
 
     def _intent_is_current(self, generation: int, *, enabled: bool) -> bool:
         state = self.state_provider()
@@ -783,20 +816,28 @@ class OverlayApplicationOwner:
         self,
         *,
         replace_starting: bool = False,
+        replace_connected: bool = False,
         intent_generation: int | None = None,
     ) -> OverlaySessionStartExecution:
+        mode_switch = replace_connected or self._vr_mode_switch_cleanup_pending
         return OverlaySessionStartExecution(
             state=self._state,
             previous_runtime=self._runtime,
-            teardown=lambda: self.teardown(preserve_presenter_state=True),
+            teardown=(
+                self._teardown_for_vr_mode_switch
+                if mode_switch
+                else lambda: self.teardown(preserve_presenter_state=True)
+            ),
             create_runtime=self.new_runtime,
             resolve_target=self.effective_target_for_start,
             on_starting=self._mark_starting,
             run_start=self.run_start,
             replace_starting=replace_starting,
+            replace_connected=replace_connected,
             retire_previous=(
                 self._retire_fallback_runtime
-                if replace_starting
+                if not mode_switch
+                and replace_starting
                 and self._fallback_owner.active
                 and self._active_target == OVERLAY_TARGET_STEAMVR
                 and self._runtime is not None
@@ -808,6 +849,35 @@ class OverlayApplicationOwner:
                 else lambda: not self._ingress_stopped
             ),
         )
+
+    async def _teardown_for_vr_mode_switch(self) -> bool:
+        self._vr_mode_switch_cleanup_pending = True
+        if self._state == "connected":
+            self._transition_state("starting")
+            self._notify_state()
+        try:
+            if await self.teardown(
+                preserve_presenter_state=True,
+                keep_presenter_ingress=True,
+                emit_shutdown=True,
+            ):
+                return True
+        except asyncio.CancelledError:
+            self._fail_vr_mode_switch_cleanup()
+            raise
+        self._fail_vr_mode_switch_cleanup()
+        return False
+
+    def _fail_vr_mode_switch_cleanup(self) -> None:
+        runtime = self._runtime
+        manager = runtime.process_manager if runtime is not None else None
+        reason = getattr(manager, "stop_failure_reason", None) or getattr(
+            manager, "failure_reason", None
+        )
+        diagnostics = getattr(manager, "failure_diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics):
+            self._failure_diagnostics = diagnostics
+        self.on_start_failed(reason or "shutdown_cleanup_failed")
 
     async def _retire_fallback_runtime(self) -> object | None:
         runtime = self._runtime
@@ -1573,9 +1643,11 @@ class OverlayApplicationOwner:
         *,
         preserve_presenter_state: bool,
         emit_shutdown: bool = False,
+        keep_presenter_ingress: bool = False,
     ) -> bool:
         existing = self._runtime
         if existing is None:
+            self._vr_mode_switch_cleanup_pending = False
             await self.cancel_bounds_persistence()
             self._active_target = None
             self.clear_bounds_suppressed()
@@ -1586,6 +1658,7 @@ class OverlayApplicationOwner:
             preserve_presenter_state or not self.runtime_has_resources(existing)
         ):
             await self.cancel_bounds_persistence()
+            self._vr_mode_switch_cleanup_pending = False
             if not self.runtime_has_resources(existing):
                 self._runtime = None
             self._active_target = None
@@ -1603,6 +1676,7 @@ class OverlayApplicationOwner:
                 preview_reset=self.reset_output_preview,
                 diagnostics_detach=self.detach_translation_diagnostics,
                 emit_shutdown=emit_shutdown,
+                keep_presenter_ingress=keep_presenter_ingress,
             )
         except Exception as exc:
             close_succeeded = False
@@ -1610,8 +1684,10 @@ class OverlayApplicationOwner:
             diagnostic_emitted = self.log_diagnostic(message, logging.WARNING, exc)
             if not diagnostic_emitted:
                 self.log_basic(message, logging.WARNING)
-        if close_succeeded and not self.runtime_has_resources(runtime):
-            self._runtime = None
+        if close_succeeded:
+            self._vr_mode_switch_cleanup_pending = False
+            if not self.runtime_has_resources(runtime):
+                self._runtime = None
         self._active_target = None
         self.clear_bounds_suppressed()
         if not preserve_presenter_state:

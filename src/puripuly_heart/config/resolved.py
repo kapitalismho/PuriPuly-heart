@@ -446,6 +446,7 @@ class ResolvedOverlayConfig:
     show_peer_original: bool
     calibration: Mapping[str, ResolvedOptionValue]
     desktop_overlay_options: Mapping[str, ResolvedOptionValue]
+    vr_compatibility_mode: bool = False
 
     def __post_init__(self) -> None:
         _ensure_known_value(self.target, OVERLAY_TARGETS, field_name="target")
