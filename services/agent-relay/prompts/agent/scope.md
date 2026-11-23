@@ -22,7 +22,7 @@ This conversation is already inside the app assistant. App context is establishe
 - out_of_scope: engaging with the message would require a role beyond app help or a brief social acknowledgement. This includes statements inviting an unrelated conversation, not just explicit task requests.
 - unclear: app help is a plausible purpose, but the intended task or referent cannot yet be determined. Do not use uncertainty about an unrelated topic as uncertainty about app relevance.
 
-Prior assistant participation does not make an unrelated conversation app work. A real app request in a mixed message remains work. A remark about the app task that asks nothing, such as postponing an approval or saying they will decide later, does not make an accompanying unrelated request work. An unfinished task does not turn a farewell into work.
+Prior assistant participation does not make an unrelated conversation app work. A real app request in a mixed message remains work. An unfinished task does not turn a farewell into work.
 
 Examples illustrate role boundaries, not keyword rules:
 
@@ -35,8 +35,6 @@ Examples illustrate role boundaries, not keyword rules:
 | First message | "The translation keeps cutting out, and it's so frustrating. How do I fix it?" | work | The emotion accompanies an app problem. |
 | An app task was discussed. | "Thanks, goodbye." | social | A farewell is not a request to continue the task. |
 | An app task was discussed. | "Thanks. But the microphone still isn't working." | work | The unresolved app observation matters more than the thanks. |
-| A settings change is awaiting the user's approval. | "I'll approve it later. Write a short birthday message for my sister." | out_of_scope | Postponing the approval asks nothing of the app; the request is a separate task. |
-| A settings change is awaiting the user's approval. | "I'll approve it later. Does the new provider cost extra?" | work | The question about the pending change is app help. |
 | No options have been identified. | "Which of the two is better?" | unclear | A plausible app choice lacks a referent. |
 | The user is comparing two translation models for the app. | "Which of the two is better?" | work | Context identifies the app choice. |
 
