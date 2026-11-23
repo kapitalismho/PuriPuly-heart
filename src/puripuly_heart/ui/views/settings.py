@@ -56,6 +56,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlaySettingsSnapshot,
     OverlayTargetSettingsIntent,
     OverlayTranslationSettingsIntent,
+    OverlayVrCompatibilitySettingsIntent,
     PeerExpectedLanguagesIntent,
     PeerSttProviderEdit,
     PeerVadSpeechThresholdIntent,
@@ -852,6 +853,7 @@ class SettingsView(ft.Column):
             self._loopback_audio_text,
             self._overlay_translation_button,
             self._overlay_peer_original_button,
+            self._overlay_vr_compatibility_button,
             self._overlay_target_button,
             self._overlay_anchor_button,
             self._overlay_text_scale_text,
@@ -1784,6 +1786,27 @@ class SettingsView(ft.Column):
             value=self._overlay_peer_original_button,
         )
 
+        self._overlay_vr_compatibility_title = ft.Text(
+            t("settings.overlay.vr_compatibility_mode"),
+            size=24,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_SECONDARY,
+        )
+        self._overlay_vr_compatibility_button = self._build_clickable_text(
+            t("settings.option.off"),
+            self._on_overlay_vr_compatibility_click,
+        )
+        self._overlay_vr_compatibility_help = ft.Text(
+            t("settings.description.overlay.vr_compatibility_mode"),
+            size=14,
+        )
+        self._overlay_vr_compatibility_card = self._wrap_unit_card(
+            title=self._overlay_vr_compatibility_title,
+            value=self._overlay_vr_compatibility_button,
+            extra_controls=(self._overlay_vr_compatibility_help,),
+            height=204,
+        )
+
         self._overlay_target_title = ft.Text(
             t("settings.overlay.caption_location"),
             size=24,
@@ -2118,6 +2141,7 @@ class SettingsView(ft.Column):
                 offset_y=self._overlay_offset_y_card,
                 text_scale=self._overlay_text_scale_card,
                 vr_reset=self._overlay_vr_reset_card,
+                vr_compatibility=self._overlay_vr_compatibility_card,
                 desktop_size=self._desktop_overlay_size_card,
                 desktop_lock=self._desktop_overlay_lock_card,
                 desktop_background_alpha=self._desktop_overlay_background_alpha_card,
@@ -6580,6 +6604,13 @@ class SettingsView(ft.Column):
             self._overlay_peer_original_button,
             t("settings.option.on" if overlay_peer_original_enabled else "settings.option.off"),
         )
+        vr_compatibility_enabled = bool(
+            self._overlay_snapshot and self._overlay_snapshot.vr_compatibility_mode
+        )
+        self._set_unit_card_value_text(
+            self._overlay_vr_compatibility_button,
+            t("settings.option.on" if vr_compatibility_enabled else "settings.option.off"),
+        )
         self._sync_overlay_target_control()
         self._sync_overlay_target_specific_visibility()
         self._sync_desktop_overlay_main_controls()
@@ -6588,6 +6619,7 @@ class SettingsView(ft.Column):
         disabled = self._overlay_snapshot is None
         self._overlay_translation_button.disabled = disabled
         self._overlay_peer_original_button.disabled = disabled
+        self._overlay_vr_compatibility_button.disabled = disabled
         self._overlay_target_button.disabled = disabled
         self._overlay_anchor_button.disabled = disabled
         self._overlay_distance_decrease_button.disabled = disabled
@@ -6661,6 +6693,14 @@ class SettingsView(ft.Column):
         self._emit_settings_changed(
             OverlayPeerOriginalSettingsIntent(self._overlay_snapshot.show_peer_original)
         )
+
+    def _on_overlay_vr_compatibility_click(self, e) -> None:
+        if self._overlay_snapshot is None or self._overlay_vr_compatibility_button.disabled:
+            return
+        enabled = not self._overlay_snapshot.vr_compatibility_mode
+        self._overlay_snapshot = replace(self._overlay_snapshot, vr_compatibility_mode=enabled)
+        self._sync_overlay_controls()
+        self._emit_settings_changed(OverlayVrCompatibilitySettingsIntent(enabled))
 
     def _handle_vad_visual_change(self, e) -> None:
         self._vad_slider.label = f"{float(e.control.value):.2f}"
@@ -7087,6 +7127,10 @@ class SettingsView(ft.Column):
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
+        self._overlay_vr_compatibility_title.value = t("settings.overlay.vr_compatibility_mode")
+        self._overlay_vr_compatibility_help.value = t(
+            "settings.description.overlay.vr_compatibility_mode"
+        )
         self._audio_settings.apply_locale()
         self._sync_general_audio_card_texts()
         self._overlay_anchor_title.value = t("settings.overlay.calibration.anchor")

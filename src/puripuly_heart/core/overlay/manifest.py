@@ -21,6 +21,7 @@ _MANIFEST_FIELDS = {
     "log_level",
     "locale",
 }
+_VR_COMPATIBILITY_MODE = "vr_compatibility_mode"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,9 +36,10 @@ class OverlayLaunchManifest:
     log_dir: str
     log_level: str
     locale: str
+    vr_compatibility_mode: bool = False
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "contract_version": self.contract_version,
             "app_version": self.app_version,
             "overlay_instance_id": self.overlay_instance_id,
@@ -49,10 +51,13 @@ class OverlayLaunchManifest:
             "log_level": self.log_level,
             "locale": self.locale,
         }
+        if self.vr_compatibility_mode:
+            data[_VR_COMPATIBILITY_MODE] = True
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "OverlayLaunchManifest":
-        extra_fields = set(data) - _MANIFEST_FIELDS
+        extra_fields = set(data) - _MANIFEST_FIELDS - {_VR_COMPATIBILITY_MODE}
         if extra_fields:
             joined = ", ".join(sorted(extra_fields))
             raise ValueError(f"overlay manifest contains unsupported runtime fields: {joined}")
@@ -62,6 +67,9 @@ class OverlayLaunchManifest:
         if missing_fields:
             joined = ", ".join(sorted(missing_fields))
             raise ValueError(f"overlay manifest is missing required fields: {joined}")
+        vr_compatibility_mode = data.get(_VR_COMPATIBILITY_MODE, False)
+        if not isinstance(vr_compatibility_mode, bool):
+            raise ValueError("overlay manifest vr_compatibility_mode must be a boolean")
 
         return cls(
             contract_version=int(data["contract_version"]),
@@ -74,4 +82,5 @@ class OverlayLaunchManifest:
             log_dir=str(data["log_dir"]),
             log_level=str(data["log_level"]),
             locale=str(data["locale"]),
+            vr_compatibility_mode=vr_compatibility_mode,
         )

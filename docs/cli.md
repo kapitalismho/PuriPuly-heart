@@ -94,6 +94,8 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Settings commit before runtime application. `degraded` can mean saved but not applied; cancellation does not undo a commit.
 - Apply a translation model and connection together using `settings choices`. For ASR, use `asr set --channel self|peer|both --provider <choice>`.
 - Retry failed provider application explicitly. Unrelated settings edits do not retry it.
+- SteamVR caption compatibility: apply `{"changes":{"overlay.vr_compatibility_mode":true}}` through the settings command above, or use Settings → Overlay. Default `false` avoids periodic retries; `true` keeps Flush and adds bounded redraws/resubmissions. The setting persists without enabling a disabled overlay; switching is manual.
+- Check `overlay status` → `effective_vr_compatibility_mode` for the active mode (`null` unless SteamVR captions are ready), separately from saved settings.
 
 ### Readiness
 

@@ -788,13 +788,14 @@ class OverlayPresenter(OverlaySink):
             )
         self._drain_presentation_state_removals()
 
-    async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
+    async def begin_runtime_epoch(self, *, native_fresh_retry: bool = False) -> None:
         async with self._ownership_transition_lock:
-            self.native_retry_enabled = bool(enabled) and not self._closing and not self._closed
-            self._retry_projection.begin(
-                enabled=self.native_retry_enabled,
-                snapshot=self.snapshot(),
-            )
+            enable_retry = native_fresh_retry and not self._closing and not self._closed
+            if enable_retry:
+                self._retry_projection.begin(enabled=True, snapshot=self.snapshot())
+            elif self.native_retry_enabled:
+                self._retry_projection.reset()
+            self.native_retry_enabled = enable_retry
             await self._publish_if_changed(force_protocol_publish=True)
             self._rearm_expiration_tasks_from_original_deadlines()
 
@@ -1175,7 +1176,8 @@ class OverlayPresenter(OverlaySink):
                 on_accepted()
             return
 
-        self._retry_projection.prune(next_blocks)
+        if self.native_retry_enabled:
+            self._retry_projection.prune(next_blocks)
         self._revision += 1
         snapshot = self._presentation_state.generate_snapshot(
             revision=self._revision,

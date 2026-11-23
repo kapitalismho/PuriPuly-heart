@@ -166,10 +166,11 @@ async fn run_rows(rows: &[Value], label: &str) -> NativePresentationOwner<SceneS
     manifest.bridge_url = format!("ws://{address}");
     let (mut bridge, initial) = BridgeClient::connect(&manifest).await.unwrap();
     let captured = Arc::new(Mutex::new(SceneFrames::default()));
-    let mut owner = NativePresentationOwner::new(
+    let mut owner = NativePresentationOwner::new_with_profile(
         initial,
         CaptionRenderer::new_for_test().unwrap(),
         SceneSubmitter(captured.clone()),
+        QuietTailProfile::P05,
     );
     let stdout = RecordingSink::default();
     let stderr = RecordingSink::default();

@@ -277,6 +277,7 @@ class SettingsOverlaySurfaceSlots:
     offset_y: ft.Control
     text_scale: ft.Control
     vr_reset: ft.Control
+    vr_compatibility: ft.Control
     desktop_size: ft.Control
     desktop_lock: ft.Control
     desktop_background_alpha: ft.Control

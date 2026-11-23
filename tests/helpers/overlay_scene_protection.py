@@ -130,7 +130,7 @@ async def projected_scenes(*, peer_mode: str = "secondary_only") -> dict[str, ob
             )
         )
         clear_rearm = presenter.snapshot().to_dict()
-        await presenter.begin_native_retry_epoch(enabled=True)
+        await presenter.begin_runtime_epoch(native_fresh_retry=True)
         fresh_epoch = presenter.snapshot().to_dict()
         await presenter.clear_for_runtime_detach()
         empty_after_rearm = presenter.snapshot().to_dict()
@@ -218,7 +218,7 @@ async def recovery_scenes(*, peer_mode: str = "secondary_only") -> dict[str, obj
                 clock.advance(deadline_before - clock.now() + 0.01)
             if case == "cleared":
                 await presenter.clear_for_runtime_detach()
-            await presenter.begin_native_retry_epoch(enabled=case != "disabled")
+            await presenter.begin_runtime_epoch(native_fresh_retry=case != "disabled")
             recovered = presenter.snapshot().to_dict()
             entry = presenter._entries.get(("peer", peer))
             deadline_after = (
@@ -229,7 +229,7 @@ async def recovery_scenes(*, peer_mode: str = "secondary_only") -> dict[str, obj
             await presenter._publish_if_changed()
             expired = presenter.snapshot().to_dict()
             await presenter.clear_for_runtime_detach()
-            await presenter.begin_native_retry_epoch(enabled=True)
+            await presenter.begin_runtime_epoch(native_fresh_retry=True)
             cases[case] = {
                 "before": before,
                 "recovered": recovered,
