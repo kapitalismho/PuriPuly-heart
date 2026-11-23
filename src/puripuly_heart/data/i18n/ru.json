@@ -138,7 +138,6 @@
   "settings.translation_model.managed_gemma_gpu.description": "Нужно 2,7 ГБ свободной VRAM",
   "settings.translation_model.managed_gemma_26b.description": "Нужно 8 ГБ свободной VRAM",
   "settings.translation_model.gemma4_26b_31b.description": "Подходит для большинства случаев",
-  "settings.translation_model.deepseek_v4_flash.description": "",
   "settings.translation_model.deepseek_v4_flash_41.description": "Хорошо знает китайский",
   "settings.translation_model.gpt_6_luna.description": "Можно использовать и по подписке ChatGPT",
   "settings.translation_model.qwen38_flash.description": "Сильная альтернатива DeepSeek",

@@ -2837,55 +2837,20 @@ def test_on_llm_selected_openrouter_provider_value_defaults_to_gemma_managed(
     assert view._llm_text.content.value == t("provider.gemma4_26b_31b")
 
 
-def test_on_llm_selected_sets_deepseek_managed_connection_and_label(
+def test_saved_deepseek_v4_flash_still_displays_its_openrouter_connection(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:
     settings = _vnext(
-        llm="openai",
-        model=TranslationModel.GPT_6_LUNA.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
+        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        connection=TranslationConnection.OPENROUTER.value,
     )
-    settings = _vnext(settings, system_prompt="G")
 
     view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
 
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.model
-        == TranslationModel.DEEPSEEK_V4_FLASH.value
-    )
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.connection
-        == TranslationConnection.OPENROUTER.value
-    )
-    assert (
-        _llm(apply_provider_intent(settings_events.settings, pending))
-        == LLMProviderName.OPENROUTER.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selection_alias
-        == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK.value
-    )
-    assert (
-        apply_provider_intent(settings_events.settings, pending).intent.translation.openrouter_model
-        == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    )
-    assert (
-        apply_provider_intent(
-            settings_events.settings, pending
-        ).intent.translation.openrouter_selected_source
-        == OpenRouterCredentialSource.BYOK.value
-    )
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.openrouter"
     )
-    assert view._prompt_editor.value == "G"
 
 
 def test_on_llm_selected_stages_byok_without_mutating_managed_identity_snapshot(

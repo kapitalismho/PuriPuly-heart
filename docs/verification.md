@@ -14,6 +14,8 @@ Use observed results in the running application as the main completion evidence 
 
 **Inputs and observations:** GUI settings/application controls; CLI `app`, `settings current`, `settings choices`, and `settings apply`; terminal operations and owner status. [Settings/runtime semantics](cli.md#settings-and-runtime-state) distinguish committed intent from applied resources. Use [account controls](cli.md#credentials-authorization-and-consent) and model/provider readiness when relevant.
 
+**GUI translation model picker:** Open **Translation** in the **API** settings tab. DeepSeek V4.1 Flash remains selectable under **Recommended / Cloud**; DeepSeek V4 Flash is no longer listed, including under **Others**. With an existing V4 Flash (OpenRouter) setting, the current model and connection should still display. This checks the GUI catalog, not CLI or OSC model availability.
+
 **Example — save and restart:** In an isolated host, record the instance and settings revision. Apply a supported harmless change through the application; inspect its terminal result, committed value, and relevant effective state. Stop to completion, start a fresh process on the same state, and read the value and owner state again. A different instance retaining the change establishes reload; an `applied` receipt alone does not. Saved-but-degraded provider selection is not usable-provider evidence.
 
 **Expectations and limits:** Failed/cancelled startup must settle already spawned children before replacement. Authentication retry must preserve existing connections on failure and prevent cancelled attempts from activating; use the focused [ChatGPT account checks](../tests/app/test_chatgpt_account.py) for detailed retry boundaries rather than repeating an OAuth incident recipe here.

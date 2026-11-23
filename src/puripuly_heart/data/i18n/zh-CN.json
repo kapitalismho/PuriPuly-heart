@@ -138,7 +138,6 @@
   "settings.translation_model.managed_gemma_gpu.description": "需要 2.7 GB 空闲显存",
   "settings.translation_model.managed_gemma_26b.description": "需要 8 GB 空闲显存",
   "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
-  "settings.translation_model.deepseek_v4_flash.description": "",
   "settings.translation_model.deepseek_v4_flash_41.description": "擅长中文",
   "settings.translation_model.gpt_6_luna.description": "也可以通过 ChatGPT 订阅使用",
   "settings.translation_model.qwen38_flash.description": "DeepSeek 的不错替代选择",

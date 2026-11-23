@@ -312,9 +312,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
         "settings.translation_model.gpt_6_luna.description"
     )
     assert managed[TranslationModel.GPT_6_LUNA.value].description
-    deepseek_v4_flash = managed[TranslationModel.DEEPSEEK_V4_FLASH.value]
-    assert deepseek_v4_flash.section == t("settings.translation_model.section.others")
-    assert deepseek_v4_flash.description == ""
+    assert TranslationModel.DEEPSEEK_V4_FLASH.value not in values
     deepseek_v4_flash_41 = managed[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
     assert deepseek_v4_flash_41.section == t("settings.translation_model.section.recommended_cloud")
     assert deepseek_v4_flash_41.description == t(
@@ -363,14 +361,6 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
     ]
-
-    others_options = [
-        option
-        for option in options
-        if option.section == t("settings.translation_model.section.others")
-    ]
-    assert others_options[0] is deepseek_v4_flash
-    assert all(option.value != cloud_gemma.value for option in others_options)
 
 
 def test_combined_gemma_connection_modal_lists_managed_and_openrouter(
