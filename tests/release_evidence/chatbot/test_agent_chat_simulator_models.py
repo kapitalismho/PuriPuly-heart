@@ -13,6 +13,7 @@ from websockets.http11 import Response
 from benchmarks.chatbot import __main__ as cli
 from benchmarks.chatbot import models
 from benchmarks.chatbot.models import (
+    JUDGE_MODEL,
     SimulatorModelError,
     SimulatorModels,
     SubscriptionConnectGate,
@@ -505,7 +506,7 @@ async def test_api_probe_completes_exact_model_effort_pairs_and_retains_usage(ht
             body = json.loads(request.content)
             result = report["roles"][role]
             assert (body["model"], body["reasoning"]["effort"]) == (
-                ("gpt-6.1-terra", "medium") if role == "user" else ("gpt-6.1-sol", "xhigh")
+                ("gpt-6.1-terra", "medium") if role == "user" else (JUDGE_MODEL, "xhigh")
             )
             assert str(request.url) == "https://api.openai.com/v1/responses"
             assert request.headers["Authorization"] == f"Bearer {_SECRET}"
@@ -770,8 +771,8 @@ async def test_subscription_roles_keep_independent_socket_lifetimes(subscription
             "gpt-6.1-terra",
         ]
         assert [request["model"] for request in state.sockets[1].requests] == [
-            "gpt-6.1-sol",
-            "gpt-6.1-sol",
+            JUDGE_MODEL,
+            JUDGE_MODEL,
         ]
         assert state.sockets[1].requests[0]["reasoning"] == {"effort": "xhigh"}
         assert user_again["subscription_wire"]["connection_sequence"] == 1
@@ -1068,7 +1069,7 @@ async def test_subscription_probe_reads_finalized_items_when_live_terminal_outpu
     subscription_boundary,
 ):
     state = subscription_boundary
-    for model in ("gpt-6.1-terra", "gpt-6.1-sol"):
+    for model in ("gpt-6.1-terra", JUDGE_MODEL):
         state.events.extend(
             [
                 {"type": "response.created"},
@@ -1124,7 +1125,7 @@ async def test_malformed_subscription_probe_fails_both_roles_without_leaking_out
     subscription_boundary,
 ):
     state = subscription_boundary
-    for model in ("gpt-6.1-terra", "gpt-6.1-sol"):
+    for model in ("gpt-6.1-terra", JUDGE_MODEL):
         terminal = response(model)
         terminal["output"][0]["id"] = _SECRET
         terminal["output"][0]["content"][0]["text"] = '{"private":"' + _SECRET + '"'
@@ -1516,7 +1517,7 @@ async def test_standalone_probe_through_shared_network_and_real_loopback_http(mo
         ]
         assert [(body["model"], body["reasoning"]["effort"]) for _, body in seen] == [
             ("gpt-6.1-terra", "medium"),
-            ("gpt-6.1-sol", "xhigh"),
+            (JUDGE_MODEL, "xhigh"),
         ]
         assert all(headers.startswith(b"POST /v1/responses HTTP/1.1") for headers, _ in seen)
     finally:

@@ -17,7 +17,7 @@ from puripuly_heart.core.chatgpt.oauth import ChatGptAuthError, ChatGptReauthReq
 from puripuly_heart.core.chatgpt.session import ChatGptSession
 from puripuly_heart.core.storage.secrets import KeyringSecretStore
 
-JUDGE_MODEL = "gpt-6.1-sol"
+JUDGE_MODEL = "gpt-6.2-sol"
 JUDGE_EFFORT = "xhigh"
 _MODELS = {"user": ("gpt-6.1-terra", "medium"), "judge": (JUDGE_MODEL, JUDGE_EFFORT)}
 _ROLE_TIMEOUTS = {"user": 180, "judge": 300}
