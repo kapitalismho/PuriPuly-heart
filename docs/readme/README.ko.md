@@ -495,18 +495,13 @@ uv run --locked python scripts/ci/check_test_selection.py
   <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
 </a>
 
+- [Nathan Roll](https://github.com/Nathan-Roll1)
+
 ---
 
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
-
----
-
-## 정책
-
-- [Code signing policy](../../CODE_SIGNING.md)
-- [개인정보처리방침](../../PRIVACY.md)
 
 ---
 
