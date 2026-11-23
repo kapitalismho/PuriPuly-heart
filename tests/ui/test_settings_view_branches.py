@@ -5813,6 +5813,28 @@ def test_fixed_settings_cards_fit_declared_row_bounds(
                 if row_height is not None:
                     assert card.height <= row_height
 
+    for card, action in (
+        (view._overlay_vr_reset_card, view._overlay_vr_reset_button),
+        (view._overlay_desktop_reset_card, view._overlay_desktop_reset_button),
+        (view._overlay_vr_compatibility_card, view._overlay_vr_compatibility_button),
+    ):
+        body = card.content
+        assert _tree_contains_control(body, action)
+        padding = body.padding
+        vertical_padding = (
+            padding.top + padding.bottom if isinstance(padding, ft.Padding) else 2 * (padding or 0)
+        )
+        reserved_height = sum(
+            slot.size if isinstance(slot, ft.Text) else (slot.height or 0)
+            for slot in body.content.controls
+            if slot.visible
+        )
+        action_height = action.height if action.height is not None else action.content.size
+        minimum_height = vertical_padding + reserved_height + action_height
+        assert (
+            card.height >= minimum_height
+        ), f"Action needs at least {minimum_height}px within a {card.height}px card"
+
 
 def test_api_keys_card_allows_its_content_to_set_height(
     monkeypatch: pytest.MonkeyPatch, settings_events
