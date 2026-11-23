@@ -306,7 +306,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
         "sort": {"by": "latency"},
-        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
+        "only": ["makora", "coreweave/bf16"],
         "allow_fallbacks": True,
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
@@ -465,7 +465,7 @@ async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["inference-net", "deepseek"],
+        "only": ["inference-net", "morph"],
         "allow_fallbacks": False,
     }
 
@@ -492,7 +492,7 @@ async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "only": ["inference-net", "deepseek"],
+        "only": ["inference-net", "morph"],
         "allow_fallbacks": False,
     }
 
@@ -560,7 +560,7 @@ async def test_httpx_openrouter_client_gemma_pool_ignores_explicit_latency_routi
     body = fake_client.last_request["json"]
     assert body["provider"] == {
         "sort": {"by": "latency"},
-        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
+        "only": ["makora", "coreweave/bf16"],
         "allow_fallbacks": True,
     }
 

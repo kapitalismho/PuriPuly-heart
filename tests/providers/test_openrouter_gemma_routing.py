@@ -28,7 +28,7 @@ def test_openrouter_internal_emergency_uses_single_model_and_modelrun_only() -> 
 
     assert body["model"] == "google/gemma-4-31b-it"
     assert "models" not in body
-    assert body["provider"] == {"only": ["modelrun/fp4"], "allow_fallbacks": False}
+    assert body["provider"] == {"only": ["modelrun"], "allow_fallbacks": False}
 
 
 def test_openrouter_unified_request_uses_models_only() -> None:
@@ -54,17 +54,14 @@ def test_openrouter_unified_request_uses_models_only() -> None:
 def test_gemma_combined_and_internal_emergency_provider_policies() -> None:
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY) == {
         "only": [
-            "cloudflare",
-            "coreweave/fp4",
-            "deepinfra/turbo",
-            "dekallm/bf16",
-            "nextbit/bf16",
             "makora",
+            "coreweave/bf16",
+            "kt",
         ],
         "sort": {"by": "latency", "partition": "none"},
         "allow_fallbacks": True,
     }
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY) == {
-        "only": ["modelrun/fp4"],
+        "only": ["modelrun"],
         "allow_fallbacks": False,
     }
