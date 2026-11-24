@@ -2,6 +2,9 @@
   "name": "puripuly-heart-broker",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-08",
+  "placement": {
+    "mode": "smart"
+  },
   "d1_databases": [
     {
       "binding": "BROKER_DB",

@@ -826,7 +826,9 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(fallback_provider, OpenRouterLLMProvider)
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT
+    assert (
+        fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT
+    )
     assert_bounded_concurrency(provider, 3)
 
 

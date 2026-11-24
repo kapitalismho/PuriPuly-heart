@@ -310,14 +310,124 @@ describe('Puri installation token boundary', () => {
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM installations').get()).toEqual({ count: 0 });
   });
 
-  it('retains installation revocation hooks and their existing entitlement side effect', async () => {
+  it.each([
+    { mode: 'missing', value: null, first: 'raw', withoutRaw: 200 },
+    { mode: 'dual write', value: '{"phase":"dual_write"}', first: 'raw', withoutRaw: 409 },
+    { mode: 'invalid state', value: 'null', first: 'raw', withoutRaw: 409 },
+    { mode: 'keyed only', value: '{"phase":"keyed_only"}', first: 'keyed', withoutRaw: 409 },
+  ])('preserves active IP hook matching and priority in $mode mode', async ({ value, first, withoutRaw }) => {
     const env = environment();
+    const ip = '203.0.113.33';
+    const [{ digest }] = await deriveStableNetworkIdentityDigest(resolveNetworkIdentitySecrets(env)!, ip, 'ip');
+    if (value === null) {
+      env.__db.prepare("DELETE FROM broker_config WHERE key = 'network_identity_migration'").run();
+    } else {
+      env.__db.prepare("UPDATE broker_config SET value = ? WHERE key = 'network_identity_migration'").run(value);
+    }
+    const insert = env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
+      (hook_kind, subject_type, subject_value, outcome_code, outcome_class, reason, active, expires_at)
+      VALUES (?, 'ip', ?, 'trial_not_eligible', 'security_fail', ?, ?, ?)`);
+    insert.run('revocation', ip, 'expired', 1, new Date().toISOString());
+    insert.run('revocation', digest, 'inactive', 0, null);
+    insert.run('denylist', ip, 'raw', 1, null);
+    insert.run('denylist', digest, 'keyed', 1, null);
+    const key = await createDeviceKeyPair();
+    const blocked = await post(env, await proof(key), ip);
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ error: { message: first } });
+    env.__db.prepare("DELETE FROM broker_abuse_subject_hooks WHERE reason = 'raw'").run();
+    const onlyKeyed = await post(env, await proof(key), ip);
+    expect(onlyKeyed.status).toBe(withoutRaw);
+    if (withoutRaw === 409) {
+      expect(await onlyKeyed.json()).toMatchObject({ error: { message: 'keyed' } });
+    }
+  });
+
+  it('honors a cutover after the flood gate without sending the raw IP in the keyed hook lookup', async () => {
+    const ip = '203.0.113.33';
+    const hookParams: unknown[][] = [];
+    const env = environment({
+      beforeRun: ({ sql, params }) => {
+        if (sql.includes('INSERT INTO puri_token_rate_limits') && params[0] === 'ip_flood') {
+          env.__db.prepare(`UPDATE broker_config SET value = '{"phase":"keyed_only"}'
+            WHERE key = 'network_identity_migration'`).run();
+        }
+      },
+      afterAll: ({ sql, params }) => {
+        if (sql.includes('FROM broker_abuse_subject_hooks')) hookParams.push(params);
+      },
+    });
+    env.__db.prepare(`UPDATE broker_config SET value = '{"phase":"dual_write"}'
+      WHERE key = 'network_identity_migration'`).run();
+    env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
+      (hook_kind, subject_type, subject_value, outcome_code, outcome_class)
+      VALUES ('denylist', 'ip', ?, 'trial_not_eligible', 'security_fail')`).run(ip);
+    expect((await post(env, await proof(await createDeviceKeyPair()), ip)).status).toBe(200);
+    expect(hookParams).toHaveLength(1);
+    expect(hookParams[0]).not.toContain(ip);
+  });
+
+  it('keeps the legacy hook decision when the migration read is unavailable and recovers when it returns', async () => {
+    const ip = '203.0.113.33';
+    let unavailable = true;
+    const checkMigrationRead = ({ sql }: { sql: string }) => {
+      if (unavailable && sql.includes("'network_identity_migration'")) {
+        throw new Error('synthetic migration read failure');
+      }
+    };
+    const env = environment({ beforeRun: checkMigrationRead, beforeFirst: checkMigrationRead });
+    env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
+      (hook_kind, subject_type, subject_value, outcome_code, outcome_class)
+      VALUES ('denylist', 'ip', ?, 'trial_not_eligible', 'security_fail')`).run(ip);
+    const request = await proof(await createDeviceKeyPair());
+    expect((await post(env, request, ip)).status).toBe(409);
+    unavailable = false;
+    expect((await post(env, request, ip)).status).toBe(200);
+  });
+
+  it('never treats a failed hook read as a successful check', async () => {
+    let failedReadsRemaining = 2;
+    let reads = 0;
+    const env = environment({ afterAll: ({ sql }) => {
+      if (sql.includes('FROM broker_abuse_subject_hooks')) {
+        reads += 1;
+        if (failedReadsRemaining > 0) {
+          failedReadsRemaining -= 1;
+          throw new Error('synthetic hook read failure');
+        }
+      }
+    } });
+    env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
+      (hook_kind, subject_type, subject_value, outcome_code, outcome_class)
+      VALUES ('denylist', 'installation_id', ?, 'trial_not_eligible', 'security_fail')`).run(installationId);
+    const request = await proof(await createDeviceKeyPair());
+    expect((await post(env, request)).status).toBe(500);
+    expect(reads).toBe(2);
+    failedReadsRemaining = 1;
+    expect((await post(env, request)).status).toBe(409);
+    expect(reads).toBe(4);
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
+    env.__db.prepare("UPDATE broker_abuse_subject_hooks SET active = 0 WHERE subject_type = 'installation_id'").run();
+    expect((await post(env, request)).status).toBe(200);
+  });
+
+  it('retains installation revocation hooks and their existing entitlement side effect', async () => {
+    let hookReads = 0;
+    const env = environment({ afterAll: ({ sql }) => {
+      if (sql.includes('FROM broker_abuse_subject_hooks')) hookReads += 1;
+    } });
     const key = await createDeviceKeyPair();
     registeredInstallation(env, installationId, key);
     insertEntitlement(env, { installation_id: installationId, status: 'active', budget_usd: 3 });
     env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
       (hook_kind, subject_type, subject_value, outcome_code, outcome_class)
+      VALUES ('denylist', 'installation_id', ?, 'trial_not_eligible', 'security_fail')`).run(installationId);
+    env.__db.prepare(`INSERT INTO broker_abuse_subject_hooks
+      (hook_kind, subject_type, subject_value, outcome_code, outcome_class)
       VALUES ('revocation', 'installation_id', ?, 'trial_not_eligible', 'security_fail')`).run(installationId);
+    expect((await post(env, await proof(key, {}, 'invalid-domain'))).status).toBe(401);
+    expect(hookReads).toBe(0);
+    expect(env.__db.prepare('SELECT status FROM openrouter_entitlements').get()).toEqual({ status: 'active' });
     expect((await post(env, await proof(key))).status).toBe(409);
     expect(env.__db.prepare('SELECT status FROM openrouter_entitlements').get()).toEqual({ status: 'revoked' });
     expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });

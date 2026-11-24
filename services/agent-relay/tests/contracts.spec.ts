@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { contracts, currentProtocol, supportedProtocols } from '../src/contracts';
 import relay from '../src/index';
-import { workInstructions } from '../src/instructions';
+import { classifierInstructions, workInstructions } from '../src/instructions';
+import { classifierQuestions } from '../src/scope';
 import { photoPolicy } from '../src/usage';
 import { authHeaders, installationHash, responseEvents, testEnv } from './fixtures';
 
@@ -82,6 +83,20 @@ describe('app protocol contracts', () => {
       if (path === '/v1/classify') {
         expect(sent.questions.map(({ name }: { name: string }) => name))
           .toEqual(expect.arrayContaining(contract.contextModules.map(({ name }) => `context_${name}`)));
+        expect(wireBody).toBe(JSON.stringify({
+          model: 'gpt-6-luna',
+          input: [{
+            role: 'developer',
+            content: [{
+              type: 'input_text',
+              text: classifierInstructions(contract),
+              prompt_cache_breakpoint: { mode: 'explicit' },
+            }],
+          }, ...body.input],
+          safety_identifier: installationHash,
+          questions: classifierQuestions(contract),
+          prompt_cache_options: { mode: 'explicit', ttl: '30m' },
+        }));
       } else if (body.route === 'work' || body.route === 'unclear') {
         expect(wireBody).toBe(JSON.stringify({
           model: 'gpt-5.6-terra',

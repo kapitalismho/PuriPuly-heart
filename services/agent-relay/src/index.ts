@@ -28,8 +28,14 @@ const prepared = new Map([...contracts].map(([protocol, contract]) => {
     prompt_cache_options: { mode: 'implicit', ttl: '30m' },
   }).slice(1, -1);
   return [protocol, {
-    classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
-    questions: classifierQuestions(contract),
+    classifierPrefix: JSON.stringify({
+      model: 'gpt-6-luna',
+      input: [developerMessage(classifierInstructions(contract))],
+    }).slice(0, -2),
+    classifierSuffix: JSON.stringify({
+      questions: classifierQuestions(contract),
+      prompt_cache_options: { mode: 'explicit', ttl: '30m' },
+    }).slice(1),
     workRequestPrefix(photoAllowance: number) {
       let prefix = work.get(photoAllowance);
       if (prefix === undefined) {
@@ -136,13 +142,7 @@ export default {
     const noTools = social || outOfScope;
     let serializeBody: () => string;
     if (classification) {
-      serializeBody = () => JSON.stringify({
-        model: 'gpt-6-luna',
-        input: [contract.classifierDeveloperMessage, ...input],
-        safety_identifier: installation,
-        questions: contract.questions,
-        prompt_cache_options: { mode: 'explicit', ttl: '30m' },
-      });
+      serializeBody = () => `${contract.classifierPrefix},${JSON.stringify(input[0])}],"safety_identifier":${JSON.stringify(installation)},${contract.classifierSuffix}`;
     } else {
       const identity = { model: accounting.model, safety_identifier: installation };
       const responseOptions = {

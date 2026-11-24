@@ -52,6 +52,8 @@ describe('broker direct deploy automation', () => {
     const renderedConfig = readFileSync(outputPath, 'utf8');
     const config = JSON.parse(renderedConfig);
     expect(config.name).toBe('puripuly-heart-broker');
+    expect(config.placement).toEqual({ mode: 'smart' });
+    expect(config.triggers.crons).toEqual(['* * * * *']);
     expect(config.d1_databases).toEqual([
       { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: brokerDatabaseId },
       { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: agentUsageDatabaseId, migrations_dir: '../agent-relay/migrations' },

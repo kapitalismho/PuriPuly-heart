@@ -5,7 +5,9 @@ import type { BrokerEnv } from './contract';
 import type { ManagedIssueMetadata } from './managed-issuance';
 import {
   deriveStableNetworkIdentityDigest,
+  networkIdentityMigrationStateStatement,
   normalizeNetworkIdentityIp,
+  parseNetworkIdentityMigrationState,
   resolveNetworkIdentitySecrets,
   resolveNetworkIdentityWriteMode,
   resolveRequestNetworkIdentity,
@@ -632,8 +634,46 @@ export async function matchSubjectHook(
   db: D1Database,
   context: RequestAbuseContext,
 ): Promise<SubjectHookMatch | null> {
-  const hooks = await listMatchingSubjectHooks(db, context);
-  const hook = hooks[0] ?? null;
+  const ipValues = await resolveHookMatchValues(db, context);
+  return applySubjectHook(db, context.now, await findSubjectHook(db, context, ipValues));
+}
+
+export async function matchPuriTokenSubjectHook(
+  db: D1Database,
+  context: RequestAbuseContext & { installationId: string },
+): Promise<SubjectHookMatch | null> {
+  if (!context.ip) {
+    return matchSubjectHook(db, context);
+  }
+
+  const keyedValues = await resolveHookMatchDigests(context);
+  let snapshot: D1Result[];
+  try {
+    snapshot = await db.batch([
+      networkIdentityMigrationStateStatement(db),
+      subjectHookStatement(db, context, keyedValues)!,
+    ]);
+  } catch {
+    return matchSubjectHook(db, context);
+  }
+
+  const [migrationResult, hookResult] = snapshot;
+  const migration = migrationResult.results[0] as { value: string } | undefined;
+  const state = parseNetworkIdentityMigrationState(migration?.value);
+  if (state?.phase === 'keyed_only') {
+    const hook = hookResult.results[0] as SubjectHookRow | undefined;
+    return applySubjectHook(db, context.now, hook ?? null);
+  }
+
+  const ipValues = state ? [context.ip, ...keyedValues] : [context.ip];
+  return applySubjectHook(db, context.now, await findSubjectHook(db, context, ipValues));
+}
+
+async function applySubjectHook(
+  db: D1Database,
+  now: Date,
+  hook: SubjectHookRow | null,
+): Promise<SubjectHookMatch | null> {
   if (!hook) {
     return null;
   }
@@ -652,7 +692,7 @@ export async function matchSubjectHook(
       code: hook.outcome_code,
       subjectType: hook.subject_type,
     }),
-    retryAfterMs: retryAfterUntilIso(hook.expires_at, context.now),
+    retryAfterMs: retryAfterUntilIso(hook.expires_at, now),
   };
 }
 
@@ -915,13 +955,25 @@ async function listMatchingVelocityCapHooks(
   return result.results;
 }
 
-async function listMatchingSubjectHooks(
+async function findSubjectHook(
   db: D1Database,
   context: RequestAbuseContext,
-): Promise<SubjectHookRow[]> {
+  ipMatchValues: string[],
+): Promise<SubjectHookRow | null> {
+  const statement = subjectHookStatement(db, context, ipMatchValues);
+  if (!statement) {
+    return null;
+  }
+  return (await statement.all<SubjectHookRow>()).results[0] ?? null;
+}
+
+function subjectHookStatement(
+  db: D1Database,
+  context: RequestAbuseContext,
+  ipMatchValues: string[],
+): D1PreparedStatement | null {
   const filters: string[] = [];
   const params: Array<string | number | null> = [];
-  const ipMatchValues = await resolveHookMatchValues(db, context);
   if (ipMatchValues.length > 0) {
     filters.push(`(subject_type = 'ip' AND subject_value IN (${ipMatchValues.map(() => '?').join(', ')}))`);
     params.push(...ipMatchValues);
@@ -935,9 +987,9 @@ async function listMatchingSubjectHooks(
     params.push('hardware_hash', context.hardwareHash);
   }
   if (filters.length === 0) {
-    return [];
+    return null;
   }
-  const result = await db
+  return db
     .prepare(
       `SELECT id, hook_kind, subject_type, subject_value, outcome_code,
               outcome_class, outcome_subcode, reason, expires_at
@@ -950,11 +1002,10 @@ async function listMatchingSubjectHooks(
           WHEN 'denylist' THEN 1
           ELSE 2
         END,
-        id ASC`,
+        id ASC
+        LIMIT 1`,
     )
-    .bind(context.now.toISOString(), ...params)
-    .all<SubjectHookRow>();
-  return result.results;
+    .bind(context.now.toISOString(), ...params);
 }
 
 async function resolveHookMatchValues(db: D1Database, context: RequestAbuseContext): Promise<string[]> {
