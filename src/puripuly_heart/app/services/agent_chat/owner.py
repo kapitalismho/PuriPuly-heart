@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import secrets
 from collections import deque
@@ -61,6 +62,7 @@ from puripuly_heart.app.services.agent_chat.routing import (
 from puripuly_heart.app.services.agent_chat.tools import AgentTools, project_operation_receipt
 from puripuly_heart.core.diagnostic_validation import contains_known_secret_pattern
 from puripuly_heart.core.diagnostics import (
+    emit_failure,
     exception_diagnostics,
     normalize_diagnostic,
     serialize_diagnostics,
@@ -68,6 +70,8 @@ from puripuly_heart.core.diagnostics import (
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,18 +324,35 @@ class AgentChatOwner:
         )
 
     def _failure(self, exception: Exception, *, code: str, operation: str) -> ErrorDiagnostics:
-        return exception_diagnostics(
+        evidence = exception.evidence if isinstance(exception, AgentTransportError) else None
+        fields = dict(evidence.fields) if evidence is not None else {}
+        if isinstance(exception, AgentServiceError):
+            fields["service_code"] = exception.code
+        diagnostics = exception_diagnostics(
             exception,
             component="application_control",
             operation=operation,
             code=code,
-            category="unknown",
-            fields=(
-                {"service_code": exception.code}
-                if isinstance(exception, AgentServiceError)
-                else None
-            ),
+            category=evidence.category if evidence is not None else "unknown",
+            fields=fields,
         )
+        if evidence is None:
+            return diagnostics
+        return replace(
+            diagnostics, status_code=evidence.status_code, retry_after_ms=evidence.retry_after_ms
+        )
+
+    def _turn_failure(
+        self, exception: AgentTransportError, *, code: str, disposition: str = "failed"
+    ) -> ErrorDiagnostics:
+        diagnostics = self._failure(exception, code=code, operation="agent_chat")
+        emit_failure(
+            _logger,
+            diagnostics,
+            severity="warning" if disposition == "degraded" else "error",
+            disposition=disposition,
+        )
+        return diagnostics
 
     def observe(self, callback: Callable[[AgentChatSnapshot], None]) -> Callable[[], None]:
         self._observers.add(callback)
@@ -1446,20 +1467,26 @@ class AgentChatOwner:
             return self._finish(
                 "service_unavailable",
                 self._localize(f"agent_chat.{service_error.code}"),
-                diagnostics=self._failure(
-                    service_error, code="agent_service_failed", operation="agent_chat"
-                ),
+                diagnostics=self._turn_failure(service_error, code="agent_service_failed"),
             )
         except AgentTransportError as exc:
             self._require_current(generation)
             if self._pending_user is not None:
                 self._append_user(self._pending_user)
+            message = {
+                "edge_challenge": "edge_challenge",
+                "unexpected_html": "unexpected_response",
+                "unexpected_http_status": "unexpected_response",
+                "invalid_response": "unexpected_response",
+                "proxy_failed": "proxy_failed",
+                "tls_failed": "tls_failed",
+                "stream_interrupted": "interrupted",
+                "stream_invalid": "interrupted",
+            }.get(exc.code, "connection_failed")
             return self._finish(
                 "failed",
-                self._localize("agent_chat.connection_failed"),
-                diagnostics=self._failure(
-                    exc, code="agent_transport_failed", operation="agent_chat"
-                ),
+                self._localize(f"agent_chat.{message}"),
+                diagnostics=self._turn_failure(exc, code="agent_transport_failed"),
             )
         finally:
             self._observations.append(
@@ -1614,7 +1641,9 @@ class AgentChatOwner:
             return extract_decision(await self._transport.classify(input=input, turn_id=turn_id))
         except AgentServiceError as error:
             return error
-        except AgentTransportError:
+        except AgentTransportError as error:
+            if error.evidence is not None:
+                self._turn_failure(error, code="agent_transport_failed", disposition="degraded")
             return AgentDecision(source="fallback", reason="classify_transport_error")
 
     def _emit_decision(

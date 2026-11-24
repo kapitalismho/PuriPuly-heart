@@ -9,7 +9,21 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from puripuly_heart.app.ports.agent_chat import AgentServiceError, AgentTransportError
+from puripuly_heart.app.adapters._agent_relay_http import (
+    AgentConnectionError,
+    agent_client,
+    close_agent_client,
+    error_envelope,
+    post_stream,
+    read_json,
+    response_details,
+    response_failure,
+)
+from puripuly_heart.app.ports.agent_chat import (
+    AgentFailureEvidence,
+    AgentServiceError,
+    AgentTransportError,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope
 from puripuly_heart.core.managed_identity import ManagedIdentityBundle, encode_base64url
 
@@ -34,6 +48,7 @@ class AgentRelayTokenOwner:
         self._token: str | None = None
         self._refresh_at = 0.0
         self._retry_at = 0.0
+        self._rate_limit: AgentFailureEvidence | None = None
         self._refresh_task: asyncio.Task[str | AgentTransportError] | None = None
         self._client: httpx.AsyncClient | None = None
 
@@ -68,7 +83,7 @@ class AgentRelayTokenOwner:
         if self._token is not None and self._clock() < self._refresh_at:
             return self._token
         if self._clock() < self._retry_at:
-            raise AgentServiceError("service_rate_limited")
+            raise AgentServiceError("service_rate_limited", evidence=self._rate_limit)
         if self._refresh_task is None:
             self._refresh_task = self._scope.create_task(self._refresh(), name="token-refresh")
         task = self._refresh_task
@@ -94,9 +109,7 @@ class AgentRelayTokenOwner:
             endpoint = self._broker_endpoint()
             bundle = await self._identity()
             if self._client is None:
-                self._client = httpx.AsyncClient(
-                    trust_env=False, follow_redirects=False, timeout=20
-                )
+                self._client = agent_client("broker_token", timeout=20)
             for attempt in range(2):
                 request = bundle.sign_puri_token_request(
                     app_version=self._app_version,
@@ -107,67 +120,112 @@ class AgentRelayTokenOwner:
                 )
                 requested_at = self._clock()
                 try:
-                    response = await self._client.post(endpoint, json=request)
-                except httpx.TimeoutException, httpx.NetworkError:
-                    if attempt:
-                        return AgentTransportError()
+                    async with post_stream(
+                        self._client, endpoint, "broker_token", json=request
+                    ) as response:
+                        payload = await read_json(response, "broker_token")
+                except AgentConnectionError as error:
+                    if attempt or not error.retryable:
+                        return error
                     await asyncio.sleep(1)
                     continue
-                if response.status_code == 429:
-                    delay = self._retry_delay(response)
+                error_body = error_envelope(payload)
+                fields = {"response_shape": "public_error_envelope"} if error_body else {}
+                status = response.status_code
+                if status == 429:
+                    delay = self._retry_delay(response, error_body)
                     self._retry_at = self._clock() + delay
-                    return AgentServiceError("service_rate_limited")
-                if 500 <= response.status_code < 600:
+                    self._rate_limit = response_details(
+                        response,
+                        "broker_token",
+                        "rate_limit",
+                        fields=fields,
+                        retry_after_ms=int(delay * 1000),
+                    )
+                    return AgentServiceError("service_rate_limited", evidence=self._rate_limit)
+                if 500 <= status < 600:
                     if attempt:
-                        return AgentServiceError("service_authentication_unavailable")
+                        return AgentServiceError(
+                            "service_authentication_unavailable",
+                            evidence=response_details(
+                                response, "broker_token", "service_unavailable", fields=fields
+                            ),
+                        )
                     await asyncio.sleep(1)
                     continue
                 break
-            if response.status_code != 200:
-                return AgentServiceError("service_authentication_failed")
-            payload = response.json()
-            if not isinstance(payload, dict):
-                return AgentServiceError("service_authentication_failed")
-            token = payload.get("access_token")
-            expires_at = payload.get("expires_at")
-            if (
-                payload.get("token_type") != "Bearer"
-                or type(payload.get("expires_in")) is not int
-                or payload["expires_in"] != 3600
-                or not isinstance(token, str)
-                or not token
-                or any(char.isspace() for char in token)
-                or not isinstance(expires_at, str)
-            ):
-                return AgentServiceError("service_authentication_failed")
-            expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-            if expiry.utcoffset() is None:
-                return AgentServiceError("service_authentication_failed")
-            remaining = min(3600.0, (expiry - datetime.now(UTC)).total_seconds())
-            if remaining <= 30:
-                return AgentServiceError("service_authentication_failed")
+            if status != 200:
+                if (
+                    error_body.get("code") == "invalid_request"
+                    and error_body.get("class") == "security_fail"
+                    and (status, error_body.get("subcode")) in (
+                        (401, "puri_proof_invalid"),
+                        (409, "installation_binding_mismatch"),
+                    )
+                ):
+                    return AgentServiceError(
+                        "service_authentication_failed",
+                        evidence=response_details(response, "broker_token", "auth", fields=fields),
+                    )
+                return response_failure(
+                    response, "broker_token", "unexpected_http_status", fields=fields
+                )
+            parsed = self._parse_token(payload)
+            if parsed is None:
+                return response_failure(
+                    response,
+                    "broker_token",
+                    "invalid_response",
+                    fields={"response_shape": "malformed_success"},
+                )
             if self._closed:
                 return AgentServiceError("service_authentication_failed")
+            token, remaining = parsed
             self._token = token
+            self._rate_limit = None
             self._refresh_at = min(requested_at + 3570, self._clock() + remaining - 30)
             return token
-        except httpx.HTTPError:
-            return AgentTransportError()
+        except AgentTransportError as error:
+            return error
         except Exception:
             return AgentServiceError("service_authentication_failed")
 
     @staticmethod
-    def _retry_delay(response: httpx.Response) -> float:
+    def _parse_token(payload: dict | None) -> tuple[str, float] | None:
+        if payload is None:
+            return None
+        token = payload.get("access_token")
+        expires_at = payload.get("expires_at")
+        if (
+            payload.get("token_type") != "Bearer"
+            or type(payload.get("expires_in")) is not int
+            or payload["expires_in"] != 3600
+            or not isinstance(token, str)
+            or not token
+            or any(char.isspace() for char in token)
+            or not isinstance(expires_at, str)
+        ):
+            return None
         try:
-            payload = response.json()
-        except ValueError:
-            payload = None
-        error = payload.get("error") if isinstance(payload, dict) else None
-        milliseconds = error.get("retry_after_ms") if isinstance(error, dict) else None
+            expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if expiry.utcoffset() is None:
+                return None
+            remaining = min(3600.0, (expiry - datetime.now(UTC)).total_seconds())
+        except (ValueError, OverflowError):
+            return None
+        return (token, remaining) if remaining > 30 else None
+
+    @staticmethod
+    def _retry_delay(response: httpx.Response, error: dict) -> float:
+        milliseconds = (
+            error.get("retry_after_ms")
+            if error.get("code") == "rate_limited" and error.get("class") == "retryable"
+            else None
+        )
         if type(milliseconds) in (int, float) and 0 < milliseconds <= 86_400_000:
             return max(1.0, milliseconds / 1000)
         header = response.headers.get("retry-after", "")
-        if header.isascii() and header.isdecimal() and 0 < int(header) <= 86_400:
+        if len(header) <= 5 and header.isascii() and header.isdecimal() and 0 < int(header) <= 86_400:
             return float(header)
         return 30.0
 
@@ -179,4 +237,4 @@ class AgentRelayTokenOwner:
         finally:
             self._refresh_task = None
             if self._client is not None:
-                await self._client.aclose()
+                await close_agent_client(self._client, "broker_token")

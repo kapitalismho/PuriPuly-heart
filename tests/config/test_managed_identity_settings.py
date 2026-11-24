@@ -3,8 +3,12 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
-from puripuly_heart.config.settings_vnext import serialization
+import pytest
+
+from puripuly_heart.config.settings_vnext import compat, serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+
+_LEGACY_BROKER_ORIGIN = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 
 
 def _with_managed_connection(settings: AppSettingsVNext, **updates: object) -> AppSettingsVNext:
@@ -18,8 +22,6 @@ def _with_managed_connection(settings: AppSettingsVNext, **updates: object) -> A
 
 
 def test_loading_and_writing_old_referral_settings_preserves_managed_authority(tmp_path) -> None:
-    from puripuly_heart.config.settings_vnext import compat
-
     settings = _with_managed_connection(
         AppSettingsVNext(),
         installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
@@ -92,3 +94,67 @@ def test_openrouter_broker_base_url_round_trip() -> None:
     restored = serialization.from_dict(serialization.to_dict(settings))
 
     assert restored.intent.translation.openrouter_broker_base_url == "https://broker.example.test"
+
+
+@pytest.mark.parametrize(
+    ("saved_origin", "migrates_default"),
+    [
+        (_LEGACY_BROKER_ORIGIN, True),
+        (f"{_LEGACY_BROKER_ORIGIN}///", True),
+        (_LEGACY_BROKER_ORIGIN.upper(), False),
+        (f"{_LEGACY_BROKER_ORIGIN}:443", False),
+        (f" {_LEGACY_BROKER_ORIGIN}", False),
+        (f"{_LEGACY_BROKER_ORIGIN} ", False),
+        ("https://broker.example.test", False),
+        (f"{_LEGACY_BROKER_ORIGIN}/api", False),
+        (f"{_LEGACY_BROKER_ORIGIN}:8443", False),
+        (f"{_LEGACY_BROKER_ORIGIN}.example.test", False),
+        (f"{_LEGACY_BROKER_ORIGIN}?custom", False),
+        (f"{_LEGACY_BROKER_ORIGIN}#custom", False),
+        (_LEGACY_BROKER_ORIGIN.replace("://", "://user@", 1), False),
+        (_LEGACY_BROKER_ORIGIN.replace("https:", "http:", 1), False),
+    ],
+)
+def test_saved_broker_origin_migrates_only_recognized_legacy_defaults(
+    tmp_path, saved_origin, migrates_default
+) -> None:
+    settings = _with_managed_connection(
+        AppSettingsVNext(),
+        installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
+        active_managed_credential_ref="synthetic-credential-ref",
+        active_managed_expires_at="2026-12-17T12:34:56Z",
+    )
+    raw = serialization.to_persisted_dict(settings)
+    raw["settings_version"] = 58
+    raw["intent"]["translation"]["openrouter_broker_base_url"] = saved_origin
+    path = tmp_path / "settings.json"
+    original = json.dumps(raw).encode("utf-8")
+    path.write_bytes(original)
+
+    loaded = compat.load_vnext_settings(path)
+
+    expected = "https://puripuly-broker.salee.sarl" if migrates_default else saved_origin
+    assert loaded.migrated and loaded.backup_path is not None
+    assert loaded.backup_path.read_bytes() == original
+    assert loaded.settings is not None
+    assert loaded.settings.intent.translation.openrouter_broker_base_url == expected
+    assert loaded.settings.state == settings.state
+    saved = json.loads(path.read_bytes())
+    assert saved["intent"]["translation"]["openrouter_broker_base_url"] == expected
+    assert saved["state"] == json.loads(original)["state"]
+    reloaded = compat.load_vnext_settings(path)
+    assert reloaded.ok and not reloaded.migrated
+    assert reloaded.settings == loaded.settings
+
+
+def test_current_settings_can_explicitly_use_the_legacy_broker_origin(tmp_path) -> None:
+    path = tmp_path / "settings.json"
+    raw = serialization.to_persisted_dict(AppSettingsVNext())
+    raw["intent"]["translation"]["openrouter_broker_base_url"] = _LEGACY_BROKER_ORIGIN
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    loaded = compat.load_vnext_settings(path)
+
+    assert loaded.ok and not loaded.migrated
+    assert loaded.settings is not None
+    assert loaded.settings.intent.translation.openrouter_broker_base_url == _LEGACY_BROKER_ORIGIN

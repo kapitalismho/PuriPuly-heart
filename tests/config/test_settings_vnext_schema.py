@@ -67,8 +67,7 @@ def test_vnext_schema_defaults_match_current_persisted_settings_defaults() -> No
     assert settings.intent.desktop_audio.vad_hangover_ms == 500
     assert settings.intent.osc.activation_notice_enabled is True
     assert (
-        settings.intent.translation.openrouter_broker_base_url
-        == schema.DEFAULT_OPENROUTER_BROKER_BASE_URL
+        settings.intent.translation.openrouter_broker_base_url == "https://puripuly-broker.salee.sarl"
     )
 
 

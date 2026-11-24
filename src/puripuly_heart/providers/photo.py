@@ -17,6 +17,8 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.oauth import ChatGptAuthError
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
+from puripuly_heart.core.external_network import NetworkConfigurationError
+from puripuly_heart.core.first_party_http import response_evidence, response_media_type
 from puripuly_heart.core.photo.image import PreparedPhoto
 from puripuly_heart.core.photo.prompt import render_photo_prompt
 from puripuly_heart.core.photo.protocol import (
@@ -27,6 +29,7 @@ from puripuly_heart.core.photo.protocol import (
     PhotoStreamEvent,
     PhotoTextDelta,
 )
+from puripuly_heart.core.qq_auth_diagnostics import exception_fields, safe_fields
 from puripuly_heart.providers.photo_output import PhotoResponseOutput
 
 logger = logging.getLogger(__name__)
@@ -83,17 +86,6 @@ async def _http_error(response: httpx.Response) -> PhotoProviderError:
     error = payload.get("error") if isinstance(payload, dict) else None
     if not isinstance(error, dict):
         return default
-    if response.status_code == 429 and error.get("code") == "service_allowance_exhausted":
-        header = response.headers.get("retry-after", "")
-        return PhotoProviderError(
-            "photo_allowance_exhausted",
-            retryable=False,
-            retry_after=(
-                min(int(header), 7 * 86400)
-                if header.isascii() and header.isdigit()
-                else 86400 - time.time() % 86400
-            ),
-        )
     for detail in error.get("details") or []:
         if isinstance(detail, dict) and detail.get("reason") in (
             "API_KEY_INVALID",
@@ -103,6 +95,69 @@ async def _http_error(response: httpx.Response) -> PhotoProviderError:
     if error.get("status") in ("UNAUTHENTICATED", "PERMISSION_DENIED", "RESOURCE_EXHAUSTED"):
         return _event_error(error)
     return default
+
+
+def first_party_photo_http_error(
+    response: httpx.Response,
+    *,
+    operation: str,
+    body: bytes,
+    auth_code: str = "service_authentication_failed",
+) -> PhotoProviderError:
+    status = response.status_code
+    evidence = response_evidence(response, body=body)
+    code = None
+    shape = evidence.get("response_shape", "unknown")
+    if shape == "unknown" and response_media_type(response) == "application/json":
+        try:
+            payload = json.loads(body)
+        except (ValueError, RecursionError):
+            shape = "non_json"
+        else:
+            envelope = payload.get("error") if isinstance(payload, dict) else None
+            if isinstance(envelope, dict) and isinstance(envelope.get("code"), str):
+                code = envelope["code"]
+                shape = "public_error_envelope"
+    if status == 401 and code == auth_code:
+        error = PhotoProviderError("photo_authentication_failed", retryable=False)
+    elif status == 429 and code == "service_allowance_exhausted":
+        header = response.headers.get("retry-after", "")
+        error = PhotoProviderError(
+            "photo_allowance_exhausted",
+            retryable=False,
+            retry_after=(
+                min(int(header), 7 * 86400)
+                if header.isascii() and header.isdigit() and len(header) <= 12
+                else 86400 - time.time() % 86400
+            ),
+        )
+    elif status == 200 or (shape in {"html", "edge_challenge"} and status != 429):
+        error = PhotoProviderError("photo_stream_invalid", retryable=False)
+    elif status in (401, 403):
+        error = PhotoProviderError("photo_request_rejected", retryable=False)
+    else:
+        error = _status_error(status)
+    fields = safe_fields(
+        {
+            **response.extensions.get("connection_diagnostics", {}),
+            "stage": "protocol_parse",
+            "http_status": status,
+            "response_shape": shape,
+            **evidence,
+        }
+    )
+    logger.warning(
+        "photo_service_failure operation=%s code=%s fields=%s", operation, error.code, fields
+    )
+    return error
+
+
+def report_first_party_photo_transport_failure(exc: BaseException, *, operation: str) -> None:
+    logger.warning(
+        "photo_service_transport_failure operation=%s fields=%s",
+        operation,
+        safe_fields(exception_fields(exc)),
+    )
 
 
 def _classified(error: Exception) -> PhotoProviderError:
@@ -581,27 +636,42 @@ class OpenAIPhotoConnection(_PhotoConnection):
                 sent = True
                 self._sent()
 
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        if self._relayed:
+            headers["User-Agent"] = network_clients.first_party_user_agent()
         try:
             async with asyncio.timeout(self._timeout):
                 assert self._http is not None
                 async with self._http.stream(
                     "POST",
                     self.endpoint,
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
+                    headers=headers,
                     content=body,
                     extensions={"trace": trace},
                 ) as response:
                     if response.status_code != 200:
-                        if response.status_code == 401 and self._invalidate is not None:
+                        if not self._relayed:
+                            raise await _http_error(response)
+                        error_body = (
+                            b""
+                            if "response_shape" in response_evidence(response)
+                            else await response.aread()
+                        )
+                        error = first_party_photo_http_error(
+                            response, operation="relay", body=error_body
+                        )
+                        if error.code == "photo_authentication_failed" and self._invalidate:
                             self._invalidate(self._api_key)
-                        raise await _http_error(response)
+                        raise error
                     if (
-                        response.headers.get("content-type", "").split(";")[0]
-                        != "text/event-stream"
+                        response_media_type(response) != "text/event-stream"
+                        or (self._relayed and "response_shape" in response_evidence(response))
                     ):
+                        if self._relayed:
+                            raise first_party_photo_http_error(response, operation="relay", body=b"")
                         raise PhotoProviderError("photo_stream_invalid", retryable=False)
                     data: list[str] = []
                     completed = False
@@ -669,6 +739,8 @@ class OpenAIPhotoConnection(_PhotoConnection):
                     if not completed:
                         raise PhotoProviderError("photo_stream_incomplete")
         except Exception as exc:
+            if self._relayed and isinstance(exc, (httpx.RequestError, OSError)):
+                report_first_party_photo_transport_failure(exc, operation="relay")
             error = _classified(exc)
             if sent:
                 error.retryable = False
@@ -749,7 +821,11 @@ class RelayPhotoConnection(OpenAIPhotoConnection):
         if self._closed:
             raise PhotoProviderError("photo_connection_closed", retryable=False)
         self._api_key = await self._token()
-        await super().preopen()
+        try:
+            await super().preopen()
+        except NetworkConfigurationError as error:
+            report_first_party_photo_transport_failure(error, operation="relay")
+            raise PhotoProviderError("photo_transport_failed", retryable=False) from None
 
     def _body(self, image: PreparedPhoto, target_language: str) -> dict:
         return {

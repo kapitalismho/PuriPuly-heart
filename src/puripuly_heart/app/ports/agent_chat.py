@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, TypedDict
 
-from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.messages import DiagnosticCategory, DiagnosticFieldValue, ErrorDiagnostics
 
 AGENT_CHAT_PROTOCOL = 8
 
@@ -38,9 +38,20 @@ class AgentResponseStream(Protocol):
     async def aclose(self) -> None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class AgentFailureEvidence:
+    category: DiagnosticCategory
+    fields: dict[str, DiagnosticFieldValue]
+    status_code: int | None = None
+    retry_after_ms: int | None = None
+
+
 class AgentTransportError(RuntimeError):
-    def __init__(self, code: str = "relay_unavailable") -> None:
+    def __init__(
+        self, code: str = "relay_unavailable", *, evidence: AgentFailureEvidence | None = None
+    ) -> None:
         self.code = code
+        self.evidence = evidence
         super().__init__(code)
 
 
@@ -58,8 +69,10 @@ class AgentServiceError(AgentTransportError):
             "service_shutdown",
             "unsupported_protocol",
         ],
+        *,
+        evidence: AgentFailureEvidence | None = None,
     ) -> None:
-        super().__init__(code)
+        super().__init__(code, evidence=evidence)
 
 
 class AgentTokenPort(Protocol):

@@ -1102,7 +1102,6 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
     transport = AgentRelayTransport(
         "http://127.0.0.1:8788/v1/respond", Tokens(), allow_loopback_http=True
     )
-    await transport._client.aclose()
     seen = []
     response = answer()
 
@@ -1210,7 +1209,6 @@ async def test_composed_owner_read_only_turn_and_agent_chat_view(tmp_path, monke
             content="".join("data: " + event + "\n\n" for event in frames),
         )
 
-    await actual_transport._client.aclose()
     actual_transport._client = httpx.AsyncClient(transport=httpx.MockTransport(wire))
     actual_transport._token_owner._client = httpx.AsyncClient(transport=httpx.MockTransport(wire))
     try:
@@ -1527,7 +1525,6 @@ async def test_composed_chat_and_managed_preflight_share_durable_identity(
         )
 
     transport = captured["transport"]
-    await transport._client.aclose()
     transport._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     transport._token_owner._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     try:

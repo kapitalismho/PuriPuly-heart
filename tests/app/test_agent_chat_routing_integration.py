@@ -659,7 +659,6 @@ async def test_service_terminal_transport_outcomes_never_fall_back_to_model(code
     transport = AgentRelayTransport(
         "http://127.0.0.1:8788/v1/respond", Tokens(), allow_loopback_http=True
     )
-    await transport._client.aclose()
 
     def handle(request):
         seen.append(request)
@@ -704,7 +703,6 @@ async def test_terminal_classification_retains_request_for_contextual_recovery(c
     transport = AgentRelayTransport(
         "http://127.0.0.1:8788/v1/respond", Tokens(), allow_loopback_http=True
     )
-    await transport._client.aclose()
 
     def handle(request):
         seen.append(request)
@@ -804,6 +802,10 @@ def test_static_service_guidance_exists_for_every_app_locale():
             "service_authentication_failed",
             "service_allowance_exhausted",
             "service_shutdown",
+            "edge_challenge",
+            "unexpected_response",
+            "proxy_failed",
+            "tls_failed",
             "unsupported_protocol",
             "key_blocked",
         ):

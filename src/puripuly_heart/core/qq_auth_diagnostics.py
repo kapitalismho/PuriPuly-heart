@@ -4,6 +4,7 @@ import logging
 import socket
 from collections.abc import Mapping
 
+from puripuly_heart.core.first_party_http import is_cf_ray
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import (
     TRANSPORT_ENUM_FIELDS,
@@ -246,6 +247,9 @@ def safe_fields(fields: Mapping[str, object]) -> dict[str, object]:
         value = fields.get(key)
         if type(value) is int and -100000 <= value <= 86400000:
             result[key] = value
+    ray = fields.get("cf_ray")
+    if is_cf_ray(ray):
+        result["cf_ray"] = ray
     return result
 
 

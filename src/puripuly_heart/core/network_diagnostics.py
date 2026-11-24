@@ -63,6 +63,8 @@ TRANSPORT_ENUM_FIELDS: Final = MappingProxyType(
                 "rich_operation",
                 "non_json",
                 "non_object",
+                "edge_challenge",
+                "html",
                 "malformed_success",
                 "unknown",
             }
