@@ -31,7 +31,7 @@ One trial per PC, free, with tokens for about 800 translations. Discord sign-in 
 
 - `not_claimed`: no claim or trial key recorded here, so the applicable trial can be claimed; issuance is decided at sign-in. `sign_in_pending`: a started sign-in is unfinished.
 - `active`: the selected trial credential is present, which alone does not show remaining allowance. `claimed`: claimed while another connection is selected.
-- `exhausted`: observed usage shows the allowance used up. `claimed_without_key`: claimed, but no trial credential is present now, for example after sign-out; usage was not observed, so call it claimed with no usable credential rather than used up. `blocked_by_other_sign_in`: the other sign-in method already claimed this PC's trial. These three leave no trial to claim here; Index with no key or the user's own key with its billing replaces it.
+- `exhausted`: observed usage shows the allowance used up. `claimed_without_key`: claimed, but no trial credential is present now, for example after sign-out; usage was not observed, so call it claimed with no usable credential rather than used up. `blocked_by_other_sign_in`: the other sign-in method already claimed this PC's trial. These three leave no trial to claim here: tell the user that this PC has no new trial to claim, and offer Index with no key or the user's own key with its billing instead.
 - `unknown`: undetermined; keep trial statements qualified and recommend from the other options.
 
 ## Chat capabilities
