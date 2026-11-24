@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 
 import {
   getBrokerAbuseControlsConfig,
-  matchSubjectHook,
+  matchPuriTokenSubjectHook,
   resolveClientIp,
   resolveRequestNetworkIdentitySecrets,
 } from './abuse-controls';
@@ -98,7 +98,7 @@ export async function handlePuriToken(c: Context<BrokerEnv>): Promise<Response> 
     return invalidProof(c);
   }
 
-  const subjectHook = await matchSubjectHook(c.env.BROKER_DB, {
+  const subjectHook = await matchPuriTokenSubjectHook(c.env.BROKER_DB, {
     endpoint: 'POST /v1/puri/token', now, ip,
     installationId: request.installation_id, hardwareHash: null, networkIdentitySecrets,
   });

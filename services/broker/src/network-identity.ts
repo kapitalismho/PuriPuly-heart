@@ -263,22 +263,28 @@ export interface NetworkIdentityMigrationState {
   purgeAfter: string | null;
 }
 
+export function networkIdentityMigrationStateStatement(db: D1Database): D1PreparedStatement {
+  return db.prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`);
+}
+
 export async function getNetworkIdentityMigrationState(
   db: D1Database,
 ): Promise<NetworkIdentityMigrationState | null> {
   let row: { value: string } | null = null;
   try {
-    row = await db
-      .prepare(`SELECT value FROM broker_config WHERE key = 'network_identity_migration'`)
-      .first<{ value: string }>();
+    row = await networkIdentityMigrationStateStatement(db).first<{ value: string }>();
   } catch {
     return null;
   }
-  if (!row) {
+  return parseNetworkIdentityMigrationState(row?.value);
+}
+
+export function parseNetworkIdentityMigrationState(value: string | undefined): NetworkIdentityMigrationState | null {
+  if (value === undefined) {
     return null;
   }
   try {
-    const parsed = JSON.parse(row.value) as { phase?: unknown; purgeAfter?: unknown; purge_after?: unknown };
+    const parsed = JSON.parse(value) as { phase?: unknown; purgeAfter?: unknown; purge_after?: unknown };
     return {
       phase: parsed.phase === 'keyed_only' ? 'keyed_only' : 'dual_write',
       purgeAfter:
