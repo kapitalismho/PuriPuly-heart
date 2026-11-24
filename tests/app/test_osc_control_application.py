@@ -73,7 +73,9 @@ def _with_osc(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext
 
 @pytest.mark.asyncio
 async def test_translation_model_control_materializes_provider_and_connection() -> None:
-    current = _with_translation(AppSettingsVNext(), connection=TranslationConnection.MANAGED.value)
+    current = _with_translation(
+        AppSettingsVNext(), connection=TranslationConnection.OPENROUTER.value
+    )
     applied: list[AppSettingsVNext] = []
 
     async def apply_settings(settings: object) -> object:
@@ -89,12 +91,12 @@ async def test_translation_model_control_materializes_provider_and_connection() 
         translation_model_normalizer=materialize_canonical_translation_settings,
     )
 
-    result = await application.set_translation_model(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    result = await application.set_translation_model(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
 
     assert result is applied[0]
     updated = applied[0]
-    assert updated.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert updated.intent.translation.connection == TranslationConnection.OPENROUTER.value
+    assert updated.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
+    assert updated.intent.translation.connection == TranslationConnection.MANAGED.value
     assert (
         provider_llm_for_translation(
             updated.intent.translation.model,
@@ -305,7 +307,7 @@ async def test_managed_local_models_control_materializes_provider_and_connection
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:
     current = _with_translation(
         AppSettingsVNext(),
-        model=TranslationModel.DEEPSEEK_V4_FLASH.value,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         http_extension_id="demo",
     )
@@ -327,7 +329,9 @@ async def test_custom_http_control_preserves_the_previous_llm_selection() -> Non
     assert current.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert current.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     assert current.intent.translation.http_extension_id == "demo"
-    assert current.intent.translation.previous_llm_model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert (
+        current.intent.translation.previous_llm_model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
+    )
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { accountingDatabase } from '../../../agent-relay/tests/fixtures';
 
 import { applyBrokerMigrations } from './migrations';
@@ -52,13 +52,17 @@ class SqliteD1PreparedStatement {
     return row as T;
   }
 
-  async run(): Promise<D1Result> {
+  async run(collectRows = false): Promise<D1Result> {
     await this.hooks.beforeRun?.({
       sql: this.sql,
       params: this.params,
     });
 
-    const result = this.db.prepare(this.sql).run(...this.params);
+    const statement = this.db.prepare(this.sql);
+    if (collectRows && statement.columns().length > 0) {
+      return this.readAll(statement);
+    }
+    const result = statement.run(...this.params);
 
     return {
       results: [],
@@ -77,7 +81,11 @@ class SqliteD1PreparedStatement {
   }
 
   async all<T = Record<string, unknown>>(): Promise<D1Result<T>> {
-    const results = this.db.prepare(this.sql).all(...this.params) as T[];
+    return this.readAll(this.db.prepare(this.sql));
+  }
+
+  private async readAll<T>(statement: StatementSync): Promise<D1Result<T>> {
+    const results = statement.all(...this.params) as T[];
     await this.hooks.afterAll?.({ sql: this.sql, params: this.params, rows: results });
 
     return {
@@ -113,7 +121,7 @@ class SqliteD1Database {
     this.db.exec('BEGIN');
     try {
       for (const statement of statements) {
-        results.push(await statement.run());
+        results.push(await statement.run(true));
       }
       this.db.exec('COMMIT');
       return results;

@@ -4,6 +4,7 @@ import asyncio
 import inspect
 from dataclasses import replace
 from types import SimpleNamespace
+from uuid import uuid4
 
 import flet as ft
 import pytest
@@ -18,8 +19,17 @@ from puripuly_heart.app.ports.agent_chat import (
     AgentToolResult,
     AgentTurnResult,
 )
+from puripuly_heart.core.conversation_history import ConversationHistory
+from puripuly_heart.domain.events import (
+    SelfTurnPresentation,
+    SelfTurnTargetPresentation,
+    UIEvent,
+    UIEventType,
+)
+from puripuly_heart.domain.models import Translation
 from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import get_locale, provider_label, set_locale
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views import agent_chat
 from puripuly_heart.ui.views.agent_chat import AgentChatHooks, AgentChatView
 from tests.helpers.flet_page import attach_dummy_page
@@ -579,8 +589,6 @@ def test_history_back_label_follows_current_locale_and_drops_stale_hover():
 
 @pytest.mark.asyncio
 async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeypatch):
-    from puripuly_heart.core.conversation_history import ConversationHistory
-
     monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
     history = ConversationHistory()
 
@@ -643,9 +651,179 @@ async def test_open_history_batches_changes_and_catches_up_after_unmount(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_history_keeps_older_position_after_paging_and_newer_growth(monkeypatch):
-    from puripuly_heart.core.conversation_history import ConversationHistory
+async def test_open_history_shows_managed_self_turn_and_its_translation(monkeypatch):
+    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
+    history = ConversationHistory()
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
+    adapter = FletUiPresentationAdapter(SimpleNamespace(conversation_history=history))
+    bridge = adapter.create_ui_event_bridge(event_queue=asyncio.Queue(), runtime_logging=None)
+    utterance_id = uuid4()
+    source_text = "最初の文です。"
+    translated_text = "This is the first sentence."
+    source = SelfTurnPresentation(
+        utterance_id=utterance_id,
+        turn_generation=1,
+        turn_order=1,
+        revision=1,
+        source_revision=1,
+        source_text=source_text,
+        source_language="ja",
+        source_closed=True,
+        status="active",
+        targets=(SelfTurnTargetPresentation("en", 1, "pending"),),
+        created_at=0.0,
+    )
+    final = replace(
+        source,
+        revision=2,
+        status="complete",
+        targets=(
+            replace(
+                source.targets[0],
+                status="ready",
+                translation=Translation(
+                    utterance_id,
+                    translated_text,
+                    source_text=source_text,
+                    source_language="ja",
+                    target_language="en",
+                ),
+            ),
+        ),
+    )
 
+    async def settle():
+        for task in tasks:
+            await task
+        tasks.clear()
+
+    async def publish(turn):
+        await bridge._handle_event(
+            UIEvent(
+                UIEventType.SELF_TURN_UPDATED,
+                utterance_id=utterance_id,
+                payload=turn,
+                source="Mic",
+                runtime_log_handled=True,
+            )
+        )
+        await settle()
+
+    def visible_rows():
+        return [(row.key, texts(row)[:-1]) for row in view._history_content.controls]
+
+    key = f"self:{utterance_id}"
+    try:
+        view._open_history()
+        await settle()
+        assert visible_rows() == []
+
+        await publish(source)
+        assert visible_rows() == [(key, [source_text])]
+
+        await publish(final)
+        assert visible_rows() == [(key, [source_text, translated_text])]
+
+        await publish(source)
+        assert visible_rows() == [(key, [source_text, translated_text])]
+    finally:
+        view.will_unmount()
+        bridge.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("return_by", ["scroll", "layout"])
+async def test_small_history_stays_paged_when_live_turns_arrive_while_reading(
+    monkeypatch, return_by
+):
+    monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
+    history = ConversationHistory()
+    offsets = []
+
+    async def scroll_to(_listing, *, offset):
+        offsets.append(offset)
+
+    monkeypatch.setattr(ft.ListView, "scroll_to", scroll_to)
+
+    def add(i, *, correction=None, revision=1):
+        history.append_conversation_record(
+            source="Listen",
+            channel="peer",
+            utterance_id=str(i),
+            source_text=f"turn {i}",
+            translated_text=correction,
+            peer_caption_revision=revision,
+        )
+
+    def numbers():
+        return [texts(row)[0] for row in view._history_content.controls]
+
+    def scroll(pixels, extent, delta):
+        view._history_list.on_scroll(
+            SimpleNamespace(
+                pixels=pixels,
+                max_scroll_extent=extent,
+                viewport_dimension=600,
+                scroll_delta=delta,
+            )
+        )
+
+    for i in range(20):
+        add(i)
+    if return_by == "layout":
+        add(15, correction="Long correction\n" * 20, revision=2)
+    view, tasks = view_for(Owner(snapshot()), conversation_history=history)
+    view._open_history()
+    view._history_list.on_size_change(SimpleNamespace(height=600))
+    await asyncio.gather(*tasks)
+    scroll(350, 700, -350)
+    reader = view._history_content.controls[6]
+    offsets.clear()
+
+    for start, stop in ((20, 25), (25, 250), (250, 1250)):
+        tasks.clear()
+        for i in range(start, stop):
+            add(i)
+        await asyncio.gather(*tasks)
+        assert numbers() == [f"turn {i}" for i in range(24)]
+        assert view._history_content.controls[6] is reader
+        assert offsets == []
+
+    tasks.clear()
+    view._close_history()
+    view._open_history()
+    await asyncio.gather(*tasks)
+    assert view._history_content.controls[6] is reader
+    assert offsets == [350]
+
+    tasks.clear()
+    add(1248, correction="corrected under the same turn", revision=2)
+    await asyncio.gather(*tasks)
+    tasks.clear()
+    if return_by == "scroll":
+        scroll(930, 950, None)
+        assert numbers() == [f"turn {i}" for i in range(24)]
+        scroll(930, 950, 580)
+        scroll(950, 950, 20)
+        scroll(950, 950, None)
+    else:
+        view._history_content.on_size_change(SimpleNamespace(height=2100))
+        scroll(1200, 1500, 850)
+        add(15, correction="Short correction", revision=3)
+        await asyncio.gather(*tasks)
+        assert numbers() == [f"turn {i}" for i in range(24)]
+        view._history_content.on_size_change(SimpleNamespace(height=1550))
+    await asyncio.gather(*tasks)
+    assert numbers() == [f"turn {i}" for i in range(1226, 1250)]
+    assert "corrected under the same turn" in texts(view._history_content.controls[-2])
+    assert offsets[-1] == 0
+    scroll(900, 950, 900)
+    assert numbers() == [f"turn {i}" for i in range(1202, 1250)]
+    view.will_unmount()
+
+
+@pytest.mark.asyncio
+async def test_history_keeps_older_position_after_paging_and_newer_growth(monkeypatch):
     monkeypatch.setattr(agent_chat, "HISTORY_PAGE_ROWS", 3)
     monkeypatch.setattr(agent_chat, "HISTORY_REFRESH_S", 0)
     history = ConversationHistory()

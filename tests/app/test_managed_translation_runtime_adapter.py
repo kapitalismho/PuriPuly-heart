@@ -94,7 +94,7 @@ def _custom_http_settings() -> AppSettingsVNext:
 def _managed_settings(*, china: bool = False) -> AppSettingsVNext:
     return _with_translation(
         AppSettingsVNext(),
-        model="deepseek_v4_flash" if china else AppSettingsVNext().intent.translation.model,
+        model="deepseek_v4_flash_41" if china else AppSettingsVNext().intent.translation.model,
         connection="managed_china" if china else "managed",
         openrouter_selected_source="managed",
     )

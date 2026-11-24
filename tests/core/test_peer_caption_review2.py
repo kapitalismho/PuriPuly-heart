@@ -603,10 +603,10 @@ async def test_overlay_reattachment_preserves_capture_generation_and_revokes_old
         assert presenter.peer_fragment_state(visible, 1) is None
         assert presenter.peer_fragment_states(pending) == ()
         presenter.detach_bridge()
-        await presenter.begin_native_retry_epoch(enabled=False)
+        await presenter.begin_runtime_epoch()
         presenter.attach_bridge(new_surface)
         assert await output.replace_overlay_sink(presenter)
-        await presenter.begin_native_retry_epoch(enabled=True)
+        await presenter.begin_runtime_epoch(native_fresh_retry=True)
         correction = caption(3, visible, "current visible correction", revision=2)
         await output.publish_overlay_event(correction, publication_generation=1, source_order=1)
         await output.wait_for_peer_output_idle()

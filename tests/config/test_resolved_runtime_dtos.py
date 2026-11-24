@@ -94,7 +94,7 @@ def _llm_config(resolved: ModuleType, *, provider_options: dict[str, object] | N
                 provider="openrouter",
                 model="deepseek/deepseek-v4.1-flash-1017",
                 credential=_credential(resolved, required=False),
-                provider_routing="deepseek_only",
+                provider_routing="deepseek_v4_flash_41_strict",
             )
         ),
         concurrency_limit=5,

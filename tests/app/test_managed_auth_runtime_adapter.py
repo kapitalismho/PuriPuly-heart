@@ -68,7 +68,7 @@ def _managed_settings(
             settings.intent,
             translation=replace(
                 settings.intent.translation,
-                model="deepseek_v4_flash" if china else settings.intent.translation.model,
+                model="deepseek_v4_flash_41" if china else settings.intent.translation.model,
                 connection="managed_china" if china else "managed",
                 openrouter_selected_source="managed",
             ),

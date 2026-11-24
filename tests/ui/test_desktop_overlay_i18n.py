@@ -26,6 +26,9 @@ SHIPPING_DESKTOP_OVERLAY_I18N_KEYS = {
     "settings.overlay.position_reset.desktop.title",
     "settings.overlay.position_reset.action.vr",
     "settings.overlay.position_reset.action.desktop",
+    "settings.overlay.target.steamvr",
+    "settings.overlay.target.steamvr_compatibility",
+    "settings.overlay.target.desktop",
 }
 
 DESKTOP_OVERLAY_RECOVERY_I18N_KEYS = {

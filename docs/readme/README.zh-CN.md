@@ -25,11 +25,9 @@
 
 ## 演示
 
-![PuriPuly（Deepgram + Qwen 3.8 Flash）与 VRCT（Google Web Speech + Google Translate）的翻译对比。PuriPuly 语音识别：“집에굴러다니는게손잡이빠진것까지합치면열개는넘을걸.”，翻译：“（家里散落的伞，加上那把没把手的，估计都超过十把了呢。）” | VRCT 语音识别：“집에 굴러다니는게 손잡이 빠진 것까지 합치면 10개는 넘을 걸”，翻译：“房子周围肯定有超过 10 个，包括那些没有把手的。”](../images/demo/ko-cn_screenshot.png)
-
----
-
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
 
 如果你想看更多通过 PuriPuly 与其他外国朋友实际交流的画面：
 - [演示 1](https://www.youtube.com/watch?v=3p0CamYui0o)
@@ -59,8 +57,9 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 - **基于大语言模型的本地化** — 俚语、口语，乃至敬语与平语，都能自然转换
 - **记忆上下文** — 结合语境，保持自然流畅的对话节奏
 - **双向语音翻译** — 同时翻译对方的语音，支持 VR 字幕浮层
+- **照片翻译** — 即时翻译在 VR 中拍摄的照片，每天免费提供
 - **无需设置即可使用** — 无需自己进行复杂设置，内置智能体就会提供最佳体验。
-- **最强本地全栈** — 从 Granite Speech 5.0 到 Gemma 4 E4B，只搭载当前最高效的模型。
+- **最强本地全栈** — 从 Granite Speech 5.0 到 Gemma 4，只搭载当前最高效的模型。
 
 ## 常见问题
 
@@ -77,7 +76,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 → 使用本地 ASR 时，若计算资源不足，处理时间可能会变长。此时建议切换为云端 STT 服务。
 
 - **个人数据如何处理？**
-→ 语音和对话内容不会发送到 Puripuly 服务器。此外，所有代码均在当前代码库中公开，您可以直接验证网络行为。
+→ 语音和对话内容不会发送到 PuriPuly 服务器。此外，所有代码均在当前代码库中公开，您可以直接验证网络行为。
 
 ### [📥 下载](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -111,7 +110,6 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (本地)** | 无限制 | 无限制 | 5,000 次 | 7,260 次 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020 次 | 17,020 次 | 3,860 次 | 5,090 次 |
 | **Qwen 3.8 Flash** | 7,460 次 | 7,460 次 | 2,990 次 | 3,680 次 |
 
 ### 每次发言成本
@@ -130,13 +128,12 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | LLM \ ASR | 本地 ASR | 云免费档 | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.001 元 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~0.0004 元 | ~0.0004 元 | ~0.002 元 | ~0.0014 元 |
 | **Qwen 3.8 Flash** | ~0.001 元 | ~0.001 元 | ~0.002 元 | ~0.002 元 |
 
 *   *(假设输入 900 token + 输出 12 token) × 每次发言平均 LLM 调用次数 1.2 次*
 *   *每 1 美元可用次数以「每次发言成本」表中四舍五入前的计算值为准*
 *   *所有费用与可用次数均为近似计算*
-*   *DeepSeek V4.1 Flash 假设缓存命中率为 70%，V4 Flash（OpenRouter）为 60%*
+*   *DeepSeek V4.1 Flash 假设缓存命中率为 70%*
 *   *GPT-6 Luna 按 OpenAI API 价格计算，假设无缓存折扣；通过 ChatGPT 连接时不产生 API 费用，而是使用 Codex 额度*
 *   *Qwen API 计费以北京区域为准*
 *   *资费标准截至：2026 年 10 月 17 日*
@@ -218,8 +215,10 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 翻译用 LLM 建议通过 OpenRouter 使用 Gemma 4 模型。
 
 如果方便的话，既然要设置，何不顺便把 ASR 也一起配置好呢？
-PuriPuly 与云端 STT 结合时能提供最佳体验。
-例如即使同样是 Qwen ASR，本地与云端的语音识别性能也有相当差距。
+PuriPuly 与云端 ASR 结合时能提供最佳体验。
+而且通过云免费档选项可以免费使用。
+
+云端 ASR 建议先从 **Gemini 3.5 Transcribe** 开始。
 
 <details>
 <summary><h3>OpenRouter</h3></summary>
@@ -286,27 +285,15 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 </details>
 
 <details>
-<summary><h3>Deepgram</h3></summary>
+<summary><h3>Cloud Free Tier ASR (Gemini, Deepgram, ElevenLabs)</h3></summary>
 
-1. 访问并登录 [Deepgram Console](https://console.deepgram.com/)。
-   ![step1](../images/deepgram/1.png)
+1. 请按下方截图所示设置两项 ASR 选项。
+   ![step1](../images/ASR_freetier/1.png)
 
-2. 当出现欢迎信息或调查问卷时，请点击 **Skip** 跳过。
-   ![step2](../images/deepgram/2.png)
+2. （可选）选择您希望使用的 ASR 提供商。
+   ![step2](../images/ASR_freetier/2.png)
 
-3. 在服务选择界面中，选择 **STT (Speech-to-Text)**。
-   ![step3](../images/deepgram/3.png)
-
-4. 在 API Keys 菜单中，点击 **Create a New API Key**。
-   ![step4](../images/deepgram/4.png)
-
-5. 输入密钥名称（例如：`puripuly`）并生成。
-   ![step5](../images/deepgram/5.png)
-
-6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
-   ![step6](../images/deepgram/6.png)
-
-</details>
+3. 参考下方指南申请 API 密钥后，填入 API 密钥输入框中。
 
 <details>
 <summary><h3>Gemini</h3></summary>
@@ -337,6 +324,63 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 8. 选择付费方案项目。
    ![step9](../images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. 访问并登录 [Deepgram Console](https://console.deepgram.com/)。
+   ![step1](../images/deepgram/1.png)
+
+2. 当出现欢迎信息或调查问卷时，请点击 **Skip** 跳过。
+   ![step2](../images/deepgram/2.png)
+
+3. 在服务选择界面中，选择 **STT (Speech-to-Text)**。
+   ![step3](../images/deepgram/3.png)
+
+4. 在 API Keys 菜单中，点击 **Create a New API Key**。
+   ![step4](../images/deepgram/4.png)
+
+5. 输入密钥名称（例如：`puripuly`）并生成。
+   ![step5](../images/deepgram/5.png)
+
+6. 复制生成的密钥并粘贴到 PuriPuly 设置中。
+   ![step6](../images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>ElevenLabs</h3></summary>
+
+1. 访问 [ElevenLabs](https://elevenlabs.io) 并点击 **Sign up** 按钮。
+   ![step1](../images/elevenlabs/1.png)
+
+2. 点击 **Continue** 按钮。
+   ![step2](../images/elevenlabs/2.png)
+
+3. 填写姓名并勾选复选框，然后点击 **Next** 按钮。
+   ![step3](../images/elevenlabs/3.png)
+
+4. 连续点击 **Skip** 按钮跳过。
+   ![step4](../images/elevenlabs/4.png)
+
+5. 如果出现付款页面，点击 **Skip** 按钮。
+   ![step5](../images/elevenlabs/5.png)
+
+6. 点击左下角的 **Switch** 按钮，切换为 **ElevenAPI**。
+   ![step6](../images/elevenlabs/6.png)
+
+7. 在左侧标签中点击 **API keys**，再点击中央的 **Create Key**。
+   ![step7](../images/elevenlabs/7.png)
+
+8. 勾选 **Speech to Text** 权限后，点击 **Create Key** 按钮。
+   ![step8](../images/elevenlabs/8.png)
+
+9. 复制 API 密钥并粘贴到 PuriPuly 中。
+   ![step9](../images/elevenlabs/9.png)
 
 </details>
 
@@ -441,18 +485,9 @@ uv run --locked python scripts/ci/check_test_selection.py
   <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
 </a>
 
----
-
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, KOZ39
-
----
-
-## 政策
-
-- [Code signing policy](../../CODE_SIGNING.md)
-- [隐私政策](../../PRIVACY.md)
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
 
 ---
 

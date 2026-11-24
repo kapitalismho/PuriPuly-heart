@@ -68,22 +68,16 @@ def test_v48_consolidates_active_pair_without_trusting_stale_alias(
     assert target.credential.reference == (
         "openrouter:managed" if connection == "managed" else "openrouter:byok"
     )
-    if model == "deepseek_v4_flash" and connection == "managed":
+    if model == "deepseek_v4_flash":
+        source = "managed" if connection == "managed" else "byok"
         assert translation["model"] == "deepseek_v4_flash_41"
-        assert translation["connection_history"]["deepseek_v4_flash_41"] == "managed"
+        assert translation["connection_history"]["deepseek_v4_flash_41"] == connection
         assert "deepseek_v4_flash" not in translation["connection_history"]
-        assert target.model == "deepseek/deepseek-v4.1-flash-1017"
+        assert target.models == ("deepseek/deepseek-v4.1-flash-1017",)
         assert translation["openrouter_model"] == "deepseek/deepseek-v4.1-flash-1017"
-        assert translation["openrouter_selection_alias"] == "deepseek_v4_flash_41_managed"
-        assert translation["openrouter_selected_source"] == "managed"
+        assert translation["openrouter_selection_alias"] == f"deepseek_v4_flash_41_{source}"
+        assert translation["openrouter_selected_source"] == source
         assert translation["openrouter_provider_routing"] == "deepseek_v4_flash_41_strict"
-    elif model == "deepseek_v4_flash":
-        assert translation["model"] == model
-        assert target.model == "deepseek/deepseek-v4-flash-0731"
-        assert target.models == ("deepseek/deepseek-v4-flash-0731",)
-        assert translation["openrouter_model"] == "deepseek/deepseek-v4-flash-0731"
-        assert translation["openrouter_selection_alias"] == "deepseek_v4_flash_byok"
-        assert translation["openrouter_selected_source"] == "byok"
     else:
         assert translation["model"] == "gemma4_26b_31b"
         assert target.model == "google/gemma-4-26b-a4b-it"

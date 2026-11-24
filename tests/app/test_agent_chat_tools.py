@@ -1206,7 +1206,9 @@ async def composed_osc_agent(tmp_path, monkeypatch, request):
             stt=replace(settings.intent.stt, provider="deepgram"),
             peer_stt=replace(settings.intent.peer_stt, provider="deepgram"),
             translation=replace(
-                settings.intent.translation, model="deepseek_v4_flash", connection="official_byok"
+                settings.intent.translation,
+                model="deepseek_v4_flash_41",
+                connection="official_byok",
             ),
         ),
     )

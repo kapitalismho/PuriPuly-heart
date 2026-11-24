@@ -6,6 +6,7 @@ import logging
 import socket
 from copy import deepcopy
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -44,6 +45,9 @@ from puripuly_heart.core.audio.source import (
 from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE, exception_diagnostics
 from puripuly_heart.core.http_extensions import http_extension_secret_key
 from puripuly_heart.core.messages import TransactionResult
+from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.manifest import OverlayLaunchManifest
+from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner
 from puripuly_heart.core.peer_capture import (
     PeerCaptureResolvedTarget,
     PeerCaptureTargetResolution,
@@ -56,6 +60,7 @@ from puripuly_heart.domain.events import (
     UIEventType,
 )
 from puripuly_heart.domain.models import Transcript, Translation
+from tests.app.test_overlay_process_manager import FakeOverlayManagedProcess
 
 
 def isolated_settings(path):
@@ -562,6 +567,129 @@ async def test_cli_photo_settings_apply_and_survive_restart(tmp_path, monkeypatc
         assert photo == {"enabled": False, "route": "gemini", "delete_translated": True}
     finally:
         await restarted.stop()
+
+
+@pytest.mark.asyncio
+async def test_cli_vr_compatibility_is_boolean_persistent_and_does_not_enable_overlay(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    legacy_settings = json.loads(path.read_text(encoding="utf-8"))
+    key = "vr_compatibility_mode"
+    legacy_settings["intent"]["overlay"].pop(key)
+    path.write_text(json.dumps(legacy_settings), encoding="utf-8")
+    field = f"overlay.{key}"
+    for initial, change in [(False, True), (True, False), (False, None)]:
+        app = compose_headless_application(path)
+        try:
+            await app.start()
+            control = app.control()
+            control.bind_instance(f"caption-compatibility-{initial}-{change}")
+            catalog = await control.query("settings.choices", {})
+            assert catalog["field_schemas"][field] == {"type": "boolean", "free_form": False}
+            before = await control.query("settings.current", {})
+            assert before["settings"]["intent"]["overlay"][key] is initial
+            output = (await control.query("overlay.status", {}))["output"]
+            assert output["desired_enabled"] is False
+            assert output["effective_vr_compatibility_mode"] is None
+            if change is not None:
+                admitted = await control.submit(
+                    "settings.apply",
+                    {"changes": {field: change}},
+                    request_id=f"compatibility-{change}",
+                )
+                result = await control.wait(admitted["operation_id"], timeout=5)
+                assert result["status"] == "applied", result
+                after = (await control.query("settings.current", {}))["settings"]
+                expected = deepcopy(before["settings"])
+                expected["intent"]["overlay"][key] = change
+                assert after == expected
+        finally:
+            await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_cli_vr_compatibility_setting_replaces_running_steamvr_child(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-test-passphrase")
+    path = tmp_path / "settings.json"
+    isolated_settings(path)
+    launches: list[tuple[OverlayLaunchManifest, FakeOverlayManagedProcess]] = []
+    manifest_paths: list[Path] = []
+
+    def prepare(_runner: DefaultOverlayProcessRunner, _manifest: OverlayLaunchManifest) -> Path:
+        return tmp_path / "synthetic-overlay.exe"
+
+    async def spawn(
+        _runner: DefaultOverlayProcessRunner, _executable: Path, manifest_path: Path
+    ) -> FakeOverlayManagedProcess:
+        manifest_paths.append(manifest_path)
+        manifest = OverlayLaunchManifest.from_dict(
+            json.loads(manifest_path.read_text(encoding="utf-8"))
+        )
+        child = FakeOverlayManagedProcess(
+            overlay_instance_id=manifest.overlay_instance_id, ready_event_delay_ms=0
+        )
+        launches.append((manifest, child))
+        return child
+
+    broadcast_shutdown = OverlayBridge.broadcast_shutdown
+
+    async def shutdown(bridge: OverlayBridge) -> None:
+        await broadcast_shutdown(bridge)
+        for _, child in launches:
+            if child.overlay_instance_id == bridge.overlay_instance_id and child.returncode is None:
+                child._events.put_nowait(
+                    {"type": "shutdown_complete", "overlay_instance_id": child.overlay_instance_id}
+                )
+                child._exit_future.set_result(0)
+                return
+
+    monkeypatch.setattr(DefaultOverlayProcessRunner, "prepare", prepare)
+    monkeypatch.setattr(DefaultOverlayProcessRunner, "spawn", spawn)
+    monkeypatch.setattr(OverlayBridge, "broadcast_shutdown", shutdown)
+    app = compose_headless_application(path)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("active-caption-compatibility")
+
+        async def assert_running_mode(mode: bool) -> None:
+            output = (await control.query("overlay.status", {}))["output"]
+            assert output["presentation_ready"] is True, output
+            assert output["effective_target"] == "steamvr", output
+            assert output["effective_vr_compatibility_mode"] is mode, output
+            manifest, child = launches[-1]
+            assert manifest.vr_compatibility_mode is mode
+            assert output["generation"] == manifest.overlay_instance_id
+            assert child.returncode is None
+
+        enabled = await control.submit("overlay.set", {"enabled": True}, request_id="steamvr-on")
+        result = await control.wait(enabled["operation_id"], timeout=5)
+        assert result["status"] == "applied", result
+        await assert_running_mode(False)
+
+        for mode in (True, False):
+            admitted = await control.submit(
+                "settings.apply",
+                {"changes": {"overlay.vr_compatibility_mode": mode}},
+                request_id=f"active-compatibility-{mode}",
+            )
+            result = await control.wait(admitted["operation_id"], timeout=5)
+            assert result["status"] == "applied", result
+            persisted = json.loads(path.read_text(encoding="utf-8"))
+            assert persisted["intent"]["overlay"]["vr_compatibility_mode"] is mode
+            await assert_running_mode(mode)
+
+        assert [manifest.vr_compatibility_mode for manifest, _ in launches] == [False, True, False]
+        assert [child.returncode for _, child in launches] == [0, 0, None]
+    finally:
+        await app.stop()
+        assert all(child.returncode == 0 and not child.terminated for _, child in launches)
+        assert not any(manifest_path.exists() for manifest_path in manifest_paths)
 
 
 def test_headless_runtime_error_is_localized_in_dashboard_state(caplog) -> None:
@@ -1361,6 +1489,32 @@ async def test_declared_extension_secret_roundtrip_is_private_and_revision_safe(
 
         catalog = await control.query("settings.choices", {})
         assert "sample" in catalog["choices"]["translation.http_extension_id"]
+        for field in (
+            "translation.model",
+            "translation.connection",
+            "translation.connection_history",
+            "translation.previous_llm_model",
+        ):
+            assert "deepseek_v4_flash" not in catalog["choices"][field]
+            assert "deepseek_v4_flash_41" in catalog["choices"][field]
+        assert catalog["choices"]["translation.connection"]["deepseek_v4_flash_41"] == [
+            "managed",
+            "managed_china",
+            "openrouter",
+            "official_byok",
+        ]
+        providers = catalog["providers"]
+        assert "deepseek/deepseek-v4-flash-0731" not in providers["openrouter_models"]
+        assert "deepseek/deepseek-v4.1-flash-1017" in providers["openrouter_models"]
+        assert {
+            "deepseek_v4_flash_managed",
+            "deepseek_v4_flash_byok",
+        }.isdisjoint(providers["openrouter_selection_aliases"])
+        assert {
+            "deepseek_v4_flash_41_managed",
+            "deepseek_v4_flash_41_byok",
+        } <= set(providers["openrouter_selection_aliases"])
+        assert "deepseek-flash" in providers["deepseek_llm_models"]
         terms = await control.query("consent.peer_translation", {})
         assert terms["accepted"] is False
         assert terms["terms"] == t("peer_translation_eula.body")
@@ -1412,6 +1566,10 @@ async def test_declared_extension_secret_roundtrip_is_private_and_revision_safe(
             (
                 "settings.apply",
                 {"changes": {"osc.connection": {"mode": "off", "receive_port": True}}},
+            ),
+            (
+                "settings.apply",
+                {"changes": {"translation.model": "deepseek_v4_flash"}},
             ),
             (
                 "settings.apply",

@@ -9,7 +9,7 @@ Recorded 2026-11-07. Korean dialogue → English/Japanese/Simplified Chinese, ea
 | GPT-6 Luna | 0.189 |
 | DeepSeek V4.1 Flash, thinking disabled | 0.452 |
 | Gemma 4 26B A4B | 0.639 |
-| DeepSeek V4 Flash 0731 | 0.727 |
+| DeepSeek V4.0 Flash 0731 (historical; no longer selectable) | 0.727 |
 | Index-Translate 35B-A3B | 1.090 |
 | Gemma 4 E4B QAT Q4, local llama.cpp | 1.927 |
 

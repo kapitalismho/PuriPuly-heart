@@ -434,17 +434,6 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             "gemma4_26b_31b_latency",
         ),
         (
-            "deepseek_v4_flash",
-            "openrouter",
-            "byok",
-            "openrouter",
-            "deepseek/deepseek-v4-flash-0731",
-            "secret_store",
-            "openrouter:byok",
-            None,
-            "deepseek_v4_flash_latency",
-        ),
-        (
             "deepseek_v4_flash_41",
             "managed",
             "managed",
@@ -808,7 +797,7 @@ def test_standard_managed_resolves_standard_managed_credential_reference() -> No
     "model",
     ["deepseek/deepseek-v4.1-flash", "deepseek/deepseek-v4.1-flash-1017"],
 )
-def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_hedge(
+def test_openrouter_deepseek_41_byok_resolves_strict_routing_with_identity_hedge(
     model: str,
 ) -> None:
     runtime_resolution = _runtime_resolution_module()
@@ -818,7 +807,7 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_
         model=model,
         selected_source="byok",
         routing_mode="parasail_first",
-        provider_routing="deepseek_only",
+        provider_routing="default",
         broker_base_url="https://broker.fixture.test/v1",
     )
     assert openrouter_intent.model == "deepseek/deepseek-v4.1-flash-1017"
@@ -854,21 +843,36 @@ def test_openrouter_deepseek_byok_deepseek_only_preserves_routing_with_identity_
     assert config.fallback.target == config.primary
 
 
-def test_openrouter_runtime_intent_normalizes_legacy_deepseek_model() -> None:
+def test_legacy_qwen_flash_compatibility_falls_back_to_deepseek_41_openrouter() -> None:
     runtime_resolution = _runtime_resolution_module()
 
-    intent = runtime_resolution.normalize_openrouter_runtime_intent(
-        provider_llm="openrouter",
-        model="deepseek/deepseek-v4-flash",
-        selected_source="byok",
+    intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
+        provider_llm="qwen",
+        qwen_model="qwen3.5-flash",
+    )
+    config = runtime_resolution.resolve_llm_config(
+        runtime_resolution.RuntimeResolutionInput(translation=intent)
     )
 
-    assert intent.model == "deepseek/deepseek-v4-flash-0731"
-    assert intent.selection_alias == "deepseek_v4_flash_byok"
+    assert intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
+    assert intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
+    assert config.model == "deepseek/deepseek-v4.1-flash-1017"
+    assert config.credential.reference == "openrouter:byok"
+    assert config.provider_routing == "deepseek_v4_flash_41_strict"
 
 
 @pytest.mark.parametrize(
-    "model", ["gemini_flash", "gemini31_flash_lite", "gemini37_flash", "unknown", "", None, 123]
+    "model",
+    [
+        "gemini_flash",
+        "gemini31_flash_lite",
+        "gemini37_flash",
+        "deepseek_v4_flash",
+        "unknown",
+        "",
+        None,
+        123,
+    ],
 )
 @pytest.mark.parametrize("connection", ["official_byok", "openrouter"])
 def test_retired_or_unknown_translation_runtime_selection_is_rejected(
@@ -888,7 +892,16 @@ def test_retired_or_unknown_direct_provider_is_rejected(provider: object) -> Non
         )
 
 
-@pytest.mark.parametrize("alias", ["gemini_flash_byok", "gemini31_flash_lite_byok", "unknown"])
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "gemini_flash_byok",
+        "gemini31_flash_lite_byok",
+        "deepseek_v4_flash_managed",
+        "deepseek_v4_flash_byok",
+        "unknown",
+    ],
+)
 def test_retired_or_unknown_alias_cannot_select_a_paid_route(alias: str) -> None:
     runtime_resolution = _runtime_resolution_module()
     with pytest.raises(ValueError):
@@ -1008,6 +1021,9 @@ def test_legacy_openrouter_selection_aliases_normalize_before_resolved_runtime(
         "google/gemini-3.8-flash",
         "google/gemini-3.7-flash",
         "google/gemini-3.1-flash-lite",
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-flash-0423",
+        "deepseek/deepseek-v4-flash-0731",
         "unknown",
         "",
         123,
@@ -1039,7 +1055,7 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         "openrouter": {
             "llm_model": "google/gemma-4-26b-a4b-it",
             "selected_source": "managed",
-            "selection_alias": "deepseek_v4_flash_byok",
+            "selection_alias": "deepseek_v4_flash_41_byok",
             "fallback_selection_alias": "qwen35_flash",
             "routing_mode": "parasail_first",
             "provider_routing": "default",
@@ -1085,19 +1101,19 @@ def test_missing_translation_openrouter_compatibility_values_derive_exact_runtim
         )
     )
 
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
+    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
     assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER
-    assert openrouter_intent.model == "deepseek/deepseek-v4-flash-0731"
+    assert openrouter_intent.model == "deepseek/deepseek-v4.1-flash-1017"
     assert openrouter_intent.selected_source == "byok"
     assert config.provider == "openrouter"
-    assert config.model == "deepseek/deepseek-v4-flash-0731"
+    assert config.model == "deepseek/deepseek-v4.1-flash-1017"
     assert config.credential == resolved.ResolvedCredentialRequirement(
         source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
         required=True,
         reference="openrouter:byok",
     )
     assert config.routing_mode == "latency"
-    assert config.provider_routing == "deepseek_v4_flash_latency"
+    assert config.provider_routing == "deepseek_v4_flash_41_strict"
     assert config.base_url is None
     assert config.service_endpoint == "https://broker.fixture.test/v1"
     assert config.fallback is not None
@@ -1157,14 +1173,17 @@ def test_openrouter_qwen_primary_compatibility_preserves_model_and_source(
     assert config.concurrency_limit == 8
 
 
-def test_openrouter_qwen_primary_deepseek_only_preserves_routing_with_identity_hedge() -> None:
+@pytest.mark.parametrize(
+    "retired_route", ["deepseek_only", "deepseek_v4_flash_latency", "deepseek_v4_flash_china"]
+)
+def test_openrouter_qwen_ignores_retired_deepseek_route(retired_route: str) -> None:
     runtime_resolution = _runtime_resolution_module()
     openrouter_intent = runtime_resolution.normalize_openrouter_runtime_intent(
         provider_llm="openrouter",
         model="qwen/qwen3.5-flash-02-23",
         selected_source="byok",
         routing_mode="parasail_first",
-        provider_routing="deepseek_only",
+        provider_routing=retired_route,
         broker_base_url="https://broker.fixture.test/v1",
     )
     translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
@@ -1185,7 +1204,7 @@ def test_openrouter_qwen_primary_deepseek_only_preserves_routing_with_identity_h
     assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH
     assert config.provider == "openrouter"
     assert config.model == "qwen/qwen3.5-flash-02-23"
-    assert config.provider_routing == "deepseek_only"
+    assert config.provider_routing == "default"
     assert config.routing_mode == "latency"
     assert config.fallback is not None
     assert config.fallback.target == config.primary
@@ -1317,7 +1336,7 @@ def test_missing_translation_direct_provider_compatibility_values_derive_exact_c
             translation=translation_intent,
             openrouter=openrouter_intent,
             direct=runtime_resolution.DirectProviderRuntimeIntent(
-                deepseek_v4_flash_model=raw_settings["deepseek"]["llm_model"],
+                deepseek_flash_model=raw_settings["deepseek"]["llm_model"],
                 qwen_region=raw_settings["qwen"]["region"],
             ),
         )

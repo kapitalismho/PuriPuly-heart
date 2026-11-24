@@ -1099,9 +1099,9 @@ async def test_gpu_discovery_receipt_follows_owner_snapshot(offline):
     [
         ("qq", "local_llm", "ollama", "byok", False),
         ("discord", "gemma4_26b_31b", "openrouter", "byok", False),
-        ("qq", "deepseek_v4_flash", "managed", "managed", False),
-        ("discord", "deepseek_v4_flash", "managed_china", "managed", False),
-        ("qq", "deepseek_v4_flash", "managed_china", "managed", True),
+        ("qq", "deepseek_v4_flash_41", "managed", "managed", False),
+        ("discord", "deepseek_v4_flash_41", "managed_china", "managed", False),
+        ("qq", "deepseek_v4_flash_41", "managed_china", "managed", True),
         ("discord", "gemma4_26b_31b", "managed", "managed", True),
         ("openrouter", "gemma4_26b_31b", "openrouter", "byok", True),
     ],
@@ -1179,7 +1179,7 @@ async def test_logout_restores_active_translation_after_failed_persistence_and_h
             base.intent,
             translation=replace(
                 base.intent.translation,
-                model="deepseek_v4_flash",
+                model="deepseek_v4_flash_41",
                 connection="managed_china",
                 openrouter_selected_source="managed",
             ),

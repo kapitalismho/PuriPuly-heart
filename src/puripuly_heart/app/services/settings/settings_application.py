@@ -41,6 +41,7 @@ from puripuly_heart.app.ports.settings_view import (
     OverlaySettingsSnapshot,
     OverlayTargetSettingsIntent,
     OverlayTranslationSettingsIntent,
+    OverlayVrCompatibilitySettingsIntent,
     PeerExpectedLanguagesIntent,
     PeerSttProviderEdit,
     PeerVadHangoverIntent,
@@ -349,6 +350,7 @@ def settings_view_surface_snapshots(
         target=intent.overlay.target,
         show_translation=intent.overlay.show_translation,
         show_peer_original=intent.overlay.show_peer_original,
+        vr_compatibility_mode=intent.overlay.vr_compatibility_mode,
         desktop_size_preset=intent.overlay.desktop_flet.size_preset,
         desktop_background_alpha=intent.overlay.desktop_flet.visual.background_alpha,
         desktop_swap_caption_languages=intent.overlay.desktop_flet.swap_caption_languages,
@@ -596,9 +598,12 @@ def materialize_immediate_settings_intent(
             ),
         )
     elif isinstance(intent, OverlayTargetSettingsIntent):
+        overlay_updates: dict[str, object] = {"target": intent.target}
+        if intent.vr_compatibility_mode is not None:
+            overlay_updates["vr_compatibility_mode"] = intent.vr_compatibility_mode
         updated = _with_intent(
             updated,
-            overlay=replace(updated.intent.overlay, target=intent.target),
+            overlay=replace(updated.intent.overlay, **overlay_updates),
         )
     elif isinstance(intent, OverlayTranslationSettingsIntent):
         updated = _with_intent(
@@ -609,6 +614,11 @@ def materialize_immediate_settings_intent(
         updated = _with_intent(
             updated,
             overlay=replace(updated.intent.overlay, show_peer_original=intent.enabled),
+        )
+    elif isinstance(intent, OverlayVrCompatibilitySettingsIntent):
+        updated = _with_intent(
+            updated,
+            overlay=replace(updated.intent.overlay, vr_compatibility_mode=intent.enabled),
         )
     elif isinstance(intent, DesktopOverlayBackgroundAlphaIntent):
         desktop = updated.intent.overlay.desktop_flet

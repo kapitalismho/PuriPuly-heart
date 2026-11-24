@@ -25,11 +25,9 @@
 
 ## Demo
 
-![Comparison of translation results between PuriPuly (Deepgram + Gemini 3 Flash) and VRCT (Google Web Speech + Google Translate). PuriPuly STT: "아역시혼자기대하면안된다니깐", Translation: "(See, I knew I shouldn't have gotten my hopes up.)" | VRCT STT: "아 역시 혼자 기대하면 안 된다니까", Translation: "Oh, I guess you shouldn't expect it alone."](docs/images/demo/ko-en_screenshot.png)
-
----
-
 <video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+
+<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
 
 If you want to see more of actual communication with other foreign friends through PuriPuly:
 - [Demo 1](https://www.youtube.com/watch?v=3p0CamYui0o)
@@ -59,8 +57,9 @@ It works in many environments, including VRChat and Discord.
 - **LLM-Powered Localization** — Slang, colloquialisms, and casual/formal speech, all rendered naturally.
 - **Context Memory** — Keeps the conversation flowing naturally with awareness of prior context.
 - **Two-way Voice Translation** — Translates the other person's voice too, with VR subtitle overlay support.
+- **Photo Translation** — Instantly translates photos taken in VR, free every day.
 - **No setup required** — No need to configure the complicated settings yourself; the built-in agent provides the best experience.
-- **The most powerful local full stack** — From Granite Speech 5.0 to Gemma 4 E4B, built with the most efficient models available today.
+- **The most powerful local full stack** — From Granite Speech 5.0 to Gemma 4, built with the most efficient models available today.
 
 ## Q&A
 
@@ -77,7 +76,7 @@ It works in many environments, including VRChat and Discord.
 → When using local ASR, processing times can be slow if compute resources are limited. In this case, we recommend switching to a cloud STT service.
 
 - **How is personal data handled?**
-→ Voice and conversation contents are never sent to Puripuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
+→ Voice and conversation contents are never sent to PuriPuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
 
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -111,7 +110,6 @@ It works in many environments, including VRChat and Discord.
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 5,090 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 3,680 |
 
 ### Cost per Utterance
@@ -130,13 +128,12 @@ It works in many environments, including VRChat and Discord.
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
 | **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
-| **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.00027 |
 
 *   *Based on (Input 900 tokens + Output 12 tokens) × 1.2 avg LLM calls per utterance.*
 *   *Uses per Dollar is derived from the un-rounded values in the Cost per Utterance table.*
 *   *All costs and usage counts are approximate.*
-*   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
+*   *DeepSeek V4.1 Flash assumes a 70% cache hit rate.*
 *   *GPT-6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
 *   *Pricing as of October 17, 2026.*
@@ -214,14 +211,13 @@ If Soniox/Gemini/Deepgram are blocked in your region, please use the following c
 
 Follow the guide that matches the service you want to use.
 
-For the translation LLM, we recommend selecting **Gemma 4 26B A4B + 31B** with the **OpenRouter** connection.
+For the translation LLM, we recommend using the **Gemma 4** model through **OpenRouter**.
 
 By the way, while you're setting things up, why not configure ASR too?
-PuriPuly delivers the best experience when paired with a cloud STT.
-For instance, even with the same Qwen ASR, local and cloud voice-recognition performance differ noticeably.
+PuriPuly delivers the best experience when paired with a cloud ASR.
+You can also use it for free through the Cloud Free Tier option.
 
-We recommend starting with Deepgram.
-Just signing up gets you $200 in free credits.
+For cloud ASR, we recommend starting with **Gemini 3.5 Transcribe**.
 
 <details>
 <summary><h3>OpenRouter</h3></summary>
@@ -288,27 +284,15 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 </details>
 
 <details>
-<summary><h3>Deepgram</h3></summary>
+<summary><h3>Cloud Free Tier ASR (Gemini, Deepgram, ElevenLabs)</h3></summary>
 
-1. Login to the [Deepgram Console](https://console.deepgram.com/).
-   ![step1](docs/images/deepgram/1.png)
+1. Set the two ASR options as shown in the screenshot.
+   ![step1](docs/images/ASR_freetier/1.png)
 
-2. If you see a welcome message/survey, click **Skip**.
-   ![step2](docs/images/deepgram/2.png)
+2. (Optional) Select the ASR providers you want to use.
+   ![step2](docs/images/ASR_freetier/2.png)
 
-3. Select **STT (Speech-to-Text)** on the service selection screen.
-   ![step3](docs/images/deepgram/3.png)
-
-4. In the API Keys menu, click **Create a New API Key**.
-   ![step4](docs/images/deepgram/4.png)
-
-5. Enter a key name (e.g., `puripuly`) and create.
-   ![step5](docs/images/deepgram/5.png)
-
-6. Copy the generated key and paste it into PuriPuly settings.
-   ![step6](docs/images/deepgram/6.png)
-
-</details>
+3. Follow the guides below to issue API keys and enter them in the API key fields.
 
 <details>
 <summary><h3>Gemini</h3></summary>
@@ -339,6 +323,63 @@ Network, proxy, TLS certificate, and service errors do not mean your key is inva
 
 8. Select your paid-tier project.
    ![step9](docs/images/gemini/9.png)
+
+</details>
+
+</details>
+
+<details>
+<summary><h3>Deepgram</h3></summary>
+
+1. Login to the [Deepgram Console](https://console.deepgram.com/).
+   ![step1](docs/images/deepgram/1.png)
+
+2. If you see a welcome message/survey, click **Skip**.
+   ![step2](docs/images/deepgram/2.png)
+
+3. Select **STT (Speech-to-Text)** on the service selection screen.
+   ![step3](docs/images/deepgram/3.png)
+
+4. In the API Keys menu, click **Create a New API Key**.
+   ![step4](docs/images/deepgram/4.png)
+
+5. Enter a key name (e.g., `puripuly`) and create.
+   ![step5](docs/images/deepgram/5.png)
+
+6. Copy the generated key and paste it into PuriPuly settings.
+   ![step6](docs/images/deepgram/6.png)
+
+</details>
+
+<details>
+<summary><h3>ElevenLabs</h3></summary>
+
+1. Go to [ElevenLabs](https://elevenlabs.io) and click **Sign up**.
+   ![step1](docs/images/elevenlabs/1.png)
+
+2. Click **Continue**.
+   ![step2](docs/images/elevenlabs/2.png)
+
+3. Enter your name, check the box, and click **Next**.
+   ![step3](docs/images/elevenlabs/3.png)
+
+4. Keep clicking **Skip**.
+   ![step4](docs/images/elevenlabs/4.png)
+
+5. If a payment screen appears, click **Skip**.
+   ![step5](docs/images/elevenlabs/5.png)
+
+6. Click **Switch** in the bottom left and switch to **ElevenAPI**.
+   ![step6](docs/images/elevenlabs/6.png)
+
+7. Click **API keys** in the left tab, then click **Create Key** in the center.
+   ![step7](docs/images/elevenlabs/7.png)
+
+8. Grant **Speech to Text** permission and click **Create Key**.
+   ![step8](docs/images/elevenlabs/8.png)
+
+9. Copy the API key and paste it into PuriPuly.
+   ![step9](docs/images/elevenlabs/9.png)
 
 </details>
 
@@ -443,18 +484,9 @@ uv run --locked python scripts/ci/check_test_selection.py
   <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
 </a>
 
----
-
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, KOZ39
-
----
-
-## Policies
-
-- [Code signing policy](CODE_SIGNING.md)
-- [Privacy Policy](PRIVACY.md)
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
 
 ---
 

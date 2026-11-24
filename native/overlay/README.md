@@ -20,6 +20,10 @@ Python and native must agree on manifests, protocols and advertised capabilities
 
 Snapshots replace the scene. Native rejects stale revisions and renders Python's selected content. Presentation retries cannot renew caption lifetime or revive removed content. Python owns startup, recovery and cleanup.
 
+SteamVR captions Flush the producer context once after successful texture submission, before visibility handling; pre-submit readiness is unchanged. The default avoids periodic redraws/resubmissions. Settings → Overlay → Overlay mode → VR (Compatibility Mode) (`overlay.vr_compatibility_mode`, default `false`) retains Flush and enables bounded P05 redraws/resubmissions, with cached rehandoff off. This is manual selection, not automatic fallback or a pre-Flush rollback; photo and desktop overlays are unaffected.
+
+The default manifest omits the option. Older native binaries reject explicit compatibility opt-in rather than silently ignoring it. Cached rehandoff remains a separate diagnostic.
+
 ## Photo Runtime Boundary
 
 The executable runs the photo role in a separate process with `--role photo --config <photo-manifest>`. Caption and photo lifecycles are independent. Photo uses its own [manifest](src/photo/manifest.rs) and [authenticated bridge](../../src/puripuly_heart/core/photo/bridge.py).

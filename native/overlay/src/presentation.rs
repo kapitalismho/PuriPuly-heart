@@ -394,7 +394,7 @@ impl PresentationDiagnostics {
             openvr_adapter_identity: AdapterIdentity::NotObservedStageOne,
             renderer_adapter_identity: AdapterIdentity::NotObservedStageOne,
             adapter_match: AdapterMatch::Unavailable,
-            retry_profile: "p05",
+            retry_profile: crate::manifest::QuietTailProfile::default().id(),
             observed_origin: Instant::now(),
             reason: "unspecified",
             handoff_mode: HandoffMode::Off,
@@ -866,7 +866,7 @@ mod tests {
         assert!(diagnostics
             .records()
             .iter()
-            .all(|record| record.retry_profile == "p05"));
+            .all(|record| record.retry_profile == "no_retry"));
         for _ in 0..200 {
             diagnostics.accept_logical_revision(
                 PresentationBackend::Test,

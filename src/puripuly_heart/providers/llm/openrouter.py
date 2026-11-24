@@ -11,7 +11,6 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.config.llm_profiles import (
-    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GPT_6_LUNA,
 )
@@ -186,71 +185,35 @@ def _build_provider_preferences(
     model: str | None = None,
     models: tuple[str, ...] = (),
 ) -> dict[str, object]:
-    if (
-        model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
-        and provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
-    ):
-        return {
-            "only": ["baidu/fp8"],
-            "allow_fallbacks": False,
-        }
     if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
         return {
-            "only": ["inference-net", "deepseek"],
+            "only": ["inference-net", "morph"],
             "allow_fallbacks": False,
-        }
-    if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
-        return {
-            "only": [
-                "makora",
-                "together",
-                "wafer/fast",
-                "baidu/fp8",
-            ],
-            "sort": {"by": "latency", "partition": "none"},
-            "allow_fallbacks": True,
         }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY:
         return {
             "only": [
-                "cloudflare",
-                "coreweave/fp4",
-                "deepinfra/turbo",
-                "dekallm/bf16",
-                "nextbit/bf16",
                 "makora",
+                "coreweave/bf16",
+                "kt",
             ],
             "sort": {"by": "latency", "partition": "none"},
             "allow_fallbacks": True,
         }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY:
         return {
-            "only": ["modelrun/fp4"],
+            "only": ["modelrun"],
             "allow_fallbacks": False,
-        }
-    if provider_routing in (
-        OpenRouterProviderRouting.DEEPSEEK_ONLY,
-        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
-    ):
-        return {
-            "only": [
-                "makora",
-                "together",
-                "wafer/fast",
-                "baidu/fp8",
-            ],
-            "sort": {"by": "latency", "partition": "none"},
-            "allow_fallbacks": True,
         }
     if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT:
         return {
-            "only": ["inference-net", "deepseek"],
+            "only": ["inference-net", "morph"],
             "allow_fallbacks": False,
         }
     if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
             "sort": {"by": "latency"},
-            "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16", "makora"],
+            "only": ["makora", "coreweave/bf16"],
             "allow_fallbacks": True,
         }
     return {

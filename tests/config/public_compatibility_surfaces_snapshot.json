@@ -43,7 +43,7 @@
         "--config",
         "{manifest_path}"
       ],
-      "explicit_env_overrides": [
+      "stripped_production_env": [
         "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE",
         "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
       ],
@@ -139,10 +139,8 @@
       "gemma4_26b_31b_managed",
       "gemma4_26b_31b_byok",
       "qwen35_flash_managed",
-      "deepseek_v4_flash_managed",
       "deepseek_v4_flash_41_managed",
       "qwen35_flash_byok",
-      "deepseek_v4_flash_byok",
       "deepseek_v4_flash_41_byok",
       "gpt_6_luna_byok"
     ],
@@ -180,6 +178,16 @@
       "provider_routing",
       "managed_credential_kind",
       "broker_base_url"
+    ],
+    "direct_provider_runtime_intent_fields": [
+      "deepseek_flash_model",
+      "qwen_38_flash_model",
+      "qwen_region",
+      "qwen_connection",
+      "local_llm_backend",
+      "local_llm_base_url",
+      "local_llm_model",
+      "local_llm_extra_body"
     ],
     "resolved_llm_config_fields": [
       "primary",

@@ -31,7 +31,7 @@ def test_owner_unrelated_delta_does_not_resurrect_retired_fallback(tmp_path: Pat
     raw = serialization.to_dict(AppSettingsVNext())
     raw["intent"]["translation"]["fallback"] = {
         "enabled": False,
-        "model": "deepseek_v4_flash",
+        "model": "deepseek_v4_flash_41",
         "connection": "official_byok",
         "selection_alias": "none",
     }

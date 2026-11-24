@@ -246,6 +246,7 @@ def _photo_model_for_route(route: str) -> str:
     return "gemini" if route == "gemini" else "luna"
 
 
+_OVERLAY_MODE_STEAMVR_COMPATIBILITY = "steamvr_compatibility"
 _OVERLAY_DISTANCE_MIN = 0.5
 _OVERLAY_DISTANCE_MAX = 2.0
 _OVERLAY_DISTANCE_DIVISIONS = 30
@@ -337,7 +338,6 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
     TranslationModel.MANAGED_GEMMA_26B: "provider.managed_gemma_26b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
-    TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
     TranslationModel.GPT_6_LUNA: "provider.gpt_6_luna",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
@@ -375,7 +375,6 @@ _TRANSLATION_MODELS = (
     TranslationModel.MANAGED_GEMMA,
     TranslationModel.MANAGED_GEMMA_26B,
     TranslationModel.GEMMA4_26B_31B,
-    TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_FLASH_41,
     TranslationModel.GPT_6_LUNA,
     TranslationModel.LOCAL_LLM,
@@ -393,7 +392,6 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.local",
     TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.local",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GPT_6_LUNA: "settings.translation_model.section.recommended_cloud",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
@@ -450,10 +448,10 @@ def _derive_openrouter_selection_alias(
         if selected_source == OpenRouterCredentialSource.MANAGED:
             return OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
         return OpenRouterSelectionAlias.QWEN35_FLASH_BYOK
-    if llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
+    if llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41:
         if selected_source == OpenRouterCredentialSource.MANAGED:
-            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-        return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
+            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED
+        return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
     if selected_source == OpenRouterCredentialSource.MANAGED:
         return OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
     return OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
@@ -3216,8 +3214,8 @@ class SettingsView(ft.Column):
             return OpenRouterSelectionAlias.GPT_6_LUNA_BYOK
         if settings.openrouter_llm_model == OpenRouterLLMModel.QWEN_35_FLASH_02_23:
             return OpenRouterSelectionAlias.QWEN35_FLASH_MANAGED
-        if settings.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH:
-            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+        if settings.openrouter_llm_model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41:
+            return OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED
         return OpenRouterSelectionAlias.GEMMA4_26B_31B_MANAGED
 
     def _openrouter_selection_profile(self, settings: ProviderSettingsSnapshot | None):
@@ -5049,20 +5047,6 @@ class SettingsView(ft.Column):
                 if openrouter_source == OpenRouterCredentialSource.MANAGED
                 else OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
             )
-        elif model == TranslationModel.DEEPSEEK_V4_FLASH:
-            llm_provider = LLMProviderName.OPENROUTER
-            openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
-            openrouter_source = (
-                OpenRouterCredentialSource.MANAGED
-                if connection
-                in {TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA}
-                else OpenRouterCredentialSource.BYOK
-            )
-            openrouter_alias = (
-                OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
-                if openrouter_source == OpenRouterCredentialSource.MANAGED
-                else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
-            )
         elif model == TranslationModel.DEEPSEEK_V4_FLASH_41:
             llm_provider = (
                 LLMProviderName.DEEPSEEK
@@ -5967,14 +5951,23 @@ class SettingsView(ft.Column):
             return OVERLAY_TARGET_STEAMVR
         return self._normalized_overlay_target(self._overlay_snapshot.target)
 
+    def _current_overlay_mode(self) -> str:
+        if self._current_overlay_target() == OVERLAY_TARGET_DESKTOP:
+            return OVERLAY_TARGET_DESKTOP
+        if self._overlay_snapshot is not None and self._overlay_snapshot.vr_compatibility_mode:
+            return _OVERLAY_MODE_STEAMVR_COMPATIBILITY
+        return OVERLAY_TARGET_STEAMVR
+
     def _overlay_target_label_for(self, target: object) -> str:
+        if target == _OVERLAY_MODE_STEAMVR_COMPATIBILITY:
+            return t("settings.overlay.target.steamvr_compatibility")
         normalized_target = self._normalized_overlay_target(target)
         return t(f"settings.overlay.target.{normalized_target}")
 
     def _sync_overlay_target_control(self) -> None:
         self._set_unit_card_value_text(
             self._overlay_target_button,
-            self._overlay_target_label_for(self._current_overlay_target()),
+            self._overlay_target_label_for(self._current_overlay_mode()),
             size=28,
         )
         self._overlay_target_button.disabled = self._overlay_snapshot is None
@@ -6164,6 +6157,10 @@ class SettingsView(ft.Column):
                 label=self._overlay_target_label_for(OVERLAY_TARGET_STEAMVR),
             ),
             OptionItem(
+                value=_OVERLAY_MODE_STEAMVR_COMPATIBILITY,
+                label=self._overlay_target_label_for(_OVERLAY_MODE_STEAMVR_COMPATIBILITY),
+            ),
+            OptionItem(
                 value=OVERLAY_TARGET_DESKTOP,
                 label=self._overlay_target_label_for(OVERLAY_TARGET_DESKTOP),
             ),
@@ -6175,19 +6172,39 @@ class SettingsView(ft.Column):
             self._on_overlay_target_selected,
             show_description=True,
         )
-        modal.open(self._current_overlay_target())
+        modal.open(self._current_overlay_mode())
 
     def _on_overlay_target_selected(self, value: str) -> None:
         if self._overlay_snapshot is None:
             return
-        target = self._normalized_overlay_target(value)
-        if self._current_overlay_target() == target:
+        if value == OVERLAY_TARGET_DESKTOP:
+            target = OVERLAY_TARGET_DESKTOP
+            vr_compatibility_mode = False
+        elif value == _OVERLAY_MODE_STEAMVR_COMPATIBILITY:
+            target = OVERLAY_TARGET_STEAMVR
+            vr_compatibility_mode = True
+        else:
+            target = OVERLAY_TARGET_STEAMVR
+            vr_compatibility_mode = False
+        if (
+            self._overlay_snapshot.target == target
+            and self._overlay_snapshot.vr_compatibility_mode == vr_compatibility_mode
+        ):
             return
-        self._overlay_snapshot = replace(self._overlay_snapshot, target=target)
+        self._overlay_snapshot = replace(
+            self._overlay_snapshot,
+            target=target,
+            vr_compatibility_mode=vr_compatibility_mode,
+        )
         if self._overlay_state == "off":
             self._overlay_runtime_target = target
         self._sync_overlay_controls()
-        self._emit_settings_changed(OverlayTargetSettingsIntent(self._overlay_snapshot.target))
+        self._emit_settings_changed(
+            OverlayTargetSettingsIntent(
+                self._overlay_snapshot.target,
+                vr_compatibility_mode=self._overlay_snapshot.vr_compatibility_mode,
+            )
+        )
 
     def _on_desktop_overlay_size_click(self, e) -> None:
         _ = e

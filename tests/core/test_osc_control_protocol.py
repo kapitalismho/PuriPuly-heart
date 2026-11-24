@@ -26,7 +26,7 @@ from puripuly_heart.core.osc.control_schema import (
 )
 
 
-@pytest.mark.parametrize("identifier", [5, 6])
+@pytest.mark.parametrize("identifier", [3, 5, 6])
 def test_retired_translation_ids_are_rejected(identifier: int) -> None:
     assert identifier not in TRANSLATION_MODEL_IDS
     with pytest.raises(UnknownOscControlValueError):
@@ -215,7 +215,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         0: "gemma4_26b_31b",
         1: "gemma4_26b_31b",
         2: "gemma4_26b_31b",
-        3: "deepseek_v4_flash",
         7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",

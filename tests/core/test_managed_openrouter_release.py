@@ -520,7 +520,7 @@ async def test_prepare_for_translation_short_circuits_when_managed_key_exists() 
 async def test_managed_china_prepare_uses_only_qq_key_with_active_entitlement_state() -> None:
     settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
+    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH_41
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
     settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
     settings.managed_identity.active_managed_expires_at = "2026-08-03T06:00:00.000Z"
@@ -543,7 +543,7 @@ async def test_managed_china_prepare_survives_missing_active_entitlement_state_w
 ):
     settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
+    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH_41
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
     secrets = InMemorySecretStore()
     secrets.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "qq-managed-key")
@@ -564,7 +564,7 @@ async def test_managed_china_prepare_does_not_start_standard_discord_challenge_w
 ):
     settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
+    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH_41
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
     settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
     secrets = InMemorySecretStore()
@@ -584,7 +584,7 @@ async def test_managed_china_llm_start_requires_qq_auth_without_standard_fallbac
 ):
     settings = ReleaseSettings()
     settings.openrouter.selected_source = OpenRouterCredentialSource.MANAGED
-    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH
+    settings.translation.model = TranslationModel.DEEPSEEK_V4_FLASH_41
     settings.translation.connection = TranslationConnection.MANAGED_CHINA
     settings.managed_identity.active_managed_credential_ref = "managed-ref-qq"
     secrets = InMemorySecretStore()

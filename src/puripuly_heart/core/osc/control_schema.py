@@ -94,7 +94,6 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         0: "gemma4_26b_31b",
         1: "gemma4_26b_31b",
         2: "gemma4_26b_31b",
-        3: "deepseek_v4_flash",
         7: "qwen38_flash",
         8: "local_llm",
         9: "custom_http",

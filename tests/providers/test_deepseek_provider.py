@@ -132,7 +132,7 @@ async def test_deepseek_provider_sends_non_thinking_request_and_closes_owned_cli
 
     provider = DeepSeekLLMProvider(
         api_key="test-key",
-        model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
+        model=DeepSeekLLMModel.FLASH.value,
         base_url="https://example.deepseek",
     )
     utterance_id = uuid4()

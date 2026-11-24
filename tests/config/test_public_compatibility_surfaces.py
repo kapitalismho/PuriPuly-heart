@@ -18,6 +18,7 @@ from puripuly_heart.app import wiring
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretKey
 from puripuly_heart.config import resolved as resolved_config
 from puripuly_heart.config import runtime_resolution
+from puripuly_heart.config.llm_profiles import OPENROUTER_MAIN_SELECTION_ALIASES
 from puripuly_heart.config.prompts import load_prompt, load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
@@ -272,7 +273,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             broker_base_url=None,
         ),
         direct=runtime_resolution.DirectProviderRuntimeIntent(
-            deepseek_v4_flash_model="deepseek-v4-flash",
             qwen_38_flash_model="qwen3.8-flash",
             qwen_region=QwenRegion.BEIJING,
             local_llm_backend="openai",
@@ -496,9 +496,11 @@ def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() ->
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("vr_compatibility_mode", [False, True], ids=["default", "compatibility"])
 async def test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    vr_compatibility_mode: bool,
 ) -> None:
     startup = _load_snapshot()["overlay"]["startup_contract"]
     manifest_path = tmp_path / "overlay-manifest.json"
@@ -507,6 +509,9 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
 
     monkeypatch.delenv("PURIPULY_HEART_NATIVE_RESOURCE_ROOT", raising=False)
     monkeypatch.setattr(sys, "executable", str(python_executable))
+    profile_env, handoff_env = startup["stripped_production_env"]
+    monkeypatch.setenv(profile_env, "p05")
+    monkeypatch.setenv(handoff_env, "cached_frame_rehandoff")
     source_runner = overlay_process_module.DesktopFletOverlayRunner()
 
     assert source_runner.build_command(manifest_path) == _render_command_template(
@@ -542,11 +547,7 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         captured_command = tuple(args)
         captured_stdio = (stdout, stderr)
         assert env is not None
-        assert env[overlay_process_module.QUIET_TAIL_PROFILE_ENV] == "p05"
-        assert (
-            env[overlay_process_module.HANDOFF_EXPERIMENT_ENV]
-            == overlay_process_module.HANDOFF_EXPERIMENT_OFF
-        )
+        assert {profile_env, handoff_env}.isdisjoint(env)
         return FakeSubprocess()
 
     monkeypatch.setattr(
@@ -554,43 +555,37 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         "create_subprocess_exec",
         fake_create_subprocess_exec,
     )
-    await overlay_process_module.DefaultOverlayProcessRunner().spawn(
-        overlay_executable,
-        manifest_path,
-    )
-
-    assert captured_command == _render_command_template(
-        startup["native_runner_command"],
-        overlay_executable=str(overlay_executable),
-        manifest_path=str(manifest_path),
-    )
-    assert captured_stdio == (asyncio.subprocess.PIPE, asyncio.subprocess.PIPE)
-
-    manifest = overlay_manifest_module.OverlayLaunchManifest(
-        contract_version=OVERLAY_CONTRACT_VERSION,
-        app_version="test",
-        overlay_instance_id="overlay-test",
+    manager = overlay_process_module.OverlayProcessManager(
         bridge_url="ws://127.0.0.1:8765",
         session_token="session-token",
-        parent_pid=1234,
-        startup_deadline_ms=3000,
-        log_dir="logs",
-        log_level="INFO",
-        locale="en",
+        overlay_instance_id="overlay-test",
+        vr_compatibility_mode=vr_compatibility_mode,
+        diagnostics_dir=tmp_path,
     )
-    manager = overlay_process_module.OverlayProcessManager()
+    manifest = manager._build_manifest()
     written_manifest_path = manager._write_manifest(manifest)
     try:
         assert written_manifest_path.name.startswith(startup["manifest_temp_prefix"])
         assert written_manifest_path.name.endswith(startup["manifest_temp_suffix"])
-        assert json.loads(written_manifest_path.read_text(encoding="utf-8")) == manifest.to_dict()
+        payload = json.loads(written_manifest_path.read_text(encoding="utf-8"))
+        assert payload == manifest.to_dict()
+        if vr_compatibility_mode:
+            assert payload["vr_compatibility_mode"] is True
+        else:
+            assert "vr_compatibility_mode" not in payload
+
+        await manager.process_runner.spawn(overlay_executable, written_manifest_path)
+        assert captured_command == _render_command_template(
+            startup["native_runner_command"],
+            overlay_executable=str(overlay_executable),
+            manifest_path=str(written_manifest_path),
+        )
+        assert captured_stdio == (asyncio.subprocess.PIPE, asyncio.subprocess.PIPE)
     finally:
         written_manifest_path.unlink(missing_ok=True)
 
-    assert startup["explicit_env_overrides"] == [
-        overlay_process_module.QUIET_TAIL_PROFILE_ENV,
-        overlay_process_module.HANDOFF_EXPERIMENT_ENV,
-    ]
+    assert os.environ[profile_env] == "p05"
+    assert os.environ[handoff_env] == "cached_frame_rehandoff"
 
 
 def test_prompt_loader_prefers_named_files_then_defaults(
@@ -624,6 +619,11 @@ def test_prompt_loader_prefers_named_files_then_defaults(
         load_prompt_for_provider("openai")
 
 
+def test_openrouter_selection_aliases_match_snapshot() -> None:
+    expected = _load_snapshot()["provider_aliases"]["openrouter_main_selection_aliases"]
+    assert tuple(expected) == OPENROUTER_MAIN_SELECTION_ALIASES
+
+
 def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() -> None:
     snapshot = _load_snapshot()["provider_runtime_public_config"]
 
@@ -635,6 +635,9 @@ def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() ->
     )
     assert tuple(snapshot["openrouter_runtime_intent_fields"]) == tuple(
         field.name for field in fields(runtime_resolution.OpenRouterRuntimeIntent)
+    )
+    assert tuple(snapshot["direct_provider_runtime_intent_fields"]) == tuple(
+        field.name for field in fields(runtime_resolution.DirectProviderRuntimeIntent)
     )
     assert tuple(snapshot["resolved_llm_config_fields"]) == tuple(
         field.name for field in fields(resolved_config.ResolvedLLMConfig)

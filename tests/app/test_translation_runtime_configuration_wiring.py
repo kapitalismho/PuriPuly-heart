@@ -35,7 +35,7 @@ from puripuly_heart.core.orchestrator.configuration import (
         ("gpt_6_luna", "openrouter", OPENROUTER_MODEL_GPT_6_LUNA),
         ("gpt_6_luna", "chatgpt", OPENAI_MODEL_GPT_6_LUNA),
         ("gemma4_26b_31b", "managed", None),
-        ("deepseek_v4_flash", "openrouter", None),
+        ("deepseek_v4_flash_41", "openrouter", None),
         ("deepseek_v4_flash_41", "official_byok", None),
         ("qwen38_flash", "official_byok", None),
         ("managed_gemma", "cpu", None),

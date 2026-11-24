@@ -14,7 +14,6 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_CREDENTIAL_SOURCE_BYOK,
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
-    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
@@ -50,7 +49,6 @@ from puripuly_heart.config.resolved import (
 
 TRANSLATION_MODEL_INDEX_TRANSLATE_35B: Final = "index_translate_35b"
 TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
-TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: Final = "deepseek_v4_flash_41"
 TRANSLATION_MODEL_GPT_6_LUNA: Final = "gpt_6_luna"
 TRANSLATION_MODEL_QWEN_38_FLASH: Final = "qwen38_flash"
@@ -67,7 +65,6 @@ _LOSER_GRACE_MS: Final = 50
 TranslationModelName: TypeAlias = Literal[
     "index_translate_35b",
     "gemma4_26b_31b",
-    "deepseek_v4_flash",
     "deepseek_v4_flash_41",
     "gpt_6_luna",
     "qwen38_flash",
@@ -80,7 +77,6 @@ TranslationModelName: TypeAlias = Literal[
 TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_INDEX_TRANSLATE_35B,
     TRANSLATION_MODEL_GEMMA4_26B_31B,
-    TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
     TRANSLATION_MODEL_GPT_6_LUNA,
     TRANSLATION_MODEL_QWEN_38_FLASH,
@@ -135,7 +131,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
-        TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: (TRANSLATION_CONNECTION_OPENROUTER,),
         TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_MANAGED_CHINA,
@@ -206,7 +201,7 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
 
 INDEX_TRANSLATE_MODEL: Final = "Index-Translate-35B-A3B"
 OPENAI_MODEL_GPT_6_LUNA: Final = "gpt-6-luna"
-DEEPSEEK_MODEL_V4_FLASH: Final = "deepseek-flash"
+DEEPSEEK_MODEL_FLASH: Final = "deepseek-flash"
 QWEN_MODEL_35_FLASH: Final = "qwen3.5-flash"
 QWEN_MODEL_38_FLASH: Final = "qwen3.8-flash"
 LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
@@ -312,17 +307,13 @@ _OPENROUTER_MODELS: Final[tuple[str, ...]] = (
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
-    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GPT_6_LUNA,
 )
 _OPENROUTER_ROUTING_MODES: Final[tuple[str, ...]] = ("latency",)
 _OPENROUTER_PROVIDER_ROUTINGS: Final[tuple[str, ...]] = (
     "default",
-    "deepseek_only",
     "gemma4_26b_31b_latency",
-    "deepseek_v4_flash_latency",
-    "deepseek_v4_flash_china",
     "deepseek_v4_flash_41_strict",
     "gemma4_31b_modelrun_only",
 )
@@ -594,14 +585,8 @@ def _translation_connection_from_openrouter_source(
     selected_source: OpenRouterSource,
     *,
     model: TranslationModelName,
-    provider_routing: str,
 ) -> TranslationConnectionName:
     if selected_source == OPENROUTER_SOURCE_MANAGED:
-        if model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH and provider_routing in {
-            "deepseek_only",
-            "deepseek_v4_flash_china",
-        }:
-            return TRANSLATION_CONNECTION_MANAGED_CHINA
         return TRANSLATION_CONNECTION_MANAGED
     if selected_source == OPENROUTER_SOURCE_BYOK:
         return TRANSLATION_CONNECTION_OPENROUTER
@@ -680,7 +665,7 @@ class OpenRouterRuntimeIntent:
 
 @dataclass(frozen=True, slots=True)
 class DirectProviderRuntimeIntent:
-    deepseek_v4_flash_model: str = DEEPSEEK_MODEL_V4_FLASH
+    deepseek_flash_model: str = DEEPSEEK_MODEL_FLASH
     qwen_38_flash_model: str = QWEN_MODEL_38_FLASH
     qwen_region: str = QWEN_REGION_BEIJING
     qwen_connection: AlibabaConnection | None = None
@@ -918,6 +903,7 @@ class OverlayRuntimeIntent:
     target: str = OVERLAY_TARGET_STEAMVR
     show_translation: bool = True
     show_peer_original: bool = True
+    vr_compatibility_mode: bool = False
     calibration: Mapping[str, ResolvedOptionValue] = field(default_factory=_empty_options)
     desktop_overlay_options: Mapping[str, ResolvedOptionValue] = field(
         default_factory=_empty_options
@@ -933,6 +919,7 @@ class OverlayRuntimeIntent:
         object.__setattr__(self, "enabled", bool(self.enabled))
         object.__setattr__(self, "show_translation", bool(self.show_translation))
         object.__setattr__(self, "show_peer_original", bool(self.show_peer_original))
+        object.__setattr__(self, "vr_compatibility_mode", bool(self.vr_compatibility_mode))
         object.__setattr__(
             self,
             "calibration",
@@ -1062,7 +1049,6 @@ def derive_translation_runtime_intent_from_compatibility(
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_source,
                     model=TRANSLATION_MODEL_GEMMA4_26B_31B,
-                    provider_routing=provider_routing,
                 ),
                 concurrency_limit=concurrency,
             )
@@ -1075,25 +1061,7 @@ def derive_translation_runtime_intent_from_compatibility(
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_source,
                     model=TRANSLATION_MODEL_GEMMA4_26B_31B,
-                    provider_routing=provider_routing,
                 ),
-                concurrency_limit=concurrency,
-            )
-        if openrouter_model_value == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
-            connection = _translation_connection_from_openrouter_source(
-                openrouter_source,
-                model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                provider_routing=provider_routing,
-            )
-            model = TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
-            if connection in (
-                TRANSLATION_CONNECTION_MANAGED,
-                TRANSLATION_CONNECTION_MANAGED_CHINA,
-            ):
-                model = TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41
-            return TranslationRuntimeIntent(
-                model=model,
-                connection=connection,
                 concurrency_limit=concurrency,
             )
         if openrouter_model_value == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
@@ -1102,7 +1070,6 @@ def derive_translation_runtime_intent_from_compatibility(
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_source,
                     model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
-                    provider_routing=provider_routing,
                 ),
                 concurrency_limit=concurrency,
             )
@@ -1112,7 +1079,6 @@ def derive_translation_runtime_intent_from_compatibility(
                 connection=_translation_connection_from_openrouter_source(
                     openrouter_source,
                     model=TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
-                    provider_routing=provider_routing,
                 ),
                 concurrency_limit=concurrency,
             )
@@ -1123,8 +1089,8 @@ def derive_translation_runtime_intent_from_compatibility(
                 concurrency_limit=concurrency,
             )
         return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-            connection=_default_translation_connection(TRANSLATION_MODEL_DEEPSEEK_V4_FLASH),
+            model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
+            connection=TRANSLATION_CONNECTION_OPENROUTER,
             concurrency_limit=concurrency,
         )
     if provider == PROVIDER_OPENAI:
@@ -1165,8 +1131,8 @@ def derive_translation_runtime_intent_from_compatibility(
             == QWEN_MODEL_35_FLASH
         ):
             return TranslationRuntimeIntent(
-                model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
-                connection=_default_translation_connection(TRANSLATION_MODEL_DEEPSEEK_V4_FLASH),
+                model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
+                connection=TRANSLATION_CONNECTION_OPENROUTER,
                 concurrency_limit=concurrency,
             )
         return TranslationRuntimeIntent(
@@ -1439,6 +1405,7 @@ def resolve_overlay_config(intent: OverlayRuntimeIntent) -> ResolvedOverlayConfi
         target=cast(str, intent.target),
         show_translation=intent.show_translation,
         show_peer_original=intent.show_peer_original,
+        vr_compatibility_mode=intent.vr_compatibility_mode,
         calibration=intent.calibration,
         desktop_overlay_options=intent.desktop_overlay_options,
     )
@@ -1495,28 +1462,11 @@ def _resolve_translation_target(
             ),
         )
 
-    if translation.model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH:
-        provider_routing = (
-            "deepseek_v4_flash_china"
-            if translation.connection == TRANSLATION_CONNECTION_MANAGED_CHINA
-            else "deepseek_v4_flash_latency"
-        )
-        return _resolved_openrouter_target(
-            model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
-            source=_openrouter_source_for_translation(translation.connection, openrouter),
-            openrouter=openrouter,
-            provider_routing=provider_routing,
-            managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
-                translation.connection,
-                openrouter,
-            ),
-        )
-
     if translation.model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41:
         if translation.connection == TRANSLATION_CONNECTION_OFFICIAL_BYOK:
             return _resolved_direct_provider_target(
                 provider=PROVIDER_DEEPSEEK,
-                model=direct.deepseek_v4_flash_model,
+                model=direct.deepseek_flash_model,
                 credential=_required_credential(
                     CREDENTIAL_SOURCE_SECRET_STORE,
                     CREDENTIAL_REF_DEEPSEEK_BYOK,
@@ -1696,7 +1646,7 @@ __all__ = [
     "CREDENTIAL_REF_QWEN_BEIJING",
     "CREDENTIAL_REF_QWEN_SINGAPORE",
     "CREDENTIAL_REF_SONIOX_STT",
-    "DEEPSEEK_MODEL_V4_FLASH",
+    "DEEPSEEK_MODEL_FLASH",
     "DEEPGRAM_STT_MODEL_NOVA_3",
     "ELEVENLABS_SCRIBE_STT_MODEL",
     "OPENAI_MODEL_GPT_6_LUNA",
@@ -1779,7 +1729,6 @@ __all__ = [
     "TRANSLATION_CONNECTION_OPENROUTER",
     "TRANSLATION_CONNECTIONS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
-    "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH",
     "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41",
     "TRANSLATION_MODEL_GPT_6_LUNA",
     "TRANSLATION_MODEL_QWEN_38_FLASH",

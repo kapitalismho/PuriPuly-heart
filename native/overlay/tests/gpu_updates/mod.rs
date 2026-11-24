@@ -174,10 +174,11 @@ async fn windows_graphics_python_snapshots_complete_paced_and_burst_with_readbac
         manifest.bridge_url = format!("ws://{address}");
         let (mut bridge, initial) = BridgeClient::connect(&manifest).await.unwrap();
         let captured = Arc::new(Mutex::new(CapturedFrames::default()));
-        let mut owner = NativePresentationOwner::new(
+        let mut owner = NativePresentationOwner::new_with_profile(
             initial,
             renderer,
             ReadbackSubmitter(captured.clone(), false),
+            QuietTailProfile::P05,
         );
         let started = Instant::now();
         owner

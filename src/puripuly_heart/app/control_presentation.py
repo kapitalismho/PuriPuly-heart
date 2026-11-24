@@ -28,6 +28,11 @@ _DEFINITIONS = {
     "overlay.target": ("settings.overlay.caption_location", "overlay", "overlay"),
     "overlay.translation.enabled": ("settings.overlay.show_translation", "boolean", "overlay"),
     "overlay.peer_original.enabled": ("settings.overlay.show_peer_original", "boolean", "overlay"),
+    "overlay.vr_compatibility_mode": (
+        "settings.overlay.target.steamvr_compatibility",
+        "boolean",
+        "overlay",
+    ),
     "overlay.background_alpha": (
         "settings.overlay.desktop.background_alpha.title",
         "transparency",
@@ -119,6 +124,7 @@ _CANONICAL_PATHS = {
     "overlay.target": "overlay.target",
     "overlay.translation.enabled": "overlay.show_translation",
     "overlay.peer_original.enabled": "overlay.show_peer_original",
+    "overlay.vr_compatibility_mode": "overlay.vr_compatibility_mode",
     "overlay.background_alpha": "overlay.desktop_flet.visual.background_alpha",
     "overlay.swap_caption_languages": "overlay.desktop_flet.swap_caption_languages",
     "overlay.desktop_size": "overlay.desktop_flet.size_preset",

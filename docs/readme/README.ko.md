@@ -1,7 +1,5 @@
 <p align="center">
-
   <img src="../../src/puripuly_heart/data/icons/icon.png" alt="PuriPuly — VRChat 실시간 양방향 음성 번역기" width="128" />
-
 </p>
 
 <h1 align="center">PuriPuly<br>
@@ -9,38 +7,27 @@
 </h1>
 
 <p align="center">
-
   <img src="https://img.shields.io/badge/version-2.11.3-blue" alt="Version" />
-
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
-
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
-
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
-
 </p>
 
 <h2 align="center">
-
   <a href="../../README.md">🇺🇸 English</a> ·
   🇰🇷 한국어 ·
   <a href="README.ja.md">🇯🇵 日本語</a> ·
   <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
   <a href="README.ru.md">🇷🇺 Русский</a>
-
 </h2>
 
 ---
 
 ## 데모
 
-![PuriPuly(Deepgram + Gemini 3 Flash)와 VRCT(Google Web Speech + Google Translate)의 번역 비교. PuriPuly 전사: "てか俺にも声かけてくんないかな まあ関係ないんだけどさ。", 번역: "그나저나 나 한테도 말 좀 해주지. 뭐, 나랑은 상관없는 일이긴 하지만." | VRCT 전사: "てか俺에도声かけてくんないかな ま 관계ないんだけどさ", 번역: "나는 나에게도 말하지 않을 거야. 상관 없다."](../images/demo/jp-ko_screenshot.png)
+<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
 
----
-
-<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%">
-
-</video>
+<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
 
 PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습을 더 보고 싶다면:
 
@@ -70,6 +57,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - **LLM 기반 현지화** — 슬랭, 구어체, 반말/존댓말까지 자연스럽게
 - **맥락 기억** — 문맥을 고려한 자연스러운 대화 흐름 유지
 - **양방향 음성 번역** — 상대 음성도 같이 번역, VR 자막 오버레이 지원
+- **사진 번역** — VR 속에서 찍은 사진을 바로 번역, 매일 무료 제공
 - **설정 없이 바로 사용** — 직접 복잡하게 설정할 필요 없이 내장 에이전트가 최적의 경험을 제공해요
 - **가장 강력한 로컬 풀스택** — Granite Speech 5.0에서 Gemma 4까지, 지금 가장 효율적인 모델을 탑재
 
@@ -84,7 +72,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - **음성 인식이 느려요**
 → 로컬 ASR을 사용할 때 컴퓨팅이 부족한 상황이라면 처리 시간이 늦어 질 수 있어요. 이때는 클라우드 STT 서비스로 바꾸는 걸 추천해요.
 - **개인 데이터는 어떻게 처리되나요?**
-→ Puripuly 서버에는 음성과 대화 내용이 전송되지 않아요. 또한 모든 코드가 현재 레포에 공개되어 있어 네트워크 동작을 직접 검증할 수 있어요.
+→ PuriPuly 서버에는 음성과 대화 내용이 전송되지 않아요. 또한 모든 코드가 현재 레포에 공개되어 있어 네트워크 동작을 직접 검증할 수 있어요.
 
 ### [📥 다운로드](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
@@ -122,7 +110,6 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | LLM \ ASR                    | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ---------------------------- | --------- | ------------------- | ------ | ---------- |
 | **Gemma 4 E4B & 26B (Local)** | 무제한       | 무제한                 | 5,000회 | 7,260회     |
-| **DeepSeek V4 Flash (OpenRouter)** | 17,020회   | 17,020회             | 3,860회 | 5,090회     |
 | **Qwen 3.8 Flash**           | 7,460회    | 7,460회              | 2,990회 | 3,680회     |
 
 
@@ -145,14 +132,13 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | LLM \ ASR                    | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ---------------------------- | --------- | ------------------- | ------ | ---------- |
 | **Gemma 4 E4B & 26B (Local)** | 0원        | 0원                  | ~0.3원  | ~0.2원      |
-| **DeepSeek V4 Flash (OpenRouter)** | ~0.08원    | ~0.08원              | ~0.4원  | ~0.3원      |
 | **Qwen 3.8 Flash**            | ~0.2원     | ~0.2원               | ~0.5원  | ~0.4원      |
 
 
 - *(입력 900 토큰 + 출력 12토큰) x 발화 1회당 평균 LLM 호출 횟수 1.2회 가정*
 - *1달러 당 사용 가능 횟수는 발화당 비용 테이블의 반올림 전 계산값 기준*
 - *모든 비용과 사용 가능 횟수는 근사치 계산*
-- *DeepSeek V4.1 Flash는 캐시 히트율 70%, V4 Flash는 60% 가정 / 피크 타임은 고려하지 않음*
+- *DeepSeek V4.1 Flash는 캐시 히트율 70% 가정*
 - *GPT-6 Luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
 - *Qwen API 비용은 베이징 리전 기준*
 - *요금표 기준: 2026년 10월 17일*
@@ -165,9 +151,9 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | ----------------- | ----------- | --- | ---------- |
 | **Deepgram**      | $200        | 없음  | 카드 등록 불필요 |
 | **ElevenLabs**    | 10,000 크레딧 | 매월 갱신 | 카드 등록 불필요 |
+| **Gemini 3.5 Transcribe** | 프리티어 | 없음 | 프리티어에서 사실상 무제한 |
 | **Alibaba Cloud** | 모델당 100만 토큰 | 90일 | 싱가포르 리전 기준 |
 | **Alibaba Cloud** | ¥300        | 1년  | 중국 내 학생 대상 |
-| **Gemini 3.5 Transcribe** | 프리티어 | 없음 | 프리티어에서 사실상 무제한 |
 
 
 ---
@@ -211,7 +197,9 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 4. **TRANS** 버튼 클릭. 신규 설치는 API 키 없이 Index를 사용해요. 인증·설정 안내가 나오면 완료해주세요.
 5. **CAPTIONS** 버튼을 눌러 자막 켜기
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
-  > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
+
+   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
+
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
 
 양방향 제어 설정과 안정적인 파라미터 ABI는 [VRChat OSC 컨트롤](../vrchat-osc.md)을 참고하세요.
@@ -224,7 +212,8 @@ Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으�
 
 - STT: **Qwen Audio**
 - LLM: **DeepSeek V4.1 Flash**
-  > 디스코드 대신 QQ를 통해 인증할 수 있어요.
+
+   > 디스코드 대신 QQ를 통해 인증할 수 있어요.
 
 ---
 
@@ -232,7 +221,7 @@ Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으�
 
 사용하려는 서비스에 따라 알맞은 가이드를 보고 따라해주세요.
 
-번역용 LLM은 Openrouter를 통해서 Gemma 4 모델을 사용하는 것을 추천해요.
+번역용 LLM은 OpenRouter를 통해서 Gemma 4 모델을 사용하는 것을 추천해요.
 
 혹시 이왕 설정하는 김에 ASR 쪽도 같이 설정하면 어떨까요?
 PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해요.
@@ -249,7 +238,7 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
 2. 앱에서 빨간색 원 안의 버튼을 눌러주세요
    ![step1](../images/openrouter/1.png)
 
-3. Openrouter에서 로그인하세요
+3. OpenRouter에서 로그인하세요
    ![step2](../images/openrouter/2.png)
 
 4. 빨간색 원 안의 버튼을 눌러 결제창을 빠져나가세요
@@ -310,8 +299,8 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
 1. 두 ASR 옵션을 사진과 같이 설정해주세요.
    ![step1](../images/ASR_freetier/1.png)
 
-2. (선택) 사용하고자 하는 ASR 제공자들을 선택해주세요. 
-   ![step1](../images/ASR_freetier/2.png)
+2. (선택) 사용하고자 하는 ASR 제공자들을 선택해주세요.
+   ![step2](../images/ASR_freetier/2.png)
 
 3. 가이드를 보고 API 키를 발급한 후 API 키 폼에 입력해주세요.
 
@@ -379,28 +368,28 @@ PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해�
    ![step1](../images/elevenlabs/1.png)
 
 2. 'Continue' 버튼을 눌러주세요.
-   ![step1](../images/elevenlabs/2.png)
+   ![step2](../images/elevenlabs/2.png)
 
-3. 이름를 작성한 후 체크 박스를 눌러주세요. 그 다음 'Next' 버튼을 눌러주세요.
-   ![step1](../images/elevenlabs/3.png)
+3. 이름을 작성한 후 체크 박스를 눌러주세요. 그 다음 'Next' 버튼을 눌러주세요.
+   ![step3](../images/elevenlabs/3.png)
 
 4. 계속 'Skip' 버튼을 눌러주세요.
-   ![step1](../images/elevenlabs/4.png)
+   ![step4](../images/elevenlabs/4.png)
 
 5. 결제 창이 나오면 'Skip' 버튼을 눌러주세요.
-   ![step1](../images/elevenlabs/5.png)
+   ![step5](../images/elevenlabs/5.png)
 
 6. 왼쪽 하단의 'Switch' 버튼을 누른 후 'ElevenAPI'로 전환해주세요.
-   ![step1](../images/elevenlabs/6.png)
+   ![step6](../images/elevenlabs/6.png)
 
 7. 왼쪽 탭에서 'API keys'를 누른 후 중앙의 'Create Key'를 눌러주세요.
-   ![step1](../images/elevenlabs/7.png)
+   ![step7](../images/elevenlabs/7.png)
 
 8. Speech to Text 권한을 부여한 후에 'Create Key' 버튼을 눌러주세요.
-   ![step1](../images/elevenlabs/8.png)
+   ![step8](../images/elevenlabs/8.png)
 
 9. API 키를 복사하여 PuriPuly에 붙여넣어주세요.
-   ![step1](../images/elevenlabs/9.png)
+   ![step9](../images/elevenlabs/9.png)
 
 </details>
 
@@ -506,18 +495,9 @@ uv run --locked python scripts/ci/check_test_selection.py
   <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
 </a>
 
----
-
 ## Special Thanks
 
-SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, KOZ39
-
----
-
-## 정책
-
-- [Code signing policy](../../CODE_SIGNING.md)
-- [개인정보처리방침](../../PRIVACY.md)
+SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
 
 ---
 

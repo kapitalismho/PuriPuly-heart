@@ -1097,6 +1097,12 @@ async def test_connection_start_fences_parameters_until_each_canonical_value_arr
     assert "PuriPuly_SelfDstLang2" not in integration._resync_unsettled
     assert control_handler("/avatar/parameters/PuriPuly_SelfDstLang2", (16,)) is True
 
+    translator = "/avatar/parameters/PuriPuly_Translator"
+    assert control_handler(translator, (0,)) is False
+    assert "PuriPuly_Translator" not in integration._resync_unsettled
+    assert control_handler(translator, (3,)) is False
+    assert control_handler(translator, (13,)) is True
+
     await integration.close()
 
 

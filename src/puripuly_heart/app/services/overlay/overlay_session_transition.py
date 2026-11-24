@@ -33,6 +33,7 @@ class OverlaySessionStartExecution:
     on_starting: OverlaySessionStartingHandler
     run_start: OverlaySessionStartOperation
     replace_starting: bool = False
+    replace_connected: bool = False
     retire_previous: Callable[[], Awaitable[object | None]] | None = None
     is_current: Callable[[], bool] = field(default=lambda: True, repr=False)
 
@@ -101,7 +102,7 @@ class OverlaySessionTransitionOwner:
                     OverlaySessionTransitionDiagnostic(operation="start", outcome="superseded")
                 )
                 return "superseded"
-            if execution.state == "connected" or (
+            if (execution.state == "connected" and not execution.replace_connected) or (
                 execution.state == "starting" and not execution.replace_starting
             ):
                 self._emit(

@@ -94,7 +94,7 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
-        (TranslationModel.DEEPSEEK_V4_FLASH, TranslationConnection.OPENROUTER, 3),
+        (TranslationModel.DEEPSEEK_V4_FLASH_41, TranslationConnection.OPENROUTER, 13),
         (TranslationModel.DEEPSEEK_V4_FLASH_41, TranslationConnection.OFFICIAL_BYOK, 13),
     ],
 )

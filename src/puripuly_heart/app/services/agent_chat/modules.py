@@ -80,6 +80,7 @@ MODULE_FIELDS = {
         "overlay.target",
         "overlay.translation.enabled",
         "overlay.peer_original.enabled",
+        "overlay.vr_compatibility_mode",
         "overlay.background_alpha",
         "overlay.swap_caption_languages",
         "overlay.desktop_size",

@@ -179,6 +179,7 @@ class OverlaySettingsSnapshot:
     desktop_background_alpha: float
     desktop_swap_caption_languages: bool
     calibration: OverlayCalibrationSnapshot
+    vr_compatibility_mode: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +290,7 @@ class CustomVocabularySettingsIntent:
 @dataclass(frozen=True, slots=True)
 class OverlayTargetSettingsIntent:
     target: str
+    vr_compatibility_mode: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +300,11 @@ class OverlayTranslationSettingsIntent:
 
 @dataclass(frozen=True, slots=True)
 class OverlayPeerOriginalSettingsIntent:
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayVrCompatibilitySettingsIntent:
     enabled: bool
 
 
@@ -346,6 +353,7 @@ ImmediateSettingsIntent: TypeAlias = (
     | OverlayTargetSettingsIntent
     | OverlayTranslationSettingsIntent
     | OverlayPeerOriginalSettingsIntent
+    | OverlayVrCompatibilitySettingsIntent
     | DesktopOverlayBackgroundAlphaIntent
     | DesktopOverlaySwapCaptionLanguagesIntent
     | DesktopOverlaySizeIntent
@@ -528,6 +536,7 @@ __all__ = [
     "OverlaySettingsSnapshot",
     "OverlayTargetSettingsIntent",
     "OverlayTranslationSettingsIntent",
+    "OverlayVrCompatibilitySettingsIntent",
     "PeerExpectedLanguagesIntent",
     "PeerSttProviderEdit",
     "PeerVadHangoverIntent",

@@ -358,12 +358,6 @@ export const appTools = [
                     "openrouter"
                   ]
                 },
-                "deepseek_v4_flash": {
-                  "type": "string",
-                  "enum": [
-                    "openrouter"
-                  ]
-                },
                 "deepseek_v4_flash_41": {
                   "type": "string",
                   "enum": [
@@ -593,7 +587,6 @@ export const appTools = [
           "enum": [
             "index_translate_35b",
             "gemma4_26b_31b",
-            "deepseek_v4_flash",
             "deepseek_v4_flash_41",
             "gemini_flash",
             "gpt_6_luna",

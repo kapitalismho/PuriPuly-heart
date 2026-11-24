@@ -6,7 +6,6 @@ from enum import Enum
 class TranslationModel(str, Enum):
     INDEX_TRANSLATE_35B = "index_translate_35b"
     GEMMA4_26B_31B = "gemma4_26b_31b"
-    DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
     GPT_6_LUNA = "gpt_6_luna"
     QWEN_38_FLASH = "qwen38_flash"
@@ -41,7 +40,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
     ),
-    TranslationModel.DEEPSEEK_V4_FLASH: (TranslationConnection.OPENROUTER,),
     TranslationModel.DEEPSEEK_V4_FLASH_41: (
         TranslationConnection.MANAGED,
         TranslationConnection.MANAGED_CHINA,
