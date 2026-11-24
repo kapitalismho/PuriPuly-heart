@@ -52,78 +52,12 @@ describe('broker direct deploy automation', () => {
     const renderedConfig = readFileSync(outputPath, 'utf8');
     const config = JSON.parse(renderedConfig);
     expect(config.name).toBe('puripuly-heart-broker');
-    expect(config.placement).toEqual({ mode: 'off' });
-    expect(config.version_metadata).toEqual({ binding: 'CF_VERSION_METADATA' });
-    expect(config.vars.TOKEN_BASELINE_START_UTC).toBe('');
     expect(config.triggers.crons).toEqual(['* * * * *']);
     expect(config.d1_databases).toEqual([
       { binding: 'BROKER_DB', database_name: 'puripuly-heart-broker', database_id: brokerDatabaseId },
       { binding: 'AGENT_USAGE_DB', database_name: 'puripuly-heart-agent-usage', database_id: agentUsageDatabaseId, migrations_dir: '../agent-relay/migrations' },
     ]);
     expect(renderedConfig).not.toContain('REQUIRED_AT_DEPLOY_TIME');
-  });
-
-  it.each([true, false])('renders a real UTC start date with explicit off placement present: %s', (explicitOff) => {
-    const tempDir = createTempDir();
-    const sourcePath = join(tempDir, 'wrangler.source.jsonc');
-    const outputPath = join(tempDir, 'wrangler.production.jsonc');
-    const source = JSON.parse(readFileSync(checkedInWranglerConfig, 'utf8'));
-    if (!explicitOff) delete source.placement;
-    writeFileSync(sourcePath, JSON.stringify(source, null, 2));
-    runNodeScript(renderWranglerConfigScript, [
-      ...productionRendererArgs(outputPath),
-      '--source', sourcePath,
-      '--token-baseline-start-utc', '2032-02-29',
-    ]);
-    const config = JSON.parse(readFileSync(outputPath, 'utf8'));
-    expect(config.placement).toEqual(explicitOff ? { mode: 'off' } : undefined);
-    expect(config.vars.TOKEN_BASELINE_START_UTC).toBe('2032-02-29');
-    expect(config.version_metadata).toEqual({ binding: 'CF_VERSION_METADATA' });
-  });
-
-  it.each(['2026-02-29', '2032-02-30', '2026-04-31', '2026-13-01', '0000-01-01', '2032-2-29', '2032-02-29T00:00:00Z', '2032-02-29\n', ' '])(
-    'rejects a baseline start that is not a real exact UTC date: %j',
-    (start) => {
-      const outputPath = join(createTempDir(), 'wrangler.production.jsonc');
-      expect(() => runNodeScript(renderWranglerConfigScript, [
-        ...productionRendererArgs(outputPath),
-        '--token-baseline-start-utc', start,
-      ])).toThrow(/exact UTC calendar date/u);
-      expect(existsSync(outputPath)).toBe(false);
-    },
-  );
-
-  it.each([
-    { mode: 'smart' },
-    { mode: 'off', hint: 'aws:ap-northeast-1' },
-    { mode: 'targeted', host: 'backend.example.com:443' },
-    { mode: 'of' },
-    {},
-    null,
-  ])('rejects non-off placement %j only when a baseline is requested', (placement) => {
-    const tempDir = createTempDir();
-    const sourcePath = join(tempDir, 'wrangler.source.jsonc');
-    const rejectedPath = join(tempDir, 'wrangler.rejected.jsonc');
-    const outputPath = join(tempDir, 'wrangler.production.jsonc');
-    const source = JSON.parse(readFileSync(checkedInWranglerConfig, 'utf8'));
-    source.placement = placement;
-    source.vars.TOKEN_BASELINE_START_UTC = '2032-02-29';
-    source.vars.UNRELATED_SETTING = 'unchanged';
-    writeFileSync(sourcePath, JSON.stringify(source, null, 2));
-    expect(() => runNodeScript(renderWranglerConfigScript, [
-      ...productionRendererArgs(rejectedPath),
-      '--source', sourcePath,
-      '--token-baseline-start-utc', '2032-02-29',
-    ])).toThrow(/requires placement/u);
-    expect(existsSync(rejectedPath)).toBe(false);
-    runNodeScript(renderWranglerConfigScript, [
-      ...productionRendererArgs(outputPath),
-      '--source', sourcePath,
-      '--token-baseline-start-utc', '',
-    ]);
-    const config = JSON.parse(readFileSync(outputPath, 'utf8'));
-    expect(config.placement).toEqual(placement);
-    expect(config.vars).toMatchObject({ TOKEN_BASELINE_START_UTC: '', UNRELATED_SETTING: 'unchanged' });
   });
 
   it('substitutes database IDs by binding even when their order changes', () => {

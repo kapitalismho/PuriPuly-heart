@@ -203,12 +203,6 @@ export async function handlePuriToken(c: Context<BrokerEnv>): Promise<Response> 
   })));
   const signingInput = `${header}.${claims}`;
   const signature = encodeBase64Url(await hmac(tokenSecret, signingInput));
-  if (c.get('puriTokenBaselineCohort') !== undefined) {
-    const bound = results[3]?.meta?.changes;
-    if (bound === 1 || bound === 0) {
-      c.set('puriTokenBaselineCohort', bound === 1 ? 'enrollment' : 'renewal');
-    }
-  }
   return c.json({
     access_token: `${signingInput}.${signature}`, token_type: 'Bearer',
     expires_in: TOKEN_LIFETIME_SECONDS, expires_at: new Date(exp * 1000).toISOString(),

@@ -2,6 +2,8 @@
 
 **Broker: unresolved; leave off. Relay: unresolved; leave off.** Both isolated Workers ended with `INSUFFICIENT_INVOCATIONS`; none of the 28 trial client requests was confirmed remotely placed. Do not interpret the differences below as an improvement or regression from placement. **Photo CPU: no production TypeScript or Wasm change.** The two version-matched completed, app-prepared photo requests used 7 and 19 ms of Cloudflare CPU. The local profile explains where to look, but does not isolate an avoidable cost that justifies changing the handler. Free-plan headroom remains unproven. No user-visible behavior changed. Ordinary speech translation, personal photo routes, established P2P delivery and Broker cron are outside this result.
 
+**Operational decision:** Do not collect production token latency for this comparison. The proposed seven-day Broker collector was never deployed and has been removed; the isolated trial results below remain historical evidence. Neither Worker is being switched to Smart Placement.
+
 ## What is running
 
 Source under test: [`83b27db2477834bf36b47ea3d89f23999ca35e84`](https://github.com/kapitalismho/PuriPuly-heart/tree/83b27db2477834bf36b47ea3d89f23999ca35e84), equal to remote `dev` at setup. The [Broker](../services/broker/wrangler.jsonc) and [Relay](../services/agent-relay/wrangler.jsonc) sources both omit `placement`. The table describes **deployed** Workers, not deployments of this checkout. Control-plane readback: 2026-11-24, approximately 08:11 UTC.

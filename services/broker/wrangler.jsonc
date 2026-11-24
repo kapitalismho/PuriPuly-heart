@@ -2,12 +2,6 @@
   "name": "puripuly-heart-broker",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-08",
-  "placement": {
-    "mode": "off"
-  },
-  "version_metadata": {
-    "binding": "CF_VERSION_METADATA"
-  },
   "d1_databases": [
     {
       "binding": "BROKER_DB",
@@ -25,7 +19,6 @@
     "crons": ["* * * * *"]
   },
   "vars": {
-    "TOKEN_BASELINE_START_UTC": "",
     "NETWORK_IDENTITY_HMAC_KEY_VERSION": "1"
   }
 }

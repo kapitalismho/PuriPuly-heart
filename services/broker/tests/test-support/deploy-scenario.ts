@@ -88,7 +88,7 @@ export function createDeployScenario(options: {
   writeFileSync(workerPath, JSON.stringify({
     deployments: 0,
     secrets: { NETWORK_IDENTITY_HMAC_SECRET: 'deployed-only-current', NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: 'deployed-only-previous', OPENROUTER_MANAGEMENT_API_KEY: 'deployed-only-provider' },
-    vars: { NETWORK_IDENTITY_HMAC_KEY_VERSION: '7', NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '6', TOKEN_BASELINE_START_UTC: '', NON_OWNED_RUNTIME_SETTING: 'preserve-me' },
+    vars: { NETWORK_IDENTITY_HMAC_KEY_VERSION: '7', NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS: '6', NON_OWNED_RUNTIME_SETTING: 'preserve-me' },
     guardrail: { allowed_models: ['preserve-me'] },
     issuedKeys: [],
   }));

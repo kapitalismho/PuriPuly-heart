@@ -44,10 +44,6 @@ async function main() {
       );
     }
   }
-  const baselineStart = args['token-baseline-start-utc'] ?? '';
-  if (baselineStart !== '') {
-    assertUtcDate(baselineStart);
-  }
   const sourceText = await readFile(sourcePath, 'utf8');
   const nameMatch = sourceText.match(/"name"\s*:\s*"([^"]+)"/u);
 
@@ -61,32 +57,25 @@ async function main() {
     );
   }
 
-  const runtimeEntries = [
+  const versionEntries = [
     `    "NETWORK_IDENTITY_HMAC_KEY_VERSION": ${JSON.stringify(keyVersion)}`,
     ...previousVersions.map(
       (previous) => `    "NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS": ${JSON.stringify(previous)}`,
     ),
-    `    "TOKEN_BASELINE_START_UTC": ${JSON.stringify(baselineStart)}`,
   ];
-  const renderedConfig = injectRuntimeVars(sourceText, runtimeEntries);
+  const renderedConfig = injectVersionVars(sourceText, versionEntries);
 
   const withBrokerDatabaseId = replaceDatabaseId(renderedConfig, 'BROKER_DB', databaseId);
   const withDatabaseIds = replaceDatabaseId(withBrokerDatabaseId, 'AGENT_USAGE_DB', agentUsageDatabaseId);
   if (withDatabaseIds.includes(DATABASE_ID_PLACEHOLDER)) {
     throw new Error('wrangler config has unexpected remaining deploy-time placeholders.');
   }
-  if (baselineStart !== '') {
-    const { placement } = JSON.parse(withDatabaseIds.replace(/^\s*\/\/.*$/gmu, ''));
-    if (placement !== undefined && (placement?.mode !== 'off' || Object.keys(placement).length !== 1)) {
-      throw new Error('A token baseline requires placement to be omitted or exactly {"mode":"off"}.');
-    }
-  }
 
   await writeFile(outputPath, withDatabaseIds, 'utf8');
   process.stdout.write(`${outputPath}\n`);
 }
 
-function injectRuntimeVars(sourceText, runtimeEntries) {
+function injectVersionVars(sourceText, versionEntries) {
   const lines = sourceText.split('\n');
   const openIndex = lines.findIndex((line) => /^\s*"vars"\s*:\s*\{\s*$/u.test(line));
   if (openIndex === -1) {
@@ -96,7 +85,7 @@ function injectRuntimeVars(sourceText, runtimeEntries) {
     }
     const withoutClose = trimmedEnd.slice(0, -1).replace(/\s+$/u, '');
     const separator = withoutClose.endsWith('{') ? '\n' : ',\n';
-    return `${withoutClose}${separator}  "vars": {\n${runtimeEntries.join(',\n')}\n  }\n}\n`;
+    return `${withoutClose}${separator}  "vars": {\n${versionEntries.join(',\n')}\n  }\n}\n`;
   }
   let depth = 0;
   let closeIndex = -1;
@@ -113,13 +102,12 @@ function injectRuntimeVars(sourceText, runtimeEntries) {
   }
   const kept = [];
   for (let index = openIndex + 1; index < closeIndex; index += 1) {
-    if (/NETWORK_IDENTITY_HMAC_KEY_VERSION/u.test(lines[index])
-      || /^\s*"TOKEN_BASELINE_START_UTC"\s*:/u.test(lines[index])) {
+    if (/NETWORK_IDENTITY_HMAC_KEY_VERSION/u.test(lines[index])) {
       continue;
     }
     kept.push(lines[index].replace(/,\s*$/u, ''));
   }
-  const body = [...kept, ...runtimeEntries].join(',\n');
+  const body = [...kept, ...versionEntries].join(',\n');
   return [...lines.slice(0, openIndex + 1), body, ...lines.slice(closeIndex)].join('\n');
 }
 
@@ -152,16 +140,6 @@ function assertPositiveInteger(value, message) {
   }
 }
 
-function assertUtcDate(value) {
-  const start = Date.parse(`${value}T00:00:00.000Z`);
-  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(value)
-    || value.startsWith('0000')
-    || !Number.isFinite(start)
-    || new Date(start).toISOString().slice(0, 10) !== value) {
-    throw new Error('--token-baseline-start-utc must be an exact UTC calendar date (YYYY-MM-DD) or empty.');
-  }
-}
-
 function parseArgs(argv) {
   const args = {};
 
@@ -175,7 +153,7 @@ function parseArgs(argv) {
     const key = token.slice(2);
     const value = argv[index + 1];
 
-    if (value === undefined || value.startsWith('--') || (value === '' && key !== 'token-baseline-start-utc')) {
+    if (!value || value.startsWith('--')) {
       throw new Error(`missing value for --${key}`);
     }
 

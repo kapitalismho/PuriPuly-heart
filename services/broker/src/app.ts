@@ -23,7 +23,6 @@ import { handleManagedKeyDeliveryAck } from './managed-key-delivery';
 import { handleManagedOperationResume } from './managed-operation-resume';
 import { handleManagedOperationStatus } from './managed-operation';
 import { handlePuriToken } from './puri-token';
-import { capturePuriTokenBaseline } from './puri-token-baseline';
 import { handlePhotoAccess } from './photo-access';
 
 export const app = new Hono<BrokerEnv>();
@@ -43,7 +42,7 @@ app.get('/v1/foundation', (c: Context<BrokerEnv>) => {
   return c.json(FOUNDATION_RESPONSE);
 });
 
-app.post('/v1/puri/token', capturePuriTokenBaseline, bodyLimit({
+app.post('/v1/puri/token', bodyLimit({
   maxSize: 4096,
   onError: (c) => {
     c.header('Cache-Control', 'no-store');

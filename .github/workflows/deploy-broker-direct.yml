@@ -12,11 +12,6 @@ on:
         required: false
         default: false
         type: boolean
-      token_baseline_start_utc:
-        description: UTC start date (YYYY-MM-DD) for seven days of passive Broker token baseline collection with placement off. Leave blank to disable.
-        required: false
-        default: ''
-        type: string
 
 permissions:
   contents: read
@@ -93,8 +88,6 @@ jobs:
       - name: Render production Wrangler config
         shell: bash
         working-directory: services/broker
-        env:
-          TOKEN_BASELINE_START_UTC: ${{ inputs.token_baseline_start_utc }}
         run: |
           version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
           if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
@@ -103,7 +96,6 @@ jobs:
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
             --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
-            --token-baseline-start-utc "${TOKEN_BASELINE_START_UTC:-}" \
             "${version_args[@]}" --out wrangler.production.jsonc
 
       - name: Validate production Wrangler config
