@@ -659,9 +659,24 @@ SCENARIOS = (
         Persona(familiarity="regular", concern="디스코드 상대 목소리 번역이 갑자기 멈췄어."),
         "LISTEN captures the Discord app, and that Peer process capture faulted after its source was lost. Retry the Peer capture or restart LISTEN without changing settings or devices, and claim recovery only from current Peer translation.",
     ),
+    Scenario(
+        "explain-vr-photo",
+        "onboarding",
+        "development",
+        "healthy",
+        Persona(concern="VRChat에서 찍은 사진도 번역된다던데 어떻게 써?", advice_only=True),
+        "Explain VR photo translation from the product facts: with PuriPuly and SteamVR running, take a VRChat camera photo, then within 10 seconds look at the right wrist, grab the icon with the left grip and pull it away; the translation appears in the left hand. Photo text is translated into the Self input language, with no separate photo language. Image translation settings hold the switch, model and connection. Do not claim that chat can see, check or retry photos, and change no settings.",
+        explanation_only=True,
+        dialogue=(
+            DialogueBeat(
+                "VR에서 VRChat 사진 번역을 어떻게 쓰는지 물어봐. 설정은 아직 바꾸지 마.", ("work",)
+            ),
+            DialogueBeat("사진 속 글자는 어떤 언어로 번역되는지 물어봐.", ("work",)),
+        ),
+    ),
 )
 
-SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact. Three development cases then added two anonymized support handoff journeys (translation route choice; TALK recovery followed by LISTEN failure) and a retry-applicable Peer process capture. Consolidation then retired unsolvable-internal: report-ticket-contact uses the same internal-fault fixture and keeps its inspection before an optional report, the explanation of failed remedies and the no custom-endpoint workaround rule, while also covering the send and contact path. Declining the report card remains covered by the code-checked upload prohibition and the controlled report-choice tests. COVERAGE records the behavior each case protects; SELECTIONS name the fast development guard set and the policy, recovery, journey and safety groups."
+SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact. Three development cases then added two anonymized support handoff journeys (translation route choice; TALK recovery followed by LISTEN failure) and a retry-applicable Peer process capture. Consolidation then retired unsolvable-internal: report-ticket-contact uses the same internal-fault fixture and keeps its inspection before an optional report, the explanation of failed remedies and the no custom-endpoint workaround rule, while also covering the send and contact path. Declining the report card remains covered by the code-checked upload prohibition and the controlled report-choice tests. COVERAGE records the behavior each case protects; SELECTIONS name the fast development guard set and the policy, recovery, journey and safety groups. One development case then added a VR photo usage question, so the selectable photo reference has a case that needs it."
 
 COVERAGE = {
     "recognition-microphone": (
@@ -740,6 +755,9 @@ COVERAGE = {
     "listen-process-retry": (
         "Peer process capture retry; recovery claimed only from current Peer translation",
     ),
+    "explain-vr-photo": (
+        "VR photo usage and photo language explained from the photo reference without settings changes",
+    ),
 }
 
 SELECTIONS = {
@@ -768,6 +786,7 @@ SELECTIONS = {
         "policy-asr-free",
         "free-index-selected",
         "recommend-default-free-options",
+        "explain-vr-photo",
         "extra-reject-paid",
     ),
     "recovery": (
