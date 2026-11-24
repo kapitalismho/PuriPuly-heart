@@ -60,8 +60,8 @@ jobs:
               exit 1
             fi
           done
-          if [[ ! "$BROKER_CANONICAL_WORKERS_DEV_URL" =~ ^https://puripuly-heart-broker\.[a-z0-9-]+\.workers\.dev/?$ ]]; then
-            echo 'BROKER_CANONICAL_WORKERS_DEV_URL must target the canonical puripuly-heart-broker workers.dev hostname.' >&2
+          if [[ "${BROKER_CANONICAL_WORKERS_DEV_URL%/}" != 'https://puripuly-heart-broker.kapitalismho.workers.dev' ]]; then
+            echo 'BROKER_CANONICAL_WORKERS_DEV_URL must target the production Broker workers.dev origin.' >&2
             exit 1
           fi
 
@@ -94,6 +94,7 @@ jobs:
             version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
           fi
           node scripts/render-production-wrangler-config.mjs \
+            --account-id "$CLOUDFLARE_ACCOUNT_ID" \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
             --agent-usage-database-id "$AGENT_USAGE_D1_DATABASE_ID_PRODUCTION" \
             "${version_args[@]}" --out wrangler.production.jsonc
@@ -101,6 +102,10 @@ jobs:
       - name: Validate production Wrangler config
         working-directory: services/broker
         run: pnpm exec wrangler types --config wrangler.production.jsonc
+
+      - name: Verify production Cloudflare target and domain ownership
+        timeout-minutes: 2
+        run: node services/worker-deployment.mjs broker
 
       - name: Require report-ready Relay usage database
         shell: bash
@@ -255,22 +260,22 @@ jobs:
         working-directory: services/broker
         run: pnpm exec wrangler deploy --keep-vars --config wrangler.production.jsonc
 
-      - name: Verify deployed health and public foundation
+      - name: Verify deployed health and public foundation on both origins
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           probe_dir="$(mktemp -d)"
           trap 'rm -rf -- "$probe_dir"' EXIT
-          for attempt in {1..12}; do
-            health_status=0
-            foundation_status=0
-            health_status="$(curl --silent --show-error --max-time 10 \
-              --output "$probe_dir/health.json" --write-out '%{http_code}' \
-              "${BROKER_CANONICAL_WORKERS_DEV_URL%/}/healthz")" || health_status=0
-            foundation_status="$(curl --silent --show-error --max-time 10 \
-              --output "$probe_dir/foundation.json" --write-out '%{http_code}' \
-              "${BROKER_CANONICAL_WORKERS_DEV_URL%/}/v1/foundation")" || foundation_status=0
-            if [[ "$health_status" == '200' && "$foundation_status" == '200' ]] && python3 - "$probe_dir" <<'PY'
+          verify_origin() {
+            local origin="$1" attempt health_status foundation_status
+            for attempt in {1..12}; do
+              health_status="$(curl --disable --silent --show-error --max-time 10 \
+                --output "$probe_dir/health.json" --write-out '%{http_code}' \
+                "$origin/healthz")" || health_status=0
+              foundation_status="$(curl --disable --silent --show-error --max-time 10 \
+                --output "$probe_dir/foundation.json" --write-out '%{http_code}' \
+                "$origin/v1/foundation")" || foundation_status=0
+              if [[ "$health_status" == '200' && "$foundation_status" == '200' ]] && python3 - "$probe_dir" <<'PY'
           import ast
           import json
           import re
@@ -302,11 +307,14 @@ jobs:
           except (AssertionError, KeyError, TypeError, ValueError):
               raise SystemExit('Deployed Broker public contract did not match.')
           PY
-            then
-              echo 'Deployed Broker health and public foundation verified.'
-              exit 0
-            fi
-            if [[ "$attempt" != '12' ]]; then sleep 5; fi
-          done
-          echo 'Timed out verifying deployed Broker health and public foundation.' >&2
-          exit 1
+              then
+                echo "Deployed Broker health and public foundation verified. Origin: $origin"
+                return 0
+              fi
+              if [[ "$attempt" != '12' ]]; then sleep 5; fi
+            done
+            echo "Timed out verifying deployed Broker health and public foundation for $origin." >&2
+            return 1
+          }
+          verify_origin 'https://puripuly-broker.salee.sarl'
+          verify_origin "${BROKER_CANONICAL_WORKERS_DEV_URL%/}"

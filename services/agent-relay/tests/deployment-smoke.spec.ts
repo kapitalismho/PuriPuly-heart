@@ -96,7 +96,7 @@ describe('deployment rejection smoke against the real relay handler', () => {
     const fetcher = vi.fn<typeof fetch>();
     for (const change of [{ origin: 'https://not-the-relay.invalid' }, { origin: 'http://127.0.0.1:1234' },
       { secret: '' }, { secret: 'short' }]) {
-      await expect(smokeDeployment({ origin: 'https://puripuly-heart-agent-relay.synthetic.workers.dev', secret: tokenSecret,
+      await expect(smokeDeployment({ origin: 'https://puripuly-relay.salee.sarl', secret: tokenSecret,
         modelEnabled: false, supportEnabled: false, fetcher, ...change })).rejects.toThrow();
     }
     expect(fetcher).not.toHaveBeenCalled();

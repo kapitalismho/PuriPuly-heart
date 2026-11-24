@@ -14,6 +14,8 @@ import {
 } from './test-support/deploy-scenario';
 
 const scenarios: DeployScenario[] = [];
+const publicOrigins = ['https://puripuly-broker.salee.sarl', 'https://puripuly-heart-broker.kapitalismho.workers.dev'];
+const publicProbes = publicOrigins.flatMap((origin) => [`GET ${origin}/healthz`, `GET ${origin}/v1/foundation`]);
 const codeOnlyInputs = [
   { selection: 'workflow default', env: {} },
   { selection: 'explicit false', env: { APPLY_MIGRATIONS: 'false' } },
@@ -55,7 +57,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readFileSync(value.usageDatabasePath)).toEqual(usageBefore);
     expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 1 });
     expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'read', 'deploy']);
-    expect(result.requests).toEqual(['GET /healthz', 'GET /v1/foundation']);
+    expect(result.requests).toEqual(publicProbes);
     expect(result.stdout).toContain('Deployed Broker health and public foundation verified.');
     expect(existsSync(join(value.broker, '.deploy-direct'))).toBe(false);
   });
@@ -105,7 +107,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
       { event: 'validate' }, { event: 'relay-read' }, { event: 'read' }, { event: 'read' },
       { event: 'migrate', pending: ['0031_photo_managed_access.sql'] }, { event: 'read' }, { event: 'deploy' },
     ]);
-    expect(result.requests).toEqual(['GET /healthz', 'GET /v1/foundation']);
+    expect(result.requests).toEqual(publicProbes);
   });
 
   it('allows explicitly selected ordinary maintenance when no migration remains pending', async () => {
@@ -125,7 +127,9 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     ...['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'BROKER_D1_DATABASE_ID_PRODUCTION', 'AGENT_USAGE_D1_DATABASE_ID_PRODUCTION'].flatMap((key) => [{ [key]: undefined }, { [key]: ' \t ' }]),
     ...['REQUIRED_AT_DEPLOY_TIME', 'not-a-uuid', '00000000-0000-0000-0000-000000000000', '22222222-2222-4222-8222-222222222222'].map((id) => ({ AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: id })),
     ...['REQUIRED_AT_DEPLOY_TIME', 'not-a-uuid', '00000000-0000-0000-0000-000000000000'].map((id) => ({ BROKER_D1_DATABASE_ID_PRODUCTION: id })),
-    ...['', 'https://other.synthetic.workers.dev', 'https://puripuly-heart-broker.synthetic.workers.dev/extra', 'https://puripuly-heart-broker.synthetic.workers.dev:443', 'http://puripuly-heart-broker.synthetic.workers.dev'].map((url) => ({ BROKER_CANONICAL_WORKERS_DEV_URL: url })),
+    { CLOUDFLARE_ACCOUNT_ID: 'not-an-account' }, { CLOUDFLARE_ACCOUNT_ID: '0'.repeat(32) },
+    ...['', 'https://puripuly-broker.salee.sarl', 'https://puripuly-heart-broker.other-account.workers.dev',
+      `${publicOrigins[1]}/extra`, `${publicOrigins[1]}:443`, `${publicOrigins[1]}/?`].map((url) => ({ BROKER_CANONICAL_WORKERS_DEV_URL: url })),
     ...['', '0', '01', 'v7', '9007199254740992'].map((version) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: version })),
     ...['0', 'v6', '7', '9007199254740992'].map((version) => ({ NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: version })),
   ])('rejects invalid deployment configuration %j before D1 or deployment', async (env) => {
@@ -138,6 +142,32 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readWorker(value)).toEqual(workerBefore);
     expect(readEvents(value)).toEqual([]);
     expect(result.requests).toEqual([]);
+  });
+
+  it.each([
+    ['wrong-account', /must own/], ['missing-worker', /already contain/], ['inactive-zone', /one active/],
+    ['foreign-zone', /one active/], ['foreign-domain', /Custom Domains/], ['extra-domain', /Custom Domains/],
+    ['partial-domain-list', /Custom Domains/], ['domain-api-error', /Custom Domains/], ['dns-conflict', /DNS/],
+    ['orphaned-managed-dns', /DNS/], ['extra-dns', /DNS/], ['missing-managed-dns', /DNS/],
+  ] as const)('blocks %s before D1 or even opted-in production writes', async (mode, message) => {
+    const value = scenario({ mode, pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
+    const before = readFileSync(value.databasePath);
+    const workerBefore = readWorker(value);
+    const result = await runDeployWorkflow(value);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(message);
+    expect(result.stderr).not.toContain('private-api-sentinel');
+    expect(result.executed.at(-1)).toBe('Verify production Cloudflare target and domain ownership');
+    expect(readEvents(value)).toEqual([{ event: 'validate' }]);
+    expect(readFileSync(value.databasePath)).toEqual(before);
+    expect(readWorker(value)).toEqual(workerBefore);
+  });
+
+  it('allows redeploy with the same Worker Custom Domain and managed DNS record', async () => {
+    const value = scenario({ mode: 'managed-domain', env: { BROKER_CANONICAL_WORKERS_DEV_URL: `${publicOrigins[1]}/` } });
+    const result = await runDeployWorkflow(value);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.requests).toEqual(publicProbes);
   });
 
   it.each([
@@ -322,6 +352,14 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readWorker(value).deployments).toBe(1);
     expect(readFileSync(value.databasePath)).toEqual(before);
     expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'read', 'deploy']);
+  });
+
+  it('requires the legacy worker to respond directly even when the custom origin is healthy', async () => {
+    const value = scenario();
+    const result = await runDeployWorkflow(value, { [`${publicOrigins[1]}/healthz`]: { status: 302 } });
+    expect(result.status).toBe(1);
+    expect(result.requests.slice(0, 4)).toEqual(publicProbes);
+    expect(result.stderr).toContain(`public foundation for ${publicOrigins[1]}`);
   });
 
   it('fails renderer rejection before remote admission when canonical configuration has drifted', async () => {

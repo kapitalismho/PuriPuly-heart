@@ -14,7 +14,7 @@ import relay from '../../src/index';
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
 const relayRoot = fileURLToPath(new URL('../../', import.meta.url));
 const support = fileURLToPath(new URL('./', import.meta.url));
-const canonicalOrigin = 'https://puripuly-heart-agent-relay.synthetic-account.workers.dev';
+const legacyOrigin = 'https://puripuly-heart-agent-relay.kapitalismho.workers.dev';
 const tokenSecret = 'synthetic-deployed-token-at-least-32-bytes';
 const shellPath = (path: string) => path.replaceAll('\\', '/');
 const bash = process.platform === 'win32'
@@ -90,7 +90,7 @@ export function createDeployScenario(options: {
       REVIEWED_COMMIT: commit, CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-agent-relay from dev',
       GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2',
       AGENT_SERVICE_ENABLED: 'true', PHOTO_SERVICE_ENABLED: 'true', SUPPORT_REPORTS_ENABLED: 'true',
-      AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: canonicalOrigin,
+      AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: legacyOrigin,
       CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
       AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: '11111111-1111-4111-8111-111111111111',
       BROKER_D1_DATABASE_ID_PRODUCTION: '22222222-2222-4222-8222-222222222222',
@@ -143,7 +143,8 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
         outgoing.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ success: true, result }));
         return;
       }
-      requests.push(`${incoming.method} ${path}`);
+      const origin = incoming.headers['x-deployment-probe-origin'];
+      requests.push(`${incoming.method} ${origin}${path}`);
       const chunks: Buffer[] = [];
       for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
       const headers = new Headers();
@@ -157,7 +158,8 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
         ...(worker.reportsBound ? { SUPPORT_REPORTS: { head: deny('R2'), put: deny('R2') } as unknown as R2Bucket } : {}),
       });
       outgoing.writeHead(worker.deployments ? actual.status : 503, { ...Object.fromEntries(actual.headers),
-        ...(scenario.env.SCENARIO_MODE === 'smoke-failure' ? { 'cache-control': 'public' } : {}) });
+        ...(scenario.env.SCENARIO_MODE === 'smoke-failure'
+          || (scenario.env.SCENARIO_MODE === 'legacy-smoke-failure' && origin === legacyOrigin) ? { 'cache-control': 'public' } : {}) });
       outgoing.end(Buffer.from(await actual.arrayBuffer()));
     } catch (error) { outgoing.writeHead(500).end(String(error)); }
   });

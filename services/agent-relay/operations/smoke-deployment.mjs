@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { relayDeployment, requireLegacyOrigin } from '../../worker-deployment.mjs';
 import { deploymentOrigin } from './prepare-deployment.mjs';
 
 export async function smokeDeployment({ origin, secret, modelEnabled, supportEnabled, allowLoopback = false, fetcher = fetch }) {
@@ -64,9 +65,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     if (process.argv.length !== 2 || !['true', 'false'].includes(process.env.AGENT_SERVICE_ENABLED)
       || !['true', 'false'].includes(process.env.SUPPORT_REPORTS_ENABLED)) throw new Error('Use explicit deployment flags for smoke.');
-    console.log(JSON.stringify(await smokeDeployment({ origin: process.env.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL,
-      secret: process.env.PURI_TOKEN_SECRET_PRODUCTION, modelEnabled: process.env.AGENT_SERVICE_ENABLED === 'true',
-      supportEnabled: process.env.SUPPORT_REPORTS_ENABLED === 'true' })));
+    const legacyOrigin = requireLegacyOrigin(process.env, relayDeployment);
+    for (const origin of [relayDeployment.origin, legacyOrigin]) {
+      try {
+        const result = await smokeDeployment({ origin,
+          secret: process.env.PURI_TOKEN_SECRET_PRODUCTION, modelEnabled: process.env.AGENT_SERVICE_ENABLED === 'true',
+          supportEnabled: process.env.SUPPORT_REPORTS_ENABLED === 'true' });
+        console.log(JSON.stringify({ origin, ...result }));
+      } catch (error) {
+        throw new Error(`${origin}: ${error instanceof Error ? error.message : 'Relay deployment smoke failed.'}`);
+      }
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Relay deployment smoke failed.');
     process.exitCode = 1;

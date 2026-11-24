@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { brokerDeployment, isExactOrigin } from '../../../worker-deployment.mjs';
 import { BROKER_SERVICE_NAME } from '../../src/contract';
 import { MANAGED_TRIAL_ALLOWED_MODELS } from '../../src/trial-policy';
 import {
@@ -13,7 +14,6 @@ import {
   signCanonicalVerifyRequest,
 } from '../test-support/ed25519';
 
-const CANONICAL_WORKER_NAME = 'puripuly-heart-broker';
 const ISSUE_REASON = 'llm_start';
 const ISSUE_BUDGET_USD = 0.07;
 const MANAGED_ALLOWLIST_MODELS = [...MANAGED_TRIAL_ALLOWED_MODELS] as const;
@@ -27,7 +27,7 @@ const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
 const BOOTSTRAP_PLACEHOLDER = '__BOOTSTRAP_REQUIRED__';
 const OPENROUTER_API_BASE_URL = new URL('https://openrouter.ai');
 const smokeRunEnabled = process.env.BROKER_DEPLOY_SMOKE_RUN === 'true';
-const smokeBaseUrl = process.env.BROKER_DEPLOY_SMOKE_BASE_URL?.trim();
+const smokeBaseUrl = process.env.BROKER_DEPLOY_SMOKE_BASE_URL;
 const smokeQqAuthHmacPsk = process.env.BROKER_DEPLOY_SMOKE_QQ_AUTH_HMAC_PSK;
 const smokeDisallowedModel = process.env.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL;
 const MANAGED_OPENROUTER_USER_ID_PATTERN = /^ph-or-user-v\d+_[A-Za-z0-9_-]+$/u;
@@ -196,23 +196,21 @@ describe('broker deploy smoke helpers', () => {
 
   it('validates complete live smoke inputs before the live flow can start', () => {
     const validInputs = readLiveDeploySmokeInputs({
-      baseUrl: 'https://puripuly-heart-broker.example.workers.dev',
-      canonicalWorkerName: CANONICAL_WORKER_NAME,
+      baseUrl: 'https://puripuly-broker.salee.sarl',
       disallowedModel: 'openai/gpt-4o-mini',
       managedAllowlistedModels: MANAGED_ALLOWLIST_MODELS,
       qqAuthHmacPsk: 'deploy-smoke-psk',
     });
 
     expect(validInputs.baseUrl.toString()).toBe(
-      'https://puripuly-heart-broker.example.workers.dev/',
+      'https://puripuly-broker.salee.sarl/',
     );
     expect(validInputs.disallowedModel).toBe('openai/gpt-4o-mini');
     expect(validInputs.qqAuthHmacPsk).toBe('deploy-smoke-psk');
 
     expect(() =>
       readLiveDeploySmokeInputs({
-        baseUrl: 'https://puripuly-heart-broker.example.workers.dev',
-        canonicalWorkerName: CANONICAL_WORKER_NAME,
+        baseUrl: 'https://puripuly-broker.salee.sarl',
         disallowedModel: undefined,
         managedAllowlistedModels: MANAGED_ALLOWLIST_MODELS,
         qqAuthHmacPsk: undefined,
@@ -223,12 +221,23 @@ describe('broker deploy smoke helpers', () => {
     expect(() =>
       readLiveDeploySmokeInputs({
         baseUrl: undefined,
-        canonicalWorkerName: CANONICAL_WORKER_NAME,
         disallowedModel: 'openai/gpt-4o-mini',
         managedAllowlistedModels: MANAGED_ALLOWLIST_MODELS,
         qqAuthHmacPsk: 'deploy-smoke-psk',
       }),
     ).toThrow(/BROKER_DEPLOY_SMOKE_BASE_URL/i);
+  });
+
+  it('accepts the exact legacy Broker origin and rejects anything outside the two Broker origins', () => {
+    expect(normalizeSmokeBaseUrl('https://puripuly-heart-broker.kapitalismho.workers.dev/').hostname)
+      .toBe('puripuly-heart-broker.kapitalismho.workers.dev');
+    for (const value of [
+      'https://broker.salee.sarl', 'https://puripuly-relay.salee.sarl', 'http://puripuly-broker.salee.sarl',
+      'https://puripuly-heart-broker.other-account.workers.dev', 'https://puripuly-heart-broker.preview.kapitalismho.workers.dev',
+      'https://puripuly-broker.salee.sarl.evil.test', 'https://user:secret@puripuly-broker.salee.sarl',
+      'https://puripuly-broker.salee.sarl:443', 'https://puripuly-broker.salee.sarl/.', 'https://puripuly-broker.salee.sarl/?',
+      'https://puripuly-broker.salee.sarl/#fragment', 'https://puripuly-broker.salee.sarl\n',
+    ]) expect(() => normalizeSmokeBaseUrl(value)).toThrow(/BROKER_DEPLOY_SMOKE_BASE_URL/);
   });
 
   it('rejects malformed managed OpenRouter user ids without echoing the value', () => {
@@ -357,10 +366,9 @@ describe('broker deploy smoke helpers', () => {
 });
 
 describeDeploySmoke('broker direct deploy smoke', () => {
-  it('passes the canonical workers.dev trial flow', async () => {
+  it('passes the selected production Broker trial flow', async () => {
     const liveInputs = readLiveDeploySmokeInputs({
       baseUrl: smokeBaseUrl,
-      canonicalWorkerName: CANONICAL_WORKER_NAME,
       disallowedModel: smokeDisallowedModel,
       managedAllowlistedModels: MANAGED_ALLOWLIST_MODELS,
       qqAuthHmacPsk: smokeQqAuthHmacPsk,
@@ -549,7 +557,6 @@ describeDeploySmoke('broker direct deploy smoke', () => {
 
 type LiveDeploySmokeInputOptions = {
   baseUrl: string | undefined;
-  canonicalWorkerName: string;
   disallowedModel: string | undefined;
   managedAllowlistedModels: readonly string[];
   qqAuthHmacPsk: string | undefined;
@@ -649,7 +656,7 @@ async function captureRequestJsonFailureMessage({
   try {
     await requestJson({
       method: 'POST',
-      url: new URL(targetPath, 'https://puripuly-heart-broker.example.workers.dev'),
+      url: new URL(targetPath, 'https://puripuly-broker.salee.sarl'),
     });
   } catch (error) {
     return readErrorMessage(error);
@@ -666,7 +673,6 @@ function shouldRunDeploySmoke(rawValue: string | undefined): boolean {
 
 function readLiveDeploySmokeInputs({
   baseUrl: rawBaseUrl,
-  canonicalWorkerName,
   disallowedModel: rawDisallowedModel,
   managedAllowlistedModels,
   qqAuthHmacPsk: rawQqAuthHmacPsk,
@@ -678,7 +684,6 @@ function readLiveDeploySmokeInputs({
 
   try {
     baseUrl = normalizeSmokeBaseUrl(rawBaseUrl);
-    validateCanonicalWorkersDevTarget(baseUrl, canonicalWorkerName);
   } catch (error) {
     validationErrors.push(readErrorMessage(error));
   }
@@ -831,23 +836,10 @@ function normalizeSmokeBaseUrl(baseUrl: string | undefined): URL {
     throw new Error('BROKER_DEPLOY_SMOKE_BASE_URL is required for deploy smoke');
   }
 
-  return new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
-}
-
-function validateCanonicalWorkersDevTarget(baseUrl: URL, canonicalWorkerName: string): void {
-  if (baseUrl.protocol !== 'https:') {
-    throw new Error('deploy smoke must target an https workers.dev URL');
+  for (const origin of [brokerDeployment.origin, brokerDeployment.legacyOrigin]) {
+    if (isExactOrigin(baseUrl, origin)) return new URL(origin);
   }
-
-  if (!baseUrl.hostname.endsWith('.workers.dev')) {
-    throw new Error('deploy smoke must target the canonical workers.dev hostname');
-  }
-
-  if (!baseUrl.hostname.startsWith(`${canonicalWorkerName}.`)) {
-    throw new Error(
-      `deploy smoke must target the canonical worker ${canonicalWorkerName}`,
-    );
-  }
+  throw new Error(`BROKER_DEPLOY_SMOKE_BASE_URL must be ${brokerDeployment.origin} or ${brokerDeployment.legacyOrigin}.`);
 }
 
 function timestampFromHeaders(headers: Headers): string {
@@ -1048,6 +1040,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function requestJson({ method, url, body, headers = {} }: JsonRequestOptions) {
   const response = await fetch(url, {
     method,
+    redirect: 'manual',
     headers: {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...headers,
@@ -1097,6 +1090,7 @@ async function requestJsonAllowFailure({
 }: JsonRequestOptions) {
   const response = await fetch(url, {
     method,
+    redirect: 'manual',
     headers: {
       ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...headers,

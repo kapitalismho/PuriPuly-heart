@@ -2,11 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isExactOrigin, relayDeployment, requireAccountId, requireLegacyOrigin } from '../../worker-deployment.mjs';
 import { configureSupportStorage } from './support-storage.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checkout = fileURLToPath(new URL('../../../', import.meta.url));
-export const workerName = 'puripuly-heart-agent-relay';
+export const workerName = relayDeployment.workerName;
 export const confirmation = `deploy ${workerName} from dev`;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const requiredColumns = {
@@ -27,10 +28,10 @@ function required(env, name) {
 }
 
 export function deploymentOrigin(value) {
-  if (!/^https:\/\/puripuly-heart-agent-relay\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.workers\.dev\/?$/.test(value ?? '')) {
-    throw new Error('AGENT_RELAY_CANONICAL_WORKERS_DEV_URL must be the canonical HTTPS workers.dev origin.');
+  for (const origin of [relayDeployment.origin, relayDeployment.legacyOrigin]) {
+    if (isExactOrigin(value, origin)) return origin;
   }
-  return new URL(value).origin;
+  throw new Error(`Relay deployment smoke requires ${relayDeployment.origin} or ${relayDeployment.legacyOrigin}.`);
 }
 
 export function guardDeployment(env, head) {
@@ -47,12 +48,11 @@ export function guardDeployment(env, head) {
   }
   if (!['', undefined, 'true', 'false'].includes(env.PHOTO_SERVICE_ENABLED)) throw new Error('PHOTO_SERVICE_ENABLED must be true or false when set.');
   if (![undefined, '', 'false', 'true'].includes(env.APPLY_MIGRATIONS)) throw new Error('APPLY_MIGRATIONS must be empty, false or true.');
-  deploymentOrigin(env.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL);
+  requireLegacyOrigin(env, relayDeployment);
 }
 
 export async function prepareDeployment({ env, directory, fetcher = fetch }) {
-  const account = required(env, 'CLOUDFLARE_ACCOUNT_ID');
-  if (!/^[a-f0-9]{32}$/i.test(account)) throw new Error('CLOUDFLARE_ACCOUNT_ID must be a real account ID.');
+  const account = requireAccountId(env.CLOUDFLARE_ACCOUNT_ID);
   required(env, 'CLOUDFLARE_API_TOKEN');
   const database = required(env, 'AGENT_USAGE_D1_DATABASE_ID_PRODUCTION');
   const brokerDatabase = required(env, 'BROKER_D1_DATABASE_ID_PRODUCTION');
@@ -64,7 +64,7 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
     if (!['true', 'false'].includes(env[name])) throw new Error(`${name} must explicitly be true or false.`);
   }
   if (!['', undefined, 'true', 'false'].includes(env.PHOTO_SERVICE_ENABLED)) throw new Error('PHOTO_SERVICE_ENABLED must be true or false when set.');
-  deploymentOrigin(env.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL);
+  requireLegacyOrigin(env, relayDeployment);
   const token = required(env, 'PURI_TOKEN_SECRET_PRODUCTION');
   if (Buffer.byteLength(token, 'utf8') < 32) throw new Error('PURI_TOKEN_SECRET_PRODUCTION must contain at least 32 UTF-8 bytes and match broker.');
   const config = JSON.parse(await readFile(resolve(root, 'wrangler.jsonc'), 'utf8'));
@@ -86,6 +86,7 @@ export async function prepareDeployment({ env, directory, fetcher = fetch }) {
   config.account_id = account;
   config.workers_dev = true;
   config.preview_urls = false;
+  config.routes = [relayDeployment.route];
   config.observability = { enabled: false };
   config.main = resolve(root, config.main);
   config.d1_databases[0].database_id = database;

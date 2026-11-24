@@ -79,6 +79,9 @@ describe('minimal production Relay deployment', () => {
     expect(readEvents(value).filter(({ event }) => event === 'migrate')).toEqual([]);
     expect(readEvents(value).filter(({ event }) => event === 'deploy')).toHaveLength(1);
     expect(result.stdout).toContain('"status":"rejection_smoke_passed"');
+    expect(result.requests).toHaveLength(26);
+    expect(result.requests[0]).toBe('GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint');
+    expect(result.requests[13]).toBe('GET https://puripuly-heart-agent-relay.kapitalismho.workers.dev/deployment-smoke-not-an-endpoint');
     expect(result.storageRequests.every((request) => request.startsWith('GET '))).toBe(true);
   }, 20000);
 
@@ -132,6 +135,27 @@ describe('minimal production Relay deployment', () => {
     expect(readEvents(value)).toEqual([]);
     expect(result.requests).toEqual([]);
     expect(result.storageRequests).toEqual([]);
+  }, 20000);
+
+  it('fails domain ownership preflight before D1 and opted-in writes', async () => {
+    const value = scenario({ mode: 'foreign-domain', pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
+    const before = readFileSync(value.databasePath);
+    const workerBefore = readWorker(value);
+    const result = await deploy(value);
+    expect(result.status).toBe(1);
+    expect(result.failedStep).toBe('Verify production Cloudflare target and domain ownership');
+    expect(readEvents(value)).toEqual([]);
+    expect(readFileSync(value.databasePath)).toEqual(before);
+    expect(readWorker(value)).toEqual(workerBefore);
+  }, 20000);
+
+  it('allows the same Worker and managed DNS on redeploy but still requires the legacy origin to pass smoke', async () => {
+    const redeploy = await deploy(scenario({ mode: 'managed-domain' }));
+    expect(redeploy.status, redeploy.stderr).toBe(0);
+    const brokenLegacy = await deploy(scenario({ mode: 'legacy-smoke-failure' }));
+    expect(brokenLegacy.status).toBe(1);
+    expect(brokenLegacy.requests).toHaveLength(14);
+    expect(brokenLegacy.stderr).toContain('https://puripuly-heart-agent-relay.kapitalismho.workers.dev: Relay smoke rejection mismatch');
   }, 20000);
 
   it.each(codeOnlyInputs)('blocks pending migrations with $selection before mutation or deployment', async ({ env }) => {
@@ -223,7 +247,7 @@ describe('minimal production Relay deployment', () => {
       if (mode === 'final-read-failure') expect(readEvents(value).some(({ event }) => event === 'deploy')).toBe(false);
       if (mode === 'smoke-failure') {
         expect(result.failedStep).toBe('Smoke endpoint authentication and protocol rejection without model calls');
-        expect(result.requests).toEqual(['GET /deployment-smoke-not-an-endpoint']);
+        expect(result.requests).toEqual(['GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint']);
       } else expect(result.requests).toEqual([]);
       expect(result.stdout).not.toContain('"status":"rejection_smoke_passed"');
     }, 20000,

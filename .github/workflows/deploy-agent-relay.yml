@@ -83,6 +83,10 @@ jobs:
           PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
         run: node services/agent-relay/operations/prepare-deployment.mjs prepare "$DEPLOY_DIR"
 
+      - name: Verify production Cloudflare target and domain ownership
+        timeout-minutes: 2
+        run: node services/worker-deployment.mjs relay
+
       - name: Require initialized relay database
         timeout-minutes: 3
         working-directory: services/agent-relay
@@ -105,7 +109,7 @@ jobs:
             --command "$RELAY_SCHEMA_QUERY" --json > "$DEPLOY_DIR/schema.json"
           node operations/prepare-deployment.mjs schema "$DEPLOY_DIR/schema.json"
 
-      - name: Deploy canonical workers.dev relay
+      - name: Deploy canonical relay worker
         timeout-minutes: 5
         working-directory: services/agent-relay
         run: >-
@@ -114,7 +118,7 @@ jobs:
           --tag "$GITHUB_SHA" --message "Reviewed source $GITHUB_SHA; run $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT"
 
       - name: Smoke endpoint authentication and protocol rejection without model calls
-        timeout-minutes: 3
+        timeout-minutes: 5
         env:
           PURI_TOKEN_SECRET_PRODUCTION: ${{ secrets.PURI_TOKEN_SECRET_PRODUCTION }}
         run: node services/agent-relay/operations/smoke-deployment.mjs
