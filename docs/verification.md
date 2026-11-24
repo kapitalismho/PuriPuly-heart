@@ -102,8 +102,6 @@ With normal production defaults and no diagnostic override, leave a caption unch
 
 **Measurements:** [Offline rendering](../native/overlay/README.md#offline-rendering) and its [job schema](../native/overlay/src/photo/offline.rs) exercise supplied images/translation blocks without provider requests or OpenVR. Compare the same inputs, assets, configuration, and hardware. Existing opt-in [model/reference](../native/overlay/tests/photo_processing.rs), [processing](../native/overlay/src/photo/processing/tests.rs), and [typesetting](../native/overlay/src/photo/typeset/tests.rs) probes own external fixture/model/ORT prerequisites; confirm the intended ignored case executed. These artifacts do not establish acquisition, recognition quality, live translation, or headset display.
 
-For managed Relay CPU, use the [Worker placement and photo profile procedure](worker-placement-499.md#controlled-local-measurements). Compare the same app-prepared request and stream with a separately labeled transport-boundary case. Local workerd samples locate expensive code; only platform measurements establish deployed CPU, and neither measures headset display.
-
 ## Chatbot
 
 **Inputs and observations:** The actual [Puri chat view](../src/puripuly_heart/ui/views/agent_chat.py), [conversation owner](../src/puripuly_heart/app/services/agent_chat/owner.py), and application tools. Submit in the Agent tab; tap a change card to approve, use Back to decline, or send `/cancel`. Observe context use, request/reply, tool results, and the affected owner/surface. An assistant's success claim or debug-preview card is not an application effect.

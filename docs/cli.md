@@ -96,6 +96,7 @@ puripuly.exe settings apply --file .\changes.json --expected-revision <current-r
 - Retry failed provider application explicitly. Unrelated settings edits do not retry it.
 - SteamVR caption compatibility: apply `{"changes":{"overlay.vr_compatibility_mode":true}}` through the settings command above, or select VR (Compatibility Mode) in Settings → Overlay → Overlay mode. Default `false` avoids periodic retries; `true` keeps Flush and adds bounded redraws/resubmissions. The setting persists without enabling a disabled overlay; switching is manual.
 - Check `overlay status` → `effective_vr_compatibility_mode` for the active mode (`null` unless SteamVR captions are ready), separately from saved settings.
+- Check `query photo.status` for VR photo translation. `availability` is `off`, `not_connected` (the chosen route's ChatGPT sign-in or OpenAI/Gemini key is missing), `allowance_exhausted`, `allowance_unknown` or `ready`, with today's Managed `remaining`/`allowance` when known. Pass `{"refresh": true}` to re-read the Managed allowance from the service; without it the query uses only today's last answer.
 
 ### Readiness
 
