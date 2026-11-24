@@ -45,7 +45,7 @@ function changeSqliteDatabase(path: string, sql: string) {
 }
 
 describe('minimal production Broker deployment', { timeout: 20000 }, () => {
-  it.each([...codeOnlyInputs, { selection: 'empty value', env: { APPLY_MIGRATIONS: '' } }])('deploys code once with $selection without database, secret, policy or issuance mutations', async ({ env }) => {
+  it.each([...codeOnlyInputs, { selection: 'empty value', env: { APPLY_MIGRATIONS: '' } }])('allows a first attach with $selection and unrelated Cloudflare records without database, secret, policy or issuance mutations', async ({ env }) => {
     const value = scenario({ env });
     const databaseBefore = readFileSync(value.databasePath);
     const usageBefore = readFileSync(value.usageDatabasePath);
@@ -148,6 +148,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     ['wrong-account', /must own/], ['missing-worker', /already contain/], ['inactive-zone', /one active/],
     ['foreign-zone', /one active/], ['foreign-domain', /Custom Domains/], ['extra-domain', /Custom Domains/],
     ['partial-domain-list', /Custom Domains/], ['domain-api-error', /Custom Domains/], ['dns-conflict', /DNS/],
+    ['partial-dns-result', /DNS/],
     ['orphaned-managed-dns', /DNS/], ['extra-dns', /DNS/], ['missing-managed-dns', /DNS/],
   ] as const)('blocks %s before D1 or even opted-in production writes', async (mode, message) => {
     const value = scenario({ mode, pendingMigration: true, env: { APPLY_MIGRATIONS: 'true' } });
@@ -163,7 +164,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(readWorker(value)).toEqual(workerBefore);
   });
 
-  it('allows redeploy with the same Worker Custom Domain and managed DNS record', async () => {
+  it('allows redeploy with the same Worker Custom Domain and managed DNS among unrelated Cloudflare records', async () => {
     const value = scenario({ mode: 'managed-domain', env: { BROKER_CANONICAL_WORKERS_DEV_URL: `${publicOrigins[1]}/` } });
     const result = await runDeployWorkflow(value);
     expect(result.status, result.stderr).toBe(0);
@@ -332,7 +333,7 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     { '/healthz': { body: '<html>not JSON</html>' } },
     { '/healthz': { body: { ok: false, service: 'puripuly-heart-broker' } } },
     { '/healthz': { body: { ok: true, service: 'wrong-service' } } },
-    { '/v1/foundation': { status: 302 } },
+    { '/v1/foundation': { status: 302, redirectToHealthyTarget: true } },
     { '/v1/foundation': { body: {} } },
     { '/v1/foundation': { body: { ...FOUNDATION_RESPONSE, service: 'wrong-service' } } },
     { '/v1/foundation': { body: { ...FOUNDATION_RESPONSE, serviceBoundary: { ...FOUNDATION_RESPONSE.serviceBoundary, proxiesTranslationText: true } } } },
@@ -348,17 +349,19 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     const result = await runDeployWorkflow(value, responses);
     expect(result.status).toBe(1);
     expect(result.stdout).not.toContain('public foundation verified');
+    expect(result.redirectRequests).toEqual([]);
     expect(result.requests).toHaveLength(24);
     expect(readWorker(value).deployments).toBe(1);
     expect(readFileSync(value.databasePath)).toEqual(before);
     expect(readEvents(value).map(({ event }) => event)).toEqual(['validate', 'relay-read', 'read', 'read', 'read', 'deploy']);
   });
 
-  it('requires the legacy worker to respond directly even when the custom origin is healthy', async () => {
+  it('rejects a legacy redirect to a healthy endpoint even when the custom origin is healthy', async () => {
     const value = scenario();
-    const result = await runDeployWorkflow(value, { [`${publicOrigins[1]}/healthz`]: { status: 302 } });
+    const result = await runDeployWorkflow(value, { [`${publicOrigins[1]}/healthz`]: { status: 302, redirectToHealthyTarget: true } });
     expect(result.status).toBe(1);
     expect(result.requests.slice(0, 4)).toEqual(publicProbes);
+    expect(result.redirectRequests).toEqual([]);
     expect(result.stderr).toContain(`public foundation for ${publicOrigins[1]}`);
   });
 

@@ -80,8 +80,8 @@ describe('minimal production Relay deployment', () => {
     expect(readEvents(value).filter(({ event }) => event === 'deploy')).toHaveLength(1);
     expect(result.stdout).toContain('"status":"rejection_smoke_passed"');
     expect(result.requests).toHaveLength(26);
-    expect(result.requests[0]).toBe('GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint');
-    expect(result.requests[13]).toBe('GET https://puripuly-heart-agent-relay.kapitalismho.workers.dev/deployment-smoke-not-an-endpoint');
+    expect(result.requests.filter((request) => request.includes('https://puripuly-relay.salee.sarl'))).toHaveLength(13);
+    expect(result.requests.filter((request) => request.includes('https://puripuly-heart-agent-relay.kapitalismho.workers.dev'))).toHaveLength(13);
     expect(result.storageRequests.every((request) => request.startsWith('GET '))).toBe(true);
   }, 20000);
 
@@ -156,6 +156,19 @@ describe('minimal production Relay deployment', () => {
     expect(brokenLegacy.status).toBe(1);
     expect(brokenLegacy.requests).toHaveLength(14);
     expect(brokenLegacy.stderr).toContain('https://puripuly-heart-agent-relay.kapitalismho.workers.dev: Relay smoke rejection mismatch');
+  }, 20000);
+
+  it('retries only custom readiness after TLS propagation delay and completes both smokes without redeploying', async () => {
+    const value = scenario({ mode: 'custom-readiness-delay' });
+    const result = await deploy(value);
+    expect(result.status, result.stderr).toBe(0);
+    const custom = result.requests.filter((request) => request.includes('https://puripuly-relay.salee.sarl'));
+    const legacy = result.requests.filter((request) => request.includes('https://puripuly-heart-agent-relay.kapitalismho.workers.dev'));
+    expect(custom).toHaveLength(14);
+    expect(custom.slice(0, 2)).toEqual(Array(2).fill('GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint'));
+    expect(legacy).toHaveLength(13);
+    expect(readEvents(value).filter(({ event }) => event === 'deploy')).toHaveLength(1);
+    expect(result.forbiddenAccess).toEqual([]);
   }, 20000);
 
   it.each(codeOnlyInputs)('blocks pending migrations with $selection before mutation or deployment', async ({ env }) => {
@@ -247,9 +260,15 @@ describe('minimal production Relay deployment', () => {
       if (mode === 'final-read-failure') expect(readEvents(value).some(({ event }) => event === 'deploy')).toBe(false);
       if (mode === 'smoke-failure') {
         expect(result.failedStep).toBe('Smoke endpoint authentication and protocol rejection without model calls');
-        expect(result.requests).toEqual(['GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint']);
-      } else expect(result.requests).toEqual([]);
-      expect(result.stdout).not.toContain('"status":"rejection_smoke_passed"');
+        expect(result.requests.filter((request) => request.includes('https://puripuly-relay.salee.sarl')))
+          .toEqual(['GET https://puripuly-relay.salee.sarl/deployment-smoke-not-an-endpoint']);
+        expect(result.requests.filter((request) => request.includes('https://puripuly-heart-agent-relay.kapitalismho.workers.dev'))).toHaveLength(13);
+        expect(result.stdout).toContain('"origin":"https://puripuly-heart-agent-relay.kapitalismho.workers.dev","status":"rejection_smoke_passed"');
+        expect(result.stdout).not.toContain('"origin":"https://puripuly-relay.salee.sarl","status":"rejection_smoke_passed"');
+      } else {
+        expect(result.requests).toEqual([]);
+        expect(result.stdout).not.toContain('"status":"rejection_smoke_passed"');
+      }
     }, 20000,
   );
 

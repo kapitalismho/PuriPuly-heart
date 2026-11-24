@@ -62,7 +62,7 @@ export async function verifyWorkerTarget(env, deployment, fetcher = fetch) {
       !info || typeof info !== 'object' || Array.isArray(info)
       || ('page' in info && info.page !== 1)
       || ('total_pages' in info && info.total_pages !== 0 && info.total_pages !== 1)
-      || ('total_count' in info && info.total_count !== result.length)
+      || ('count' in info && info.count !== result.length)
     ))) throw new Error(failure);
     return result;
   }

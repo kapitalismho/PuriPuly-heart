@@ -130,6 +130,7 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
   const storageRequests: string[] = [];
   const forbiddenAccess: string[] = [];
   const deny = (name: string) => () => { forbiddenAccess.push(name); throw new Error(`Smoke must not access ${name}.`); };
+  let readinessDelayed = false;
   const server = createServer(async (incoming, outgoing) => {
     try {
       const path = incoming.url!;
@@ -145,6 +146,12 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
       }
       const origin = incoming.headers['x-deployment-probe-origin'];
       requests.push(`${incoming.method} ${origin}${path}`);
+      if (!readinessDelayed && scenario.env.SCENARIO_MODE === 'custom-readiness-delay'
+        && origin === 'https://puripuly-relay.salee.sarl' && path === '/deployment-smoke-not-an-endpoint') {
+        readinessDelayed = true;
+        outgoing.writeHead(525, { 'content-type': 'text/html' }).end('controlled TLS provisioning response');
+        return;
+      }
       const chunks: Buffer[] = [];
       for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
       const headers = new Headers();
@@ -158,7 +165,7 @@ export async function runDeployWorkflow(scenario: DeployScenario) {
         ...(worker.reportsBound ? { SUPPORT_REPORTS: { head: deny('R2'), put: deny('R2') } as unknown as R2Bucket } : {}),
       });
       outgoing.writeHead(worker.deployments ? actual.status : 503, { ...Object.fromEntries(actual.headers),
-        ...(scenario.env.SCENARIO_MODE === 'smoke-failure'
+        ...((scenario.env.SCENARIO_MODE === 'smoke-failure' && origin === 'https://puripuly-relay.salee.sarl')
           || (scenario.env.SCENARIO_MODE === 'legacy-smoke-failure' && origin === legacyOrigin) ? { 'cache-control': 'public' } : {}) });
       outgoing.end(Buffer.from(await actual.arrayBuffer()));
     } catch (error) { outgoing.writeHead(500).end(String(error)); }

@@ -140,22 +140,29 @@ sleep() { :; }
   };
 }
 
-export type PublicResponse = { status?: number; body?: unknown };
+export type PublicResponse = { status?: number; body?: unknown; redirectToHealthyTarget?: boolean };
 
 export async function runDeployWorkflow(scenario: DeployScenario, responses: Partial<Record<string, PublicResponse>> = {}) {
   const requests: string[] = [];
+  const redirectRequests: string[] = [];
   const server = createServer(async (request, response) => {
-    const path = request.url!;
+    const url = request.url!;
+    const redirectTarget = url.startsWith('/redirect-target/');
+    const path = redirectTarget ? url.slice('/redirect-target'.length) : url;
     const target = `${request.headers['x-deployment-probe-origin']}${path}`;
-    requests.push(`${request.method} ${target}`);
+    if (redirectTarget) redirectRequests.push(`${request.method} ${url}`);
+    else requests.push(`${request.method} ${target}`);
     if (!['/healthz', '/v1/foundation'].includes(path) || request.method !== 'GET') {
       response.writeHead(500).end('Unexpected request');
       return;
     }
     const effective = JSON.parse(readFileSync(scenario.workerPath, 'utf8'));
     const actual = await app.request(`http://synthetic.local${path}`);
-    const override = responses[target] ?? responses[path];
-    response.writeHead(override?.status ?? (effective.deployments ? actual.status : 503), { 'Content-Type': 'application/json' });
+    const override = redirectTarget ? undefined : responses[target] ?? responses[path];
+    response.writeHead(override?.status ?? (redirectTarget || effective.deployments ? actual.status : 503), {
+      'Content-Type': 'application/json',
+      ...(override?.redirectToHealthyTarget ? { Location: `/redirect-target${path}` } : {}),
+    });
     response.end(override && 'body' in override ? (typeof override.body === 'string' ? override.body : JSON.stringify(override.body)) : await actual.text());
   });
   const listening = once(server, 'listening');
@@ -171,6 +178,17 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
   let stdout = '';
   let stderr = '';
   try {
+    for (const [path, response] of Object.entries(responses)) {
+      if (!response?.redirectToHealthyTarget) continue;
+      const destination = new URL(path, 'http://synthetic.local').pathname;
+      const healthy = await fetch(`${env.LOCAL_HTTP_URL}/redirect-target${destination}`, { redirect: 'error' });
+      const payload = await healthy.json();
+      if (healthy.status !== 200 || !payload || typeof payload !== 'object'
+        || !('service' in payload) || payload.service !== 'puripuly-heart-broker') {
+        throw new Error('Controlled redirect target is not healthy.');
+      }
+    }
+    redirectRequests.length = 0;
     for (const block of workflow.split(/(?=^      - name: )/mu).slice(1)) {
       const name = block.match(/^      - name: (.+)/u)![1];
       if (block.includes('\n        uses:') || name === 'Install workspace dependencies') continue;
@@ -194,9 +212,9 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
       child.stdout.on('data', (data) => { stdout += String(data); });
       child.stderr.on('data', (data) => { stderr += String(data); });
       const [status] = await once(child, 'close');
-      if (status !== 0) return { status, stdout, stderr, executed, requests };
+      if (status !== 0) return { status, stdout, stderr, executed, requests, redirectRequests };
     }
-    return { status: 0, stdout, stderr, executed, requests };
+    return { status: 0, stdout, stderr, executed, requests, redirectRequests };
   } finally {
     await promisify(server.close.bind(server))();
   }

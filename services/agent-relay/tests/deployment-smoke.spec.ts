@@ -1,13 +1,22 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { smokeDeployment } from '../operations/smoke-deployment.mjs';
 import relay from '../src/index';
 import { tokenSecret } from './fixtures';
 
+vi.mock('node:timers/promises', () => ({ setTimeout: vi.fn(async () => {}) }));
+
+const customOrigin = 'https://puripuly-relay.salee.sarl';
+const readinessPath = '/deployment-smoke-not-an-endpoint';
+const stoppedSmoke = { secret: tokenSecret, modelEnabled: false, supportEnabled: false };
 const networkFetch = globalThis.fetch;
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.mocked(delay).mockClear();
+  vi.restoreAllMocks();
+});
 
 async function loopback<T>(handler: (request: Request) => Promise<Response>, run: (origin: string) => Promise<T>) {
   const server = createServer(async (incoming, outgoing) => {
@@ -79,9 +88,8 @@ describe('deployment rejection smoke against the real relay handler', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it('does not follow redirects, accept oversized/non-JSON errors, cacheable errors or leaked response text', async () => {
-    for (const response of [new Response(null, { status: 302, headers: { location: 'https://must-not-contact.invalid' } }),
-      new Response('sensitive-synthetic-response'), new Response('x'.repeat(4097)),
+  it('does not accept oversized/non-JSON errors or cacheable errors or leak response text', async () => {
+    for (const response of [new Response('sensitive-synthetic-response'), new Response('x'.repeat(4097)),
       Response.json({ error: { code: 'not_found' } }, { status: 404 })]) {
       await loopback(async () => response, async (origin) => {
         const result = smokeDeployment({ origin, secret: tokenSecret, modelEnabled: false, supportEnabled: false,
@@ -90,6 +98,62 @@ describe('deployment rejection smoke against the real relay handler', () => {
         await expect(result).rejects.not.toThrow('sensitive-synthetic-response');
       });
     }
+  });
+
+  it('does not send an authenticated rejection probe or payload to a reachable redirect destination', async () => {
+    const env = { PURI_TOKEN_SECRET: tokenSecret, AGENT_SERVICE_ENABLED: 'true' };
+    const destination = vi.fn((request: Request) => relay.fetch(request, env));
+    const options = { ...stoppedSmoke, modelEnabled: true, allowLoopback: true, fetcher: networkFetch };
+    await loopback(destination, async (secondOrigin) => {
+      expect(await smokeDeployment({ origin: secondOrigin, ...options })).toMatchObject({ probes: 13 });
+      destination.mockClear();
+      const redirect = vi.fn(() => new Response(null, { status: 307, headers: { location: `${secondOrigin}/v1/respond` } }));
+      await loopback((request) => {
+        const authorization = request.headers.get('authorization');
+        if (new URL(request.url).pathname === '/v1/respond' && authorization && authorization !== 'Bearer invalid') {
+          return Promise.resolve(redirect());
+        }
+        return relay.fetch(request, env);
+      }, async (origin) => {
+        await expect(smokeDeployment({ origin, ...options })).rejects.toThrow('rejected redirect for /v1/respond (HTTP 307)');
+      });
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(destination).not.toHaveBeenCalled();
+    });
+  });
+
+  it('waits through transient transport and gateway faults, then runs the full Relay contract once', async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input, init) =>
+      relay.fetch(new Request(input, init), { PURI_TOKEN_SECRET: tokenSecret }));
+    fetcher.mockRejectedValueOnce(new TypeError('synthetic TLS failure', { cause: { code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR' } }));
+    fetcher.mockResolvedValueOnce(new Response('synthetic provisioning HTML', { status: 525 }));
+    await expect(smokeDeployment({ origin: customOrigin, ...stoppedSmoke, fetcher })).resolves.toMatchObject({ probes: 13 });
+    expect(fetcher).toHaveBeenCalledTimes(15);
+    expect(fetcher.mock.calls.slice(0, 3).map(([url, init]) => [url, init?.method, init?.headers])).toEqual(
+      Array(3).fill([`${customOrigin}${readinessPath}`, 'GET', undefined]),
+    );
+    expect(delay).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds a persistent not-ready response and never progresses to authenticated requests', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response('synthetic provisioning HTML', { status: 503 }));
+    await expect(smokeDeployment({ origin: customOrigin, ...stoppedSmoke, fetcher })).rejects
+      .toThrow('readiness did not settle for /deployment-smoke-not-an-endpoint after 12 attempts (HTTP 503)');
+    expect(fetcher).toHaveBeenCalledTimes(12);
+    expect(delay).toHaveBeenCalledTimes(11);
+    expect(fetcher.mock.calls.every(([url, init]) => url === `${customOrigin}${readinessPath}` && init?.method === 'GET' && !init.headers)).toBe(true);
+  });
+
+  it.each([
+    ['redirect', () => new Response(null, { status: 302, headers: { location: 'https://ignored.invalid' } }), /rejected redirect/],
+    ['contract mismatch', () => Response.json({ error: { code: 'other' } }, { status: 404 }), /rejection mismatch/],
+    ['edge rejection', () => new Response('synthetic HTML', { status: 403 }), /request failed/],
+    ['certificate validation failure', () => { throw new TypeError('synthetic invalid TLS', { cause: { code: 'ERR_TLS_CERT_ALTNAME_INVALID' } }); }, /request failed/],
+  ] as const)('does not retry %s on the custom readiness URL', async (_label, response, failure) => {
+    const fetcher = vi.fn<typeof fetch>(async () => response());
+    await expect(smokeDeployment({ origin: customOrigin, ...stoppedSmoke, fetcher })).rejects.toThrow(failure);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
   });
 
   it('rejects arbitrary targets and invalid secrets before networking', async () => {
