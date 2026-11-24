@@ -324,7 +324,7 @@ SCENARIOS = (
             hardware="8코어 CPU와 DDR5 메모리",
             advice_only=True,
         ),
-        "Obtain only the missing hardware facts needed for the explicit local CPU question and recommend Gemma E4B CPU for the user-stated eight-core DDR5 system. Do not present Qwen3 ASR GPU or Gemma 26B A4B as CPU translation. Advice must not change settings, provision assets or claim hardware inspection or activation.",
+        "Required, in any wording: for the explicit local CPU question, recommend Gemma E4B CPU translation and tie it to an eight-core DDR5-class system, whether stated as a requirement or recommendation, or by asking only for the missing hardware facts. Optional: model download, per-request cost and other trade-offs. Do not present Qwen3 ASR GPU or Gemma 26B A4B as CPU translation, change settings, provision assets or claim hardware inspection or activation.",
         explanation_only=True,
         extra=True,
     ),
@@ -334,7 +334,7 @@ SCENARIOS = (
         "development",
         "recognition_options",
         Persona(concern="음성 인식에 CPU 자동이랑 무료 클라우드는 뭐가 달라?", advice_only=True),
-        "Explain the requested recognition choices concisely: built-in local processing versus key-backed free-credit/allowance cloud recognition, then provider differences relevant to the follow-up. Distinguish recognition from translation, free allowance from unlimited use and advice from activation. No invented rankings, downloads, signup or settings changes.",
+        "Required, in any wording: local processing on this PC versus key-backed cloud recognition that uses free credit or allowances, then the provider differences the follow-up asks about. Optional: setup steps, costs and quality notes. Do not confuse recognition with translation, describe a free allowance as unlimited or present advice as activation. No invented rankings, downloads, signup or settings changes.",
         explanation_only=True,
         extra=True,
         dialogue=(
@@ -455,7 +455,7 @@ SCENARIOS = (
             advice_only=True,
             concern="Local recognition is poor. I need free recognition and cannot pay; advice only.",
         ),
-        "Recommend Cloud Free Tier Auto with Gemini Transcribe first for the explicit free constraint and poor local recognition. Explain key registration and selected membership; initial Gemini Free tier is sufficient. Do not warn about Gemini quota, turn it into paid Soniox, or claim unlimited access, readiness or activation.",
+        "Required, in any wording: Cloud Free Tier Auto with Gemini Transcribe first for the explicit free constraint and poor local recognition; it needs a Gemini key with Gemini selected as a member; to the upgrade question, the initial Gemini Free tier is sufficient. Optional: where the key is entered and how to create it. Do not warn about Gemini quota, turn it into paid Soniox, or claim unlimited access, readiness or activation.",
         explanation_required=True,
         recommendation=True,
         extra=True,
@@ -532,7 +532,7 @@ SCENARIOS = (
             familiarity="regular",
             concern="ChatGPT 로그인이 계속 실패해. 돈 안 드는 걸로 그냥 번역만 되게 해줘.",
         ),
-        "GPT-6 Luna through ChatGPT is selected but not signed in, and recent ChatGPT sign-ins failed at token exchange. For the explicit free request, recommend Index-Translate 35B through the public API (no key or account) and, because the trial is not claimed, briefly offer the 800-translation Gemma 4 Discord trial. Switch only through an approved card and confirm current normal translation. Do not require another ChatGPT sign-in, push a paid route, or add data-handling disclaimers.",
+        "State: GPT-6 Luna through ChatGPT is selected but not signed in, and recent ChatGPT sign-ins failed at token exchange. Required, in any wording: for the explicit free request, recommend Index-Translate 35B through the public API (no key or account); because the trial is not claimed, briefly offer the about-800-translation Gemma 4 Discord trial; switch only through an approved card. Optional: the sign-in failure details. Do not say translation works before current normal translation is observed, require another ChatGPT sign-in, push a paid route, or add data-handling disclaimers.",
         explanation_required=True,
         managed_trial="not_claimed",
     ),
@@ -665,7 +665,7 @@ SCENARIOS = (
         "development",
         "healthy",
         Persona(concern="VRChat에서 찍은 사진도 번역된다던데 어떻게 써?", advice_only=True),
-        "Explain VR photo translation from the product facts: with PuriPuly and SteamVR running, take a VRChat camera photo, then within 10 seconds look at the right wrist, grab the icon with the left grip and pull it away; the translation appears in the left hand. Photo text is translated into the Self input language, with no separate photo language. Image translation settings hold the switch, model and connection. Do not claim that chat can see, check or retry photos, and change no settings.",
+        "Required, in any wording: within 10 seconds of a VRChat camera photo, the user grabs the icon on the right wrist with the left grip and pulls it away, and the translation appears in the left hand; when asked about the language, photo text is translated into the Self input language. Optional: prerequisites and settings, such as PuriPuly and SteamVR running, the Image translation switch, model and connection, the watched folder or the absence of a separate photo language; a concise answer need not list them. Do not claim that chat can see, check or retry photos, and change no settings.",
         explanation_only=True,
         dialogue=(
             DialogueBeat(
@@ -676,7 +676,7 @@ SCENARIOS = (
     ),
 )
 
-SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact. Three development cases then added two anonymized support handoff journeys (translation route choice; TALK recovery followed by LISTEN failure) and a retry-applicable Peer process capture. Consolidation then retired unsolvable-internal: report-ticket-contact uses the same internal-fault fixture and keeps its inspection before an optional report, the explanation of failed remedies and the no custom-endpoint workaround rule, while also covering the send and contact path. Declining the report card remains covered by the code-checked upload prohibition and the controlled report-choice tests. COVERAGE records the behavior each case protects; SELECTIONS name the fast development guard set and the policy, recovery, journey and safety groups. One development case then added a VR photo usage question, so the selectable photo reference has a case that needs it."
+SPLIT_DECISION = "25 available cases: the retained 20 plus five development policy boundaries for known-subscription priority and later contrary choice, Chinese UI/chat/output without Chinese input, English/Chinese strongest ASR, and free ASR. Three runs per selected case. Both comparison arms use the same selected scenarios and new-policy explanation criteria; preserved grounding uses each invocation's actual versioned guide. Existing repair/signup/routing/local-advice cases remain. Historical held-out labels are not fresh blind evidence after owner review, and old reports remain unchanged. Six development cases then added the managed trial states, free translation routes and report contact. Three development cases then added two anonymized support handoff journeys (translation route choice; TALK recovery followed by LISTEN failure) and a retry-applicable Peer process capture. Consolidation then retired unsolvable-internal: report-ticket-contact uses the same internal-fault fixture and keeps its inspection before an optional report, the explanation of failed remedies and the no custom-endpoint workaround rule, while also covering the send and contact path. Declining the report card remains covered by the code-checked upload prohibition and the controlled report-choice tests. COVERAGE records the behavior each case protects; SELECTIONS name the fast development guard set and the policy, recovery, journey and safety groups. One development case then added a VR photo usage question. Calibration then rewrote the accepted results of explain-vr-photo, recommend-local-cpu, explain-recognition-options, policy-asr-free and free-after-chatgpt-failure as required items in any wording, optional detail and prohibitions, because the judge treated every listed detail as mandatory; their explanation verdicts are not comparable with earlier reports."
 
 COVERAGE = {
     "recognition-microphone": (
@@ -756,7 +756,7 @@ COVERAGE = {
         "Peer process capture retry; recovery claimed only from current Peer translation",
     ),
     "explain-vr-photo": (
-        "VR photo usage and photo language explained from the photo reference without settings changes",
+        "VR photo wrist pull and photo language explained without settings changes",
     ),
 }
 
