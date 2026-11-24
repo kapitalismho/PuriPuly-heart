@@ -55,12 +55,13 @@ function post(env: TestBrokerEnv, request: unknown, ip = '203.0.113.33') {
 }
 
 interface BaselineTestContext {
+  props: Record<string, unknown>;
   waitUntil: Mock<(promise: Promise<unknown>) => void>;
   passThroughOnException(): void;
 }
 
 function baselineContext(): BaselineTestContext {
-  return { waitUntil: vi.fn<(promise: Promise<unknown>) => void>(), passThroughOnException() {} };
+  return { props: {}, waitUntil: vi.fn<(promise: Promise<unknown>) => void>(), passThroughOnException() {} };
 }
 
 function baselinePost(
