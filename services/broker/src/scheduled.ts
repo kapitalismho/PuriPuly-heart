@@ -24,6 +24,7 @@ import { runNetworkIdentityBackfill } from './network-identity-migration';
 import { resolveNetworkIdentitySecrets } from './network-identity';
 import { deleteExpiredChallengePreflightInstallations } from './preflight-retention';
 import { deleteExpiredPuriProofNonces } from './puri-token';
+import { expirePuriTokenBaseline } from './puri-token-baseline';
 import { getRelayDailyUsage } from './relay-usage';
 
 import {
@@ -131,6 +132,7 @@ async function applyScheduledRetention(db: D1Database, now: Date): Promise<void>
     deleteExpiredChallengePreflightInstallations(db, { now }),
   );
   await runScheduledPhase(failures, () => deleteExpiredPuriProofNonces(db, now));
+  await runScheduledPhase(failures, () => expirePuriTokenBaseline(db, now));
   throwFirstScheduledFailure(failures);
 }
 

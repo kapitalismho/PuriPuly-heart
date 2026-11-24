@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import app from '../src/index';
 import { getBrokerAbuseControlsConfig } from '../src/abuse-controls';
@@ -21,6 +21,9 @@ const installationId = '019a3544-3380-7000-8000-000000000330';
 const otherId = '019a3544-3380-7000-8000-000000000331';
 const tokenSecret = 'puri-test-token-secret-0000000000000000';
 const identitySecret = 'puri-test-identity-secret-0000000000000';
+const baselineVersion = { id: 'bba31e88-165a-4d29-97a3-5815007e08ab', tag: '', timestamp: '2026-10-30T00:00:00Z' };
+const onBaseline = { TOKEN_BASELINE_START_UTC: '2026-10-30', CF_VERSION_METADATA: baselineVersion };
+const oversized = 'x'.repeat(4097);
 const databases: TestBrokerEnv[] = [];
 const encoder = new TextEncoder();
 
@@ -49,6 +52,33 @@ function post(env: TestBrokerEnv, request: unknown, ip = '203.0.113.33') {
     method: 'POST', headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
     body: JSON.stringify(request),
   }, env);
+}
+
+interface BaselineTestContext {
+  waitUntil: Mock<(promise: Promise<unknown>) => void>;
+  passThroughOnException(): void;
+}
+
+function baselineContext(): BaselineTestContext {
+  return { waitUntil: vi.fn<(promise: Promise<unknown>) => void>(), passThroughOnException() {} };
+}
+
+function baselinePost(
+  env: TestBrokerEnv, ctx: BaselineTestContext, body: string, colo = 'ICN',
+  framing: 'content-length' | 'streamed' = 'content-length',
+) {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.33',
+    'cf-colo': 'HKG', 'cf-placement': 'remote-FOO',
+    'cf-version-id': '207a5535-d738-4b10-a07b-d940e0c05a26',
+  };
+  if (framing === 'content-length') headers['content-length'] = String(Buffer.byteLength(body));
+  const request = new Request('http://broker.test/v1/puri/token?synthetic=not-a-dimension', { method: 'POST', body, headers });
+  return app.fetch(Object.assign(request, { cf: { colo, country: 'US' } }), env, ctx);
+}
+
+async function settleBaseline(ctx: BaselineTestContext) {
+  await Promise.all(ctx.waitUntil.mock.calls.map(([pending]) => pending));
 }
 
 function registeredInstallation(env: TestBrokerEnv, id: string, key: DeviceKeyPair) {
@@ -89,8 +119,171 @@ describe('Puri installation token boundary', () => {
   });
   afterEach(() => {
     for (const env of databases.splice(0)) env.__db.close();
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('stores only aggregate bins for token enrollment, renewal and rejected responses', async () => {
+    const env = Object.assign(environment(), onBaseline);
+    const ctx = baselineContext();
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    const key = await createDeviceKeyPair();
+    expect((await preEnroll(env, installationId, key)).status).toBe(200);
+    const signed = JSON.stringify(await proof(key));
+    expect((await baselinePost(env, ctx, signed)).status).toBe(200);
+    expect((await baselinePost(env, ctx, signed)).status).toBe(401);
+    expect((await baselinePost(env, ctx, JSON.stringify(await proof(key)))).status).toBe(200);
+    expect((await baselinePost(env, ctx, JSON.stringify(await proof(key)), 'ICN', 'streamed')).status).toBe(200);
+    const rejected = await baselinePost(env, ctx, oversized);
+    expect(rejected.status).toBe(413);
+    expect(rejected.headers.get('cache-control')).toBe('no-store');
+    expect((await baselinePost(env, ctx, '{}', 'US')).status).toBe(400);
+    expect((await app.fetch(new Request('http://broker.test/v1/puri/token'), env, ctx)).status).toBe(404);
+    expect((await app.fetch(new Request('http://broker.test/healthz'), env, ctx)).status).toBe(200);
+    await settleBaseline(ctx);
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(6);
+    const common = { day_utc: '2026-10-30', version_id: baselineVersion.id, upper_ms: 25 };
+    expect(env.__db.prepare('SELECT * FROM puri_token_baseline ORDER BY status, cohort').all()).toEqual([
+      { ...common, ingress_colo: 'ICN', cohort: 'enrollment', status: 200, requests: 1 },
+      { ...common, ingress_colo: 'ICN', cohort: 'renewal', status: 200, requests: 2 },
+      { ...common, ingress_colo: 'unknown', cohort: 'unknown', status: 400, requests: 1 },
+      { ...common, ingress_colo: 'ICN', cohort: 'unknown', status: 401, requests: 1 },
+      { ...common, ingress_colo: 'ICN', cohort: 'unknown', status: 413, requests: 1 },
+    ]);
+    expect(() => env.__db.prepare('SELECT rowid FROM puri_token_baseline')).toThrow('no such column');
+  });
+
+  it('collects Hono 500s and atomically increments an existing bin across overlapping requests', async () => {
+    const env = Object.assign(environment({
+      beforeFirst: ({ sql }) => {
+        if (sql.includes('SELECT value FROM broker_config')) throw new Error('synthetic handler failure');
+      },
+    }), onBaseline);
+    const ctx = baselineContext();
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    const statuses = await Promise.all(Array.from({ length: 8 }, async () => (await baselinePost(env, ctx, '{}')).status));
+    expect(statuses).toEqual(Array(8).fill(500));
+    await settleBaseline(ctx);
+    expect(env.__db.prepare('SELECT status, cohort, upper_ms, requests FROM puri_token_baseline').all())
+      .toEqual([{ status: 500, cohort: 'unknown', upper_ms: 25, requests: 8 }]);
+  });
+
+  it('buckets elapsed time inclusively before a delayed aggregate write', async () => {
+    let slowWrite: Promise<void> | undefined;
+    const env = Object.assign(environment({
+      beforeRun: ({ sql }) => sql.includes('INSERT INTO puri_token_baseline') ? slowWrite : undefined,
+    }), onBaseline);
+    const ctx = baselineContext();
+    const clock = vi.spyOn(performance, 'now');
+    for (const elapsedMs of [0, 25, 25.001, 50, 50.001, 100, 100.001, 200, 200.001, 400,
+      400.001, 800, 800.001, 1600, 1600.001, 3200, 3200.001, 6400, 6400.001]) {
+      clock.mockReturnValueOnce(100).mockReturnValueOnce(100 + elapsedMs);
+      expect((await baselinePost(env, ctx, oversized)).status).toBe(413);
+    }
+    await settleBaseline(ctx);
+    const { promise, resolve } = Promise.withResolvers<void>();
+    slowWrite = promise;
+    try {
+      clock.mockReturnValueOnce(100).mockReturnValueOnce(125);
+      expect((await baselinePost(env, ctx, oversized)).status).toBe(413);
+      expect(env.__db.prepare('SELECT requests FROM puri_token_baseline WHERE upper_ms = 25').get())
+        .toEqual({ requests: 2 });
+    } finally {
+      resolve();
+    }
+    await settleBaseline(ctx);
+    expect(env.__db.prepare('SELECT upper_ms, requests FROM puri_token_baseline ORDER BY upper_ms').all())
+      .toEqual([
+        { upper_ms: -1, requests: 1 },
+        ...[25, 50, 100, 200, 400, 800, 1600, 3200, 6400].map((upper_ms) => ({
+          upper_ms, requests: upper_ms === 25 ? 3 : 2,
+        })),
+      ]);
+  });
+
+  it('captures across precisely seven UTC dates and fails closed on malformed or missing bindings', async () => {
+    const env = environment();
+    const ctx = baselineContext();
+    const cases = [
+      ['2026-10-29T23:59:59.999Z', onBaseline.TOKEN_BASELINE_START_UTC, baselineVersion, false],
+      ['2026-10-30T00:00:00.000Z', onBaseline.TOKEN_BASELINE_START_UTC, baselineVersion, true],
+      ['2026-11-05T23:59:59.999Z', onBaseline.TOKEN_BASELINE_START_UTC, baselineVersion, true],
+      ['2026-11-06T00:00:00.000Z', onBaseline.TOKEN_BASELINE_START_UTC, baselineVersion, false],
+      ['2026-10-30T12:00:00.000Z', undefined, baselineVersion, false],
+      ['2026-10-30T12:00:00.000Z', '', baselineVersion, false],
+      ['2026-10-30T12:00:00.000Z', '2026-10-30 ', baselineVersion, false],
+      ['2026-03-02T12:00:00.000Z', '2026-02-30', baselineVersion, false],
+      ['2026-10-30T12:00:00.000Z', onBaseline.TOKEN_BASELINE_START_UTC, undefined, false],
+      ['2026-10-30T12:00:00.000Z', onBaseline.TOKEN_BASELINE_START_UTC, { id: 'local' }, false],
+      ['2026-10-30T12:00:00.000Z', onBaseline.TOKEN_BASELINE_START_UTC, { id: '00000000-0000-0000-0000-000000000000' }, false],
+    ] as const;
+    for (const [now, start, version, captures] of cases) {
+      vi.setSystemTime(new Date(now));
+      Object.assign(env, { TOKEN_BASELINE_START_UTC: start, CF_VERSION_METADATA: version });
+      const prior = ctx.waitUntil.mock.calls.length;
+      expect((await baselinePost(env, ctx, oversized)).status).toBe(413);
+      expect(ctx.waitUntil.mock.calls.length - prior).toBe(Number(captures));
+    }
+    await settleBaseline(ctx);
+    expect(env.__db.prepare('SELECT day_utc, requests FROM puri_token_baseline ORDER BY day_utc').all())
+      .toEqual([{ day_utc: '2026-10-30', requests: 1 }, { day_utc: '2026-11-05', requests: 1 }]);
+  });
+
+  it.each(['prepare', 'run', 'waitUntil'] as const)('does not change or log a valid token response when the baseline %s fails', async (stage) => {
+    const failure = new Error('synthetic sensitive aggregate failure');
+    const env = Object.assign(environment({
+      beforeRun: async ({ sql }) => {
+        if (stage === 'run' && sql.includes('INSERT INTO puri_token_baseline')) throw failure;
+      },
+    }), onBaseline);
+    const ctx = baselineContext();
+    const error = vi.spyOn(console, 'error');
+    const warn = vi.spyOn(console, 'warn');
+    const prepare = env.BROKER_DB.prepare.bind(env.BROKER_DB);
+    vi.spyOn(env.BROKER_DB, 'prepare').mockImplementation((sql) => {
+      if (stage === 'prepare' && sql.includes('INSERT INTO puri_token_baseline')) throw failure;
+      return prepare(sql);
+    });
+    if (stage === 'waitUntil') ctx.waitUntil.mockImplementation(() => { throw failure; });
+    const response = await baselinePost(env, ctx, JSON.stringify(await proof(await createDeviceKeyPair())));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({ access_token: expect.any(String), token_type: 'Bearer' });
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
+    await settleBaseline(ctx);
+    expect(env.__db.prepare('SELECT * FROM puri_token_baseline').all()).toEqual([]);
+    expect(enrollments(env)).toEqual({ count: 1 });
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('prunes older UTC dates on an existing hourly maintenance tick even with capture disabled', async () => {
+    const env = environment();
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.dailyReport.enabled', json('false')) WHERE key = 'abuse_controls'`).run();
+    const retention = vi.spyOn(env.BROKER_DB, 'prepare');
+    const insert = env.__db.prepare('INSERT INTO puri_token_baseline VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const day of ['2026-10-24', '2026-10-25', '2026-10-26', '2026-11-01']) {
+      insert.run(day, baselineVersion.id, 'ICN', 'renewal', 200, 25, 7);
+    }
+    await app.scheduled({ scheduledTime: Date.parse('2026-10-31T23:59:00Z') }, env, {});
+    expect(retention.mock.calls.some(([sql]) => sql.includes('puri_token_baseline'))).toBe(false);
+    await app.scheduled({ scheduledTime: Date.parse('2026-11-01T00:00:00Z') }, env, {});
+    expect(env.__db.prepare('SELECT day_utc, requests FROM puri_token_baseline ORDER BY day_utc').all())
+      .toEqual([{ day_utc: '2026-10-26', requests: 7 }, { day_utc: '2026-11-01', requests: 7 }]);
+  });
+
+  it('keeps token writes and hourly maintenance working on the pre-baseline schema', async () => {
+    const env = Object.assign(environment({ throughMigration: '0031_photo_managed_access.sql' }), onBaseline);
+    env.__db.prepare(`UPDATE broker_config SET value = json_set(value, '$.dailyReport.enabled', json('false')) WHERE key = 'abuse_controls'`).run();
+    const ctx = baselineContext();
+    const response = await baselinePost(env, ctx, JSON.stringify(await proof(await createDeviceKeyPair())));
+    expect(response.status).toBe(200);
+    await settleBaseline(ctx);
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 1 });
+    await app.scheduled({ scheduledTime: Date.parse('2026-10-30T13:00:00Z') }, env, {});
+    expect(env.__db.prepare('SELECT COUNT(*) AS count FROM puri_proof_nonces').get()).toEqual({ count: 0 });
+    expect(enrollments(env)).toEqual({ count: 1 });
   });
 
   it('registers only the proven managed identity and mints the exact short-lived HS256 token', async () => {

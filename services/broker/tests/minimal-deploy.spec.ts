@@ -60,6 +60,52 @@ describe('minimal production Broker deployment', { timeout: 20000 }, () => {
     expect(existsSync(join(value.broker, '.deploy-direct'))).toBe(false);
   });
 
+  it('deploys the requested baseline date and clears it on a subsequent default deploy with keep-vars', async () => {
+    const start = '2032-02-29';
+    const value = scenario({ env: { TOKEN_BASELINE_START_UTC: start } });
+    const workerBefore = readWorker(value);
+    const enabled = await runDeployWorkflow(value);
+    expect(enabled.status, enabled.stderr).toBe(0);
+    expect(readWorker(value)).toEqual({
+      ...workerBefore,
+      deployments: 1,
+      vars: { ...workerBefore.vars, TOKEN_BASELINE_START_UTC: start },
+    });
+
+    delete value.env.TOKEN_BASELINE_START_UTC;
+    const disabled = await runDeployWorkflow(value);
+    expect(disabled.status, disabled.stderr).toBe(0);
+    expect(readWorker(value)).toEqual({ ...workerBefore, deployments: 2 });
+  });
+
+  it('requires a pending baseline migration to be explicitly selected before enabling collection', async () => {
+    const value = scenario({ env: { TOKEN_BASELINE_START_UTC: '2032-02-29' } });
+    changeDatabase(value, "DROP TABLE puri_token_baseline; DELETE FROM d1_migrations WHERE name = '0032_puri_token_baseline.sql'");
+    const before = readFileSync(value.databasePath);
+    const blocked = await runDeployWorkflow(value);
+    expect(blocked.status).not.toBe(0);
+    expect(blocked.stderr).toContain('Required ordinary migrations are pending');
+    expect(readFileSync(value.databasePath)).toEqual(before);
+    expect(readWorker(value).deployments).toBe(0);
+
+    value.env.APPLY_MIGRATIONS = 'true';
+    const allowed = await runDeployWorkflow(value);
+    expect(allowed.status, allowed.stderr).toBe(0);
+    expect(readEvents(value)).toContainEqual({ event: 'migrate', pending: ['0032_puri_token_baseline.sql'] });
+    expect(readWorker(value).vars.TOKEN_BASELINE_START_UTC).toBe('2032-02-29');
+  });
+
+  it('rejects an invalid baseline date before any D1 access even with migrations selected', async () => {
+    const value = scenario({ env: { TOKEN_BASELINE_START_UTC: '2032-02-30', APPLY_MIGRATIONS: 'true' } });
+    const before = readWorker(value);
+    const result = await runDeployWorkflow(value);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('--token-baseline-start-utc must be an exact UTC calendar date');
+    expect(readWorker(value)).toEqual(before);
+    expect(readEvents(value)).toEqual([]);
+    expect(result.requests).toEqual([]);
+  });
+
   it('uses explicit current and previous versions without needing provider runtime credentials or replacing deployed secrets', async () => {
     const value = scenario({ env: { NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '9', NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '8' } });
     const before = readWorker(value);

@@ -116,6 +116,25 @@ For managed Relay CPU, use the [Worker placement and photo profile procedure](wo
 
 **Measurements:** [Chatbot benchmark instructions](../benchmarks/chatbot/README.md), [CLI/results](../benchmarks/chatbot/__main__.py), and [calibration](../benchmarks/chatbot/judging.py) own simulator use. Controlled smoke checks use synthetic responses/state, not live-model evaluation. Live evaluation requires its documented access/resources and preserves `blocked_calibration` and other blocked statuses. Neither mode proves GUI interaction or real app effects. Do not duplicate simulator cases, commands, rubrics, or model policy here.
 
+## Broker token baseline (placement off)
+
+Collect passive server timings for `POST /v1/puri/token` **only**. No desktop release, active test installations, Relay calls or provider traffic are required. The measured interval is Broker route entry through construction of the response, **not** time until the app receives or accepts a token. A Puri first binding is an enrollment even if the installation already exists; a successful later binding is a renewal. A failed request has unknown cohort. Keep failures in the denominator. The records are counts, not individual requests: UTC day, serving Worker version, ingress colo, cohort, HTTP status, and a handler-latency bucket. They contain no IP, identity, token, request/response body, or URL.
+
+**Before production:** Use the [Broker direct-deploy workflow](../.github/workflows/deploy-broker-direct.yml) only on its guarded `dev` ref. Compare the intended release with the active Broker, not just the branch tip. A request for baseline collection is not approval to ship other policy or handler changes. Check ordinary migration readiness; do not apply unrelated pending migrations. Confirm placement is absent/off, there is no explicit placement hint, and no Relay workflow will run. Do not enable Workers Logs, traces or client uploads for this procedure.
+
+**Capture:** The ordinary Broker migration creates `puri_token_baseline`. After release and migration approval, enter the UTC start date (`YYYY-MM-DD`) in the Broker workflow. Use `apply_migrations` only if the intended ordinary migration is pending. Capture runs for seven UTC dates starting at midnight on that date, not seven days after deployment; deploying late loses the earlier period. Leave the date blank to deploy with capture disabled. Check the active deployment's version/share, effective placement, start date and version-metadata binding through the Cloudflare control plane. Do not publish a raw settings dump. Keep the Broker code, placement, DB and client mix unchanged during the window.
+
+**Read the baseline:** From `services/broker`, use an authorized read-only identity and a privately rendered Broker config:
+
+```sh
+pnpm exec wrangler d1 execute puripuly-heart-broker --remote \
+  --config "$BROKER_CONFIG" --file deploy/read-puri-token-baseline.sql --json
+```
+
+The [read-only query](../services/broker/deploy/read-puri-token-baseline.sql) covers today and the preceding six UTC dates. Save the aggregate before the first day ages out. Match `version_id` to the active off deployment. Compare like ingress and request cohorts, never different deployment versions pooled together. Percentiles are nearest-rank **bucket upper bounds**, not exact milliseconds: `-1` means over 6,400 ms; `NULL` means fewer than 2 samples for P50 or 20 for P95. Those floors allow a readout, not a claim of statistical stability. Sum counts across statuses for the observed denominator; report sparse or unknown groups. An empty readback is **not evidence of zero requests**: confirm the capture window, migration and version binding, then wait for organic traffic. Delivery is best-effort; a missing aggregate write or a request stopped before the Worker returns is not a measured success. Do not send synthetic production requests to fill buckets.
+
+**Stop:** Capture stops at the end of the window. For an early stop, redeploy the approved candidate with the date blank and verify the effective setting. Keep retention running to age out stored counts; rolling back to pre-collector code removes its cleanup as well. If that rollback is necessary, arrange an authorized purge of **only** `puri_token_baseline` after the retention window; do not drop auth tables or assume database backups expire with live rows. No Smart Placement toggle is part of this baseline.
+
 ## Build and packaging checks
 
 Use the [Native Release workflow](../.github/workflows/release-native.yml), [artifact builder](../scripts/ci/build-native-release-artifacts.ps1), and [release-evidence checks](../tests/release_evidence/) for packaging changes. Native Release is explicitly dispatched on `dev` for an existing version tag; it builds the validated tag commit and stages a draft, not a published release. Publication remains a separate maintainer action after staging completes.
