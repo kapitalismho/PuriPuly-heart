@@ -6,14 +6,16 @@ from copy import deepcopy
 import pytest
 
 from benchmarks.chatbot import __main__ as cli
-from benchmarks.chatbot import runner
+from benchmarks.chatbot import relay_context, runner
 from benchmarks.chatbot.app import ScenarioApp
+from benchmarks.chatbot.judging import model_judge_payload
 from benchmarks.chatbot.relay_context import (
     load_relay_context,
     upstream_context_id,
     validate_relay_context,
 )
 from benchmarks.chatbot.scenarios import select_scenarios
+from puripuly_heart.app.ports.agent_chat import AGENT_REFERENCES
 from puripuly_heart.app.services.agent_chat.modules import MODULES
 from tests.app.test_agent_chat import context_of
 
@@ -25,7 +27,8 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
     source.write_text(json.dumps(relay_context_manifest), encoding="utf-8")
     loaded = load_relay_context(source, relay_build=relay_context_manifest["relay_build"])
     assert loaded == relay_context_manifest
-    assert loaded["agent_protocol"] == 7
+    assert loaded["agent_protocol"] == 8
+    assert tuple(item["name"] for item in loaded["references"]) == AGENT_REFERENCES
     tools = loaded["contexts"]["work"]["tools"]
     assert [tool["name"] for tool in tools] == [
         "read_app",
@@ -38,6 +41,38 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
     assert all(tool["strict"] is False and tool["parameters"] for tool in tools)
     loaded["contexts"]["work"]["input_prefix"].clear()
     assert relay_context_manifest["contexts"]["work"]["input_prefix"]
+
+
+def test_protocol_7_manifest_does_not_require_references(relay_context_manifest, monkeypatch):
+    monkeypatch.setattr(relay_context.agent_chat, "AGENT_CHAT_PROTOCOL", 7)
+    monkeypatch.delattr(relay_context.agent_chat, "AGENT_REFERENCES")
+    relay_context_manifest["agent_protocol"] = 7
+    del relay_context_manifest["references"]
+    assert (
+        validate_relay_context(
+            relay_context_manifest, relay_build=relay_context_manifest["relay_build"]
+        )
+        == relay_context_manifest
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: value.pop("references"),
+        lambda value: value.update(references={}),
+        lambda value: value["references"].reverse(),
+        lambda value: value["references"][0].update(name="unknown"),
+        lambda value: value["references"][2].update(name="photo"),
+        lambda value: value["references"][1].update(text=" "),
+    ],
+)
+def test_protocol_8_manifest_rejects_invalid_references(relay_context_manifest, mutation):
+    mutation(relay_context_manifest)
+    with pytest.raises(ValueError, match="references"):
+        validate_relay_context(
+            relay_context_manifest, relay_build=relay_context_manifest["relay_build"]
+        )
 
 
 @pytest.mark.parametrize(
@@ -157,7 +192,8 @@ def test_context_reference_uses_actual_route(method, route, identity):
 
 
 @pytest.mark.asyncio
-async def test_recorded_inputs_and_allow_tools_stay_per_call(relay_context_manifest):
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_recorded_inputs_and_reference_choices_stay_per_call(relay_context_manifest, legacy):
     class Transport:
         def __init__(self):
             self.arguments = []
@@ -174,11 +210,14 @@ async def test_recorded_inputs_and_allow_tools_stay_per_call(relay_context_manif
         {"role": "user", "content": "Synthetic app help"},
         {"type": "configuration_update", "reasoning": {"effort": "high"}},
     ]
-    for route, allow_tools in (
-        ("work", False),
-        ("unclear", True),
-        ("social", True),
-        ("out_of_scope", False),
+    if legacy:
+        relay_context_manifest["agent_protocol"] = 7
+        del relay_context_manifest["references"]
+    for route, allow_tools, omitted in (
+        ("work", False, ("costs", "photo")),
+        ("unclear", True, ()),
+        ("social", True, ()),
+        ("out_of_scope", False, ()),
     ):
         arguments = {
             "input": deepcopy(inputs),
@@ -186,9 +225,13 @@ async def test_recorded_inputs_and_allow_tools_stay_per_call(relay_context_manif
             "effort": "high",
             "allow_tools": allow_tools,
         }
+        if not legacy:
+            arguments["omitted_references"] = omitted
         async for _ in recording.respond(**arguments):
             pass
-        assert actual.arguments[-1] == arguments == recording.calls[-1]["request"]
+        assert actual.arguments[-1] == arguments
+        request = arguments if legacy else {**arguments, "omitted_references": list(omitted)}
+        assert recording.calls[-1]["request"] == request
         assert recording.calls[-1]["upstream_context_id"] == (
             "work" if route == "unclear" else route
         )
@@ -204,6 +247,19 @@ async def test_recorded_inputs_and_allow_tools_stay_per_call(relay_context_manif
         False,
     ]
     assert all(call["request"]["input"] == inputs for call in evidence["M_invocations"])
+    projected = model_judge_payload(evidence)
+    requests = [call["request"] for call in projected["M_invocations"]]
+    if legacy:
+        assert "references" not in projected["relay_contexts"]
+        assert all("omitted_references" not in request for request in requests)
+    else:
+        assert projected["relay_contexts"]["references"] == relay_context_manifest["references"]
+        assert [request["omitted_references"] for request in requests] == [
+            ["costs", "photo"],
+            [],
+            [],
+            [],
+        ]
 
 
 @pytest.mark.asyncio
@@ -238,9 +294,11 @@ async def test_smoke_evidence_matches_selected_context_and_full_comparison(
     assert all(decision["context_modules"] == expected_modules for decision in decisions)
     assert all(decision["context_mode"] == context_mode for decision in decisions)
     assert all({"context_source", "context_reason"} <= decision.keys() for decision in decisions)
+    assert all(decision["omitted_references"] == [] for decision in decisions)
     assert [call["decision"] for call in attempt["D_invocations"]] == decisions
     assert [event for event in attempt["events"] if event.get("kind") == "decision"] == decisions
     for call in attempt["M_invocations"]:
+        assert call["request"]["omitted_references"] == []
         context = context_of(call["request"])
         assert context["modules"] == expected_modules
         assert [module for module in MODULES if module in context] == expected_modules

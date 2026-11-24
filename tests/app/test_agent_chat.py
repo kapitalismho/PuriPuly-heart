@@ -1106,6 +1106,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
                 effort=effort,
                 route="work",
                 allow_tools=False,
+                omitted_references=("benchmarks", "photo"),
             )
         ]
         assert events == [{"type": "completed", "response": response}]
@@ -1116,6 +1117,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
             "effort": effort,
             "route": "work",
             "allow_tools": False,
+            "omitted_references": ["benchmarks", "photo"],
         }
         assert seen[0].headers["authorization"] == "Bearer synthetic-installation-token"
         for invalid in ("xhigh", "extreme"):
@@ -1127,6 +1129,7 @@ async def test_transport_rejects_insecure_routes_authenticates_and_sends_only_fi
                         effort=invalid,
                         route="work",
                         allow_tools=True,
+                        omitted_references=(),
                     )
                 )
         assert len(seen) == 1

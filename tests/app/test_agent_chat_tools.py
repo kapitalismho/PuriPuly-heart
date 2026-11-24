@@ -967,7 +967,7 @@ async def test_owner_retains_normal_tools_after_confirmation_boundary(catalog, f
                 ]
             }
 
-        async def respond(self, *, input, turn_id, effort, route, allow_tools):
+        async def respond(self, *, input, turn_id, effort, route, allow_tools, omitted_references):
             self.allowed.append(allow_tools)
             yield {
                 "type": "completed",

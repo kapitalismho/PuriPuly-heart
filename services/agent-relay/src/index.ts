@@ -1,6 +1,6 @@
 import { authenticate, hasTokenSecret } from './auth';
 import { contracts, contractFor, supportedProtocols } from './contracts';
-import { classifierInstructions, outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
+import { classifierInstructions, outOfScopeInstructions, referenceInstructions, socialInstructions, workInstructions } from './instructions';
 import { beforeAbort, requestLifetime } from './lifetime';
 import { PhotoEnv, receivePhoto, receivePhotoAllowance } from './photo';
 import { ClassifyRequest, isClassifyRequest, isRespondRequest, maxClassifyBytes, maxRespondBytes, readRequestJson, RespondRequest } from './requests';
@@ -16,26 +16,27 @@ type Env = UsageEnv & SupportEnv & PhotoEnv & {
   AGENT_SERVICE_ENABLED?: string;
 };
 
-const developerMessage = (text: string, breakpoint: Record<string, string> = { mode: 'explicit' }) => ({
+const developerMessage = (text: string, breakpoint?: Record<string, string>) => ({
   role: 'developer',
   content: [{ type: 'input_text', text, prompt_cache_breakpoint: breakpoint }],
 });
 const prepared = new Map([...contracts].map(([protocol, contract]) => {
-  const work = new Map<number, string>();
+  const work = new Map<number | undefined, string>();
   const workOptions = JSON.stringify({
     tools: contract.tools,
     reasoning: { effort: 'high' },
     prompt_cache_options: { mode: 'implicit', ttl: '30m' },
   }).slice(1, -1);
   return [protocol, {
-    classifierDeveloperMessage: developerMessage(classifierInstructions(contract)),
+    classifierDeveloperMessage: developerMessage(classifierInstructions(contract), { mode: 'explicit' }),
     questions: classifierQuestions(contract),
     workRequestPrefix(photoAllowance: number) {
-      let prefix = work.get(photoAllowance);
+      const cacheKey = contract.selectReferences ? undefined : photoAllowance;
+      let prefix = work.get(cacheKey);
       if (prefix === undefined) {
         const message = developerMessage(workInstructions(contract, photoAllowance), { mode: 'explicit', ttl: '12h' });
         prefix = `,${workOptions},"input":[${JSON.stringify(message)}`;
-        work.set(photoAllowance, prefix);
+        work.set(cacheKey, prefix);
       }
       return prefix;
     },
@@ -157,12 +158,15 @@ export default {
         const options = outOfScope ? outOfScopeOptions : socialOptions;
         serializeBody = () => JSON.stringify({ ...identity, ...options, input, ...responseOptions });
       } else {
-        const prefix = contract.workRequestPrefix(photoAllowance(env));
+        const allowance = photoAllowance(env);
+        const prefix = contract.workRequestPrefix(allowance);
+        const references = responseBody.omitted_references && referenceInstructions(allowance, responseBody.omitted_references);
+        const suffix = references ? `,${JSON.stringify(developerMessage(references))}` : '';
         serializeBody = () => {
           const head = JSON.stringify(identity).slice(0, -1);
-          const history = JSON.stringify(input).slice(1);
+          const history = JSON.stringify(input).slice(1, -1);
           const tail = JSON.stringify(responseOptions).slice(1);
-          return `${head}${prefix}${input.length ? ',' : ''}${history},${tail}`;
+          return `${head}${prefix}${input.length ? ',' : ''}${history}${suffix}],${tail}`;
         };
       }
     }

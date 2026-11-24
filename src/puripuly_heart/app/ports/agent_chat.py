@@ -6,7 +6,8 @@ from typing import Literal, Protocol, TypedDict
 
 from puripuly_heart.core.messages import ErrorDiagnostics
 
-AGENT_CHAT_PROTOCOL = 7
+AGENT_CHAT_PROTOCOL = 8
+AGENT_REFERENCES = ("costs", "benchmarks", "setup", "photo")
 
 AgentEffort = Literal["low", "medium", "high"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]
@@ -83,6 +84,7 @@ class AgentTransport(Protocol):
         effort: AgentEffort,
         route: AgentRoute,
         allow_tools: bool,
+        omitted_references: tuple[str, ...],
     ) -> AgentResponseStream: ...
 
     async def upload_support(

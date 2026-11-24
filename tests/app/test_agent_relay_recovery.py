@@ -255,7 +255,12 @@ async def test_relay_401_is_retried_only_once_and_other_errors_are_not_replayed(
             await relay.classify(input=[], turn_id="a" * 32)
         elif operation == "respond":
             async for _ in relay.respond(
-                input=[], turn_id="a" * 32, effort="low", route="social", allow_tools=False
+                input=[],
+                turn_id="a" * 32,
+                effort="low",
+                route="social",
+                allow_tools=False,
+                omitted_references=(),
             ):
                 raise AssertionError("Rejected response must not emit events")
         else:
@@ -301,6 +306,7 @@ async def test_oversize_request_is_rejected_before_authentication_or_relay_reque
                     effort="low",
                     route="social",
                     allow_tools=False,
+                    omitted_references=(),
                 )
             )
         assert requests == []
@@ -368,6 +374,7 @@ async def test_rejected_token_retry_shares_the_turn_http_budget_but_not_support_
         "effort": "low",
         "route": "social",
         "allow_tools": False,
+        "omitted_references": (),
     }
     try:
         await relay.classify(input=request["input"], turn_id=request["turn_id"])

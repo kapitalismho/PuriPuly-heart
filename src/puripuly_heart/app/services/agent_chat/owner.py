@@ -1191,6 +1191,7 @@ class AgentChatOwner:
             context_modules, context_source, context_reason = self._select_context(
                 decision, entry, notice
             )
+            omitted_references = decision.omitted_references if context_source == "model" else ()
             self._emit_decision(
                 entry,
                 generation,
@@ -1198,6 +1199,7 @@ class AgentChatOwner:
                 context_modules=context_modules,
                 context_source=context_source,
                 context_reason=context_reason,
+                omitted_references=omitted_references,
             )
             out_of_scope = decision.route == "out_of_scope"
             brief = decision.route in {"social", "out_of_scope"}
@@ -1270,6 +1272,7 @@ class AgentChatOwner:
                         allow_tools=calls < 10
                         and self._prompt_requests < 15
                         and decision.route in {"work", "unclear"},
+                        omitted_references=omitted_references,
                     )
                     presentation = AgentPresentationBuffer(generation, model_calls)
                     self._presentation = presentation
@@ -1626,6 +1629,7 @@ class AgentChatOwner:
         context_modules: tuple[str, ...] = (),
         context_source: str = "unavailable",
         context_reason: str | None = None,
+        omitted_references: tuple[str, ...] = (),
     ) -> None:
         self._emit_event(
             {
@@ -1641,6 +1645,7 @@ class AgentChatOwner:
                 "context_source": context_source,
                 "context_reason": context_reason,
                 "context_relation": decision.context_relation,
+                "omitted_references": list(omitted_references),
             }
         )
 

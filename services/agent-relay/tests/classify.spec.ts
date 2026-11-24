@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import relay from '../src/index';
@@ -77,6 +78,35 @@ describe('entry classification relay', () => {
         expect(policy).toContain(`\n- ${choice.value}: `);
       }
     }
+  });
+
+  it('adds only the ordered reference policy and questions in protocol eight', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ answers: [] }));
+    for (const protocol of [6, 7, 8]) {
+      expect((await relay.fetch(request({ ...body, agent_protocol: protocol }), env)).status).toBe(200);
+    }
+    const [six, seven, eight] = fetch.mock.calls.map(([, init]) => JSON.parse(init?.body as string));
+    expect(seven).toEqual(six);
+    const references = readFileSync(new URL('../prompts/agent/scope-references.md', import.meta.url), 'utf8')
+      .replaceAll('\r\n', '\n').trim();
+    expect(eight).toEqual({
+      ...seven,
+      input: [{ role: 'developer', content: [{
+        ...seven.input[0].content[0],
+        text: `${seven.input[0].content[0].text}\n\n${references}`,
+      }] }, ...body.input],
+      questions: [
+        ...seven.questions.slice(0, -1),
+        ...['costs', 'benchmarks', 'setup', 'photo'].map((name) => ({
+          type: 'choice',
+          name: `reference_${name}`,
+          instructions: `Decide whether the ${name} reference is needed by the References section.`,
+          choices: ['include', 'omit', 'unclear'].map((value) => ({ value })),
+        })),
+        seven.questions.at(-1),
+      ],
+    });
+    expect(seven.input[0].content[0].text).not.toContain('## References');
   });
 
   it.each(['social', 'out_of_scope'])('forces %s to one low-effort request with no available tools', async (route) => {

@@ -15,7 +15,17 @@ from tests.app.test_agent_chat_routing import selected_decision
 
 FIXTURES = Path(__file__).resolve().parents[2] / "services/agent-relay/tests/app-requests"
 _VALUES = frozenset(
-    {"agent_protocol", "route", "effort", "allow_tools", "type", "role", "name", "status"}
+    {
+        "agent_protocol",
+        "route",
+        "effort",
+        "allow_tools",
+        "omitted_references",
+        "type",
+        "role",
+        "name",
+        "status",
+    }
 )
 
 
@@ -29,7 +39,7 @@ def _shape(value, key=None):
 
 async def _app_requests() -> list[dict]:
     decisions = [
-        selected_decision("output"),
+        selected_decision("output", omitted_references=("photo", "costs")),
         selected_decision(route="social", effort="low"),
         selected_decision(route="out_of_scope", effort="low"),
     ]

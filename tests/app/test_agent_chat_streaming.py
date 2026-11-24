@@ -232,6 +232,7 @@ async def test_transport_rejects_missing_duplicate_and_unsafe_terminal_streams(e
                     effort="high",
                     route="work",
                     allow_tools=True,
+                    omitted_references=(),
                 )
             ]
     finally:
@@ -280,6 +281,7 @@ async def test_effective_decision_events_expose_safe_route_effort_and_fallback_c
         assert event["source"] == source and event["reason"] == reason
         assert event["route"] == transport.requests[0]["route"]
         assert event["effort"] == transport.requests[0]["effort"]
+        assert event["omitted_references"] == []
         assert "PRIVATE" not in json.dumps(event)
     finally:
         await owner.close()

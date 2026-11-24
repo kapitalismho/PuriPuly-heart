@@ -5,7 +5,7 @@ import re
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
 
-from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL
+from puripuly_heart.app.ports import agent_chat
 
 FORMAT = "puri-agent-relay-context-1"
 CONTEXT_IDS = frozenset({"classify", "work", "social", "out_of_scope"})
@@ -54,10 +54,26 @@ def _prefix_item(item: object) -> bool:
 def validate_relay_context(value: object, *, relay_build: str | None) -> dict:
     _require(isinstance(value, dict), "expected an object")
     _require(value.get("format") == FORMAT, f"format must be {FORMAT}")
-    _require(
-        value.get("agent_protocol") == AGENT_CHAT_PROTOCOL,
-        f"agent_protocol must be {AGENT_CHAT_PROTOCOL}",
-    )
+    protocol = agent_chat.AGENT_CHAT_PROTOCOL
+    _require(value.get("agent_protocol") == protocol, f"agent_protocol must be {protocol}")
+    if protocol >= 8:
+        references = value.get("references")
+        _require(
+            isinstance(references, list)
+            and bool(references)
+            and all(
+                isinstance(item, dict)
+                and set(item) == {"name", "text"}
+                and _text(item["name"])
+                and _text(item["text"])
+                for item in references
+            ),
+            "references must contain named text blocks",
+        )
+        names = tuple(item["name"] for item in references)
+        _require(len(set(names)) == len(names), "references must have unique names")
+        expected_names = getattr(agent_chat, "AGENT_REFERENCES", names)
+        _require(names == expected_names, "references must match the app's names in order")
     _require(_text(relay_build), "the measured relay build is required")
     _require(
         value.get("relay_build") == relay_build, "relay_build does not match the measured relay"

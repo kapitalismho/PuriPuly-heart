@@ -1,4 +1,5 @@
-export function extractContext(upstream: unknown, input: Record<string, unknown>[]): Record<string, unknown>;
+export function extractContext(upstream: unknown, input: Record<string, unknown>[],
+  referenceTexts?: readonly string[]): Record<string, unknown>;
 
 export function exportRelayContext(options: {
   emitted: string;
@@ -6,11 +7,14 @@ export function exportRelayContext(options: {
   migrations?: string;
   compatibilityDate: string;
   compatibilityFlags?: string[];
+  protocol?: number;
 }): Promise<{
   format: 'puri-agent-relay-context-1';
+  agent_protocol: number;
   relay_build: string;
   bundle_hashes: Record<string, string>;
   contexts: Record<string, Record<string, unknown>>;
+  references?: { name: string; text: string }[];
   export_provenance: {
     mode: 'controlled_no_network';
     diagnostic_only: true;
