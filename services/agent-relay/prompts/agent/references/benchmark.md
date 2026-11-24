@@ -1,6 +1,6 @@
 # Model comparison evidence
 
-Recorded 2026-11-07. Korean dialogue → English/Japanese/Simplified Chinese; Astra-high MQM penalty, lower is better. Quality evidence, not speed or default recommendations.
+Recorded 2026-11-07. Korean dialogue → English/Japanese/Simplified Chinese, each figure one combined score with no per-language breakdown; Astra-high MQM penalty, lower is better. Quality evidence, not speed or default recommendations.
 
 ## Experiment 1: Translation
 
