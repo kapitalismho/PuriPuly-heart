@@ -484,8 +484,6 @@ uv run --locked python scripts/ci/check_test_selection.py
   <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
 </a>
 
----
-
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro, garanshiro, KOZ39
