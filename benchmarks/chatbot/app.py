@@ -1973,8 +1973,7 @@ class ScenarioApp:
             return (
                 translation is not None
                 and translation["configuration"]["model"]
-                in {"gemma4_26b_31b", "deepseek_v4_flash_41"}
-                - {SLOW_MODELS[cause]}
+                in {"gemma4_26b_31b", "deepseek_v4_flash_41"} - {SLOW_MODELS[cause]}
                 and (
                     cause == "slow_luna"
                     or translation["configuration"]["connection"] == "openrouter"

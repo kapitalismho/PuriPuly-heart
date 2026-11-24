@@ -566,7 +566,11 @@ def _migrate_deepseek_translation(translation: dict[str, Any]) -> None:
     source = translation.get("openrouter_selected_source")
     alias = translation.get("openrouter_selection_alias")
     routing = translation.get("openrouter_provider_routing")
-    retired_route = routing in {"deepseek_only", "deepseek_v4_flash_latency", "deepseek_v4_flash_china"}
+    retired_route = routing in {
+        "deepseek_only",
+        "deepseek_v4_flash_latency",
+        "deepseek_v4_flash_china",
+    }
     retired_primary = model in {retired_flash, retired_pro}
     if retired_primary:
         if model == retired_pro:
