@@ -768,15 +768,16 @@ async def test_relay_allowance_exhaustion_is_distinct_from_transient_rate_limits
 
 
 @pytest.mark.parametrize(
-    ("status", "kwargs", "expected", "invalidates"),
+    ("status", "kwargs", "expected", "invalidates", "shape"),
     [
         (
             401,
             {"json": {"error": {"code": "service_authentication_failed", "message": "private"}}},
             "photo_authentication_failed",
             True,
+            "public_error_envelope",
         ),
-        (403, {"text": "<html>private</html>"}, "photo_stream_invalid", False),
+        (403, {"text": "<html>private</html>"}, "photo_stream_invalid", False, "html"),
         (
             401,
             {
@@ -785,17 +786,19 @@ async def test_relay_allowance_exhaustion_is_distinct_from_transient_rate_limits
             },
             "photo_stream_invalid",
             False,
+            "edge_challenge",
         ),
         (
             401,
             {"headers": {"CF-Ray": "1234567890abcdef-ICN"}, "text": "private"},
             "photo_request_rejected",
             False,
+            "unknown",
         ),
     ],
 )
 async def test_photo_relay_does_not_replay_or_invalidate_unverified_requests(
-    tmp_path, caplog, status, kwargs, expected, invalidates
+    tmp_path, photo_runtime_diagnostics, status, kwargs, expected, invalidates, shape
 ):
     photo = await synthetic_photo(tmp_path)
     rejected = []
@@ -837,8 +840,18 @@ async def test_photo_relay_does_not_replay_or_invalidate_unverified_requests(
         assert requests[-1] == (
             "Bearer replacement-token" if invalidates else "Bearer synthetic-puri-token"
         )
-    assert "private" not in caplog.text
-    assert "synthetic-puri-token" not in caplog.text
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["operation"] == "photo_relay"
+    assert record["code"] == expected
+    assert record["category"] == ("auth" if invalidates else "invalid_response")
+    assert record["status_code"] == status
+    assert record["fields"]["response_shape"] == shape
+    if shape == "unknown":
+        assert record["fields"]["cf_ray"] == "1234567890abcdef-ICN"
+    persisted = photo_runtime_diagnostics.log_file.read_text(encoding="utf-8")
+    assert record["diagnostic_id"] in persisted
+    for value in ("private", "synthetic-puri-token", photo.jpeg_base64):
+        assert value not in repr(record) + persisted
 
 
 async def test_api_completion_drains_sse_terminator_and_reuses_the_connection(tmp_path):

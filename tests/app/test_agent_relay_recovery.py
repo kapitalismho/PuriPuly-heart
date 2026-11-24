@@ -43,7 +43,7 @@ def token_owner(
         return bundle
 
     owner = AgentRelayTokenOwner(
-        lambda: base_url,
+        base_url if callable(base_url) else lambda: base_url,
         identity,
         app_version="synthetic",
         allow_loopback_http=allow_loopback_http,

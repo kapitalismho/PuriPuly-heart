@@ -17,8 +17,15 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.oauth import ChatGptAuthError
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.external_network import NetworkConfigurationError
 from puripuly_heart.core.first_party_http import response_evidence, response_media_type
+from puripuly_heart.core.messages import (
+    CONTENT_POLICY_METADATA_ONLY,
+    DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
+    DiagnosticCategory,
+    ErrorDiagnostics,
+)
 from puripuly_heart.core.photo.image import PreparedPhoto
 from puripuly_heart.core.photo.prompt import render_photo_prompt
 from puripuly_heart.core.photo.protocol import (
@@ -137,26 +144,70 @@ def first_party_photo_http_error(
         error = PhotoProviderError("photo_request_rejected", retryable=False)
     else:
         error = _status_error(status)
-    fields = safe_fields(
-        {
+    category: DiagnosticCategory
+    if error.code == "photo_authentication_failed":
+        category = "auth"
+    elif status == 429:
+        category = "rate_limit"
+    elif error.code == "photo_provider_unavailable":
+        category = "service_unavailable"
+    else:
+        category = "invalid_response"
+    emit_photo_service_failure(
+        error.code,
+        operation=operation,
+        category=category,
+        status_code=status,
+        retry_after_ms=int(error.retry_after * 1000) if error.retry_after is not None else None,
+        fields={
             **response.extensions.get("connection_diagnostics", {}),
             "stage": "protocol_parse",
-            "http_status": status,
+            "dispatch_certainty": "response_received",
             "response_shape": shape,
             **evidence,
-        }
-    )
-    logger.warning(
-        "photo_service_failure operation=%s code=%s fields=%s", operation, error.code, fields
+        },
     )
     return error
 
 
-def report_first_party_photo_transport_failure(exc: BaseException, *, operation: str) -> None:
-    logger.warning(
-        "photo_service_transport_failure operation=%s fields=%s",
-        operation,
-        safe_fields(exception_fields(exc)),
+def emit_photo_service_failure(
+    code: str,
+    *,
+    operation: str,
+    category: DiagnosticCategory,
+    fields: dict[str, object],
+    status_code: int | None = None,
+    retry_after_ms: int | None = None,
+) -> None:
+    emit_failure(
+        logger,
+        ErrorDiagnostics(
+            component="provider.photo",
+            operation=operation,
+            code=code,
+            category=category,
+            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
+            content_policy=CONTENT_POLICY_METADATA_ONLY,
+            status_code=status_code,
+            retry_after_ms=retry_after_ms,
+            fields=safe_fields(fields),
+        ),
+        severity="warning",
+    )
+
+
+def report_first_party_photo_transport_failure(
+    exc: BaseException, *, operation: str, code: str = "photo_transport_failed"
+) -> None:
+    fields = exception_fields(exc)
+    fields.setdefault("stage", "request_send")
+    status = fields.pop("http_status", None)
+    emit_photo_service_failure(
+        code,
+        operation=operation,
+        category="timeout" if fields.get("network_error_kind") == "timeout" else "network",
+        status_code=status if type(status) is int else None,
+        fields=fields,
     )
 
 
@@ -661,7 +712,7 @@ class OpenAIPhotoConnection(_PhotoConnection):
                             else await response.aread()
                         )
                         error = first_party_photo_http_error(
-                            response, operation="relay", body=error_body
+                            response, operation="photo_relay", body=error_body
                         )
                         if error.code == "photo_authentication_failed" and self._invalidate:
                             self._invalidate(self._api_key)
@@ -671,7 +722,9 @@ class OpenAIPhotoConnection(_PhotoConnection):
                         or (self._relayed and "response_shape" in response_evidence(response))
                     ):
                         if self._relayed:
-                            raise first_party_photo_http_error(response, operation="relay", body=b"")
+                            raise first_party_photo_http_error(
+                                response, operation="photo_relay", body=b""
+                            )
                         raise PhotoProviderError("photo_stream_invalid", retryable=False)
                     data: list[str] = []
                     completed = False
@@ -739,9 +792,11 @@ class OpenAIPhotoConnection(_PhotoConnection):
                     if not completed:
                         raise PhotoProviderError("photo_stream_incomplete")
         except Exception as exc:
-            if self._relayed and isinstance(exc, (httpx.RequestError, OSError)):
-                report_first_party_photo_transport_failure(exc, operation="relay")
             error = _classified(exc)
+            if self._relayed and isinstance(exc, (httpx.RequestError, OSError)):
+                report_first_party_photo_transport_failure(
+                    exc, operation="photo_relay", code=error.code
+                )
             if sent:
                 error.retryable = False
             raise error from None
@@ -824,7 +879,7 @@ class RelayPhotoConnection(OpenAIPhotoConnection):
         try:
             await super().preopen()
         except NetworkConfigurationError as error:
-            report_first_party_photo_transport_failure(error, operation="relay")
+            report_first_party_photo_transport_failure(error, operation="photo_relay")
             raise PhotoProviderError("photo_transport_failed", retryable=False) from None
 
     def _body(self, image: PreparedPhoto, target_language: str) -> dict:

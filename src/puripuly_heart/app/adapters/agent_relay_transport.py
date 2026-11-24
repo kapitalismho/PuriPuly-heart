@@ -15,6 +15,7 @@ from puripuly_heart.app.adapters._agent_relay_http import (
     check_response_shape,
     close_agent_client,
     error_envelope,
+    is_loopback_http,
     post_stream,
     read_json,
     response_details,
@@ -48,11 +49,7 @@ class AgentRelayTransport:
             not parsed.hostname
             or not (
                 parsed.scheme == "https"
-                or (
-                    allow_loopback_http
-                    and parsed.scheme == "http"
-                    and parsed.hostname in {"127.0.0.1", "::1"}
-                )
+                or (allow_loopback_http and is_loopback_http(parsed))
             )
             or parsed.username is not None
             or parsed.password is not None
@@ -63,6 +60,7 @@ class AgentRelayTransport:
             raise ValueError(
                 "Agent Chat requires HTTPS /v1/respond or explicit source loopback HTTP"
             )
+        self._allow_loopback_http = allow_loopback_http
         self._endpoint = endpoint
         self._classification_endpoint = endpoint.removesuffix("/respond") + "/classify"
         self._support_endpoint = endpoint.removesuffix("/respond") + "/support"
@@ -110,7 +108,9 @@ class AgentRelayTransport:
             if self._closed:
                 raise AgentTransportError()
             if self._client is None:
-                self._client = agent_client(operation, timeout=180)
+                self._client = agent_client(
+                    operation, timeout=180, allow_loopback_http=self._allow_loopback_http
+                )
             if budget is not None:
                 if budget.count >= 15:
                     raise AgentServiceError("service_turn_exhausted")

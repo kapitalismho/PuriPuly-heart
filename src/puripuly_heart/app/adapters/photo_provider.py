@@ -118,7 +118,7 @@ class PhotoProviderAdapter:
                 response, body=response.content
             ):
                 error = first_party_photo_http_error(
-                    response, operation="relay_allowance", body=response.content
+                    response, operation="photo_relay_allowance", body=response.content
                 )
                 if error.code == "photo_authentication_failed":
                     self.token_owner.invalidate(token)
@@ -128,7 +128,7 @@ class PhotoProviderAdapter:
             photo_token_error(error)
             return None
         except (httpx.RequestError, OSError) as error:
-            report_first_party_photo_transport_failure(error, operation="relay_allowance")
+            report_first_party_photo_transport_failure(error, operation="photo_relay_allowance")
             return None
         except Exception:
             return None
@@ -177,7 +177,7 @@ class PhotoProviderAdapter:
         try:
             client = self._client()
         except NetworkConfigurationError as error:
-            report_first_party_photo_transport_failure(error, operation="relay")
+            report_first_party_photo_transport_failure(error, operation="photo_relay")
             raise PhotoProviderError("photo_transport_failed", retryable=False) from None
         return RelayPhotoConnection(
             self.relay_endpoint,

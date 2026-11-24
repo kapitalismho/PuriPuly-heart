@@ -51,7 +51,7 @@ def reply(writer, body: bytes, content_type: str, *, status=200, size=None, head
 
 
 @asynccontextmanager
-async def service(respond, *, tls=None):
+async def service(respond, *, tls=None, local_host="127.0.0.1"):
     requests = []
     disconnected = []
     tasks = []
@@ -85,13 +85,15 @@ async def service(respond, *, tls=None):
     def accept(reader, writer):
         tasks.append(asyncio.create_task(handle(reader, writer)))
 
-    server = await asyncio.start_server(accept, "127.0.0.1", 0, ssl=tls)
+    server = await asyncio.start_server(accept, local_host, 0, ssl=tls)
     servers = [server]
     port = server.sockets[0].getsockname()[1]
     try:
         if tls is not None and socket.has_ipv6:
             servers.append(await asyncio.start_server(accept, "::1", port, ssl=tls))
-        yield f"https://localhost:{port}" if tls is not None else f"http://127.0.0.1:{port}", requests, disconnected
+        authority = f"[{local_host}]" if ":" in local_host else local_host
+        origin = f"https://localhost:{port}" if tls is not None else f"http://{authority}:{port}"
+        yield origin, requests, disconnected
     finally:
         for listener in servers:
             listener.close()
@@ -152,6 +154,73 @@ async def test_agent_clients_send_through_shared_tls_and_proxy_policy_and_close(
                 await asyncio.gather(*(event.wait() for event in disconnected))
     assert PRIVATE not in caplog.text and proof["signature"] not in caplog.text
     assert not any(record.name.startswith(("httpx", "httpcore")) for record in caplog.records)
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "::1"])
+@pytest.mark.parametrize("proxy_source", ["scheme_env", "all_env", "system"])
+async def test_source_loopback_is_direct_but_https_uses_proxy_in_same_session(
+    certificates, monkeypatch, host, proxy_source
+):
+    if host == "::1" and not socket.has_ipv6:
+        pytest.skip("IPv6 loopback is unavailable")
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+
+    def reply_from(token):
+        def respond(path, writer):
+            if path == "/v1/puri/token":
+                reply(writer, token_response(token).content, "application/json")
+            else:
+                assert path == "/v1/respond"
+                reply(writer, sse({"type": "completed", "response": answer()}), "text/event-stream")
+
+        return respond
+
+    local_token = "synthetic-local"
+    https_token = "synthetic-https"
+    async with (
+        service(reply_from(local_token), local_host=host) as (local, local_requests, _),
+        service(reply_from(https_token), tls=contexts["valid"]) as (https, https_requests, _),
+        recording_proxy() as (proxy, forwarded),
+    ):
+        match proxy_source:
+            case "scheme_env":
+                monkeypatch.setenv("HTTP_PROXY", proxy)
+                monkeypatch.setenv("HTTPS_PROXY", proxy)
+            case "all_env":
+                monkeypatch.setenv("ALL_PROXY", proxy)
+            case "system":
+                monkeypatch.setattr(
+                    external_network, "_windows_proxy_settings", lambda: ({"all": proxy}, "")
+                )
+
+        broker_origin = local
+        auth = token_owner(None, base_url=lambda: broker_origin, allow_loopback_http=True)
+        local_relay = relay_at(local, auth)
+        https_relay = AgentRelayTransport(https + "/v1/respond", auth, allow_loopback_http=True)
+        try:
+            async with asyncio.timeout(5):
+                assert [event["type"] async for event in local_relay.respond(**TURN)] == ["completed"]
+                assert [path for path, _, _ in local_requests] == ["/v1/puri/token", "/v1/respond"]
+                assert local_requests[-1][1]["authorization"] == f"Bearer {local_token}"
+                assert forwarded == []
+
+                broker_origin = https
+                auth.invalidate(local_token)
+                assert [event["type"] async for event in https_relay.respond(**TURN)] == ["completed"]
+                assert [path for path, _, _ in https_requests] == ["/v1/puri/token", "/v1/respond"]
+                assert https_requests[-1][1]["authorization"] == f"Bearer {https_token}"
+                expected_proxy = [("CONNECT", https.removeprefix("https://"))] * 2
+                assert forwarded == expected_proxy
+
+                broker_origin = local
+                auth.invalidate(https_token)
+                assert await auth.get_token() == local_token
+                assert [path for path, _, _ in local_requests].count("/v1/puri/token") == 2
+                assert forwarded == expected_proxy
+        finally:
+            await local_relay.close()
+            await https_relay.close()
 
 
 @pytest.mark.parametrize("operation", ["broker_token", "relay_classify"])
@@ -302,6 +371,75 @@ async def test_real_proxy_denial_reaches_app_diagnostics_without_proxy_content(m
         proxy.close()
         proxy.abort_clients()
         await proxy.wait_closed()
+
+
+@pytest.mark.parametrize(
+    ("media_type", "body", "headers", "shape", "delay", "held"),
+    [
+        ("text/plain", b"<html>synthetic limit</html>", "Retry-After: 7\r\n", "html", 7, False),
+        (
+            "text/html",
+            b"",
+            "CF-Mitigated: challenge\r\nCF-Ray: 0123456789abcdef-ICN\r\nRetry-After: 9\r\n",
+            "edge_challenge",
+            9,
+            True,
+        ),
+        ("text/plain", b"synthetic limit", "Retry-After: 86401\r\n", None, 30, False),
+    ],
+)
+async def test_broker_non_json_429_keeps_cooldown_and_response_evidence(
+    caplog, media_type, body, headers, shape, delay, held
+):
+    clock = [0.0]
+    issued = 0
+
+    def respond(path, writer):
+        nonlocal issued
+        if path == "/v1/puri/token":
+            issued += 1
+            if issued == 1:
+                reply(writer, body, media_type, status=429, headers=headers, size=100 if held else None)
+            else:
+                reply(writer, token_response(PRIVATE).content, "application/json")
+        elif path == "/v1/classify":
+            reply(writer, b'{"answers":[]}', "application/json")
+        else:
+            assert path == "/v1/respond"
+            reply(writer, sse({"type": "completed", "response": answer()}), "text/event-stream")
+
+    async with service(respond) as (origin, requests, disconnected):
+        auth = token_owner(None, base_url=origin, allow_loopback_http=True, clock=lambda: clock[0])
+        owner = AgentChatOwner(Records(), relay_at(origin, auth), localize=str)
+        await owner.start()
+        try:
+            async with asyncio.timeout(5):
+                for instant in (0, delay - 1, delay - 0.01):
+                    clock[0] = instant
+                    result = await owner.send(f"Synthetic request {PRIVATE}")
+                    assert result.status == "service_unavailable"
+                    assert result.text == "agent_chat.service_rate_limited"
+                    evidence = serialize_diagnostics(result.diagnostics)
+                    assert evidence["status_code"] == 429
+                    assert evidence["category"] == "rate_limit"
+                    assert evidence["retry_after_ms"] == delay * 1000
+                    assert evidence["fields"].get("response_shape") == shape
+                    if shape == "edge_challenge":
+                        assert evidence["fields"]["cf_ray"] == "0123456789abcdef-ICN"
+                    assert PRIVATE not in json.dumps(evidence) and PRIVATE not in caplog.text
+                    assert [path for path, _, _ in requests] == ["/v1/puri/token"]
+                if held:
+                    await disconnected[0].wait()
+                clock[0] = delay
+                assert (await owner.send("Synthetic recovery")).status == "completed"
+                assert [path for path, _, _ in requests] == [
+                    "/v1/puri/token",
+                    "/v1/puri/token",
+                    "/v1/classify",
+                    "/v1/respond",
+                ]
+        finally:
+            await owner.close()
 
 
 @pytest.mark.parametrize("endpoint", ["broker_token", "relay_response"])

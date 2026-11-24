@@ -6,6 +6,7 @@ from typing import get_args
 
 from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.messages import DIAGNOSTIC_CATEGORIES, TRANSACTION_RESULT_STATUSES
+from puripuly_heart.core.photo.protocol import PHOTO_FAILURE_CODES
 from puripuly_heart.core.qq_auth_diagnostics import CODES as QQ_AUTH_CODES
 
 AUDIO_DIAGNOSE_FAILURE_CODES = frozenset(
@@ -345,6 +346,7 @@ DOMAIN_CODES = (
     | frozenset(TRANSACTION_RESULT_STATUSES)
     | QQ_AUTH_CODES
     | AUDIO_DIAGNOSE_FAILURE_CODES
+    | PHOTO_FAILURE_CODES
     | frozenset(
         f"{surface}.{category}"
         for surface in ("provider", "stt")

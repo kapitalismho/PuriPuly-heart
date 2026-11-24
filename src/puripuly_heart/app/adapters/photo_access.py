@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
@@ -20,22 +19,16 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.first_party_http import response_evidence
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.photo.protocol import PhotoProviderError
-from puripuly_heart.core.qq_auth_diagnostics import safe_fields
 from puripuly_heart.providers.photo import (
+    emit_photo_service_failure,
     first_party_photo_http_error,
     report_first_party_photo_transport_failure,
 )
-
-logger = logging.getLogger(__name__)
 
 _PHOTO_ACCESS_PATH = "/v1/photo/access"
 
 
 def photo_token_error(error: AgentTransportError) -> PhotoProviderError:
-    evidence = error.evidence
-    if evidence is not None:
-        fields = safe_fields({**evidence.fields, "http_status": evidence.status_code})
-        logger.warning("photo_service_failure operation=broker_token fields=%s", fields)
     code = {
         "service_authentication_failed": "photo_authentication_failed",
         "service_authentication_unavailable": "photo_provider_unavailable",
@@ -45,6 +38,16 @@ def photo_token_error(error: AgentTransportError) -> PhotoProviderError:
         "invalid_response": "photo_stream_invalid",
         "unexpected_http_status": "photo_request_rejected",
     }.get(error.code, "photo_transport_failed")
+    evidence = error.evidence
+    if evidence is not None:
+        emit_photo_service_failure(
+            code,
+            operation="photo_broker_token",
+            category=evidence.category,
+            fields=evidence.fields,
+            status_code=evidence.status_code,
+            retry_after_ms=evidence.retry_after_ms,
+        )
     return PhotoProviderError(code, retryable=False)
 
 
@@ -113,7 +116,7 @@ class PhotoManagedCredentialOwner:
             ) or "response_shape" in response_evidence(response, body=response.content):
                 error = first_party_photo_http_error(
                     response,
-                    operation="broker_access",
+                    operation="photo_broker_access",
                     body=response.content,
                     auth_code="invalid_token",
                 )
@@ -125,14 +128,14 @@ class PhotoManagedCredentialOwner:
             except (ValueError, RecursionError):
                 raise first_party_photo_http_error(
                     response,
-                    operation="broker_access",
+                    operation="photo_broker_access",
                     body=response.content,
                     auth_code="invalid_token",
                 ) from None
             if not isinstance(result, dict):
                 raise first_party_photo_http_error(
                     response,
-                    operation="broker_access",
+                    operation="photo_broker_access",
                     body=response.content,
                     auth_code="invalid_token",
                 )
@@ -143,7 +146,7 @@ class PhotoManagedCredentialOwner:
             raise
         except Exception as error:
             if isinstance(error, (httpx.RequestError, OSError)):
-                report_first_party_photo_transport_failure(error, operation="broker_access")
+                report_first_party_photo_transport_failure(error, operation="photo_broker_access")
             raise PhotoProviderError("photo_transport_failed", retryable=False) from None
 
     @staticmethod

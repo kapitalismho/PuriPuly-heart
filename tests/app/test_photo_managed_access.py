@@ -150,10 +150,24 @@ async def test_cached_access_is_bound_to_installation_and_revocation_requires_up
 
 
 @pytest.mark.parametrize(
-    ("status", "kwargs", "code", "invalidate"),
+    ("status", "kwargs", "code", "invalidate", "shape", "category"),
     [
-        (401, {"json": {"error": {"code": "invalid_token"}}}, "photo_authentication_failed", True),
-        (401, {"text": "<html>private-response</html>"}, "photo_stream_invalid", False),
+        (
+            401,
+            {"json": {"error": {"code": "invalid_token"}}},
+            "photo_authentication_failed",
+            True,
+            "public_error_envelope",
+            "auth",
+        ),
+        (
+            401,
+            {"text": "<html>private-response</html>"},
+            "photo_stream_invalid",
+            False,
+            "html",
+            "invalid_response",
+        ),
         (
             401,
             {
@@ -162,19 +176,37 @@ async def test_cached_access_is_bound_to_installation_and_revocation_requires_up
             },
             "photo_stream_invalid",
             False,
+            "edge_challenge",
+            "invalid_response",
         ),
         (
             403,
             {"headers": {"CF-Ray": "1234567890abcdef-ICN"}},
             "photo_request_rejected",
             False,
+            "unknown",
+            "invalid_response",
         ),
-        (401, {"json": {"error": {"code": "unknown_auth_code"}}}, "photo_request_rejected", False),
-        (429, {"json": {"error": {"code": "rate_limited"}}}, "photo_quota_exhausted", False),
+        (
+            401,
+            {"json": {"error": {"code": "unknown_auth_code"}}},
+            "photo_request_rejected",
+            False,
+            "public_error_envelope",
+            "invalid_response",
+        ),
+        (
+            429,
+            {"json": {"error": {"code": "rate_limited"}}},
+            "photo_quota_exhausted",
+            False,
+            "public_error_envelope",
+            "rate_limit",
+        ),
     ],
 )
 async def test_photo_broker_ack_recovery_never_reissues_credentials(
-    caplog, status, kwargs, code, invalidate
+    photo_runtime_diagnostics, status, kwargs, code, invalidate, shape, category
 ):
     tokens = Token()
     store = InMemorySecretStore()
@@ -186,7 +218,18 @@ async def test_photo_broker_ack_recovery_never_reissues_credentials(
         if action == "get":
             return httpx.Response(200, json=credential())
         if len(requests) == 2:
-            return httpx.Response(status, **kwargs)
+            return httpx.Response(
+                status,
+                extensions={
+                    "connection_diagnostics": {
+                        "proxy_source": "env",
+                        "tls_source": "explicit_file",
+                        "tls_backend": "openssl",
+                        "private_proxy_url": "private-broker-proxy",
+                    }
+                },
+                **kwargs,
+            )
         return httpx.Response(200, json={"acknowledged": True, "operation_id": "synthetic-operation"})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(broker)) as client:
@@ -203,5 +246,18 @@ async def test_photo_broker_ack_recovery_never_reissues_credentials(
             ("acknowledge", "Bearer synthetic-token"),
             ("acknowledge", "Bearer replacement-token" if invalidate else "Bearer synthetic-token"),
         ]
-    assert "private-response" not in caplog.text
-    assert "synthetic-token" not in caplog.text
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["operation"] == "photo_broker_access"
+    assert record["code"] == code
+    assert record["category"] == category
+    assert record["status_code"] == status
+    assert record["fields"]["response_shape"] == shape
+    assert record["fields"]["proxy_source"] == "env"
+    assert record["fields"]["tls_source"] == "explicit_file"
+    assert record["fields"]["tls_backend"] == "openssl"
+    if status == 403:
+        assert record["fields"]["cf_ray"] == "1234567890abcdef-ICN"
+    persisted = photo_runtime_diagnostics.log_file.read_text(encoding="utf-8")
+    assert record["diagnostic_id"] in persisted
+    for value in ("private-response", "synthetic-token", "synthetic-ack", "private-broker-proxy"):
+        assert value not in repr(record) + persisted

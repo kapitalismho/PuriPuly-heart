@@ -4,10 +4,12 @@ import json
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from typing import Literal
+from urllib.parse import SplitResult, urlsplit
 
 import httpx
 
 from puripuly_heart.app.ports.agent_chat import AgentFailureEvidence, AgentTransportError
+from puripuly_heart.core.external_network import ProxyPolicy, ProxyRoute
 from puripuly_heart.core.first_party_http import response_evidence, response_media_type
 from puripuly_heart.core.http_client_logging import suppress_http_client_logs
 from puripuly_heart.core.messages import DiagnosticCategory, DiagnosticFieldValue
@@ -61,10 +63,26 @@ class AgentConnectionError(AgentTransportError):
         super().__init__(code, evidence=evidence)
 
 
-def agent_client(endpoint: AgentEndpoint, *, timeout: float) -> httpx.AsyncClient:
+def is_loopback_http(url: SplitResult) -> bool:
+    return url.scheme == "http" and url.hostname in {"127.0.0.1", "::1"}
+
+
+class _AgentLoopbackProxyPolicy(ProxyPolicy):
+    def route(self, url: str) -> ProxyRoute:
+        if is_loopback_http(urlsplit(url)):
+            return ProxyRoute(None, "direct")
+        return super().route(url)
+
+
+def agent_client(
+    endpoint: AgentEndpoint, *, timeout: float, allow_loopback_http: bool
+) -> httpx.AsyncClient:
     try:
         return external_async_client(
-            follow_redirects=False, timeout=timeout, headers={"User-Agent": first_party_user_agent()}
+            follow_redirects=False,
+            timeout=timeout,
+            headers={"User-Agent": first_party_user_agent()},
+            policy=_AgentLoopbackProxyPolicy() if allow_loopback_http else None,
         )
     except OSError as exc:
         error = AgentConnectionError(exc, endpoint)

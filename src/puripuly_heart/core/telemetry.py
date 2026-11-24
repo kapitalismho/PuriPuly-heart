@@ -79,6 +79,7 @@ class HttpAppActiveDayTelemetryClient:
         normalized_base_url = _normalize_base_url(base_url)
         async with network_clients.external_async_client(
             base_url=normalized_base_url,
+            headers={"User-Agent": network_clients.first_party_user_agent()},
             timeout=self.timeout,
             transport=self.transport,
         ) as client:

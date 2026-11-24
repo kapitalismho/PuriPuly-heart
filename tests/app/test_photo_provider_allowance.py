@@ -7,6 +7,7 @@ import pytest
 
 from puripuly_heart.app.adapters import photo_provider
 from puripuly_heart.app.adapters.photo_provider import PhotoProviderAdapter
+from puripuly_heart.app.ports.agent_chat import AgentFailureEvidence, AgentTransportError
 from puripuly_heart.core.network_clients import first_party_user_agent
 
 
@@ -75,7 +76,9 @@ async def test_allowance_rejects_unusable_relay_answers(monkeypatch, response):
     assert await _adapter(monkeypatch, lambda request: response).allowance() is None
 
 
-async def test_allowance_recovers_with_fresh_token_only_after_application_rejection(monkeypatch):
+async def test_allowance_recovers_with_fresh_token_only_after_application_rejection(
+    monkeypatch, photo_runtime_diagnostics
+):
     tokens = _Tokens()
     requests = []
 
@@ -100,6 +103,9 @@ async def test_allowance_recovers_with_fresh_token_only_after_application_reject
     assert requests == ["Bearer synthetic-token"]
     assert await adapter.allowance() == (99, 100)
     assert requests == ["Bearer synthetic-token", "Bearer replacement-token"]
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["code"] == "photo_authentication_failed"
+    assert record["category"] == "auth"
 
 
 @pytest.mark.parametrize(
@@ -109,7 +115,7 @@ async def test_allowance_recovers_with_fresh_token_only_after_application_reject
         (
             401,
             {
-                "headers": {"CF-Mitigated": "challenge"},
+                "headers": {"CF-Mitigated": "challenge", "CF-Ray": "invalid-private-ray"},
                 "json": {"error": {"code": "service_authentication_failed"}},
             },
             "edge_challenge",
@@ -126,20 +132,35 @@ async def test_allowance_recovers_with_fresh_token_only_after_application_reject
     ],
 )
 async def test_allowance_does_not_invalidate_on_unverified_rejection(
-    monkeypatch, caplog, status, kwargs, shape
+    monkeypatch, photo_runtime_diagnostics, status, kwargs, shape
 ):
     tokens = _Tokens()
     adapter = _adapter(monkeypatch, lambda _: httpx.Response(status, **kwargs), tokens)
     assert await adapter.allowance() is None
     assert not tokens.invalidated
-    assert f"'response_shape': '{shape}'" in caplog.text
-    assert "'http_status': " + str(status) in caplog.text
-    assert "private-body" not in caplog.text
-    assert "synthetic-token" not in caplog.text
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["component"] == "provider.photo"
+    assert record["operation"] == "photo_relay_allowance"
+    assert record["category"] == "invalid_response"
+    assert record["stage"] == "protocol_parse"
+    assert record["status_code"] == status
+    assert record["fields"]["response_shape"] == shape
+    assert record["detail"]["rejected_fields"] == 0
+    persisted = photo_runtime_diagnostics.log_file.read_text(encoding="utf-8")
+    assert record["diagnostic_id"] in persisted
+    if status == 403:
+        assert record["fields"]["cf_ray"] == "1234567890abcdef-ICN"
+        assert record["fields"]["cf_ray"] in persisted
+    else:
+        assert "cf_ray" not in record["fields"]
+    for value in ("private-body", "invalid-private-ray", "synthetic-token"):
+        assert value not in repr(record) + persisted
 
 
 @pytest.mark.parametrize("kind", ["proxy", "tls"])
-async def test_allowance_logs_only_safe_transport_evidence(monkeypatch, caplog, kind):
+async def test_allowance_retains_only_safe_transport_evidence(
+    monkeypatch, photo_runtime_diagnostics, kind
+):
     def fail(request):
         failure = (
             httpx.ProxyError("private-proxy-credentials", request=request)
@@ -158,7 +179,71 @@ async def test_allowance_logs_only_safe_transport_evidence(monkeypatch, caplog, 
     tokens = _Tokens()
     assert await _adapter(monkeypatch, fail, tokens).allowance() is None
     assert not tokens.invalidated
-    assert f"'network_error_kind': '{kind}'" in caplog.text
-    assert "'tls_source': 'windows'" in caplog.text
-    assert "'proxy_source': 'system'" in caplog.text
-    assert "private-" not in caplog.text
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["operation"] == "photo_relay_allowance"
+    assert record["code"] == "photo_transport_failed"
+    assert record["category"] == "network"
+    assert record["stage"] == "request_send"
+    assert record["status_code"] is None
+    assert record["fields"]["network_error_kind"] == kind
+    assert record["fields"]["tls_source"] == "windows"
+    assert record["fields"]["proxy_source"] == "system"
+    assert record["detail"]["rejected_fields"] == 0
+    assert "private-" not in repr(record) + photo_runtime_diagnostics.log_file.read_text(
+        encoding="utf-8"
+    )
+
+
+async def test_allowance_retains_broker_token_failure_without_sending_or_invalidating(
+    monkeypatch, photo_runtime_diagnostics
+):
+    class UnavailableOnce(_Tokens):
+        requests = 0
+
+        async def get_token(self):
+            self.requests += 1
+            if self.requests == 1:
+                raise AgentTransportError(
+                    "edge_challenge",
+                    evidence=AgentFailureEvidence(
+                        "invalid_response",
+                        {
+                            "response_shape": "edge_challenge",
+                            "cf_ray": "1234567890abcdef-ICN",
+                            "tls_source": "windows",
+                            "proxy_source": "system",
+                            "stage": "protocol_parse",
+                            "private_proof": "private-installation-proof",
+                            "dispatch_certainty": "response_received",
+                        },
+                        status_code=403,
+                    ),
+                )
+            return await super().get_token()
+
+    tokens = UnavailableOnce()
+    sent = []
+
+    def relay(request):
+        sent.append(request)
+        return httpx.Response(200, json={"allowance": 50, "remaining": 41})
+
+    adapter = _adapter(monkeypatch, relay, tokens)
+    assert await adapter.allowance() is None
+    assert not sent
+    assert not tokens.invalidated
+    assert await adapter.allowance() == (41, 50)
+    assert len(sent) == 1
+
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["operation"] == "photo_broker_token"
+    assert record["code"] == "photo_stream_invalid"
+    assert record["category"] == "invalid_response"
+    assert record["stage"] == "protocol_parse"
+    assert record["status_code"] == 403
+    assert record["fields"]["response_shape"] == "edge_challenge"
+    assert record["fields"]["cf_ray"] == "1234567890abcdef-ICN"
+    assert record["fields"]["proxy_source"] == "system"
+    assert record["fields"]["tls_source"] == "windows"
+    persisted = photo_runtime_diagnostics.log_file.read_text(encoding="utf-8")
+    assert "private-installation-proof" not in repr(record) + persisted

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from time import monotonic
 from urllib.parse import urlsplit
@@ -14,6 +15,7 @@ from puripuly_heart.app.adapters._agent_relay_http import (
     agent_client,
     close_agent_client,
     error_envelope,
+    is_loopback_http,
     post_stream,
     read_json,
     response_details,
@@ -59,11 +61,7 @@ class AgentRelayTokenOwner:
             not parsed.hostname
             or not (
                 parsed.scheme == "https"
-                or (
-                    self._allow_loopback_http
-                    and parsed.scheme == "http"
-                    and parsed.hostname in {"127.0.0.1", "::1"}
-                )
+                or (self._allow_loopback_http and is_loopback_http(parsed))
             )
             or parsed.username is not None
             or parsed.password is not None
@@ -109,7 +107,9 @@ class AgentRelayTokenOwner:
             endpoint = self._broker_endpoint()
             bundle = await self._identity()
             if self._client is None:
-                self._client = agent_client("broker_token", timeout=20)
+                self._client = agent_client(
+                    "broker_token", timeout=20, allow_loopback_http=self._allow_loopback_http
+                )
             for attempt in range(2):
                 request = bundle.sign_puri_token_request(
                     app_version=self._app_version,
@@ -123,6 +123,8 @@ class AgentRelayTokenOwner:
                     async with post_stream(
                         self._client, endpoint, "broker_token", json=request
                     ) as response:
+                        if response.status_code == 429:
+                            return await self._rate_limited(response)
                         payload = await read_json(response, "broker_token")
                 except AgentConnectionError as error:
                     if attempt or not error.retryable:
@@ -132,17 +134,6 @@ class AgentRelayTokenOwner:
                 error_body = error_envelope(payload)
                 fields = {"response_shape": "public_error_envelope"} if error_body else {}
                 status = response.status_code
-                if status == 429:
-                    delay = self._retry_delay(response, error_body)
-                    self._retry_at = self._clock() + delay
-                    self._rate_limit = response_details(
-                        response,
-                        "broker_token",
-                        "rate_limit",
-                        fields=fields,
-                        retry_after_ms=int(delay * 1000),
-                    )
-                    return AgentServiceError("service_rate_limited", evidence=self._rate_limit)
                 if 500 <= status < 600:
                     if attempt:
                         return AgentServiceError(
@@ -214,6 +205,30 @@ class AgentRelayTokenOwner:
         except (ValueError, OverflowError):
             return None
         return (token, remaining) if remaining > 30 else None
+
+    async def _rate_limited(self, response: httpx.Response) -> AgentServiceError:
+        error_body = {}
+        try:
+            error_body = error_envelope(await read_json(response, "broker_token"))
+        except AgentTransportError as error:
+            evidence = error.evidence
+        else:
+            evidence = None
+        delay = self._retry_delay(response, error_body)
+        self._retry_at = self._clock() + delay
+        retry_after_ms = int(delay * 1000)
+        self._rate_limit = (
+            replace(evidence, category="rate_limit", retry_after_ms=retry_after_ms)
+            if evidence is not None
+            else response_details(
+                response,
+                "broker_token",
+                "rate_limit",
+                fields={"response_shape": "public_error_envelope"} if error_body else None,
+                retry_after_ms=retry_after_ms,
+            )
+        )
+        return AgentServiceError("service_rate_limited", evidence=self._rate_limit)
 
     @staticmethod
     def _retry_delay(response: httpx.Response, error: dict) -> float:
