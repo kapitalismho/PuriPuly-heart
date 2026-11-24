@@ -1,12 +1,12 @@
 # Broker and Agent Relay placement — #499
 
-**Broker: unresolved; leave off. Relay: unresolved; leave off.** Both isolated Workers ended with `INSUFFICIENT_INVOCATIONS`; none of the 28 trial client requests was confirmed remotely placed. Do not interpret the differences below as an improvement or regression from placement. **Photo CPU: no production TypeScript or Wasm change.** The two version-matched completed, app-prepared photo requests used 7 and 19 ms of Cloudflare CPU. The local profile explains where to look, but does not isolate an avoidable cost that justifies changing the handler. Free-plan headroom remains unproven. No user-visible behavior changed. Ordinary speech translation, personal photo routes, established P2P delivery and Broker cron are outside this result.
+**Decision: enable Smart Placement for Broker on its next ordinary deployment; keep Relay off.** The optimized token renewal path still makes four sequential D1 calls, so a better Worker location could save several round trips for one forwarding hop. This is an architectural judgment, not a measured speedup. The owner chose not to require a production comparison or add a latency collector. The [Broker source configuration](../services/broker/wrangler.jsonc) sets `placement.mode` to `smart`. Merging does not deploy it. To reverse, set the same field to `off` and deploy Broker through the ordinary workflow.
 
-**Operational decision:** Do not collect production token latency for this comparison. The proposed seven-day Broker collector was never deployed and has been removed; the isolated trial results below remain historical evidence. Neither Worker is being switched to Smart Placement.
+**Trial result:** Both isolated Workers ended with `INSUFFICIENT_INVOCATIONS`; none of the 28 trial requests was confirmed remotely placed. Neither a latency gain nor a regression can be attributed to placement. Two matched completed photo requests used 7 and 19 ms of Cloudflare CPU; no change to the photo handler or Wasm adoption was justified. Production photo CPU headroom and headset display latency remain unverified. Ordinary speech translation, personal photo routes, established P2P delivery and Broker cron are outside this result.
 
-## What is running
+## What was running during the trial
 
-Source under test: [`83b27db2477834bf36b47ea3d89f23999ca35e84`](https://github.com/kapitalismho/PuriPuly-heart/tree/83b27db2477834bf36b47ea3d89f23999ca35e84), equal to remote `dev` at setup. The [Broker](../services/broker/wrangler.jsonc) and [Relay](../services/agent-relay/wrangler.jsonc) sources both omit `placement`. The table describes **deployed** Workers, not deployments of this checkout. Control-plane readback: 2026-11-24, approximately 08:11 UTC.
+At the tested revision, [`83b27db`](https://github.com/kapitalismho/PuriPuly-heart/tree/83b27db2477834bf36b47ea3d89f23999ca35e84), both Wrangler sources omitted `placement`. The table describes **deployed** Workers, not deployments of that checkout. Control-plane readback: 2026-11-24, approximately 08:11 UTC.
 
 | Production Worker | Active version (100% of traffic) | Source provenance | Effective settings |
 | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ Across four runs: **720 complete, 144 deliberately incomplete, 48 warmups, and 1
 
 ## Reviewable placement control and reversal
 
-No change to either canonical Wrangler source or a production workflow. With Node 24.14.0, pnpm 10.34.9 and locked Wrangler 4.153.0, the following local procedure exercised both repository renderers and both placement modes. Use an empty private directory outside the checkout (`$T`), no cloud credentials or inherited `.dev.vars`/provider environment, and a temporary HOME, Wrangler config and log directory. Disable Wrangler metrics and dotenv loading. From the repository root after `pnpm install --frozen-lockfile`:
+The following procedure reproduces the historical comparison at `83b27db`, before the Broker configuration decision. It exercised both repository renderers and both placement modes with Node 24.14.0, pnpm 10.34.9 and locked Wrangler 4.153.0. Use an empty private directory outside the checkout (`$T`), no cloud credentials or inherited `.dev.vars`/provider environment, and a temporary HOME, Wrangler config and log directory. Disable Wrangler metrics and dotenv loading. From the repository root after `pnpm install --frozen-lockfile`:
 
 ```sh
 B=22222222-2222-4222-8222-222222222222
