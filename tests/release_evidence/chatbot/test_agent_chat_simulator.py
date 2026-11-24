@@ -1021,7 +1021,11 @@ def test_simulated_user_sees_card_values_but_not_catalog_availability():
     }
     shown = ScenarioApp.visible_confirmation(card)
     assert shown["presentation"] == {
-        "audio.input_host_api": {"label": "오디오 호스트 API", "section": "일반", "value_label": "MME"},
+        "audio.input_host_api": {
+            "label": "오디오 호스트 API",
+            "section": "일반",
+            "value_label": "MME",
+        },
         "audio.input_device": {
             "label": "내 마이크 오디오",
             "section": "일반",

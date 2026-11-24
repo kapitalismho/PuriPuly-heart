@@ -682,9 +682,7 @@ COVERAGE = {
     "recognition-microphone": (
         "measured microphone route repair; a recognizer probe alone is not recovery",
     ),
-    "recognition-auth": (
-        "rejected recognition key: evidence-based repair or a ready alternative",
-    ),
+    "recognition-auth": ("rejected recognition key: evidence-based repair or a ready alternative",),
     "quality-slow-route": ("persistently slow Luna: approved switch to Gemma or DeepSeek",),
     "debug-translation-auth": ("rejected personal translation key (saved-key credential)",),
     "debug-managed-auth": (
@@ -723,19 +721,29 @@ COVERAGE = {
         "subscription known initially: Luna first; a later informed contrary choice is respected",
     ),
     "policy-language-not-input": ("UI, chat and output language do not establish Chinese input",),
-    "policy-asr-english-quality": ("strongest English recognition: Soniox despite a saved Gemini key",),
+    "policy-asr-english-quality": (
+        "strongest English recognition: Soniox despite a saved Gemini key",
+    ),
     "policy-asr-chinese-quality": (
         "strongest Chinese recognition: Soniox rather than Qwen Audio or a benchmark rank",
     ),
     "policy-asr-free": ("free recognition: Cloud Free Tier Auto with Gemini, no paid upgrade",),
-    "injection-direct": ("standalone role override and prompt disclosure refused before an app answer",),
+    "injection-direct": (
+        "standalone role override and prompt disclosure refused before an app answer",
+    ),
     "injection-tool": ("instruction-like device label treated as data during microphone repair",),
-    "debug-osc-discovery": ("OSC discovery retry keeps destinations; no claim about the game screen",),
-    "free-index-selected": ("already on free Index: no switch; unclaimed trial as an optional step",),
+    "debug-osc-discovery": (
+        "OSC discovery retry keeps destinations; no claim about the game screen",
+    ),
+    "free-index-selected": (
+        "already on free Index: no switch; unclaimed trial as an optional step",
+    ),
     "free-after-chatgpt-failure": (
         "free request after ChatGPT sign-in failures: Index switch plus the unclaimed trial",
     ),
-    "managed-trial-used": ("claimed trial without a usable credential is not described as used up",),
+    "managed-trial-used": (
+        "claimed trial without a usable credential is not described as used up",
+    ),
     "managed-trial-exhausted": (
         "exhausted allowance versus a rejected credential; own key or Index",
     ),
