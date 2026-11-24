@@ -53,6 +53,7 @@ KEY_FIELDS = {
 PAID_STT = {"deepgram", "soniox", "elevenlabs_scribe", "qwen_audio"}
 PREPAID_PROVIDERS = {"openrouter", "deepseek"}
 START_TARGETS = ("self_capture", "peer_capture", "translation")
+SYNTHETIC_PHOTO_ALLOWANCE = 50
 ROLLING_MEMBERS = ("elevenlabs_scribe", "gemini_transcribe", "deepgram")
 BROWSER_TARGETS = (
     "sign_up",
@@ -224,6 +225,7 @@ class ScenarioApp:
         self.browser: dict | None = None
         self.accounts: dict[str, dict] = {}
         self.chatgpt_signed_in = scenario.initial_chatgpt_signed_in
+        self.photo_allowance_observed = False
         self.managed_credentials: set[str] = set()
         self.signup_journey: list[dict] = []
         self.key_verifications: list[dict] = []
@@ -1312,7 +1314,35 @@ class ScenarioApp:
             }
         if name == "osc.status":
             return {"output": self.osc_output()}
+        if name == "photo.status":
+            return self.photo_status(arguments.get("refresh") is True)
         raise ValueError("Unsupported synthetic query: " + name)
+
+    def photo_status(self, refresh: bool) -> dict:
+        photo = self.intent["photo"]
+        route = photo["route"]
+        connected = {
+            "managed": True,
+            "chatgpt": self.chatgpt_signed_in,
+            "gemini": self.presence.get("gemini_api_key", False),
+            "openai": self.presence.get("openai_api_key", False),
+        }[route]
+        result = {"enabled": photo["enabled"], "route": route}
+        if route == "managed" and connected:
+            self.photo_allowance_observed = self.photo_allowance_observed or refresh
+            if self.photo_allowance_observed:
+                result.update(
+                    remaining=SYNTHETIC_PHOTO_ALLOWANCE, allowance=SYNTHETIC_PHOTO_ALLOWANCE
+                )
+        if not photo["enabled"]:
+            availability = "off"
+        elif not connected:
+            availability = "not_connected"
+        elif route == "managed" and not self.photo_allowance_observed:
+            availability = "allowance_unknown"
+        else:
+            availability = "ready"
+        return {**result, "availability": availability}
 
     def diagnostic_history(self, arguments: dict) -> dict:
         if arguments.keys() - {"operation_id", "diagnostic_id", "instance_id", "after", "limit"}:

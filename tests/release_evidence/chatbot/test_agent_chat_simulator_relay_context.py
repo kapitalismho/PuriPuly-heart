@@ -14,6 +14,7 @@ from benchmarks.chatbot.relay_context import (
     validate_relay_context,
 )
 from benchmarks.chatbot.scenarios import select_scenarios
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL
 from puripuly_heart.app.services.agent_chat.modules import MODULES
 from tests.app.test_agent_chat import context_of
 
@@ -25,7 +26,7 @@ def test_manifest_preserves_emitted_prefix_cache_questions_and_options(
     source.write_text(json.dumps(relay_context_manifest), encoding="utf-8")
     loaded = load_relay_context(source, relay_build=relay_context_manifest["relay_build"])
     assert loaded == relay_context_manifest
-    assert loaded["agent_protocol"] == 7
+    assert loaded["agent_protocol"] == AGENT_CHAT_PROTOCOL
     tools = loaded["contexts"]["work"]["tools"]
     assert [tool["name"] for tool in tools] == [
         "read_app",

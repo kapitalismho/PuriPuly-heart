@@ -322,6 +322,9 @@ export const appTools = [
             "overlay.translation.enabled": {
               "type": "boolean"
             },
+            "overlay.vr_compatibility_mode": {
+              "type": "boolean"
+            },
             "peer_expected_languages": {
               "type": "array",
               "items": {

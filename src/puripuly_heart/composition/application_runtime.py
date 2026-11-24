@@ -1909,9 +1909,13 @@ def compose_application_runtime(
             return
         await run_owned_thread_call(lambda: recycle_captured_photo(capture))
 
-    async def photo_status() -> PhotoStatusSnapshot:
+    async def photo_status(*, refresh: bool = True) -> PhotoStatusSnapshot:
         kind = photo_route_kind(await photo_provider.resolve_route())
-        allowance = await photo_provider.allowance()
+        if kind != "managed":
+            return PhotoStatusSnapshot(kind)
+        allowance = (
+            await photo_provider.allowance() if refresh else photo_provider.cached_allowance()
+        )
         if allowance is None:
             return PhotoStatusSnapshot(kind)
         return PhotoStatusSnapshot(kind, remaining=allowance[0], allowance=allowance[1])

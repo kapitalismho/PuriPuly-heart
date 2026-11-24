@@ -44,6 +44,20 @@ async def test_allowance_reads_remaining_photos_from_the_relay(monkeypatch):
     assert requests[0].headers["authorization"] == "Bearer synthetic-token"
 
 
+async def test_cached_allowance_reuses_todays_relay_answer_without_a_request(monkeypatch):
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"allowance": 50, "remaining": 0})
+
+    adapter = _adapter(monkeypatch, handler)
+    assert adapter.cached_allowance() is None
+    assert await adapter.allowance() == (0, 50)
+    assert adapter.cached_allowance() == (0, 50)
+    assert len(requests) == 1
+
+
 @pytest.mark.parametrize(
     "response",
     [

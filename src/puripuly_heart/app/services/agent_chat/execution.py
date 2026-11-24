@@ -43,6 +43,7 @@ OVERLAY_FIELDS = (
     "recovery_reason",
     "ingress_stopped",
     "generation",
+    "effective_vr_compatibility_mode",
 )
 
 DEDICATED_COMMANDS = frozenset(
@@ -84,7 +85,7 @@ CLI_ONLY_COMMANDS = frozenset(
         "overlay.calibrate",
     }
 )
-CLI_ONLY_QUERIES = frozenset({"audio.processes", "audio.target"})
+CLI_ONLY_QUERIES = frozenset({"audio.processes", "audio.target", "photo.status"})
 QUERY_DOMAINS = {
     "app.status": "app",
     "settings.current": "settings",

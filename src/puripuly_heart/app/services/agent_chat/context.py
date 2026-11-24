@@ -318,6 +318,12 @@ async def collect_agent_context(
             ),
             "osc": project_osc_output(osc.get("output")) if osc else None,
         }
+    if "photo.status" in queries:
+        photo = await query("photo.status", {"refresh": True} if topic == "general" else None)
+        if photo is not None:
+            result["photo"] = _pick(
+                photo, ("enabled", "route", "availability", "remaining", "allowance")
+            )
     if "diagnostics" in queries:
         health = await query("diagnostics.health")
         filters = {

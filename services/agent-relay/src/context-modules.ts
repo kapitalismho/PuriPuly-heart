@@ -25,6 +25,6 @@ export const contextModules = [
   },
   {
     "name": "general",
-    "description": "App UI language, clipboard and anonymous usage-data settings."
+    "description": "App UI language, clipboard, anonymous usage-data settings, and VR photo translation settings and availability."
   }
 ];

@@ -26,7 +26,7 @@ MODULE_DESCRIPTIONS = {
     "accounts": "ChatGPT subscription/sign-in and managed QQ/Discord account readiness, usage and account actions.",
     "languages": "Self and Peer source/target languages, secondary translation and automatic language detection.",
     "output": "Captions, desktop/VR overlays, VRChat chatbox, OSC connection and microphone mute synchronization.",
-    "general": "App UI language, clipboard and anonymous usage-data settings.",
+    "general": "App UI language, clipboard, anonymous usage-data settings, and VR photo translation settings and availability.",
 }
 TOPICS = frozenset({"overview", "diagnostics", *MODULES[1:]})
 MODULE_FIELDS = {
@@ -126,7 +126,7 @@ _MODULE_QUERIES = {
     "accounts": frozenset({"accounts.status"}),
     "languages": _SETTINGS_QUERIES,
     "output": _SETTINGS_QUERIES | {"overlay.status", "osc.status"},
-    "general": _SETTINGS_QUERIES,
+    "general": _SETTINGS_QUERIES | {"photo.status"},
 }
 _LABEL_SOURCES = {
     "peer_expected_languages": "languages.source",
@@ -470,6 +470,8 @@ def _module(snapshot: Mapping, module: str, localize: Callable[[str], str]) -> t
         result["audio_test"] = deepcopy(snapshot["audio_test"])
     if module == "output" and isinstance(snapshot.get("output"), Mapping):
         result.update(deepcopy(dict(snapshot["output"])))
+    if module == "general" and isinstance(snapshot.get("photo"), Mapping):
+        result["photo"] = deepcopy(dict(snapshot["photo"]))
     return result, catalog
 
 
