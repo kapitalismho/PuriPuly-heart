@@ -113,6 +113,33 @@ The ordinary pre-output samples implicate the combined validation predicate in `
 
 **Repeatability checks.** The current tools preserve metadata for interrupted Broker attempts (a read response, including expected rejections, counts as completed) and refuse to mix photo runs: use a fresh fixture directory with no `profile/` subdirectory. The sampler writes that subdirectory exclusively. A post-header reset on the oversized case requires an observed 413; a pre-header reset or wrong status fails the run. A small repaired-tool run settled 30/30 admissions including warmups (15 complete and three deliberately incomplete profiled streams). The original profile observations above predate these evidence-only repairs. Focused unchanged contracts exercised: 43 Vitest cases in `services/agent-relay/tests/{stream,photo}.spec.ts` and 30 Python cases for chat streaming, managed photo transport and partial/truncated photo handling. These checks do not establish headset display or production CPU.
 
+### Follow-up: what changed in code (local, placement off)
+
+Baseline `16fca59f408ec9dff00c580280fe2f2d32d30cbb`. These comparisons change code, **not** placement. They used isolated workerd, migrated local D1, synthetic identities and fixed inputs. No production traffic, external model, desktop display or headset was measured.
+
+**Broker:** On the successful IP path, read the network-identity migration state and the candidate keyed hooks in one batch **after proof verification**. Use the hook result only if that snapshot confirms keyed-only mode. Otherwise evaluate the original policy; a rejected batch goes through one authoritative sequential lookup, not an automatic grant. No-IP requests retain the old path. Legacy and dual modes do one extra speculative SQL read and do not save a binding call. The flood gate and atomic admission writes stay in order.
+
+Run `node services/broker/scripts/issue-499-broker-probe.mjs --d1-timing` on baseline and candidate. Each 80-request arm matched all outcomes, including 76 independently verified tokens and fresh proof after rejection, with identical stored counts. On 60 renewals per arm the successful keyed path went from **five to four sequential D1 binding calls**, still nine SQL statements. Local dispatch-to-complete-body P50/P95 went from 7.813/8.611 to 7.042/8.190 ms. This is a measured round-trip reduction, not a production latency prediction.
+
+**Relay chat:** Pre-serialize the classifier's fixed developer message, question list and options once per protocol, retaining ordinary JSON encoding for the request input and subject. In the protocol-7 fixture, 8,694 of 8,933 outbound bytes were fixed. Both supported protocols have exact-wire checks. Use the first classify/respond pair in `services/agent-relay/tests/app-requests/protocol-7.json`, fresh turn IDs, real local auth and D1, and the same controlled Decisions answer and SSE text/terminal in both arms. Do not substitute a response-header time for receipt of a nonblank answer. In an amplified workerd check (six measured invocations, 4,000 serializations and encodes each per arm), estimated per-iteration time was **3.705 → 1.327 µs**. This measures serialization/encoding, not request CPU. D1 and model call counts did not change.
+
+| Client measurement, 50 completed chat turns per arm | Before, P50/P95 (ms) | After, P50/P95 (ms) |
+| --- | ---: | ---: |
+| Start of classification request preparation to first meaningful reply | 6.976 / 8.196 | 6.825 / 8.417 |
+| Same start to terminal SSE frame | 30.570 / 31.745 | 29.713 / 31.223 |
+
+Each plain arm sent 115 HTTP requests: 111 HTTP 200 (including the deliberately cancelled reply), one expected 401, one expected 429 and two expected 502s. A direct reader cancellation settled usage and released the slot; a fresh turn completed. A plain HTTP disconnect did not stop the local provider stub in either arm. The timings do not establish an end-to-end or visible speedup.
+
+**Relay managed photo:** Rejected a candidate that serialized the image separately and assembled the upstream body as a `Blob`. The same profiler ran in baseline → candidate → candidate → baseline order with a fresh output directory each time. The table gives dispatch to first parsed block for completed requests, not display time.
+
+| Input | Baseline first-block P50, two runs (ms) | Blob first-block P50, two runs (ms) |
+| --- | ---: | ---: |
+| Prepared JPEG, 12 blocks | 5.89–6.35 | 6.17–6.21 |
+| Synthetic near-limit body, 12 blocks | 31.90–34.96 | 34.99–35.11 |
+| Same JPEG, 72 blocks | 5.86–6.15 | 6.26–6.35 |
+
+All 864 measured requests produced the expected complete or deliberately incomplete stream. All 912 admissions including warmups settled with no missing usage. The candidate did not demonstrate a repeatable first-block or total pre-upstream processing improvement. Keep the current photo handler; neither a Wasm change nor a production CPU/headroom claim is justified by this test.
+
 ## Reviewable placement control and reversal
 
 No change to either canonical Wrangler source or a production workflow. With Node 24.14.0, pnpm 10.34.9 and locked Wrangler 4.153.0, the following local procedure exercised both repository renderers and both placement modes. Use an empty private directory outside the checkout (`$T`), no cloud credentials or inherited `.dev.vars`/provider environment, and a temporary HOME, Wrangler config and log directory. Disable Wrangler metrics and dotenv loading. From the repository root after `pnpm install --frozen-lockfile`:
