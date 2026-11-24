@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from urllib.parse import urlsplit
 
 import httpx
@@ -52,6 +53,7 @@ class PhotoProviderAdapter:
     selected_route: Callable[[], str] = lambda: "managed"
     _comparison_access: PhotoManagedCredentialOwner | None = field(default=None, init=False)
     _http: httpx.AsyncClient | None = field(default=None, init=False)
+    _allowance_seen: tuple[int, int, date] | None = field(default=None, init=False)
 
     async def resolve_route(self) -> PhotoRoute | None:
         route = self.benchmark_route or self.selected_route()
@@ -126,7 +128,14 @@ class PhotoProviderAdapter:
             or not 0 <= remaining <= allowance
         ):
             return None
+        self._allowance_seen = (remaining, allowance, datetime.now(timezone.utc).date())
         return remaining, allowance
+
+    def cached_allowance(self) -> tuple[int, int] | None:
+        seen = self._allowance_seen
+        if seen is None or seen[2] != datetime.now(timezone.utc).date():
+            return None
+        return seen[0], seen[1]
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None:

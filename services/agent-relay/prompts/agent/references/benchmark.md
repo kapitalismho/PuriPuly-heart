@@ -1,6 +1,6 @@
 # Model comparison evidence
 
-Korean dialogue → English/Japanese/Simplified Chinese; Astra-high MQM penalty, lower is better. Quality evidence, not speed or default recommendations.
+Recorded 2026-11-07. Korean dialogue → English/Japanese/Simplified Chinese, each figure one combined score with no per-language breakdown; Astra-high MQM penalty, lower is better. Quality evidence, not speed or default recommendations. The product's Gemma 4 26B + 31B option runs Gemma 4 26B A4B and uses 31B only when 26B A4B cannot serve a request, so the 26B A4B figure is that option's measurement; 31B was not measured separately.
 
 ## Experiment 1: Translation
 

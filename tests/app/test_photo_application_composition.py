@@ -456,3 +456,56 @@ async def test_composed_photo_settings_gate_offers_report_status_and_discard_onl
         assert recycled == [photo]
     finally:
         await app.stop()
+
+
+async def test_composed_photo_status_query_names_why_photos_are_unavailable(tmp_path, monkeypatch):
+    monkeypatch.delenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", raising=False)
+    monkeypatch.setattr(
+        application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
+    )
+    monkeypatch.setattr(ChatGptSession, "status", lambda self: SimpleNamespace(signed_in=False))
+    monkeypatch.setattr(application_runtime, "create_secret_store", lambda *args, **kwargs: {})
+    fetches = []
+
+    async def allowance(self):
+        fetches.append(True)
+        return 0, 50
+
+    monkeypatch.setattr(photo_provider.PhotoProviderAdapter, "allowance", allowance)
+    monkeypatch.setattr(photo_provider.PhotoProviderAdapter, "cached_allowance", lambda self: None)
+    app = application_runtime.compose_application_runtime(
+        presentation=HeadlessApplicationPresentation(), config_path=tmp_path / "settings.json"
+    )
+    canonical = AppSettingsVNext()
+
+    def apply_photo(**values):
+        current = replace(canonical, intent=replace(canonical.intent, photo=PhotoIntent(**values)))
+        app._settings.settings.canonical = current
+        app.control().settings.committed_settings = current
+
+    async def status(**arguments):
+        result = await app.control().query("photo.status", arguments)
+        return {key: result[key] for key in result if key not in {"instance_id", "revision"}}
+
+    try:
+        apply_photo()
+        assert await status() == {
+            "enabled": True,
+            "route": "managed",
+            "availability": "allowance_unknown",
+        }
+        assert fetches == []
+        assert await status(refresh=True) == {
+            "enabled": True,
+            "route": "managed",
+            "availability": "allowance_exhausted",
+            "remaining": 0,
+            "allowance": 50,
+        }
+        apply_photo(route="gemini")
+        assert (await status(refresh=True))["availability"] == "not_connected"
+        apply_photo(enabled=False)
+        assert (await status())["availability"] == "off"
+        assert fetches == [True]
+    finally:
+        await app.stop()

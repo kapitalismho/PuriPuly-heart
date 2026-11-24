@@ -13,6 +13,7 @@ from puripuly_heart.app.services.agent_chat.execution import (
     app_actions,
     check_inventory,
     private_fields,
+    project_capture_channel,
     project_query,
     safe_receipt,
     validate,
@@ -197,6 +198,34 @@ async def test_direct_actions_run_without_a_card_and_report_the_terminal_result(
         assert tools.confirmation is None and not events
     finally:
         await tools.close()
+
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        (
+            {"kind": "named_output_device", "device_name": "Speakers (Private Device)"},
+            "named_output_device",
+        ),
+        ({"kind": "process", "process": {"executable_identity": "C:/Private/App.exe"}}, "process"),
+        ({"kind": "invented"}, None),
+        (None, None),
+    ],
+)
+def test_peer_capture_projection_shows_target_kind_and_retry_applicability_only(target, expected):
+    projected = project_capture_channel(
+        {
+            "effective_active": False,
+            "capture": {
+                "state": "faulted",
+                "retry_available": True,
+                "capture_target": target,
+            },
+        }
+    )
+    assert projected["capture"]["retry_available"] is True
+    assert projected["capture"].get("target_kind") == expected
+    assert "Private" not in json.dumps(projected)
 
 
 @pytest.mark.asyncio

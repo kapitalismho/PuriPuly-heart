@@ -50,6 +50,7 @@ from puripuly_heart.app.ports.settings_view import (
     PhotoDeleteTranslatedSettingsIntent,
     PhotoEnabledSettingsIntent,
     PhotoRouteSettingsIntent,
+    PhotoStatusSnapshot,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenBeijingApiHostEdit,
@@ -86,7 +87,7 @@ from puripuly_heart.config.provider_values import (
     STTProviderName,
     normalize_stt_provider,
 )
-from puripuly_heart.config.settings_vnext.schema import PHOTO_ROUTES, AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import PHOTO_ROUTES, AppSettingsVNext, PhotoIntent
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -185,6 +186,7 @@ QUERIES = {
     "auth.status",
     "overlay.status",
     "osc.status",
+    "photo.status",
     "consent.peer_translation",
     "diagnostics.history",
     "diagnostics.health",
@@ -439,6 +441,29 @@ def _effective_secret_presence(
             value = value or os.getenv(env_vars[key])
         presence[key] = bool(value.strip()) if type(value) is str else False
     return presence
+
+
+def _photo_availability(photo: PhotoIntent | None, status: PhotoStatusSnapshot) -> dict:
+    if photo is None:
+        return {"availability": "unknown"}
+    connected = status.route
+    remaining = status.remaining
+    allowance = status.allowance
+    if not photo.enabled:
+        availability = "off"
+    elif connected is None:
+        availability = "not_connected"
+    elif connected != "managed":
+        availability = "ready"
+    elif remaining is None:
+        availability = "allowance_unknown"
+    else:
+        availability = "allowance_exhausted" if remaining == 0 else "ready"
+    result = {"enabled": photo.enabled, "route": photo.route, "availability": availability}
+    if connected == "managed" and remaining is not None:
+        result["remaining"] = remaining
+        result["allowance"] = allowance
+    return result
 
 
 def _accounts_status(application: object, retain: Callable[..., dict]) -> dict:
@@ -975,6 +1000,9 @@ class ApplicationControlOwner:
                     "limit": "integer 1..100, default 50",
                 },
                 "diagnostics.health": {},
+                "photo.status": {
+                    "refresh": "optional boolean; true re-reads today's managed photo allowance"
+                },
             },
             "settings_fields": sorted(SETTINGS_FIELDS),
             "secret_keys": list(_secret_keys(self.application)),
@@ -1568,7 +1596,10 @@ class ApplicationControlOwner:
                 "events": self.events.delivery_health(),
                 "output": self._output_diagnostic_health(),
             }
-        if arguments:
+        if name == "photo.status":
+            if arguments.keys() - {"refresh"} or type(arguments.get("refresh", False)) is not bool:
+                raise InvalidArgumentsError("photo status accepts only a boolean refresh")
+        elif arguments:
             raise InvalidArgumentsError("query does not accept arguments")
         revision = self._current_revision()
         canonical = self.settings.committed_settings
@@ -1650,6 +1681,14 @@ class ApplicationControlOwner:
                 **base,
                 "ports": self.application.effective_osc_ports(),
                 "output": _json(output["osc"]),
+            }
+        if name == "photo.status":
+            status = await self.application.photo_status(refresh=arguments.get("refresh", False))
+            return {
+                **base,
+                **_photo_availability(
+                    canonical.intent.photo if canonical is not None else None, status
+                ),
             }
         if name == "accounts.status":
             return {**base, **_accounts_status(self.application, self._retain_diagnostic)}
@@ -2740,6 +2779,10 @@ class ApplicationControlOwner:
                 raise PeerCaptureTargetUnavailable("audio target is unavailable")
             return await app.apply_loopback_capture_option(value)
         if command == "audio.retry":
+            components = getattr(self.pipeline, "current", None)
+            peer_capture = components.peer_capture if components is not None else None
+            if peer_capture is None or peer_capture.snapshot.retry_available is not True:
+                return {"status": "rejected", "reason": "no_faulted_process_capture"}
             return await app.retry_peer_process_capture()
         if command == "accounts.managed.refresh":
             refresh = getattr(app, "refresh_managed_account_usage", None)

@@ -307,7 +307,7 @@ class UiApplicationBoundary:
         settings_secrets: SettingsSecretsPort,
         osc_state_publisher: Callable[[], object] | None = None,
         output_status_provider: Callable[[], dict[str, dict[str, object]]] | None = None,
-        photo_status_provider: Callable[[], Awaitable[PhotoStatusSnapshot]] | None = None,
+        photo_status_provider: Callable[..., Awaitable[PhotoStatusSnapshot]] | None = None,
         http_extension_registry: object | None = None,
         scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
         runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
@@ -446,10 +446,10 @@ class UiApplicationBoundary:
     def effective_osc_ports(self) -> tuple[int | None, int | None]:
         return self._runtime_shutdown.effective_osc_ports()
 
-    async def photo_status(self) -> PhotoStatusSnapshot:
+    async def photo_status(self, *, refresh: bool = True) -> PhotoStatusSnapshot:
         if self._photo_status_provider is None:
             return PhotoStatusSnapshot(None)
-        return await self._photo_status_provider()
+        return await self._photo_status_provider(refresh=refresh)
 
     def output_status(self) -> dict[str, dict[str, object]]:
         if self._output_status_provider is None:

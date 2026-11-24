@@ -6,7 +6,7 @@ from typing import Literal, Protocol, TypedDict
 
 from puripuly_heart.core.messages import ErrorDiagnostics
 
-AGENT_CHAT_PROTOCOL = 7
+AGENT_CHAT_PROTOCOL = 8
 
 AgentEffort = Literal["low", "medium", "high"]
 AgentRoute = Literal["work", "social", "out_of_scope", "unclear"]

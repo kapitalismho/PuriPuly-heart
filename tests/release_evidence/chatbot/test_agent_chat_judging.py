@@ -543,7 +543,8 @@ def test_missing_or_duplicate_decision_judgments_are_not_valid():
 
 
 def pending_card_evidence(*, reject=False):
-    app = ScenarioApp(replace(select_scenarios(["routing-pending-approval"])[0], dialogue=()))
+    pending = select_scenarios(["routing-pending-approval"])[0]
+    app = ScenarioApp(replace(pending, dialogue=pending.dialogue[1:2]))
     card = {
         "id": "pending-paid",
         "changes": {"stt.provider": "soniox"},
@@ -553,7 +554,10 @@ def pending_card_evidence(*, reject=False):
     app.confirmation_observations = [
         {"turn": 2, "phase": phase, "confirmation": deepcopy(card)} for phase in ("before", "after")
     ]
-    transcript = [{"turn": 3, "role": "user", "text": "I don't want to pay."}]
+    transcript = [
+        {"turn": 2, "role": "user", "text": "저녁 뭐 먹을까?"},
+        {"turn": 3, "role": "user", "text": "I don't want to pay."},
+    ]
     withdrawal = {"status": "withdrawn", "card_id": card["id"]}
     archive = [
         {
@@ -582,7 +586,8 @@ def pending_card_evidence(*, reject=False):
     if reject:
         app.rejections = app.paid_rejections = 1
         result = {"status": "declined", "changes": card["changes"], "revision": 1}
-        archive = transcript = []
+        archive = []
+        transcript = transcript[:1]
     actions = [
         {
             "turn": 3,
@@ -649,9 +654,9 @@ def test_pending_paid_refusal_requires_matching_observed_completion_and_unchange
         archive[1]["output"] = json.dumps(rejected)
         actions[0]["result"]["tool_results"][0]["result"] = rejected
     elif failure == "no_refusal":
-        transcript[0]["text"] = "What does that card mean?"
+        transcript[1]["text"] = "What does that card mean?"
     elif failure == "refusal_after_withdrawal":
-        transcript[0]["turn"] = 4
+        transcript[1]["turn"] = 4
     elif failure == "card_still_visible":
         actions[0]["visible_after"] = deepcopy(actions[0]["visible_before"])
     elif failure == "detour_replaced_card":
@@ -669,6 +674,16 @@ def test_pending_paid_refusal_requires_matching_observed_completion_and_unchange
         actions.clear()
     result = code_judgment(app, transcript, archive, model_calls=calls, actions=actions)
     assert not result["accepted_state"]
+
+
+@pytest.mark.parametrize("withdrawn", [False, True], ids=["kept", "withdrawn"])
+def test_pending_card_survival_is_checked_at_the_scripted_detour_on_any_route(withdrawn):
+    app, transcript, archive, calls, actions = pending_card_evidence()
+    calls[0]["effective_route"] = "work"
+    if withdrawn:
+        app.confirmation_observations[-1]["confirmation"] = None
+    result = code_judgment(app, transcript, archive, model_calls=calls, actions=actions)
+    assert result["pending_card_preserved"] is not withdrawn
 
 
 def report_evidence_calls(*, inspection_first=True, source="initial_context"):
@@ -713,7 +728,7 @@ def report_evidence_calls(*, inspection_first=True, source="initial_context"):
 
 
 def unresolved_report_app(*, offered=True):
-    app = ScenarioApp(select_scenarios(["unsolvable-internal"])[0])
+    app = ScenarioApp(select_scenarios(["report-ticket-contact"])[0])
     app.advance()
     if offered:
         app.report_offers.append(

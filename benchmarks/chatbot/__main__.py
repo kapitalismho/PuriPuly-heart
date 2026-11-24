@@ -44,7 +44,7 @@ from .runner import (
     run_case,
     write_json,
 )
-from .scenarios import SCENARIOS, select_scenarios
+from .scenarios import SCENARIOS, SELECTIONS, select_scenarios
 
 
 def load_json(path: str) -> dict:
@@ -77,6 +77,7 @@ def parser() -> argparse.ArgumentParser:
         "run", help=f"Default: all {len(SCENARIOS)} cases, exactly 3 logical runs each"
     )
     run.add_argument("--case", action="append", dest="cases")
+    run.add_argument("--selection", choices=sorted(SELECTIONS))
     run.add_argument("--split", choices=["development", "heldout"])
     run.add_argument("--context-mode", choices=["selected", "full"], default="selected")
     run.add_argument("--relay", default=os.environ.get("PURIPULY_SIMULATOR_RELAY"))
@@ -133,6 +134,7 @@ def parser() -> argparse.ArgumentParser:
     )
     smoke.add_argument("--output", default="agent-chat-simulator-smoke.json")
     smoke.add_argument("--case", action="append", dest="cases")
+    smoke.add_argument("--selection", choices=sorted(SELECTIONS))
     smoke.add_argument("--context-mode", choices=["selected", "full"], default="selected")
     smoke.add_argument(
         "--relay",
@@ -388,7 +390,7 @@ async def execute(args) -> int:
             context_mode=args.context_mode,
             relay_contexts=relay_contexts,
         )
-        cases = select_scenarios(args.cases)
+        cases = select_scenarios(args.cases, selection=args.selection)
         report.update(planned_scenarios=len(cases), planned_runs=len(cases))
         models = ControlledModels()
         for case in cases:
@@ -538,7 +540,7 @@ async def execute(args) -> int:
             write_json(args.output, samples)
             print(json.dumps({"status": samples["status"], "output": args.output}))
             return 0 if samples["status"] == "rejudged_same20" else 2
-        cases = select_scenarios(args.cases, args.split)
+        cases = select_scenarios(args.cases, args.split, args.selection)
         report = report_header(
             relay=args.relay,
             build=args.relay_build,

@@ -36,7 +36,9 @@ from benchmarks.chatbot.runner import (
     run_case,
 )
 from benchmarks.chatbot.scenarios import (
+    COVERAGE,
     SCENARIOS,
+    SELECTIONS,
     select_scenarios,
 )
 from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentSetupAction
@@ -62,7 +64,8 @@ def isolated_scenario(identity):
         "fixture-slow-deepseek": ("quality-openrouter-gemma", "slow_deepseek"),
         "fixture-openrouter-return": ("recommend-gemma", "signup_openrouter_return"),
         "fixture-deepgram-signup": ("extra-reject-paid", "signup_deepgram"),
-        "fixture-managed-damage": ("unsolvable-internal", "managed_damaged"),
+        "fixture-managed-damage": ("report-ticket-contact", "managed_damaged"),
+        "fixture-internal-report": ("report-ticket-contact", "internal_error"),
     }
     base_id, cause = fixtures[identity]
     base = select_scenarios([base_id])[0]
@@ -226,7 +229,7 @@ async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundari
         "extra-recovered-auth-overlay",
         "debug-translation-auth",
         "fixture-clipped-speech",
-        "unsolvable-internal",
+        "fixture-internal-report",
     ):
         result = await run_attempt(
             scenario(identity),
@@ -260,7 +263,7 @@ async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundari
     transitions = language["code"]["state"]["transitions"]
     assert transitions[0]["approved_exact"] is True
     assert language["code"]["state"]["normal_translation"] > 0
-    report = results["unsolvable-internal"]
+    report = results["fixture-internal-report"]
     report_state = report["code"]["state"]
     assert len(report_state["report_offers"]) == 1
     offer = report_state["report_offers"][0]
@@ -316,7 +319,7 @@ async def test_optional_report_departure_preserves_unresolved_task_and_failed_cl
         return transport
 
     result = await run_attempt(
-        scenario("unsolvable-internal"),
+        scenario("fixture-internal-report"),
         ReportChoice(),
         transport_factory,
         identity=f"optional-report/{choice}",
@@ -795,7 +798,7 @@ async def test_live_attempts_use_fresh_synthetic_identity_with_actual_refresh_ow
         [
             "run",
             "--case",
-            "unsolvable-internal",
+            "report-ticket-contact",
             "--relay",
             "http://127.0.0.1:18791/v1/respond",
             "--broker",
@@ -967,6 +970,71 @@ async def test_secret_safety_guidance_does_not_fail_a_resolved_owner_dialogue(re
     assert result["status"] == "passed"
     assert not result["code"]["prohibitions"]["secret_value_requested_in_chat"]
     assert result["code"]["secret_detection"]["matches"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reply", "stray"),
+    [
+        ("키 값은 채팅에 쓰지 말고 그 입력칸에만 넣어줘.", False),
+        ("키 값은 채팅에 쓰지 말고 այնտեղ 입력칸에만 넣어줘.", True),
+    ],
+)
+async def test_a_reply_in_a_script_the_user_never_used_fails_the_run(reply, stray):
+    result = await run_attempt(
+        scenario("fixture-first-run"),
+        ControlledModels(),
+        scripted_relay([answer(reply)], []),
+        identity="stray-script",
+        controlled=True,
+    )
+    assert result["code"]["accepted_state"]
+    assert result["code"]["prohibitions"]["stray_script_in_reply"] is stray
+    assert result["status"] == ("failed" if stray else "passed")
+
+
+def test_simulated_user_sees_card_values_but_not_catalog_availability():
+    card = {
+        "id": "card-1",
+        "revision": 1,
+        "changes": {"audio.input_host_api": "MME", "audio.input_device": "Headset Microphone"},
+        "effects": ["This change may interrupt self recognition."],
+        "presentation": {
+            "audio.input_host_api": {
+                "label": "오디오 호스트 API",
+                "section": "일반",
+                "choices": [{"value": "MME", "label": "MME", "available": True}],
+            },
+            "audio.input_device": {
+                "label": "내 마이크 오디오",
+                "section": "일반",
+                "choices": [
+                    {
+                        "value": "Headset Microphone",
+                        "label": "Headset Microphone",
+                        "host_api": "MME",
+                        "available": False,
+                    }
+                ],
+            },
+        },
+    }
+    shown = ScenarioApp.visible_confirmation(card)
+    assert shown["presentation"] == {
+        "audio.input_host_api": {
+            "label": "오디오 호스트 API",
+            "section": "일반",
+            "value_label": "MME",
+        },
+        "audio.input_device": {
+            "label": "내 마이크 오디오",
+            "section": "일반",
+            "value_label": "Headset Microphone",
+        },
+    }
+    assert {key: shown[key] for key in ("id", "revision", "changes", "effects")} == {
+        key: card[key] for key in ("id", "revision", "changes", "effects")
+    }
 
 
 @pytest.mark.asyncio
@@ -1822,6 +1890,18 @@ async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tm
     assert report["judge_effort"] == report["calibration"]["judge_effort"] == "xhigh"
 
 
+def test_every_case_records_coverage_and_belongs_to_a_review_group():
+    identities = {case.id for case in SCENARIOS}
+    assert set(COVERAGE) == identities
+    assert all(COVERAGE[identity] for identity in identities)
+    groups = set().union(*(cases for name, cases in SELECTIONS.items() if name != "fast"))
+    assert groups == identities
+    fast = select_scenarios(["journey-talk-listen"], selection="fast")
+    assert {case.id for case in fast} == {*SELECTIONS["fast"], "journey-talk-listen"}
+    with pytest.raises(ValueError):
+        select_scenarios(selection="unknown")
+
+
 @pytest.mark.asyncio
 async def test_invalid_raw_classification_is_retained_beside_effective_fallback():
     raw = {"unexpected": "classification"}
@@ -2304,7 +2384,30 @@ async def test_peer_start_and_capture_tool_never_accept_missing_terms():
     assert not app.peer_terms_accepted
     assert app.capture_active == {"self": False, "peer": False}
     assert not app.event_log
-    assert all(not ScenarioApp(case).peer_terms_accepted for case in SCENARIOS)
+    assert all(
+        app.peer_terms_accepted == app.capture_active["peer"] for app in map(ScenarioApp, SCENARIOS)
+    )
+
+
+@pytest.mark.asyncio
+async def test_simulated_audio_retry_restarts_only_a_faulted_process_capture():
+    listen = ScenarioApp(select_scenarios(["journey-talk-listen"])[0])
+    listen.advance()
+    peer = listen.current_observations("peer")
+    assert peer["recognition"] is not None and peer["translation"] is None
+    submitted = await listen.submit("audio.retry", {}, request_id="device-loopback-retry")
+    receipt = await listen.wait(submitted["operation_id"])
+    assert receipt["status"] == "rejected"
+    assert receipt["reason"] == "no_faulted_process_capture"
+    assert not listen.audio_retry_attempts
+    process = ScenarioApp(select_scenarios(["listen-process-retry"])[0])
+    assert process.channels()["peer"]["capture"]["state"] == "faulted"
+    assert process.current_observations("peer")["translation"] is None
+    submitted = await process.submit("audio.retry", {}, request_id="process-retry")
+    receipt = await process.wait(submitted["operation_id"])
+    assert receipt["status"] == "applied"
+    assert process.channels()["peer"]["capture"]["state"] == "active"
+    assert process.current_observations("peer")["translation"] is not None
 
 
 def present_fixture_setup_action(app, provider, *, kind="key_console", message_index=None):
@@ -2472,6 +2575,7 @@ async def test_openrouter_model_timeout_is_route_scoped_and_reuses_verified_acco
     try:
         probe = await tools.execute("probe_app", {"target": "translation.self"})
         assert probe["receipt"]["translation_result"] == "failed"
+        assert probe["receipt"]["failure_category"] == "timeout"
         assert not app.resolved()
         app.capture_active["self"] = False
         changed = await approved_tool_change(

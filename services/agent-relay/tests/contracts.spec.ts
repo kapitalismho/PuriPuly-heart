@@ -51,6 +51,7 @@ describe('app protocol contracts', () => {
   it.each([
     [6, 'propose_app'],
     [7, 'manage_proposal'],
+    [8, 'manage_proposal'],
   ] as const)('offers DeepSeek V4.1 but not V4.0 in protocol %i', (protocol, settingsTool) => {
     const { tools } = contracts.get(protocol)!;
     expect(JSON.stringify(tools)).not.toContain('"deepseek_v4_flash"');
@@ -63,6 +64,13 @@ describe('app protocol contracts', () => {
       ['properties', 'changes', 'properties', 'translation.connection_history', 'properties', 'deepseek_v4_flash_41', 'enum'],
       ['managed', 'managed_china', 'openrouter', 'official_byok'],
     );
+  });
+
+  it('offers the VR compatibility setting only to apps that accept it', () => {
+    const offered = (protocol: number) => contracts.get(protocol)!.tools
+      .find(({ name }) => name === 'manage_proposal')?.parameters as { properties: { changes: { properties: Record<string, unknown> } } };
+    expect(offered(7).properties.changes.properties).not.toHaveProperty(['overlay.vr_compatibility_mode']);
+    expect(offered(8).properties.changes.properties['overlay.vr_compatibility_mode']).toEqual({ type: 'boolean' });
   });
 
   it.each(supportedProtocols)('serves recorded protocol %i app requests with that protocol contract', async (protocol) => {

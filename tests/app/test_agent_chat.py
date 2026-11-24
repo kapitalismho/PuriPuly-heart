@@ -29,7 +29,7 @@ from puripuly_heart.app.services.agent_chat.context import (
     AgentActivity,
     collect_agent_context,
 )
-from puripuly_heart.app.services.agent_chat.modules import setting_values
+from puripuly_heart.app.services.agent_chat.modules import model_context, setting_values
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.wiring.wiring_agent_chat import compose_agent_transport
@@ -125,6 +125,11 @@ class Records:
                     "remote_delivery": "unacknowledged",
                 },
             },
+            "photo.status": {
+                "enabled": True,
+                "route": "managed",
+                "availability": "allowance_unknown",
+            },
             "secrets.presence": {
                 "presence": {"openai_api_key": True, "custom_name": "PRIVATE-SECRET"}
             },
@@ -201,6 +206,7 @@ def answer(text="Translation is off in the current records. Turn it on in the ap
     }
 
 
+OVERVIEW_QUERIES = 11
 OUTPUT_READ_QUERIES = 7
 
 
@@ -368,6 +374,22 @@ async def test_context_allowlist_recent_priority_and_initial_supported_choices()
     assert translation["secret_presence"] == context["secret_presence"]
     with pytest.raises(ValueError, match="unsupported"):
         await collect_agent_context(records, activity=AgentActivity(), topic="raw_logs")
+
+
+@pytest.mark.asyncio
+async def test_photo_availability_refreshes_only_on_an_explicit_general_read():
+    records = Records()
+    await collect_agent_context(records, activity=AgentActivity())
+    general = await collect_agent_context(records, activity=AgentActivity(), topic="general")
+    assert [arguments for name, arguments in records.queries if name == "photo.status"] == [
+        {},
+        {"refresh": True},
+    ]
+    assert model_context(general, "general")["general"]["photo"] == {
+        "enabled": True,
+        "route": "managed",
+        "availability": "allowance_unknown",
+    }
 
 
 @pytest.mark.asyncio
@@ -733,7 +755,7 @@ async def test_interrupted_responses_never_execute_tools_or_retain_uncommitted_o
         result = await owner.send("Check output")
         assert result.status == "interrupted"
         assert "interrupted" in result.text
-        assert len(records.queries) == 10
+        assert len(records.queries) == OVERVIEW_QUERIES
         await owner.send("Continue")
         items = transport.requests[1]["input"]
         calls = [item for item in items if item.get("type") == "function_call"]
@@ -784,7 +806,7 @@ async def test_duplicate_call_id_does_not_execute_or_break_followup_pairing():
         result = await owner.send("Check output")
         assert result.status == "interrupted"
         assert len(result.tool_results) == 1
-        assert len(records.queries) == 10 + OUTPUT_READ_QUERIES
+        assert len(records.queries) == OVERVIEW_QUERIES + OUTPUT_READ_QUERIES
         await owner.send("Continue")
         items = transport.requests[-1]["input"]
         calls = [item["call_id"] for item in items if item.get("type") == "function_call"]
@@ -806,7 +828,7 @@ async def test_invalid_singleton_arguments_are_rejected_without_reading():
     try:
         result = await owner.send("Check output")
         assert result.status == "completed"
-        assert len(records.queries) == 10
+        assert len(records.queries) == OVERVIEW_QUERIES
         assert len(result.tool_results) == 1
         assert result.tool_results[0].result == {"status": "rejected", "code": "invalid_tool_call"}
     finally:
@@ -933,7 +955,7 @@ async def test_four_read_batches_share_the_ten_call_turn_budget():
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "completed"
-        assert len(records.queries) == 10 + 10 * OUTPUT_READ_QUERIES
+        assert len(records.queries) == OVERVIEW_QUERIES + 10 * OUTPUT_READ_QUERIES
         assert [item.call_id for item in result.tool_results] == [call["call_id"] for call in calls]
         assert [request["allow_tools"] for request in transport.requests] == [
             True,
@@ -962,7 +984,7 @@ async def test_oversized_or_overbudget_batches_execute_no_members(prior_count, b
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "interrupted"
-        assert len(records.queries) == 10 + prior_count * OUTPUT_READ_QUERIES
+        assert len(records.queries) == OVERVIEW_QUERIES + prior_count * OUTPUT_READ_QUERIES
         assert all(item.status == "rejected" for item in result.tool_results[-batch_size:])
         assert [item.result["code"] for item in result.tool_results[-batch_size:]] == [
             "tool_limit"
@@ -984,7 +1006,7 @@ async def test_invalid_batch_call_ids_never_execute_or_enter_followup_history(ba
         result = await owner.send("Check output")
         assert result.status == "interrupted"
         assert not result.tool_results
-        assert len(records.queries) == 10
+        assert len(records.queries) == OVERVIEW_QUERIES
         await owner.send("Continue")
         assert not [
             item
@@ -1008,7 +1030,7 @@ async def test_batch_cannot_reuse_a_prior_call_id_or_execute_its_valid_sibling()
     try:
         result = await owner.send("Check output")
         assert result.status == "interrupted"
-        assert len(records.queries) == 10 + OUTPUT_READ_QUERIES
+        assert len(records.queries) == OVERVIEW_QUERIES + OUTPUT_READ_QUERIES
         assert [item.call_id for item in result.tool_results] == ["prior"]
         await owner.send("Continue")
         items = transport.requests[-1]["input"]
@@ -1044,7 +1066,7 @@ async def test_one_active_turn_shutdown_rejects_late_response_and_drains():
     release.set()
     await owner.close()
     assert active.cancelled()
-    assert len(records.queries) == 10
+    assert len(records.queries) == OVERVIEW_QUERIES
     assert transport.closed
     assert not owner.snapshot.busy
     assert (await owner.send("Later")).status == "unavailable"
@@ -1235,7 +1257,7 @@ async def test_serial_context_tools_reject_eleventh_call_without_executing_it():
     try:
         result = await owner.send("Read current app facts")
         assert result.status == "interrupted"
-        assert len(records.queries) == 10 + 10 * OUTPUT_READ_QUERIES
+        assert len(records.queries) == OVERVIEW_QUERIES + 10 * OUTPUT_READ_QUERIES
         assert result.tool_results[-1].result["code"] == "tool_limit"
         assert [request["allow_tools"] for request in transport.requests] == [True] * 10 + [False]
     finally:

@@ -93,7 +93,7 @@ export const appTools = [
   {
     "type": "function",
     "name": "probe_app",
-    "description": "Run an isolated scoped check, not live pipeline repair or output delivery. Arguments: recognition.self; recognition.peer; translation.self; translation.peer; microphone. Local capture/VAD only; no settings change; managed_access. Whether the selected managed credential is still usable; no translation request. Supply only the selected action's fields.",
+    "description": "Run an isolated scoped check, not live pipeline repair or output delivery. Arguments: recognition.self; recognition.peer; translation.self; translation.peer; microphone. Self microphone routes only: local capture/VAD, no Peer loopback or recognition; no settings change; managed_access. Whether the selected managed credential is still usable; no translation request. Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
@@ -119,7 +119,7 @@ export const appTools = [
   {
     "type": "function",
     "name": "retry_app",
-    "description": "Retry existing application recovery through its resource owner. Arguments: audio; osc_discovery; gpu_activation. Supply only the selected action's fields.",
+    "description": "Retry existing application recovery through its resource owner. Arguments: audio. Restarts only a faulted Peer app/process capture shown as retry_available; otherwise rejected and nothing restarts; osc_discovery; gpu_activation. Supply only the selected action's fields.",
     "strict": false,
     "parameters": {
       "type": "object",
@@ -320,6 +320,9 @@ export const appTools = [
               ]
             },
             "overlay.translation.enabled": {
+              "type": "boolean"
+            },
+            "overlay.vr_compatibility_mode": {
               "type": "boolean"
             },
             "peer_expected_languages": {
