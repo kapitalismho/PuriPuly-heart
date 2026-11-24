@@ -36,7 +36,9 @@ from benchmarks.chatbot.runner import (
     run_case,
 )
 from benchmarks.chatbot.scenarios import (
+    COVERAGE,
     SCENARIOS,
+    SELECTIONS,
     select_scenarios,
 )
 from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AgentSetupAction
@@ -62,7 +64,8 @@ def isolated_scenario(identity):
         "fixture-slow-deepseek": ("quality-openrouter-gemma", "slow_deepseek"),
         "fixture-openrouter-return": ("recommend-gemma", "signup_openrouter_return"),
         "fixture-deepgram-signup": ("extra-reject-paid", "signup_deepgram"),
-        "fixture-managed-damage": ("unsolvable-internal", "managed_damaged"),
+        "fixture-managed-damage": ("report-ticket-contact", "managed_damaged"),
+        "fixture-internal-report": ("report-ticket-contact", "internal_error"),
     }
     base_id, cause = fixtures[identity]
     base = select_scenarios([base_id])[0]
@@ -226,7 +229,7 @@ async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundari
         "extra-recovered-auth-overlay",
         "debug-translation-auth",
         "fixture-clipped-speech",
-        "unsolvable-internal",
+        "fixture-internal-report",
     ):
         result = await run_attempt(
             scenario(identity),
@@ -260,7 +263,7 @@ async def test_real_owner_adapters_visibility_notice_receipt_and_report_boundari
     transitions = language["code"]["state"]["transitions"]
     assert transitions[0]["approved_exact"] is True
     assert language["code"]["state"]["normal_translation"] > 0
-    report = results["unsolvable-internal"]
+    report = results["fixture-internal-report"]
     report_state = report["code"]["state"]
     assert len(report_state["report_offers"]) == 1
     offer = report_state["report_offers"][0]
@@ -316,7 +319,7 @@ async def test_optional_report_departure_preserves_unresolved_task_and_failed_cl
         return transport
 
     result = await run_attempt(
-        scenario("unsolvable-internal"),
+        scenario("fixture-internal-report"),
         ReportChoice(),
         transport_factory,
         identity=f"optional-report/{choice}",
@@ -795,7 +798,7 @@ async def test_live_attempts_use_fresh_synthetic_identity_with_actual_refresh_ow
         [
             "run",
             "--case",
-            "unsolvable-internal",
+            "report-ticket-contact",
             "--relay",
             "http://127.0.0.1:18791/v1/respond",
             "--broker",
@@ -1820,6 +1823,18 @@ async def test_actual_cli_smoke_covers_retained_suite_and_scripted_boundaries(tm
     assert report["live_pass"] is False
     assert {case["id"] for case in report["cases"]} == set(selected)
     assert report["judge_effort"] == report["calibration"]["judge_effort"] == "xhigh"
+
+
+def test_every_case_records_coverage_and_belongs_to_a_review_group():
+    identities = {case.id for case in SCENARIOS}
+    assert set(COVERAGE) == identities
+    assert all(COVERAGE[identity] for identity in identities)
+    groups = set().union(*(cases for name, cases in SELECTIONS.items() if name != "fast"))
+    assert groups == identities
+    fast = select_scenarios(["journey-talk-listen"], selection="fast")
+    assert {case.id for case in fast} == {*SELECTIONS["fast"], "journey-talk-listen"}
+    with pytest.raises(ValueError):
+        select_scenarios(selection="unknown")
 
 
 @pytest.mark.asyncio

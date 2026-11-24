@@ -728,7 +728,7 @@ def report_evidence_calls(*, inspection_first=True, source="initial_context"):
 
 
 def unresolved_report_app(*, offered=True):
-    app = ScenarioApp(select_scenarios(["unsolvable-internal"])[0])
+    app = ScenarioApp(select_scenarios(["report-ticket-contact"])[0])
     app.advance()
     if offered:
         app.report_offers.append(
