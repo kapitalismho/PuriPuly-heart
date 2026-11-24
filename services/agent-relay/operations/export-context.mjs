@@ -2,8 +2,9 @@ import { createHash, createHmac } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, extname, relative, resolve } from 'node:path';
-import { isDeepStrictEqual, parseArgs } from 'node:util';
+import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 const require = createRequire(import.meta.url);
 const { Miniflare, Response, convertV4MiniflareOptions } = createRequire(require.resolve('wrangler/package.json'))('miniflare');
@@ -11,8 +12,6 @@ const migrationsDefault = fileURLToPath(new URL('../migrations/', import.meta.ur
 const tokenSecret = 'puri-context-export-synthetic-token-secret-only';
 const installation = createHash('sha256').update('puri-context-export-synthetic-installation').digest('hex');
 const dummyKey = 'synthetic-context-export-no-provider-access';
-const currentProtocol = 8;
-const referenceNames = ['costs', 'benchmarks', 'setup', 'photo'];
 const staticFields = new Set(['model', 'instructions', 'tools', 'questions', 'reasoning',
   'prompt_cache_options', 'store', 'stream', 'parallel_tool_calls', 'max_output_tokens', 'include']);
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -52,19 +51,13 @@ async function emittedModules(entry) {
   return { root, modules, hashes };
 }
 
-export function extractContext(upstream, input, referenceTexts = []) {
-  if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream) || !Array.isArray(upstream.input)) {
-    throw new Error('The emitted Worker did not provide an input array.');
+export function extractContext(upstream, input) {
+  if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream)
+    || !Array.isArray(upstream.input) || upstream.input.length < input.length
+    || !isDeepStrictEqual(upstream.input.slice(upstream.input.length - input.length), input)) {
+    throw new Error('The emitted Worker changed client input instead of prepending a static context.');
   }
-  const clientEnd = upstream.input.length - (referenceTexts.length ? 1 : 0);
-  const prefixLength = clientEnd - input.length;
-  if (prefixLength < 0 || !isDeepStrictEqual(upstream.input.slice(prefixLength, clientEnd), input)) {
-    throw new Error('The emitted Worker changed client input or misplaced a context message.');
-  }
-  if (referenceTexts.length && !isDeepStrictEqual(upstream.input[clientEnd], {
-    role: 'developer', content: [{ type: 'input_text', text: referenceTexts.join('\n\n') }],
-  })) throw new Error('The emitted Worker reference suffix does not match the expected developer message.');
-  const context = { input_prefix: upstream.input.slice(0, prefixLength) };
+  const context = { input_prefix: upstream.input.slice(0, upstream.input.length - input.length) };
   for (const [key, value] of Object.entries(upstream)) {
     if (['input', 'safety_identifier', 'tool_choice'].includes(key)) continue;
     if (!staticFields.has(key)) throw new Error(`Unrecognized outbound static field ${key}; extend the manifest explicitly.`);
@@ -73,10 +66,10 @@ export function extractContext(upstream, input, referenceTexts = []) {
   return context;
 }
 
-function samples(protocol) {
+function samples() {
   const user = (content) => ({ role: 'user', content });
   const configuration = (effort) => ({ type: 'configuration_update', reasoning: { effort } });
-  const base = [
+  return [
     { id: 'classify', input: [user('Synthetic context export classification.')] },
     { id: 'classify', input: [user('Different synthetic classification input.')] },
     { id: 'work', route: 'work', effort: 'low', allow_tools: true,
@@ -89,20 +82,10 @@ function samples(protocol) {
       id: route, route, effort: 'low', allow_tools, input: [user(`Synthetic ${route} context export.`)],
     }))),
   ];
-  if (protocol !== 8) return base;
-  const work = base.find(({ route }) => route === 'work');
-  return [
-    ...base.map((sample) => sample.id === 'classify' ? sample
-      : { ...sample, omitted_references: sample.id === 'work' ? referenceNames : [] }),
-    ...referenceNames.map((reference) => ({
-      ...work, reference, omitted_references: referenceNames.filter((name) => name !== reference),
-    })),
-    { ...work, omitted_references: [] },
-  ];
 }
 
 export async function exportRelayContext({ emitted, relayBuild, migrations = migrationsDefault,
-  compatibilityDate, compatibilityFlags = [], protocol = currentProtocol }) {
+  compatibilityDate, compatibilityFlags = [], protocol = 7 }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate ?? '')
     || !Array.isArray(compatibilityFlags) || compatibilityFlags.some((flag) => typeof flag !== 'string')) {
     throw new Error('Supply the measured Worker compatibility date and flags explicitly.');
@@ -147,7 +130,6 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
   }));
   const contexts = {};
   const captures = [];
-  const references = [];
   try {
     await runtime.ready;
     const database = await runtime.getD1Database('AGENT_USAGE_DB');
@@ -155,12 +137,11 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
       const statements = sql.split(';').map((statement) => statement.trim()).filter(Boolean);
       await database.batch(statements.map((statement) => database.prepare(statement)));
     }
-    for (const [number, sample] of samples(protocol).entries()) {
+    for (const [number, sample] of samples().entries()) {
       pending = { sample, bodies: [] };
       const classification = sample.id === 'classify';
       const request = { agent_protocol: protocol, turn_id: (number + 1).toString(16).padStart(32, '0'), input: sample.input,
-        ...(classification ? {} : { route: sample.route, effort: sample.effort, allow_tools: sample.allow_tools }),
-        ...(sample.omitted_references ? { omitted_references: sample.omitted_references } : {}) };
+        ...(classification ? {} : { route: sample.route, effort: sample.effort, allow_tools: sample.allow_tools }) };
       const response = await runtime.dispatchFetch(`http://context-export.invalid/v1/${classification ? 'classify' : 'respond'}`, {
         method: 'POST', headers: { authorization: `Bearer ${signedToken()}`, 'content-type': 'application/json' },
         body: JSON.stringify(request),
@@ -174,25 +155,13 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
       if (!classification && upstream.tool_choice !== (sample.allow_tools && sample.id === 'work' ? 'auto' : 'none')) {
         throw new Error('The emitted Worker tool choice does not follow the per-call route/allow_tools boundary.');
       }
-      let referenceTexts;
-      if (sample.reference) {
-        const text = Array.isArray(upstream.input) && upstream.input.at(-1)?.content?.[0]?.text;
-        if (typeof text !== 'string' || !text || text !== text.replaceAll('\r\n', '\n').trim()) {
-          throw new Error(`The emitted Worker did not return normalized reference text for ${sample.reference}.`);
-        }
-        references.push({ name: sample.reference, text });
-        referenceTexts = [text];
-      } else if (sample.id === 'work' && sample.omitted_references?.length === 0) {
-        referenceTexts = references.map(({ text }) => text);
-      }
-      const context = extractContext(upstream, sample.input, referenceTexts);
+      const context = extractContext(upstream, sample.input);
       if (contexts[sample.id] && !isDeepStrictEqual(contexts[sample.id], context)) {
         throw new Error(`The emitted ${sample.id} context is not static across valid client requests.`);
       }
       contexts[sample.id] = context;
       captures.push({ upstream_context_id: sample.id, route: sample.route ?? 'classify',
-        ...(classification ? {} : { allow_tools: sample.allow_tools, effort: sample.effort }),
-        ...(sample.omitted_references ? { omitted_references: sample.omitted_references } : {}) });
+        ...(classification ? {} : { allow_tools: sample.allow_tools, effort: sample.effort }) });
       pending = undefined;
     }
   } finally {
@@ -200,7 +169,6 @@ export async function exportRelayContext({ emitted, relayBuild, migrations = mig
   }
   return {
     format: 'puri-agent-relay-context-1', agent_protocol: protocol, relay_build: build, bundle_hashes: hashes, contexts,
-    ...(protocol === 8 ? { references } : {}),
     export_provenance: {
       mode: 'controlled_no_network', diagnostic_only: true, external_model_calls: 0,
       source: 'observed_emitted_worker_outbound_requests', entry_module: relative(root, entry).replaceAll('\\', '/'),
@@ -217,7 +185,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       emitted: { type: 'string' }, output: { type: 'string' }, 'relay-build': { type: 'string' },
       migrations: { type: 'string' }, 'compatibility-date': { type: 'string' },
       'compatibility-flag': { type: 'string', multiple: true },
-      protocol: { type: 'string', default: String(currentProtocol) },
+      protocol: { type: 'string', default: '7' },
     } });
     if (!values.emitted || !values.output) throw new Error('Use --emitted <Wrangler index.js> --output <new manifest.json> --compatibility-date <date> [--compatibility-flag <flag>] [--relay-build <expected entry SHA256>] [--migrations <directory>].');
     const manifest = await exportRelayContext({ emitted: values.emitted, relayBuild: values['relay-build'],

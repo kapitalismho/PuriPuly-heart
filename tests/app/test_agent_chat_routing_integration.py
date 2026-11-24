@@ -16,7 +16,7 @@ from puripuly_heart.app.ports.agent_chat import (
 from puripuly_heart.app.services.agent_chat.owner import AgentChatOwner
 from puripuly_heart.ui.i18n import available_locales, t_for_locale
 from tests.app.test_agent_chat import Records, Responses, Tokens, answer, context_of, tool
-from tests.app.test_agent_chat_routing import decision, selected_decision
+from tests.app.test_agent_chat_routing import decision
 
 
 class RoutedResponses(Responses):
@@ -41,7 +41,6 @@ def owner_for(transport, records=None, **kwargs):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("context_mode", ["selected", "full"])
 @pytest.mark.parametrize(
     ("route", "effort", "effective"),
     [
@@ -53,18 +52,12 @@ def owner_for(transport, records=None, **kwargs):
         ("out_of_scope", "medium", "low"),
     ],
 )
-async def test_route_controls_model_invocation_and_whole_turn_effort(
-    route, effort, effective, context_mode
-):
+async def test_route_controls_model_invocation_and_whole_turn_effort(route, effort, effective):
     responses = [{"status": "completed", "output": [tool()]}] if route == "work" else []
     transport = RoutedResponses(
-        selected_decision(route=route, effort=effort, omitted_references=("photo", "costs")),
-        *responses,
-        answer("확인할 수 있는 기록을 안내해요."),
+        decision(route, effort), *responses, answer("확인할 수 있는 기록을 안내해요.")
     )
-    owner = owner_for(transport, context_mode=context_mode)
-    events = []
-    owner.observe_events(events.append)
+    owner = owner_for(transport)
     await owner.start()
     try:
         result = await owner.send("synthetic routing message")
@@ -75,14 +68,6 @@ async def test_route_controls_model_invocation_and_whole_turn_effort(
         assert len(transport.requests) == (2 if route == "work" else 1)
         assert all(request["effort"] == effective for request in transport.requests)
         assert all(request["route"] == route for request in transport.requests)
-        omitted_references = (
-            ("costs", "photo") if route == "work" and context_mode == "selected" else ()
-        )
-        assert all(
-            request["omitted_references"] == omitted_references for request in transport.requests
-        )
-        decisions = [event for event in events if event["kind"] == "decision"]
-        assert [event["omitted_references"] for event in decisions] == [list(omitted_references)]
         assert transport.requests[0]["allow_tools"] is (route in {"work", "unclear"})
         if route in {"social", "out_of_scope"}:
             assert transport.requests[0]["input"] == [
@@ -297,7 +282,6 @@ async def test_off_topic_after_work_is_private_without_waiting_and_preserves_wor
             "effort": "low",
             "route": "out_of_scope",
             "allow_tools": False,
-            "omitted_references": (),
         }
         assert len(transport.requests) == 3
         assert owner.snapshot.messages[-1].role == "assistant"
@@ -516,10 +500,9 @@ async def test_classification_and_local_records_start_together():
     [
         (AgentTransportError(), "unclear"),
         (decision("invalid", "high"), "unclear"),
-        (selected_decision(effort="max", omitted_references=("costs",)), "work"),
+        (decision("work", "max"), "work"),
         (decision("work", "xhigh"), "work"),
         (decision("unclear", None), "unclear"),
-        (selected_decision(relation="unclear", omitted_references=("costs",)), "work"),
     ],
 )
 async def test_failed_classification_falls_back_once_without_retry(routing, expected_route):
@@ -531,7 +514,6 @@ async def test_failed_classification_falls_back_once_without_retry(routing, expe
         assert len(transport.classifications) == len(transport.requests) == 1
         assert transport.requests[0]["route"] == expected_route
         assert transport.requests[0]["effort"] == "high"
-        assert transport.requests[0]["omitted_references"] == ()
     finally:
         await owner.close()
 
@@ -639,10 +621,8 @@ async def test_initial_and_reset_notice_defaults_are_high_after_a_brief_route(re
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("effort", ["low", "medium", "high"])
-async def test_notice_and_error_keep_all_references_even_after_selected_work(effort):
-    transport = RoutedResponses(
-        selected_decision(effort=effort, omitted_references=("setup",)), answer(), answer(), answer()
-    )
+async def test_notice_continuation_preserves_the_selected_work_effort(effort):
+    transport = RoutedResponses(decision("work", effort), answer(), answer())
     owner = owner_for(transport)
     owner.bind_verification_providers(frozenset({"openai"}))
     await owner.start()
@@ -653,19 +633,11 @@ async def test_notice_and_error_keep_all_references_even_after_selected_work(eff
         )
         owner.key_verification_completed("openai", True)
         await owner._notice_task
-        assert (
-            await owner.send("Explain this app error.", diagnostic_id="synthetic-error")
-        ).status == "completed"
         assert len(transport.classifications) == 1
-        assert [request["effort"] for request in transport.requests] == [effort, effort, "high"]
-        assert [request["omitted_references"] for request in transport.requests] == [
-            ("setup",),
-            (),
-            (),
-        ]
+        assert [request["effort"] for request in transport.requests] == [effort, effort]
         assert [
             item["reasoning"]["effort"]
-            for item in transport.requests[1]["input"]
+            for item in transport.requests[-1]["input"]
             if item.get("type") == "configuration_update"
         ] == [effort, effort]
     finally:

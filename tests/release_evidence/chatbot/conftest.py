@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from benchmarks.chatbot.app import choice_catalog
-from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL, AGENT_REFERENCES
+from puripuly_heart.app.ports.agent_chat import AGENT_CHAT_PROTOCOL
 from puripuly_heart.app.services.agent_chat.execution import (
     app_tool_descriptions,
     app_tool_schemas,
@@ -20,9 +20,6 @@ async def relay_context_manifest() -> dict:
         "agent_protocol": AGENT_CHAT_PROTOCOL,
         "relay_build": "a" * 64,
         "bundle_hashes": {"index.js": "a" * 64, "guide.md": "b" * 64},
-        "references": [
-            {"name": name, "text": f"{marker} {name} reference"} for name in AGENT_REFERENCES
-        ],
         "contexts": {
             "classify": {
                 "model": "synthetic-model",

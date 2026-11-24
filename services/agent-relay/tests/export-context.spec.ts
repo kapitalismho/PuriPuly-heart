@@ -20,20 +20,6 @@ describe('offline emitted relay context export', () => {
       input: [prefix, ...input] }, input)).toEqual({ input_prefix: [prefix], ...options });
   });
 
-  it('checks that joined references follow unmodified client input and stay out of the static prefix', () => {
-    const texts = ['First measured block.', 'Second measured block.'];
-    const suffix = { role: 'developer', content: [{ type: 'input_text', text: 'First measured block.\n\nSecond measured block.' }] };
-    const work = { model: 'gpt-5.6-terra', input: [prefix, ...input] };
-    const withSuffix = { ...work, input: [...work.input, suffix] };
-    expect(extractContext(withSuffix, input, texts)).toEqual(extractContext(work, input));
-    expect(() => extractContext(withSuffix, input)).toThrow('misplaced a context message');
-    expect(() => extractContext(withSuffix, input, [...texts].reverse())).toThrow('reference suffix');
-    expect(() => extractContext(work, input, texts)).toThrow('misplaced a context message');
-    expect(() => extractContext({ ...work, input: [prefix, suffix, ...input] }, input, texts)).toThrow('misplaced a context message');
-    expect(() => extractContext({ ...work, input: [...work.input, prefix] }, input, [prefix.content[0].text]))
-      .toThrow('reference suffix');
-  });
-
   it('retains server-owned classification questions and social instructions exactly', () => {
     const question = { type: 'choice', name: 'route', instructions: 'Exact emitted route instructions.',
       choices: [{ value: 'work', description: 'Synthetic work.' }] };

@@ -4,14 +4,12 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from puripuly_heart.app.ports.agent_chat import AGENT_REFERENCES, AgentEffort, AgentMessage, AgentRoute
+from puripuly_heart.app.ports.agent_chat import AgentEffort, AgentMessage, AgentRoute
 from puripuly_heart.app.services.agent_chat.modules import MODULES
 
 _CONTEXT_QUESTIONS = frozenset(
     ("context_relation", *(f"context_{module}" for module in MODULES[1:]))
 )
-_REFERENCE_QUESTIONS = {f"reference_{name}": name for name in AGENT_REFERENCES}
-_SELECTION_QUESTIONS = _CONTEXT_QUESTIONS.union(_REFERENCE_QUESTIONS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +21,6 @@ class AgentDecision:
     context_modules: tuple[str, ...] | None = None
     context_relation: str = "unclear"
     context_reason: str | None = field(default=None, compare=False)
-    omitted_references: tuple[str, ...] = ()
 
 
 def _context_selection(answers: list) -> dict:
@@ -48,24 +45,7 @@ def _context_selection(answers: list) -> dict:
             }
         if choice == "include":
             modules.append(module)
-    omitted = []
-    for question, reference in _REFERENCE_QUESTIONS.items():
-        matching = [
-            answer
-            for answer in answers
-            if isinstance(answer, dict) and answer.get("name") == question
-        ]
-        if (
-            len(matching) == 1
-            and matching[0].get("type") == "choice"
-            and matching[0].get("choice") == "omit"
-        ):
-            omitted.append(reference)
-    return {
-        "context_modules": tuple(modules),
-        "context_relation": relation,
-        "omitted_references": tuple(omitted),
-    }
+    return {"context_modules": tuple(modules), "context_relation": relation}
 
 
 def extract_decision(result: object) -> AgentDecision:
@@ -75,7 +55,7 @@ def extract_decision(result: object) -> AgentDecision:
     if any(
         isinstance(answer, dict)
         and answer.get("type") == "refusal"
-        and (not isinstance(answer.get("name"), str) or answer["name"] not in _SELECTION_QUESTIONS)
+        and (not isinstance(answer.get("name"), str) or answer["name"] not in _CONTEXT_QUESTIONS)
         for answer in answers
     ):
         return AgentDecision(

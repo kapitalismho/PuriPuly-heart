@@ -120,7 +120,6 @@ class AgentRelayTransport:
         effort: AgentEffort,
         route: AgentRoute,
         allow_tools: bool,
-        omitted_references: tuple[str, ...],
     ) -> AsyncGenerator[AgentResponseEvent, None]:
         if effort not in ("low", "medium", "high"):
             raise AgentTransportError("invalid_effort")
@@ -132,7 +131,6 @@ class AgentRelayTransport:
                 "effort": effort,
                 "route": route,
                 "allow_tools": allow_tools,
-                "omitted_references": list(omitted_references),
             },
             1024 * 1024,
         )

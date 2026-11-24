@@ -15,10 +15,9 @@ function classifyBody(protocol: number, turn_id = turnId) {
 }
 
 function respondBody(protocol: number, turn_id = turnId, route = 'work') {
-  const fields = { agent_protocol: protocol, turn_id, route, ...(protocol === 8 ? { omitted_references: [] } : {}) };
   return route === 'work' || route === 'unclear'
-    ? { ...fields, input: [highEffort, user], effort: 'high', allow_tools: true }
-    : { ...fields, input: [user], effort: 'low', allow_tools: false };
+    ? { agent_protocol: protocol, turn_id, input: [highEffort, user], route, effort: 'high', allow_tools: true }
+    : { agent_protocol: protocol, turn_id, input: [user], route, effort: 'low', allow_tools: false };
 }
 
 function post(path: string, body: unknown, token = signToken()): Request {

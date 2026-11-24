@@ -1798,7 +1798,6 @@ async def test_recording_stream_closes_inner_iterator_without_fabricating_comple
         effort="low",
         route="work",
         allow_tools=False,
-        omitted_references=(),
     )
     assert await anext(stream) == {"type": "text_delta", "text": "아직 끝나지 않은"}
     await stream.aclose()

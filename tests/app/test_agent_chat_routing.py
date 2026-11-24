@@ -22,7 +22,7 @@ def decision(route="work", effort="high"):
     }
 
 
-def selected_decision(*modules, relation="new", route="work", effort="high", omitted_references=()):
+def selected_decision(*modules, relation="new", route="work", effort="high"):
     result = decision(route, effort)
     result["answers"].extend(
         {
@@ -31,10 +31,6 @@ def selected_decision(*modules, relation="new", route="work", effort="high", omi
             "choice": "include" if module in modules else "omit",
         }
         for module in MODULES[1:]
-    )
-    result["answers"].extend(
-        {"name": f"reference_{name}", "type": "choice", "choice": "omit"}
-        for name in omitted_references
     )
     result["answers"].append({"name": "context_relation", "type": "choice", "choice": relation})
     return result
@@ -49,43 +45,11 @@ def test_independent_context_choices_allow_cross_area_tasks_without_a_two_module
 
 
 @pytest.mark.parametrize(
-    "kept_answers",
-    [
-        [],
-        [{"type": "choice", "choice": "include"}],
-        [{"type": "choice", "choice": "unclear"}],
-        [{"type": "choice"}],
-        [{"type": "choice", "choice": {"value": "omit"}}],
-        [{"type": "text", "choice": "omit"}],
-        [{"type": "refusal"}],
-        [{"type": "choice", "choice": "omit"}, {"type": "choice", "choice": "omit"}],
-    ],
-)
-def test_only_unambiguous_omit_choices_omit_references_in_canonical_order(kept_answers):
-    result = selected_decision("audio", omitted_references=("photo", "costs"))
-    result["answers"].extend({"name": "reference_setup", **answer} for answer in kept_answers)
-    result["answers"].append({"name": "unrelated", "type": "choice", "choice": "omit"})
-    extracted = extract_decision(result)
-    assert extracted.route == "work" and extracted.context_modules == ("core", "audio")
-    assert extracted.omitted_references == ("costs", "photo")
-
-
-@pytest.mark.parametrize("route", ["unclear", "social", "out_of_scope"])
-def test_non_work_routes_ignore_reference_choices(route):
-    result = selected_decision(route=route, omitted_references=("costs",))
-    extracted = extract_decision(result)
-    assert extracted.route == route
-    assert extracted.omitted_references == ()
-
-
-@pytest.mark.parametrize(
     "failure",
     ["missing", "duplicate", "invalid", "unclear", "refusal", "relation", "structured"],
 )
 def test_invalid_context_selection_keeps_valid_work_route_without_a_partial_subset(failure):
-    result = selected_decision(
-        "translation", "accounts", effort="medium", omitted_references=("photo",)
-    )
+    result = selected_decision("translation", "accounts", effort="medium")
     answer = next(item for item in result["answers"] if item["name"] == "context_audio")
     if failure == "missing":
         result["answers"].remove(answer)
@@ -94,15 +58,13 @@ def test_invalid_context_selection_keeps_valid_work_route_without_a_partial_subs
     elif failure == "refusal":
         answer["type"] = "refusal"
     elif failure == "relation":
-        relation = next(item for item in result["answers"] if item["name"] == "context_relation")
-        relation["choice"] = "unclear"
+        result["answers"][-1]["choice"] = "unclear"
     else:
         answer["choice"] = {"invalid": True} if failure == "structured" else failure
     extracted = extract_decision(result)
     assert extracted.route == "work" and extracted.effort == "medium"
     assert extracted.context_modules is None
     assert extracted.context_reason is not None
-    assert extracted.omitted_references == ()
 
 
 @pytest.mark.parametrize("route", ["work", "unclear", "social", "out_of_scope"])

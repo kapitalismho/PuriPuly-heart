@@ -1,4 +1,4 @@
-import { type Contract, type ReferenceName, contractFor, referenceNames } from './contracts';
+import { Contract, contractFor } from './contracts';
 import { isRecord } from './type-guards';
 
 export type RespondRequest = {
@@ -8,7 +8,6 @@ export type RespondRequest = {
   effort: 'low' | 'medium' | 'high';
   allow_tools: boolean;
   route: 'work' | 'social' | 'out_of_scope' | 'unclear';
-  omitted_references?: readonly ReferenceName[];
 };
 
 export type ClassifyRequest = {
@@ -85,21 +84,12 @@ export function isClassifyRequest(value: unknown): value is ClassifyRequest {
 }
 
 export function isRespondRequest(value: unknown): value is RespondRequest {
-  if (!isRecord(value) || !only(value, ['agent_protocol', 'turn_id', 'input', 'effort', 'route', 'allow_tools', 'omitted_references'])) return false;
+  if (!isRecord(value) || !only(value, ['agent_protocol', 'turn_id', 'input', 'effort', 'route', 'allow_tools'])) return false;
   const contract = contractFor(value.agent_protocol);
   if (!contract || typeof value.turn_id !== 'string' || !/^[0-9a-f]{32}$/.test(value.turn_id)
     || !effort(value.effort)
     || !['work', 'social', 'out_of_scope', 'unclear'].includes(value.route as string)
     || typeof value.allow_tools !== 'boolean' || !Array.isArray(value.input)) return false;
-  if (contract.selectReferences) {
-    const omitted = value.omitted_references;
-    if (!Array.isArray(omitted)) return false;
-    const seen = new Set<unknown>();
-    for (const name of omitted) {
-      if (!referenceNames.some((known) => known === name) || seen.has(name)) return false;
-      seen.add(name);
-    }
-  } else if ('omitted_references' in value) return false;
   const work = value.route === 'work' || value.route === 'unclear';
   let selectedEffort: RespondRequest['effort'] | undefined;
   for (const item of value.input) {

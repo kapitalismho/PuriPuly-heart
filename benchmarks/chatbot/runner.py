@@ -145,15 +145,12 @@ class RecordingTransport:
         started = monotonic()
         if self.started_monotonic is None:
             self.started_monotonic = started
-        request = deepcopy(arguments)
-        if "omitted_references" in request:
-            request["omitted_references"] = list(request["omitted_references"])
         record = {
             "id": len(self.calls) + 1,
             "turn": self.turn,
             "origin": self.origin,
             "method": "respond",
-            "request": request,
+            "request": deepcopy(arguments),
             "upstream_context_id": upstream_context_id("respond", arguments),
             "state_before": self.app.state(),
             "events": [],

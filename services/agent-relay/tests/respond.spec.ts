@@ -206,33 +206,6 @@ describe('authenticated agent relay', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(['work', 'unclear', 'social', 'out_of_scope'])('requires a unique list of known protocol eight reference names for %s', async (route) => {
-    const fetch = mockUpstream();
-    const work = route === 'work' || route === 'unclear';
-    const database = usageDatabase();
-    const env = { ...testEnv(), AGENT_USAGE_DB: database.db };
-    for (const omitted_references of [undefined, null, 'costs', { costs: true }, [7], [null], ['unknown'], ['costs', 'costs']]) {
-      const response = await relay.fetch(request({
-        ...body, agent_protocol: 8, route, omitted_references,
-        input: work ? body.input : [body.input[1]], effort: work ? 'high' : 'low',
-      }), env);
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: { code: 'invalid_request' } });
-    }
-    expect(database.admission).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it.each([6, 7])('rejects any omission field for protocol %i', async (agent_protocol) => {
-    const fetch = mockUpstream();
-    for (const omitted_references of [[], ['costs']]) {
-      const response = await relay.fetch(request({ ...body, agent_protocol, omitted_references }), env);
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ error: { code: 'invalid_request' } });
-    }
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
   it('rejects malformed or expanded configuration updates before admitting a prompt', async () => {
     const fetch = mockUpstream();
     const database = usageDatabase();
