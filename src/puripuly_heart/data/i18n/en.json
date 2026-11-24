@@ -100,7 +100,7 @@
   "settings.peer_auto_languages.title": "Language Auto-Detection Hint",
   "settings.peer_auto_languages.add": "Add language",
   "dashboard.peer_source.automatic": "Automatic detection",
-  "dashboard.peer_source.automatic.description": "For more accurate recognition, set a language detection hint on the Prompt page",
+  "dashboard.peer_source.automatic.description": "For more accurate recognition, set a language detection hint on the API tab",
   "settings.audio_host_api": "Audio Host API",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",

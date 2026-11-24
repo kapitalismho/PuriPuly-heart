@@ -100,7 +100,7 @@
   "settings.peer_auto_languages.title": "语言自动检测提示",
   "settings.peer_auto_languages.add": "添加语言",
   "dashboard.peer_source.automatic": "自动检测",
-  "dashboard.peer_source.automatic.description": "为了更准确识别，请在提示词页面设置语言检测提示",
+  "dashboard.peer_source.automatic.description": "为了更准确识别，请在 API 标签页设置语言检测提示",
   "settings.audio_host_api": "应用音频接口",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",

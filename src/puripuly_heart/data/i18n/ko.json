@@ -100,7 +100,7 @@
   "settings.peer_auto_languages.title": "언어 자동 감지 힌트",
   "settings.peer_auto_languages.add": "언어 추가",
   "dashboard.peer_source.automatic": "자동 감지",
-  "dashboard.peer_source.automatic.description": "정확한 인식을 위해 프롬프트 페이지에서 언어 감지 힌트를 설정해주세요",
+  "dashboard.peer_source.automatic.description": "정확한 인식을 위해 API 탭에서 언어 감지 힌트를 설정해주세요",
   "settings.audio_host_api": "오디오 호스트 API",
   "settings.audio_host_api.option.windows_mme": "MME",
   "settings.audio_host_api.option.windows_wasapi": "Windows WASAPI",
