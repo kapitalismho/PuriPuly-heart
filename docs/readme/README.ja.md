@@ -480,11 +480,9 @@ uv run --locked python scripts/ci/check_test_selection.py
 
 ## コントリビューター
 
-<a href="https://github.com/kapitalismho"><img src="https://github.com/kapitalismho.png?size=64" width="64" height="64" alt="kapitalismho" /></a>
-<a href="https://github.com/RICHARDwuxiaofei"><img src="https://github.com/RICHARDwuxiaofei.png?size=64" width="64" height="64" alt="RICHARDwuxiaofei" /></a>
-<a href="https://github.com/fzcfweasdferttgg-png"><img src="https://github.com/fzcfweasdferttgg-png.png?size=64" width="64" height="64" alt="fzcfweasdferttgg-png" /></a>
-<a href="https://github.com/garanshiro"><img src="https://github.com/garanshiro.png?size=64" width="64" height="64" alt="garanshiro" /></a>
-<a href="https://github.com/Nathan-Roll1"><img src="https://github.com/Nathan-Roll1.png?size=64" width="64" height="64" alt="Nathan Roll" /></a>
+<a href="https://github.com/kapitalismho/PuriPuly-heart/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kapitalismho/PuriPuly-heart" alt="Contributors" />
+</a>
 
 ---
 
