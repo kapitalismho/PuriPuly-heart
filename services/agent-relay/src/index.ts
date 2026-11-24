@@ -1,3 +1,4 @@
+import { createServicePage } from '../../service-page';
 import { authenticate, hasTokenSecret } from './auth';
 import { contracts, contractFor, supportedProtocols } from './contracts';
 import { classifierInstructions, outOfScopeInstructions, socialInstructions, workInstructions } from './instructions';
@@ -15,6 +16,11 @@ type Env = UsageEnv & SupportEnv & PhotoEnv & {
   PURI_TOKEN_SECRET?: string;
   AGENT_SERVICE_ENABLED?: string;
 };
+
+const rootPage = createServicePage(
+  'Agent Relay',
+  'Agent Relay sends requests from the Puri assistant to its model provider and streams replies back to the app. It also handles photo translation requests and support reports that users choose to send.',
+);
 
 const developerMessage = (text: string, breakpoint: Record<string, string> = { mode: 'explicit' }) => ({
   role: 'developer',
@@ -77,6 +83,8 @@ function capabilityError(body: unknown, status: number): boolean {
 export default {
   async fetch(request: Request, env: Env, context?: Pick<ExecutionContext, 'waitUntil'>): Promise<Response> {
     const url = new URL(request.url);
+    const page = rootPage(url, request.method);
+    if (page) return page;
     const classification = url.pathname === '/v1/classify';
     const support = url.pathname === '/v1/support';
     const photo = url.pathname === '/v1/photo';
