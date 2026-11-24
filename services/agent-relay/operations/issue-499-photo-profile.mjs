@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, createHmac } from 'node:crypto';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -12,11 +12,18 @@ import { convertV4MiniflareOptions, Miniflare, Response as LocalResponse } from 
 
 const relayRoot = fileURLToPath(new URL('../', import.meta.url));
 const root = path.resolve(relayRoot, '../..');
-const output = path.resolve(process.argv[2] ?? '');
+const fixtureDir = path.resolve(process.argv[2] ?? '');
 const batches = Number(process.argv[3] ?? 3);
 const count = Number(process.argv[4] ?? 24);
 assert(process.argv[2] && Number.isInteger(batches) && batches > 0 && Number.isInteger(count) && count > 0 && count <= 48,
   'Usage: node issue-499-photo-profile.mjs <fixture directory> [batches=3] [requests-per-cohort=24]');
+const output = path.join(fixtureDir, 'profile');
+try {
+  await mkdir(output);
+} catch (error) {
+  if (error.code !== 'EEXIST') throw error;
+  throw new Error(`Measurement directory already exists: ${output}. Use a fresh fixture directory.`, { cause: error });
+}
 
 const getJSON = async (filename) => JSON.parse(await readFile(filename, 'utf8'));
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
@@ -32,8 +39,8 @@ const tailDelayMs = 30;
 const cliTimeoutMs = 12000;
 const config = await getJSON(path.join(relayRoot, 'wrangler.jsonc'));
 const contract = await getJSON(path.join(relayRoot, 'src/photo-contract.json'));
-const fixture = await getJSON(path.join(output, 'app-fixture.json'));
-const prepared = await getJSON(path.join(output, 'app-request.json'));
+const fixture = await getJSON(path.join(fixtureDir, 'app-fixture.json'));
+const prepared = await getJSON(path.join(fixtureDir, 'app-request.json'));
 assert.equal(prepared.photo_protocol, 2);
 assert.equal(prepared.target_language, 'ko');
 assert.deepEqual(prepared.image_size, [1280, 720]);
@@ -398,22 +405,32 @@ try {
       assert(records.every((r) => r.outcome === (r.incomplete ? 'incomplete' : 'completed')), `Unexpected outcome: ${runName}`);
     }
   }
-  const replay = await probe('prepared', 1, subject('0-prepared'), false, true);
-  exclusions.push(replay);
-  assert.equal(replay.outcome, 'duplicate_rejected');
-  for (const [expected, image_base64] of [[400, boundary.slice(0, -1) + '!'], [413, boundary + 'A'.repeat(196608)]]) {
-    let status;
-    try {
-      const response = await initiate(JSON.stringify({ ...prepared, image_base64 }), subject(`reject-${expected}`));
-      status = response.status;
-      const body = await response.json();
-      exclusions.push({ status, error: body.error?.code });
-      assert.equal(status, expected);
-      assert.deepEqual(body, { error: { code: 'invalid_photo_request' } });
-    } catch (error) {
-      if (expected !== 413 || error.cause?.code !== 'ECONNRESET') throw error;
-      exclusions.push({ expected, status: status ?? null, transportError: 'ECONNRESET', errorBodyVerified: false });
+  try {
+    const replay = await probe('prepared', 1, subject('0-prepared'), false, true);
+    exclusions.push(replay);
+    assert.equal(replay.outcome, 'duplicate_rejected');
+    for (const [expected, image_base64] of [[400, boundary.slice(0, -1) + '!'], [413, boundary + 'A'.repeat(196608)]]) {
+      const rejection = { expected, status: null, errorBodyVerified: false };
+      exclusions.push(rejection);
+      try {
+        const response = await initiate(JSON.stringify({ ...prepared, image_base64 }), subject(`reject-${expected}`));
+        rejection.status = response.status;
+        assert.equal(rejection.status, expected);
+        const body = await response.json();
+        rejection.error = body?.error?.code;
+        assert.deepEqual(body, { error: { code: 'invalid_photo_request' } });
+        rejection.errorBodyVerified = true;
+      } catch (error) {
+        const transportError = error.cause?.code;
+        if (transportError) rejection.transportError = transportError;
+        if (expected !== 413 || rejection.status !== 413 || transportError !== 'ECONNRESET') {
+          rejection.failure = error.code ?? error.name;
+          throw error;
+        }
+      }
     }
+  } finally {
+    await save('exclusions.json', exclusions);
   }
   const { results: [row] } = await db.prepare(`SELECT COUNT(*) AS admissions, SUM(settled) AS settled,
     SUM(missing_usage) AS missing, SUM(output_tokens) AS outputTokens, SUM(requested_at IS NOT NULL) AS timestamped

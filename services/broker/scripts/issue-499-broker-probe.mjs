@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHmac, generateKeyPairSync, randomBytes, randomUUID, sign, timingSafeEqual } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -17,6 +18,50 @@ const expectedErrors = new Map([
   ['bad-signature', [401, 'puri_proof_invalid']], ['replay', [401, 'puri_proof_invalid']],
   ['binding-mismatch', [409, 'installation_binding_mismatch']], ['installation-limit', [429, 'installation_rate_limited']],
 ]);
+const d1Fields = ['calls', 'waitMs', 'statements', 'meteredStatements', 'sqlMs'];
+
+function numbers(value, fields) {
+  return Object.fromEntries(fields.map((field) => [field, Number.isFinite(value?.[field]) ? value[field] : null]));
+}
+
+async function readJournal(path) {
+  let text;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch (error) {
+    return { samples: [], stage: 'setup', journalIncomplete: error.code !== 'ENOENT' };
+  }
+  const lines = text.split('\n');
+  let journalIncomplete = lines.pop() !== '';
+  const samples = [];
+  let stage = 'setup';
+  let brokerMigrations, elapsedMs, state;
+  for (const line of lines) {
+    let entry;
+    try { entry = JSON.parse(line); }
+    catch { journalIncomplete = true; break; }
+    if (entry.event === 'start') {
+      samples.push({ attempt: entry.attempt, kind: entry.kind, status: null, outcome: 'interrupted', matched: null, elapsedMs: null });
+    } else if (entry.event === 'finish' && samples.at(-1)?.attempt === entry.sample.attempt) {
+      samples[samples.length - 1] = entry.sample;
+    } else if (entry.event === 'workload') {
+      stage = 'workload';
+      brokerMigrations = entry.brokerMigrations;
+    } else if (entry.event === 'shutdown') {
+      stage = 'shutdown';
+      elapsedMs = entry.elapsedMs;
+    } else if (entry.event === 'snapshot') {
+      stage = 'snapshot';
+    } else if (entry.event === 'done') {
+      stage = 'done';
+      state = entry.state;
+    } else {
+      journalIncomplete = true;
+      break;
+    }
+  }
+  return { samples, stage, brokerMigrations, elapsedMs, state, journalIncomplete };
+}
 
 function check(condition, message) {
   if (!condition) throw new Error(message);
@@ -85,31 +130,39 @@ function validToken(payload, id, secrets, receivedAt) {
   }
 }
 
-async function workload(port, cohort, secrets, timed) {
-  const samples = [];
+async function workload(port, cohort, secrets, timed, record) {
+  let attempts = 0;
   const origin = `http://127.0.0.1:${port}`;
   const submit = async (kind, identity, body = proof(identity)) => {
+    const attempt = ++attempts;
+    record({ event: 'start', attempt, kind });
+    const signal = AbortSignal.timeout(4000);
     const start = performance.now();
     let status, subcode, d1, matched, elapsedMs;
+    let outcome = 'transport-error';
     try {
-      const response = await fetch(origin + endpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(4000),
+      const response = await fetch(origin + endpoint, { method: 'POST', redirect: 'error', signal,
         headers: { 'content-type': 'application/json', 'cf-connecting-ip': '192.0.2.10' }, body });
       status = response.status;
       const bytes = await response.text();
       elapsedMs = performance.now() - start;
+      outcome = 'completed';
       const payload = JSON.parse(bytes);
       const observation = response.headers.get('x-issue-499-d1');
-      d1 = observation ? JSON.parse(observation) : undefined;
+      if (observation) d1 = numbers(JSON.parse(observation), d1Fields);
       const expected = expectedErrors.get(kind);
       subcode = [...expectedErrors.values()].some(([, value]) => value === payload.error?.subcode) ? payload.error.subcode : undefined;
-      matched = response.headers.get('cache-control') === 'no-store' && (timed === Boolean(d1)) && (expected
+      const timingMatched = timed ? d1 && Object.values(d1).every(Number.isFinite) : observation === null;
+      matched = Boolean(timingMatched) && response.headers.get('cache-control') === 'no-store' && (expected
         ? status === expected[0] && subcode === expected[1] && !Object.hasOwn(payload, 'access_token')
           && (status !== 429 || Number.isFinite(payload.error.retry_after_ms) && payload.error.retry_after_ms > 0)
         : status === 200 && validToken(payload, identity.id, secrets, Date.now()));
     } catch {
+      if (outcome !== 'completed' && signal.aborted) outcome = 'timed-out';
       matched = false;
     }
-    samples.push({ kind, status: status ?? null, subcode, matched, elapsedMs: +(elapsedMs ?? performance.now() - start).toFixed(3), d1 });
+    record({ event: 'finish', sample: { attempt, kind, status: status ?? null, outcome, subcode, matched,
+      elapsedMs: +(elapsedMs ?? performance.now() - start).toFixed(3), d1 } });
     return body;
   };
   const started = performance.now();
@@ -130,10 +183,11 @@ async function workload(port, cohort, secrets, timed) {
     await submit('installation-limit', cohort[12]);
   }
   await submit('recovery', cohort[0]);
-  return { elapsedMs: +(performance.now() - started).toFixed(3), samples };
+  return +(performance.now() - started).toFixed(3);
 }
 
-async function runLocal(root, timed) {
+async function runLocal(root, timed, journal) {
+  const record = (entry) => appendFileSync(journal, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
   const secrets = Object.fromEntries(['PURI_TOKEN_SECRET', 'PURI_IDENTITY_HMAC_SECRET', 'NETWORK_IDENTITY_HMAC_SECRET']
     .map((name) => [name, randomBytes(32).toString('hex')]));
   const { version } = require('wrangler/package.json');
@@ -157,28 +211,29 @@ async function runLocal(root, timed) {
   const worker = await unstable_dev(main, { config, ip: '127.0.0.1', port: 0,
     inspectorPort: 0, local: true, persistTo: state, logLevel: 'error',
     experimental: { disableExperimentalWarning: true, disableDevRegistry: true, forceLocal: true, enableContainers: false } });
-  let result;
   try {
     check(worker.address === '127.0.0.1' && worker.port > 0, 'Worker did not bind a private loopback listener');
-    result = { timed, brokerMigrations, ...await workload(worker.port, cohort, secrets, timed) };
+    record({ event: 'workload', brokerMigrations });
+    const elapsedMs = await workload(worker.port, cohort, secrets, timed, record);
+    record({ event: 'shutdown', elapsedMs });
   } finally {
     await worker.stop();
   }
+  record({ event: 'snapshot' });
   const snapshot = 'SELECT (SELECT count(*) FROM installations) AS installations, ' +
     '(SELECT count(*) FROM installations WHERE puri_bound_at IS NOT NULL) AS bound, ' +
     '(SELECT count(*) FROM puri_enrollment_admissions) AS enrollments, (SELECT count(*) FROM puri_proof_nonces) AS nonces, ' +
     "(SELECT sum(request_count) FROM puri_token_rate_limits WHERE policy='ip_flood') AS flood, " +
     "(SELECT sum(request_count) FROM puri_token_rate_limits WHERE policy='installation') AS installation";
-  result.state = JSON.parse(d1(['execute'], 'BROKER_DB', '--command', snapshot, '--json'))[0].results[0];
-  result.passed = result.samples.length === 80 && result.samples.every(({ matched }) => matched) &&
-    Object.entries(expectedState).every(([name, value]) => result.state[name] === value);
-  return result;
+  const row = JSON.parse(d1(['execute'], 'BROKER_DB', '--command', snapshot, '--json'))[0]?.results?.[0];
+  check(row, 'D1 snapshot returned no row');
+  record({ event: 'done', state: numbers(row, Object.keys(expectedState)) });
 }
 
 const args = process.argv.slice(2);
+const journalName = 'attempts.jsonl';
 if (args[0] === '--isolated-child' && process.env.ISSUE_499_LOCAL_ROOT === process.cwd()) {
-  const result = await runLocal(process.cwd(), args[1] === '--d1-timing');
-  console.log(`ISSUE_499_RESULT ${JSON.stringify(result)}`);
+  await runLocal(process.cwd(), args[1] === '--d1-timing', join(process.cwd(), journalName));
 } else {
   check(args.length === 0 || args.length === 1 && args[0] === '--d1-timing', 'Usage: node issue-499-broker-probe.mjs [--d1-timing]');
   const root = await mkdtemp(join(tmpdir(), 'issue-499-broker-'));
@@ -187,19 +242,34 @@ if (args[0] === '--isolated-child' && process.env.ISSUE_499_LOCAL_ROOT === proce
     TMP: root, TEMP: root, TMPDIR: root, CI: 'true', WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(root, 'wrangler.log'),
     CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', ISSUE_499_LOCAL_ROOT: root });
   const started = performance.now();
-  let result;
+  let report;
+  let runnerFailure = null;
+  let cleanupFailure;
   try {
     const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--isolated-child', ...args], {
       cwd: root, env, encoding: 'utf8', timeout: 120_000, maxBuffer: 2_000_000,
     });
-    check(child.status === 0, `Isolated runner failed (${child.error?.code ?? child.signal ?? child.status}): ${
-      child.stderr?.match(/^Error: (.+ failed \([A-Z0-9_-]+\))$/m)?.[1] ?? 'no sanitized stage error'}`);
-    const line = child.stdout.split(/\r?\n/).find((entry) => entry.startsWith('ISSUE_499_RESULT '));
-    check(line, 'Isolated runner produced no sanitized result');
-    result = JSON.parse(line.slice('ISSUE_499_RESULT '.length));
+    if (child.status !== 0) runnerFailure = child.error?.code ?? child.signal ?? `exit-${child.status}`;
+    report = await readJournal(join(root, journalName));
   } finally {
-    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    try { await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
+    catch (error) { cleanupFailure = error.code ?? 'unknown'; }
   }
-  console.log(JSON.stringify({ ...result, cleanup: 'stopped and removed private local state', totalMs: +(performance.now() - started).toFixed(3) }));
-  if (!result.passed) process.exitCode = 1;
+  if (report.stage !== 'done') runnerFailure ??= 'missing-final-snapshot';
+  const workerStopped = report.stage === 'snapshot' || report.stage === 'done';
+  const cleanup = cleanupFailure ? `private local state removal failed (${cleanupFailure})`
+    : workerStopped ? 'stopped and removed private local state' : 'removed private local state; Worker shutdown unconfirmed';
+  const counts = { planned: 80, attempted: report.samples.length, completed: 0, timedOut: 0, transportErrors: 0, interrupted: 0 };
+  for (const sample of report.samples) {
+    if (sample.outcome === 'completed') counts.completed++;
+    else if (sample.outcome === 'timed-out') counts.timedOut++;
+    else if (sample.outcome === 'transport-error') counts.transportErrors++;
+    else counts.interrupted++;
+  }
+  const passed = !runnerFailure && !report.journalIncomplete && !cleanupFailure &&
+    counts.attempted === counts.planned && report.samples.every(({ matched }) => matched) &&
+    Object.entries(expectedState).every(([name, value]) => report.state[name] === value);
+  console.log(JSON.stringify({ timed: args.length === 1, ...report, counts, runnerFailure, passed, cleanup,
+    totalMs: +(performance.now() - started).toFixed(3) }));
+  if (!passed) process.exitCode = 1;
 }
