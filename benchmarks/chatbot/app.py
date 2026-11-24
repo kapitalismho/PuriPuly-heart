@@ -1707,6 +1707,13 @@ class ScenarioApp:
                     output_delivery="not_exercised",
                     display="not_exercised",
                 )
+                if self.translation_ready() and self.translation_times_out():
+                    self.add_diagnostic("provider.timeout", "timeout", channel)
+                    receipt.update(
+                        error={"code": "translation_probe_failed"},
+                        failure_category="timeout",
+                        diagnostic_id=self.diagnostics[-1]["diagnostic_id"],
+                    )
         else:
             receipt.update(status="rejected", error={"code": "unsupported_command"})
         for diagnostic in self.diagnostics[diagnostic_start:]:
@@ -2162,6 +2169,33 @@ class ScenarioApp:
             and provider in self.verified
         )
 
+    @staticmethod
+    def visible_confirmation(card: dict | None) -> dict | None:
+        if not isinstance(card, dict):
+            return deepcopy(card)
+        visible = deepcopy(card)
+        presentation = visible.get("presentation")
+        if isinstance(presentation, dict):
+            changes = visible.get("changes") or {}
+            shown = {}
+            for field, meta in presentation.items():
+                if not isinstance(meta, dict):
+                    continue
+                item = {key: meta[key] for key in ("label", "section") if key in meta}
+                choices = meta.get("choices")
+                if field in changes and isinstance(choices, list):
+                    item["value_label"] = next(
+                        (
+                            choice.get("label")
+                            for choice in choices
+                            if isinstance(choice, dict) and choice.get("value") == changes[field]
+                        ),
+                        None,
+                    )
+                shown[field] = item
+            visible["presentation"] = shown
+        return visible
+
     def visible(self, snapshot) -> dict:
         observations = {channel: self.current_observations(channel) for channel in ("self", "peer")}
         screen = {
@@ -2259,7 +2293,7 @@ class ScenarioApp:
                     else not self.recognition_ready(item["channel"])
                 )
             ],
-            "confirmation": deepcopy(snapshot.confirmation),
+            "confirmation": self.visible_confirmation(snapshot.confirmation),
             "report_buttons": [
                 {"id": offer.id, "status": offer.status, "ticket": offer.ticket}
                 for offer in snapshot.report_offers

@@ -974,6 +974,67 @@ async def test_secret_safety_guidance_does_not_fail_a_resolved_owner_dialogue(re
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    ("reply", "stray"),
+    [
+        ("키 값은 채팅에 쓰지 말고 그 입력칸에만 넣어줘.", False),
+        ("키 값은 채팅에 쓰지 말고 այնտեղ 입력칸에만 넣어줘.", True),
+    ],
+)
+async def test_a_reply_in_a_script_the_user_never_used_fails_the_run(reply, stray):
+    result = await run_attempt(
+        scenario("fixture-first-run"),
+        ControlledModels(),
+        scripted_relay([answer(reply)], []),
+        identity="stray-script",
+        controlled=True,
+    )
+    assert result["code"]["accepted_state"]
+    assert result["code"]["prohibitions"]["stray_script_in_reply"] is stray
+    assert result["status"] == ("failed" if stray else "passed")
+
+
+def test_simulated_user_sees_card_values_but_not_catalog_availability():
+    card = {
+        "id": "card-1",
+        "revision": 1,
+        "changes": {"audio.input_host_api": "MME", "audio.input_device": "Headset Microphone"},
+        "effects": ["This change may interrupt self recognition."],
+        "presentation": {
+            "audio.input_host_api": {
+                "label": "오디오 호스트 API",
+                "section": "일반",
+                "choices": [{"value": "MME", "label": "MME", "available": True}],
+            },
+            "audio.input_device": {
+                "label": "내 마이크 오디오",
+                "section": "일반",
+                "choices": [
+                    {
+                        "value": "Headset Microphone",
+                        "label": "Headset Microphone",
+                        "host_api": "MME",
+                        "available": False,
+                    }
+                ],
+            },
+        },
+    }
+    shown = ScenarioApp.visible_confirmation(card)
+    assert shown["presentation"] == {
+        "audio.input_host_api": {"label": "오디오 호스트 API", "section": "일반", "value_label": "MME"},
+        "audio.input_device": {
+            "label": "내 마이크 오디오",
+            "section": "일반",
+            "value_label": "Headset Microphone",
+        },
+    }
+    assert {key: shown[key] for key in ("id", "revision", "changes", "effects")} == {
+        key: card[key] for key in ("id", "revision", "changes", "effects")
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     ("targets", "expected_capture", "expected_translation", "expected_result"),
     [
         (["self_capture"], {"self": True, "peer": False}, False, "failed"),
@@ -2511,6 +2572,7 @@ async def test_openrouter_model_timeout_is_route_scoped_and_reuses_verified_acco
     try:
         probe = await tools.execute("probe_app", {"target": "translation.self"})
         assert probe["receipt"]["translation_result"] == "failed"
+        assert probe["receipt"]["failure_category"] == "timeout"
         assert not app.resolved()
         app.capture_active["self"] = False
         changed = await approved_tool_change(
