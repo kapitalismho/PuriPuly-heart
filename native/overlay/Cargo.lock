@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "puripuly-heart-overlay"
-version = "2.11.3"
+version = "2.12.0"
 dependencies = [
  "crossbeam-channel",
  "embed-resource",
