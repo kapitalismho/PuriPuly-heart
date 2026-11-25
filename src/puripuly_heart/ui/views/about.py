@@ -72,25 +72,55 @@ SPECIAL_THANKS_COLUMNS = 3
 # Special thanks entries - add new people here, update locale bundles,
 # and place the avatar in data/pictures/special_thanks/
 SPECIAL_THANKS_ENTRIES: tuple[SpecialThanksEntry, ...] = (
-    SpecialThanksEntry("about.special_thanks.name.sui_32c", "sui_32c.png"),
-    SpecialThanksEntry("about.special_thanks.name.nagikokoro", "nagikokoro.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.sui_32c",
+        "sui_32c.png",
+        "https://x.com/SUI32C",
+    ),
+    SpecialThanksEntry(
+        "about.special_thanks.name.nagikokoro",
+        "nagikokoro.png",
+        "https://github.com/RICHARDwuxiaofei",
+    ),
     SpecialThanksEntry("about.special_thanks.name.motoka96", "motoka96.png"),
     SpecialThanksEntry("about.special_thanks.name.ykol", "ykol.png"),
     SpecialThanksEntry("about.special_thanks.name.kascr", "kascr.png"),
     SpecialThanksEntry("about.special_thanks.name.just_monika_v", "just_monika_v.png"),
     SpecialThanksEntry("about.special_thanks.name.fluvia", "fluvia.png"),
     SpecialThanksEntry("about.special_thanks.name.han_chole", "han_chole.png"),
-    SpecialThanksEntry("about.special_thanks.name.ea_pe", "ea_pe.png"),
-    SpecialThanksEntry("about.special_thanks.name.ephedrine", "ephedrine.png"),
-    SpecialThanksEntry("about.special_thanks.name.eri", "eri.png"),
     SpecialThanksEntry(
-        "about.special_thanks.name.fzcfweasdferttgg_png", "fzcfweasdferttgg_png.png"
+        "about.special_thanks.name.ea_pe",
+        "ea_pe.png",
+        "https://discord.com/users/859837257917136918",
     ),
-    SpecialThanksEntry("about.special_thanks.name.welcius", "welcius.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.ephedrine",
+        "ephedrine.png",
+        "https://x.com/NUN1EL",
+    ),
+    SpecialThanksEntry(
+        "about.special_thanks.name.eri",
+        "eri.png",
+        "https://x.com/39eri_vr",
+    ),
+    SpecialThanksEntry(
+        "about.special_thanks.name.fzcfweasdferttgg_png",
+        "fzcfweasdferttgg_png.png",
+        "https://github.com/fzcfweasdferttgg-png",
+    ),
+    SpecialThanksEntry(
+        "about.special_thanks.name.welcius",
+        "welcius.png",
+        "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57",
+    ),
     SpecialThanksEntry("about.special_thanks.name.nunu299", "nunu299.png"),
     SpecialThanksEntry("about.special_thanks.name.tsuyu_shiro", "tsuyu_shiro.png"),
     SpecialThanksEntry("about.special_thanks.name.garanshiro", "garanshiro.png"),
-    SpecialThanksEntry("about.special_thanks.name.koz39", "koz39.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.koz39",
+        "koz39.png",
+        "https://github.com/KOZ39",
+    ),
 )
 
 

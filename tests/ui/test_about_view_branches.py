@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import struct
 import types
 from pathlib import Path
 
@@ -90,6 +91,14 @@ def test_about_view_link_actions_handle_missing_page_gracefully(
     assert "https://github.com/misyaguziya/VRCT" in opened
     assert "https://github.com/naeruru/mimiuchi" in opened
     assert "https://github.com/febilly/Yakutan" in opened
+    assert "https://x.com/SUI32C" in opened
+    assert "https://github.com/RICHARDwuxiaofei" in opened
+    assert "https://discord.com/users/859837257917136918" in opened
+    assert "https://x.com/NUN1EL" in opened
+    assert "https://x.com/39eri_vr" in opened
+    assert "https://github.com/fzcfweasdferttgg-png" in opened
+    assert "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57" in opened
+    assert "https://github.com/KOZ39" in opened
 
 
 def test_about_view_special_thanks_names_render_from_i18n(
@@ -295,6 +304,70 @@ def test_about_view_special_thanks_avatar_uses_bundled_image_or_initial(
     assert avatar_of(with_image).src == "C:/avatars/with.png"
     assert isinstance(avatar_of(without_image), ft.Text)
     assert avatar_of(without_image).value == "E"
+
+
+def test_about_view_special_thanks_bundled_entries_use_avatars_and_https_links(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr(about_module, "_get_profile_image_path", lambda: "")
+    monkeypatch.setattr(about_module, "_load_third_party_notices", lambda: "licenses")
+    monkeypatch.setattr(about_module.webbrowser, "open", lambda url: opened.append(url))
+
+    expected_bundled = {
+        "SUI_32C": ("sui_32c.png", "https://x.com/SUI32C"),
+        "Nagikokoro": ("nagikokoro.png", "https://github.com/RICHARDwuxiaofei"),
+        "Han โชเล่ย์": ("han_chole.png", None),
+        "EA_PE": ("ea_pe.png", "https://discord.com/users/859837257917136918"),
+        "Ephedrine": ("ephedrine.png", "https://x.com/NUN1EL"),
+        "~ eri ~": ("eri.png", "https://x.com/39eri_vr"),
+        "fzcfweasdferttgg-png": (
+            "fzcfweasdferttgg_png.png",
+            "https://github.com/fzcfweasdferttgg-png",
+        ),
+        "Welcius": (
+            "welcius.png",
+            "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57",
+        ),
+        "KOZ39": ("koz39.png", "https://github.com/KOZ39"),
+    }
+
+    view = AboutView()
+    people_by_name = {person.data.value: person for person in _special_thanks_people(view)}
+
+    for display_name, (image_file, expected_url) in expected_bundled.items():
+        person = people_by_name[display_name]
+        avatar = person.content.controls[0].content
+        assert isinstance(avatar, ft.Image)
+        assert Path(avatar.src) == SOURCE_ROOT / "data" / "pictures" / "special_thanks" / image_file
+        assert Path(avatar.src).is_file()
+
+        opened.clear()
+        handlers = _collect_click_handlers(person)
+        if expected_url is None:
+            assert handlers == []
+        else:
+            assert expected_url.startswith("https://")
+            assert len(handlers) == 1
+            handlers[0](None)
+            assert opened == [expected_url]
+
+
+def test_special_thanks_bundled_avatars_are_pngs_within_size_limit() -> None:
+    avatar_dir = SOURCE_ROOT / "data" / "pictures" / "special_thanks"
+    bundled = sorted(path for path in avatar_dir.iterdir() if path.is_file())
+    known_files = {entry.image_file for entry in about_module.SPECIAL_THANKS_ENTRIES}
+
+    assert bundled
+    for path in bundled:
+        assert path.suffix == ".png"
+        assert path.name in known_files
+        header = path.read_bytes()[:24]
+        assert header[:8] == b"\x89PNG\r\n\x1a\n"
+        assert header[12:16] == b"IHDR"
+        width, height = struct.unpack(">II", header[16:24])
+        assert 0 < width <= 256
+        assert 0 < height <= 256
 
 
 def test_special_thanks_image_path_requires_a_bundled_file(
