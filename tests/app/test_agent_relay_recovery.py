@@ -90,14 +90,25 @@ async def test_transient_authentication_retries_once_with_fresh_proof(failure):
         ),
         (
             409,
-            {"code": "invalid_request", "class": "security_fail", "subcode": "installation_binding_mismatch"},
+            {
+                "code": "invalid_request",
+                "class": "security_fail",
+                "subcode": "installation_binding_mismatch",
+            },
             "service_authentication_failed",
             1,
         ),
-        (503, {"code": "internal_error", "class": "retryable"}, "service_authentication_unavailable", 2),
+        (
+            503,
+            {"code": "internal_error", "class": "retryable"},
+            "service_authentication_unavailable",
+            2,
+        ),
     ],
 )
-async def test_authentication_rejection_and_unavailability_are_distinct(status, error, expected, attempts):
+async def test_authentication_rejection_and_unavailability_are_distinct(
+    status, error, expected, attempts
+):
     requests = []
 
     def issue(request):
@@ -109,7 +120,9 @@ async def test_authentication_rejection_and_unavailability_are_distinct(status, 
         with pytest.raises(AgentServiceError, match=expected) as caught:
             await owner.get_token()
         assert caught.value.evidence.status_code == status
-        assert caught.value.evidence.category == ("auth" if status != 503 else "service_unavailable")
+        assert caught.value.evidence.category == (
+            "auth" if status != 503 else "service_unavailable"
+        )
         assert len(requests) == attempts
     finally:
         await owner.close()
@@ -124,7 +137,14 @@ async def test_authentication_rate_limit_blocks_new_requests_until_server_cooldo
         requests.append(request)
         if len(requests) == 1:
             return httpx.Response(
-                429, json={"error": {"code": "rate_limited", "class": "retryable", "retry_after_ms": 30_000}}
+                429,
+                json={
+                    "error": {
+                        "code": "rate_limited",
+                        "class": "retryable",
+                        "retry_after_ms": 30_000,
+                    }
+                },
             )
         return token_response()
 

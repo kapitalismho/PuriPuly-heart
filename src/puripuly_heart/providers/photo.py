@@ -118,7 +118,7 @@ def first_party_photo_http_error(
     if shape == "unknown" and response_media_type(response) == "application/json":
         try:
             payload = json.loads(body)
-        except (ValueError, RecursionError):
+        except ValueError, RecursionError:
             shape = "non_json"
         else:
             envelope = payload.get("error") if isinstance(payload, dict) else None
@@ -717,9 +717,8 @@ class OpenAIPhotoConnection(_PhotoConnection):
                         if error.code == "photo_authentication_failed" and self._invalidate:
                             self._invalidate(self._api_key)
                         raise error
-                    if (
-                        response_media_type(response) != "text/event-stream"
-                        or (self._relayed and "response_shape" in response_evidence(response))
+                    if response_media_type(response) != "text/event-stream" or (
+                        self._relayed and "response_shape" in response_evidence(response)
                     ):
                         if self._relayed:
                             raise first_party_photo_http_error(

@@ -45,8 +45,7 @@ def sse(event: dict) -> bytes:
 def reply(writer, body: bytes, content_type: str, *, status=200, size=None, headers=""):
     writer.write(
         f"HTTP/1.1 {status} Test\r\nContent-Type: {content_type}\r\n"
-        f"Content-Length: {len(body) if size is None else size}\r\n{headers}\r\n".encode()
-        + body
+        f"Content-Length: {len(body) if size is None else size}\r\n{headers}\r\n".encode() + body
     )
 
 
@@ -65,13 +64,16 @@ async def service(respond, *, tls=None, local_host="127.0.0.1"):
                 request, *headers = raw.decode("ascii").strip().split("\r\n")
                 method, path, _ = request.split(" ")
                 assert method == "POST"
-                headers = {name.lower(): value.lstrip() for name, value in (h.split(":", 1) for h in headers)}
+                headers = {
+                    name.lower(): value.lstrip()
+                    for name, value in (h.split(":", 1) for h in headers)
+                }
                 body = await reader.readexactly(int(headers["content-length"]))
                 requests.append((path, headers, body))
                 if respond(path, writer) is False:
                     return
                 await writer.drain()
-        except (ConnectionError, asyncio.IncompleteReadError):
+        except ConnectionError, asyncio.IncompleteReadError:
             pass
         finally:
             writer.close()
@@ -126,7 +128,9 @@ async def test_agent_clients_send_through_shared_tls_and_proxy_policy_and_close(
                 case "env":
                     monkeypatch.setenv("HTTPS_PROXY", proxy)
                 case "system":
-                    monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({"https": proxy}, ""))
+                    monkeypatch.setattr(
+                        external_network, "_windows_proxy_settings", lambda: ({"https": proxy}, "")
+                    )
                 case "bypass":
                     monkeypatch.setenv("HTTPS_PROXY", proxy)
                     monkeypatch.setenv("NO_PROXY", "localhost")
@@ -137,9 +141,18 @@ async def test_agent_clients_send_through_shared_tls_and_proxy_policy_and_close(
                 assert await auth.get_token() == PRIVATE
                 assert await relay.classify(input=[], turn_id=TURN["turn_id"]) == {"answers": []}
                 assert [event["type"] async for event in relay.respond(**TURN)] == ["completed"]
-                assert [path for path, _, _ in requests] == ["/v1/puri/token", "/v1/classify", "/v1/respond"]
-                assert all(headers["user-agent"] == first_party_user_agent() for _, headers, _ in requests)
-                assert all(headers["authorization"] == f"Bearer {PRIVATE}" for _, headers, _ in requests[1:])
+                assert [path for path, _, _ in requests] == [
+                    "/v1/puri/token",
+                    "/v1/classify",
+                    "/v1/respond",
+                ]
+                assert all(
+                    headers["user-agent"] == first_party_user_agent() for _, headers, _ in requests
+                )
+                assert all(
+                    headers["authorization"] == f"Bearer {PRIVATE}"
+                    for _, headers, _ in requests[1:]
+                )
                 proof = json.loads(requests[0][2])
                 assert proof["signature_alg"] == "ed25519"
                 assert len(disconnected) == 2 and not any(event.is_set() for event in disconnected)
@@ -200,14 +213,18 @@ async def test_source_loopback_is_direct_but_https_uses_proxy_in_same_session(
         https_relay = AgentRelayTransport(https + "/v1/respond", auth, allow_loopback_http=True)
         try:
             async with asyncio.timeout(5):
-                assert [event["type"] async for event in local_relay.respond(**TURN)] == ["completed"]
+                assert [event["type"] async for event in local_relay.respond(**TURN)] == [
+                    "completed"
+                ]
                 assert [path for path, _, _ in local_requests] == ["/v1/puri/token", "/v1/respond"]
                 assert local_requests[-1][1]["authorization"] == f"Bearer {local_token}"
                 assert forwarded == []
 
                 broker_origin = https
                 auth.invalidate(local_token)
-                assert [event["type"] async for event in https_relay.respond(**TURN)] == ["completed"]
+                assert [event["type"] async for event in https_relay.respond(**TURN)] == [
+                    "completed"
+                ]
                 assert [path for path, _, _ in https_requests] == ["/v1/puri/token", "/v1/respond"]
                 assert https_requests[-1][1]["authorization"] == f"Bearer {https_token}"
                 expected_proxy = [("CONNECT", https.removeprefix("https://"))] * 2
@@ -278,7 +295,9 @@ async def test_agent_response_read_failure_is_sanitized_and_never_replayed(opera
                     async with aclosing(relay.respond(**TURN)) as stream:
                         assert await anext(stream) == {"type": "text_delta", "text": PRIVATE}
                         await anext(stream)
-            assert caught.value.code == ("stream_interrupted" if operation == "relay_response" else "relay_unavailable")
+            assert caught.value.code == (
+                "stream_interrupted" if operation == "relay_response" else "relay_unavailable"
+            )
             assert caught.value.evidence.status_code == 200
             fields = caught.value.evidence.fields
             assert fields["stage"] == "response_body"
@@ -323,7 +342,9 @@ async def test_agent_closes_held_token_read_and_cancelled_stream_without_replay(
                 async with aclosing(relay.respond(**TURN)) as stream:
                     assert (await anext(stream))["type"] == "text_delta"
                 await disconnected[1].wait()
-                assert [event["type"] async for event in relay.respond(**{**TURN, "turn_id": "b" * 32})] == ["completed"]
+                assert [
+                    event["type"] async for event in relay.respond(**{**TURN, "turn_id": "b" * 32})
+                ] == ["completed"]
                 assert paths == ["/v1/puri/token", "/v1/respond", "/v1/respond"]
         finally:
             await auth.close()
@@ -349,7 +370,9 @@ async def test_real_proxy_denial_reaches_app_diagnostics_without_proxy_content(m
     port = proxy.sockets[0].getsockname()[1]
     monkeypatch.setenv("HTTPS_PROXY", f"http://synthetic:{PRIVATE}@127.0.0.1:{port}")
     caplog.set_level(logging.DEBUG)
-    owner = AgentChatOwner(Records(), relay_at("https://localhost", auth_at("https://localhost")), localize=str)
+    owner = AgentChatOwner(
+        Records(), relay_at("https://localhost", auth_at("https://localhost")), localize=str
+    )
     try:
         await owner.start()
         async with asyncio.timeout(5):
@@ -363,7 +386,13 @@ async def test_real_proxy_denial_reaches_app_diagnostics_without_proxy_content(m
         assert evidence["fields"]["proxy_source"] == "env"
         assert evidence["fields"]["agent_endpoint"] == "broker_token"
         (record,) = [r for r in caplog.records if hasattr(r, DIAGNOSTIC_RECORD_ATTRIBUTE)]
-        assert getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE) == (result.diagnostics, "error", "failed", None, None)
+        assert getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE) == (
+            result.diagnostics,
+            "error",
+            "failed",
+            None,
+            None,
+        )
         assert PRIVATE not in caplog.text and PRIVATE not in json.dumps(evidence)
         assert not any(r.name.startswith(("httpx", "httpcore")) for r in caplog.records)
     finally:
@@ -399,7 +428,14 @@ async def test_broker_non_json_429_keeps_cooldown_and_response_evidence(
         if path == "/v1/puri/token":
             issued += 1
             if issued == 1:
-                reply(writer, body, media_type, status=429, headers=headers, size=100 if held else None)
+                reply(
+                    writer,
+                    body,
+                    media_type,
+                    status=429,
+                    headers=headers,
+                    size=100 if held else None,
+                )
             else:
                 reply(writer, token_response(PRIVATE).content, "application/json")
         elif path == "/v1/classify":
@@ -473,7 +509,9 @@ async def test_broker_non_json_429_keeps_cooldown_and_response_evidence(
         (
             403,
             "application/json",
-            json.dumps({"error": {"code": "service_authentication_failed", "message": PRIVATE}}).encode(),
+            json.dumps(
+                {"error": {"code": "service_authentication_failed", "message": PRIVATE}}
+            ).encode(),
             "CF-Ray: 0123456789abcdef-ICN\r\n",
             "public_error_envelope",
             "unexpected_response",
@@ -492,7 +530,11 @@ async def test_unknown_rejection_and_edge_evidence_reach_app_without_reset_or_re
         if path == target and not rejected:
             rejected = True
             reply(
-                writer, body, media_type, status=status, headers=headers,
+                writer,
+                body,
+                media_type,
+                status=status,
+                headers=headers,
                 size=100 if shape == "edge_challenge" else None,
             )
         elif path == "/v1/puri/token":
@@ -525,9 +567,11 @@ async def test_unknown_rejection_and_edge_evidence_reach_app_without_reset_or_re
             assert evidence["fields"].get("response_shape") == shape
             assert evidence["fields"]["agent_endpoint"] == endpoint
             assert evidence["fields"].get("cf_ray") == (
-                "0123456789abcdef-ICN" if shape in {"edge_challenge", "public_error_envelope"} else None
+                "0123456789abcdef-ICN"
+                if shape in {"edge_challenge", "public_error_envelope"}
+                else None
             )
-            assert [path for path, _, _ in requests[len(observed):]] == (
+            assert [path for path, _, _ in requests[len(observed) :]] == (
                 ["/v1/puri/token", "/v1/classify", "/v1/respond"]
                 if endpoint == "broker_token"
                 else ["/v1/classify", "/v1/respond"]

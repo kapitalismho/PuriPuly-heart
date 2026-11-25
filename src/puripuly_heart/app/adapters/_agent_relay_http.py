@@ -209,7 +209,7 @@ async def read_json(response: httpx.Response, endpoint: AgentEndpoint) -> dict |
     if media_type == "application/json":
         try:
             payload = json.loads(body)
-        except (ValueError, RecursionError):
+        except ValueError, RecursionError:
             return None
         if isinstance(payload, dict):
             return payload

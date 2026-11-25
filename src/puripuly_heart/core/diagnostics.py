@@ -197,7 +197,9 @@ _ENUM_FIELDS = {
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "retry_outcome": frozenset({"succeeded", "failed", "cancelled"}),
-    "agent_endpoint": frozenset({"broker_token", "relay_classify", "relay_response", "relay_support"}),
+    "agent_endpoint": frozenset(
+        {"broker_token", "relay_classify", "relay_response", "relay_support"}
+    ),
     "agent_failure": frozenset(
         {
             "edge_challenge",

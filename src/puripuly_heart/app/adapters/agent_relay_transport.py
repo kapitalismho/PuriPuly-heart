@@ -47,10 +47,7 @@ class AgentRelayTransport:
         parsed = urlsplit(endpoint)
         if (
             not parsed.hostname
-            or not (
-                parsed.scheme == "https"
-                or (allow_loopback_http and is_loopback_http(parsed))
-            )
+            or not (parsed.scheme == "https" or (allow_loopback_http and is_loopback_http(parsed)))
             or parsed.username is not None
             or parsed.password is not None
             or parsed.path != "/v1/respond"
@@ -78,7 +75,7 @@ class AgentRelayTransport:
             content = json.dumps(
                 body, ensure_ascii=False, allow_nan=False, separators=(",", ":")
             ).encode("utf-8")
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         else:
             if len(content) > limit:
@@ -203,7 +200,7 @@ class AgentRelayTransport:
         operation = "relay_response"
         try:
             event = json.loads("\n".join(data))
-        except (ValueError, RecursionError):
+        except ValueError, RecursionError:
             event = None
         if isinstance(event, dict):
             kind = event.get("type")
@@ -309,7 +306,9 @@ class AgentRelayTransport:
             case (429, _):
                 service_code, category = "service_rate_limited", "rate_limit"
             case _:
-                return response_failure(response, operation, "unexpected_http_status", fields=fields)
+                return response_failure(
+                    response, operation, "unexpected_http_status", fields=fields
+                )
         return AgentServiceError(
             service_code,
             evidence=response_details(response, operation, category, fields=fields),

@@ -42,7 +42,9 @@ def credential():
     }
 
 
-def owner(tokens, store, client, identity="synthetic-installation", base_url="https://broker.example"):
+def owner(
+    tokens, store, client, identity="synthetic-installation", base_url="https://broker.example"
+):
     async def installation():
         return identity
 
@@ -230,7 +232,9 @@ async def test_photo_broker_ack_recovery_never_reissues_credentials(
                 },
                 **kwargs,
             )
-        return httpx.Response(200, json={"acknowledged": True, "operation_id": "synthetic-operation"})
+        return httpx.Response(
+            200, json={"acknowledged": True, "operation_id": "synthetic-operation"}
+        )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(broker)) as client:
         with pytest.raises(PhotoProviderError) as failure:

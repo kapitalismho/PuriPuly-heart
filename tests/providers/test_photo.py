@@ -822,7 +822,9 @@ async def test_photo_relay_does_not_replay_or_invalidate_unverified_requests(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(relay)) as client:
         endpoint = "https://puripuly-relay.salee.sarl/v1/photo"
-        connection = RelayPhotoConnection(endpoint, token, client=client, invalidate=rejected.append)
+        connection = RelayPhotoConnection(
+            endpoint, token, client=client, invalidate=rejected.append
+        )
         events = []
         with pytest.raises(PhotoProviderError) as failure:
             async for event in connection.stream(photo, "ko"):

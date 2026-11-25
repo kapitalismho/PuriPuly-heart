@@ -125,7 +125,7 @@ class PhotoManagedCredentialOwner:
                 raise error
             try:
                 result = response.json()
-            except (ValueError, RecursionError):
+            except ValueError, RecursionError:
                 raise first_party_photo_http_error(
                     response,
                     operation="photo_broker_access",

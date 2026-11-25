@@ -1028,7 +1028,8 @@ def _parse_error_response(
             and nested
             and (
                 code == "challenge_invalid"
-                and subcode in {None, "timestamp_skew", "signature_mismatch", "release_token_invalid"}
+                and subcode
+                in {None, "timestamp_skew", "signature_mismatch", "release_token_invalid"}
                 or code == "invalid_request"
                 and subcode == "qq_credential_invalid"
             )

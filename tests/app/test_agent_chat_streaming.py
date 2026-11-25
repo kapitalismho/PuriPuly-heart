@@ -199,7 +199,10 @@ def test_sentence_boundaries_preserve_structured_text(text, expected):
     [
         ([{"type": "text_delta", "text": "Not committed."}], "stream_interrupted"),
         (
-            [{"type": "completed", "response": answer()}, {"type": "completed", "response": answer()}],
+            [
+                {"type": "completed", "response": answer()},
+                {"type": "completed", "response": answer()},
+            ],
             "stream_invalid",
         ),
         (

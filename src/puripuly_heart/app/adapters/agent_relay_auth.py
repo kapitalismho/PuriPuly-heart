@@ -60,8 +60,7 @@ class AgentRelayTokenOwner:
         if (
             not parsed.hostname
             or not (
-                parsed.scheme == "https"
-                or (self._allow_loopback_http and is_loopback_http(parsed))
+                parsed.scheme == "https" or (self._allow_loopback_http and is_loopback_http(parsed))
             )
             or parsed.username is not None
             or parsed.password is not None
@@ -149,7 +148,8 @@ class AgentRelayTokenOwner:
                 if (
                     error_body.get("code") == "invalid_request"
                     and error_body.get("class") == "security_fail"
-                    and (status, error_body.get("subcode")) in (
+                    and (status, error_body.get("subcode"))
+                    in (
                         (401, "puri_proof_invalid"),
                         (409, "installation_binding_mismatch"),
                     )
@@ -202,7 +202,7 @@ class AgentRelayTokenOwner:
             if expiry.utcoffset() is None:
                 return None
             remaining = min(3600.0, (expiry - datetime.now(UTC)).total_seconds())
-        except (ValueError, OverflowError):
+        except ValueError, OverflowError:
             return None
         return (token, remaining) if remaining > 30 else None
 
@@ -240,7 +240,12 @@ class AgentRelayTokenOwner:
         if type(milliseconds) in (int, float) and 0 < milliseconds <= 86_400_000:
             return max(1.0, milliseconds / 1000)
         header = response.headers.get("retry-after", "")
-        if len(header) <= 5 and header.isascii() and header.isdecimal() and 0 < int(header) <= 86_400:
+        if (
+            len(header) <= 5
+            and header.isascii()
+            and header.isdecimal()
+            and 0 < int(header) <= 86_400
+        ):
             return float(header)
         return 30.0
 
