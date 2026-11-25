@@ -14,7 +14,7 @@ const base = {
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/dev', GITHUB_SHA: commit,
   REVIEWED_COMMIT: commit, CONFIRM_PRODUCTION_DEPLOY: confirmation,
   AGENT_SERVICE_ENABLED: 'false', SUPPORT_REPORTS_ENABLED: 'false',
-  AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-agent-relay.synthetic-account.workers.dev',
+  AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-agent-relay.kapitalismho.workers.dev',
   CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKEN: 'synthetic-cf-token-not-real',
   AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: '11111111-1111-4111-8111-111111111111',
   BROKER_D1_DATABASE_ID_PRODUCTION: '22222222-2222-4222-8222-222222222222',
@@ -83,12 +83,16 @@ describe('manual relay deployment preparation', () => {
     }
   });
 
-  it('rejects noncanonical, credential-bearing, preview, path and query smoke origins', () => {
-    expect(deploymentOrigin(`${base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL}/`)).toBe(base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL);
-    for (const origin of ['http://puripuly-heart-agent-relay.account.workers.dev', 'https://other.account.workers.dev',
-      'https://puripuly-heart-agent-relay.account.workers.dev.evil.test', 'https://puripuly-heart-agent-relay.preview.account.workers.dev',
-      'https://user:secret@puripuly-heart-agent-relay.account.workers.dev', `${base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL}/v1/respond`,
-      `${base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL}?secret=value`, `${base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL}#fragment`]) {
+  it('accepts only the two exact Relay origins for smoke and the exact legacy variable for deployment', () => {
+    const custom = 'https://puripuly-relay.salee.sarl';
+    const legacy = base.AGENT_RELAY_CANONICAL_WORKERS_DEV_URL;
+    expect(deploymentOrigin(`${legacy}/`)).toBe(legacy);
+    expect(deploymentOrigin(custom)).toBe(custom);
+    expect(() => guardDeployment({ ...base, AGENT_RELAY_CANONICAL_WORKERS_DEV_URL: custom }, commit)).toThrow();
+    for (const origin of ['https://relay.salee.sarl', 'https://puripuly-broker.salee.sarl', 'http://puripuly-relay.salee.sarl',
+      'https://puripuly-heart-agent-relay.other-account.workers.dev', 'https://puripuly-heart-agent-relay.preview.kapitalismho.workers.dev',
+      'https://puripuly-relay.salee.sarl.evil.test', 'https://user:secret@puripuly-relay.salee.sarl',
+      `${custom}:443`, `${custom}/v1/respond`, `${custom}/?`, `${custom}#fragment`, `${legacy}\n`]) {
       expect(() => deploymentOrigin(origin)).toThrow();
     }
   });
@@ -102,6 +106,7 @@ describe('manual relay deployment preparation', () => {
     expect(config).toMatchObject({ name: 'puripuly-heart-agent-relay', workers_dev: true, preview_urls: false,
       observability: { enabled: false }, vars: { AGENT_SERVICE_ENABLED: 'false', SUPPORT_REPORTS_ENABLED: 'false' },
       secrets: { required: ['PURI_TOKEN_SECRET'] } });
+    expect(config.routes).toEqual([{ pattern: 'puripuly-relay.salee.sarl', zone_name: 'salee.sarl', custom_domain: true }]);
     expect(config.r2_buckets).toBeUndefined();
     expect(config.d1_databases).toHaveLength(1);
     expect(config.d1_databases[0]).toMatchObject({ binding: 'AGENT_USAGE_DB', database_id: base.AGENT_USAGE_D1_DATABASE_ID_PRODUCTION });

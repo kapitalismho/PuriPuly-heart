@@ -25,6 +25,7 @@ from puripuly_heart.app.ports.broker_client import (
 )
 from puripuly_heart.core import messages, network_clients
 from puripuly_heart.core.external_network import NetworkConfigurationError
+from puripuly_heart.core.first_party_http import response_evidence, response_media_type
 from puripuly_heart.core.qq_auth_diagnostics import exception_fields, safe_fields
 
 from .managed_openrouter_release import (
@@ -439,6 +440,8 @@ class HttpManagedOpenRouterBrokerClient:
             "POST", path=path, operation=operation, json=dict(request_body)
         )
         if response.is_error:
+            if response.status_code in {401, 403}:
+                raise _parse_error_response(response, operation=operation)
             try:
                 payload = _parse_json_mapping(response, operation=operation)
             except ManagedOpenRouterReleaseError:
@@ -485,7 +488,7 @@ class HttpManagedOpenRouterBrokerClient:
                 subcode=exc.code,
                 message="Correct the configured proxy or CA trust settings.",
                 fields=safe_fields(exception_fields(exc)),
-            ) from exc
+            ) from None
         except httpx.HTTPError as exc:
             fields = safe_fields(exception_fields(exc))
             fields.setdefault("dispatch_certainty", "possible")
@@ -496,7 +499,7 @@ class HttpManagedOpenRouterBrokerClient:
                 message="Broker request failed.",
                 http_status=fields.get("http_status"),
                 fields=fields,
-            ) from exc
+            ) from None
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         if self._client is not None:
@@ -509,6 +512,7 @@ class HttpManagedOpenRouterBrokerClient:
                     base_url=normalized_base_url,
                     timeout=self.timeout,
                     transport=self.transport,
+                    headers={"User-Agent": network_clients.first_party_user_agent()},
                 )
             return self._client
 
@@ -1017,6 +1021,21 @@ def _parse_error_response(
             if nested
             else _http_error_class(response.status_code)
         )
+        subcode = _require_optional_text(raw_error, "subcode")
+        if response.status_code in {401, 403} and not (
+            response.status_code == 401
+            and response_media_type(response) == "application/json"
+            and nested
+            and (
+                code == "challenge_invalid"
+                and subcode
+                in {None, "timestamp_skew", "signature_mismatch", "release_token_invalid"}
+                or code == "invalid_request"
+                and subcode == "qq_credential_invalid"
+            )
+            and error_class == "security_fail"
+        ):
+            return _http_rejection(response, operation=operation, fields=fields)
         if code in {"authorization_expired", "resume_issuance_unavailable"}:
             error_class = "terminal"
         raw_message = raw_error.get("message")
@@ -1024,7 +1043,7 @@ def _parse_error_response(
             operation=operation,
             code=code,
             error_class=error_class,
-            subcode=_require_optional_text(raw_error, "subcode"),
+            subcode=subcode,
             retry_after_ms=retry_after,
             http_status=response.status_code,
             message=(
@@ -1044,6 +1063,12 @@ def _parse_error_response(
 
 
 def _parse_json_mapping(response: httpx.Response, *, operation: str) -> Mapping[str, object]:
+    if "response_shape" in response_evidence(response, body=response.content):
+        raise _with_response(
+            _retryable_error(operation, "broker returned an unexpected HTTP response"),
+            response,
+            shape="non_json",
+        )
     try:
         payload = response.json()
     except ValueError as exc:
@@ -1205,6 +1230,7 @@ def _response_fields(response, *, shape):
             "dispatch_certainty": "response_received",
             "http_status": response.status_code,
             "response_shape": shape,
+            **response_evidence(response, body=response.content),
         }
     )
 
@@ -1234,20 +1260,22 @@ def _http_error_class(status):
 
 
 def _http_rejection(response, *, operation, fields):
+    unverified_access = response.status_code in {401, 403} or fields.get("response_shape") in {
+        "html",
+        "edge_challenge",
+    }
+    error_class = (
+        RETRYABLE_ERROR_CLASS if unverified_access else _http_error_class(response.status_code)
+    )
     code = (
         "rate_limited"
         if response.status_code == 429
-        else (
-            "invalid_request"
-            if _http_error_class(response.status_code) == "terminal"
-            else RETRYABLE_ERROR_CODE
-        )
+        else ("invalid_request" if error_class == "terminal" else RETRYABLE_ERROR_CODE)
     )
     return _broker_error(
         operation=operation,
         code=code,
-        error_class=_http_error_class(response.status_code),
-        subcode="access_rejected" if response.status_code in {401, 403} else None,
+        error_class=error_class,
         message=(
             "Broker rejected the request."
             if code == "invalid_request"

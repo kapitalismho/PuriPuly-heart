@@ -29,7 +29,9 @@ def token_response(token: str = "synthetic-token") -> httpx.Response:
     )
 
 
-def token_owner(handler, *, clock=lambda: 0.0) -> AgentRelayTokenOwner:
+def token_owner(
+    handler, *, clock=lambda: 0.0, base_url="https://broker.example", allow_loopback_http=False
+) -> AgentRelayTokenOwner:
     key = Ed25519PrivateKey.generate()
     bundle = ManagedIdentityBundle(
         "01961ad7-a7c1-7000-8000-0123456789ab",
@@ -41,9 +43,14 @@ def token_owner(handler, *, clock=lambda: 0.0) -> AgentRelayTokenOwner:
         return bundle
 
     owner = AgentRelayTokenOwner(
-        lambda: "https://broker.example", identity, app_version="synthetic", clock=clock
+        base_url if callable(base_url) else lambda: base_url,
+        identity,
+        app_version="synthetic",
+        allow_loopback_http=allow_loopback_http,
+        clock=clock,
     )
-    owner._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    if handler is not None:
+        owner._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return owner
 
 
@@ -73,24 +80,49 @@ async def test_transient_authentication_retries_once_with_fresh_proof(failure):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("status", "expected", "attempts"),
+    ("status", "error", "expected", "attempts"),
     [
-        (401, "service_authentication_failed", 1),
-        (403, "service_authentication_failed", 1),
-        (503, "service_authentication_unavailable", 2),
+        (
+            401,
+            {"code": "invalid_request", "class": "security_fail", "subcode": "puri_proof_invalid"},
+            "service_authentication_failed",
+            1,
+        ),
+        (
+            409,
+            {
+                "code": "invalid_request",
+                "class": "security_fail",
+                "subcode": "installation_binding_mismatch",
+            },
+            "service_authentication_failed",
+            1,
+        ),
+        (
+            503,
+            {"code": "internal_error", "class": "retryable"},
+            "service_authentication_unavailable",
+            2,
+        ),
     ],
 )
-async def test_authentication_rejection_and_unavailability_are_distinct(status, expected, attempts):
+async def test_authentication_rejection_and_unavailability_are_distinct(
+    status, error, expected, attempts
+):
     requests = []
 
     def issue(request):
         requests.append(request)
-        return httpx.Response(status)
+        return httpx.Response(status, json={"error": error})
 
     owner = token_owner(issue)
     try:
-        with pytest.raises(AgentServiceError, match=expected):
+        with pytest.raises(AgentServiceError, match=expected) as caught:
             await owner.get_token()
+        assert caught.value.evidence.status_code == status
+        assert caught.value.evidence.category == (
+            "auth" if status != 503 else "service_unavailable"
+        )
         assert len(requests) == attempts
     finally:
         await owner.close()
@@ -104,7 +136,16 @@ async def test_authentication_rate_limit_blocks_new_requests_until_server_cooldo
     def issue(request):
         requests.append(request)
         if len(requests) == 1:
-            return httpx.Response(429, json={"error": {"retry_after_ms": 30_000}})
+            return httpx.Response(
+                429,
+                json={
+                    "error": {
+                        "code": "rate_limited",
+                        "class": "retryable",
+                        "retry_after_ms": 30_000,
+                    }
+                },
+            )
         return token_response()
 
     owner = token_owner(issue, clock=lambda: now[0])
@@ -164,7 +205,6 @@ async def test_first_enrollment_throttle_is_temporary_and_not_daily_exhaustion()
     relay = AgentRelayTransport(
         "https://relay.example/v1/respond", token_owner(issue, clock=lambda: now[0])
     )
-    await relay._client.aclose()
     relay._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     owner = AgentChatOwner(Records(), relay, localize=str)
     await owner.start()
@@ -207,12 +247,11 @@ async def test_concurrent_401s_do_not_invalidate_a_newer_token_or_duplicate_refr
             if order == 2:
                 await refreshed.wait()
                 await asyncio.sleep(0)
-            return httpx.Response(401)
+            return httpx.Response(401, json={"error": {"code": "service_authentication_failed"}})
         return httpx.Response(200, json={"answers": []})
 
     owner = token_owner(issue)
     relay = AgentRelayTransport("https://relay.example/v1/respond", owner)
-    await relay._client.aclose()
     relay._client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
     try:
         await relay.prepare()
@@ -247,7 +286,6 @@ async def test_relay_401_is_retried_only_once_and_other_errors_are_not_replayed(
 
     owner = token_owner(issue)
     relay = AgentRelayTransport("https://relay.example/v1/respond", owner)
-    await relay._client.aclose()
     relay._client = httpx.AsyncClient(transport=httpx.MockTransport(reject))
 
     async def invoke():
@@ -348,7 +386,7 @@ async def test_rejected_token_retry_shares_the_turn_http_budget_but_not_support_
     def handle(request):
         requests.append(request)
         if len(requests) == 1:
-            return httpx.Response(401)
+            return httpx.Response(401, json={"error": {"code": "service_authentication_failed"}})
         if request.url.path == "/v1/classify":
             return httpx.Response(200, json={"answers": []})
         if request.url.path == "/v1/support":
@@ -360,7 +398,6 @@ async def test_rejected_token_retry_shares_the_turn_http_budget_but_not_support_
         )
 
     relay = AgentRelayTransport("https://relay.example/v1/respond", token_owner(issue))
-    await relay._client.aclose()
     relay._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     request = {
         "input": [{"role": "user", "content": "Synthetic request."}],

@@ -8,6 +8,10 @@ from typing import Any
 
 from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.provider_values import ELEVENLABS_SCRIBE_STT_MODEL
+from puripuly_heart.config.service_endpoints import (
+    DEFAULT_OPENROUTER_BROKER_BASE_URL,
+    LEGACY_OPENROUTER_BROKER_BASE_URL,
+)
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
     VNEXT_SETTINGS_SCHEMA_VERSION,
@@ -38,6 +42,7 @@ _PROMPT_OVERRIDE_MIGRATION_VERSION = 45
 _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION = 43
 _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION = 44
 _PROMPT_OVERRIDE_RESET_VERSION = 52
+_BROKER_ORIGIN_MIGRATION_VERSION = 59
 _RELEASED_DEFAULT_PROMPT_SHA256 = frozenset(
     {
         "9badb2a6aa2dca63f57eef67bdd46d8ecbe171b0eff951d1fced92377df8ba6e",
@@ -96,6 +101,13 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
     translation = intent.get("translation") if isinstance(intent.get("translation"), dict) else {}
     if isinstance(intent, dict) and isinstance(translation, dict):
+        broker_base_url = translation.get("openrouter_broker_base_url")
+        if (
+            _requires_version_migration(settings_version, _BROKER_ORIGIN_MIGRATION_VERSION)
+            and isinstance(broker_base_url, str)
+            and broker_base_url.rstrip("/") == LEGACY_OPENROUTER_BROKER_BASE_URL
+        ):
+            translation["openrouter_broker_base_url"] = DEFAULT_OPENROUTER_BROKER_BASE_URL
         retained_combined_history = (
             isinstance(translation.get("connection_history"), dict)
             and "gemma4_26b_31b" in translation["connection_history"]

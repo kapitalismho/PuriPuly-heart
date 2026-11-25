@@ -5,6 +5,7 @@ import json
 import httpx
 import pytest
 
+from puripuly_heart import __version__
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryService,
     AppActiveDayTelemetryState,
@@ -56,6 +57,7 @@ async def test_http_client_posts_only_anonymous_id_and_utc_date() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == "/v1/telemetry/app-active-day"
+        assert request.headers["User-Agent"] == f"PuriPulyHeart/{__version__}"
         assert json.loads(request.content) == {
             "anonymous_id": "anon-telemetry-id-123456",
             "active_date_utc": "2026-08-28",

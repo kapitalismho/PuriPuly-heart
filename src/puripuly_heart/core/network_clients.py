@@ -6,6 +6,8 @@ from typing import Any
 import httpx
 from websockets.asyncio.client import connect
 
+from puripuly_heart import __version__
+
 from .external_network import (
     ProxyPolicy,
     TLSSelection,
@@ -14,6 +16,10 @@ from .external_network import (
     select_tls,
     validate_http_proxy,
 )
+
+
+def first_party_user_agent() -> str:
+    return f"PuriPulyHeart/{__version__}"
 
 
 class _HTTPResponseStream(httpx.SyncByteStream):

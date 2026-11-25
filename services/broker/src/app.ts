@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
+import { createServicePage } from '../../service-page';
 import { errorResponse, internalErrorResponse } from './broker-error';
 import {
   BROKER_SERVICE_NAME,
@@ -27,9 +28,16 @@ import { handlePhotoAccess } from './photo-access';
 
 export const app = new Hono<BrokerEnv>();
 
+const rootPage = createServicePage(
+  'Broker',
+  'Broker authenticates PuriPuly Heart installations, checks access to managed features, and issues the credentials the app needs to use them. Speech recognition and translation requests do not pass through Broker.',
+);
+
 app.onError((_error: Error, c: Context<BrokerEnv>) => {
   return internalErrorResponse(c);
 });
+
+app.get('/', (c) => rootPage(new URL(c.req.url), c.req.method) ?? c.notFound());
 
 app.get('/healthz', (c: Context<BrokerEnv>) => {
   return c.json({

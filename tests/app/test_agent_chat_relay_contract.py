@@ -69,7 +69,6 @@ async def _app_requests() -> list[dict]:
         )
 
     transport = AgentRelayTransport("https://relay.example/v1/respond", Tokens())
-    await transport._client.aclose()
     transport._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     owner = AgentChatOwner(Records(), transport, localize=str)
     await owner.start()

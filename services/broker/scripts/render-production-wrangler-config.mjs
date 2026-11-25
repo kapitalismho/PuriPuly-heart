@@ -2,7 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CANONICAL_WORKER_NAME = 'puripuly-heart-broker';
+import { brokerDeployment, requireAccountId } from '../../worker-deployment.mjs';
+
+const CANONICAL_WORKER_NAME = brokerDeployment.workerName;
 const DATABASE_ID_PLACEHOLDER = 'REQUIRED_AT_DEPLOY_TIME';
 const DATABASE_ID_PLACEHOLDERS = {
   BROKER_DB: DATABASE_ID_PLACEHOLDER,
@@ -71,8 +73,24 @@ async function main() {
     throw new Error('wrangler config has unexpected remaining deploy-time placeholders.');
   }
 
-  await writeFile(outputPath, withDatabaseIds, 'utf8');
+  const accountId = args['account-id'];
+  const output = accountId === undefined ? withDatabaseIds : addProductionRouting(withDatabaseIds, accountId);
+
+  await writeFile(outputPath, output, 'utf8');
   process.stdout.write(`${outputPath}\n`);
+}
+
+function addProductionRouting(config, accountId) {
+  requireAccountId(accountId);
+  if (/"(?:account_id|route|routes|workers_dev)"\s*:/u.test(config)) {
+    throw new Error('Broker production routing must come from the deployment renderer.');
+  }
+  return config.replace(/"name"\s*:/u, [
+    `"account_id": ${JSON.stringify(accountId)},`,
+    '"workers_dev": true,',
+    `"routes": ${JSON.stringify([brokerDeployment.route])},`,
+    '"name":',
+  ].join('\n  '));
 }
 
 function injectVersionVars(sourceText, versionEntries) {

@@ -10,6 +10,7 @@ import httpx
 import pytest
 from websockets.asyncio.server import serve
 
+from puripuly_heart.core.network_clients import first_party_user_agent
 from puripuly_heart.core.photo.image import load_prepared_photo
 from puripuly_heart.core.photo.parsing import PhotoBlockParser
 from puripuly_heart.core.photo.protocol import (
@@ -638,6 +639,7 @@ async def test_api_baseline_streams_partial_blocks_without_setup_requests_or_pai
             "required"
         ] == ["bbox", "source", "translation"]
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-api-key"
+        assert server.requests[0][3]["user-agent"] != first_party_user_agent()
 
 
 @pytest.mark.parametrize(
@@ -728,6 +730,7 @@ async def test_relay_uses_dedicated_photo_contract_without_per_photo_coordinatio
         assert sent["image_base64"] == photo.jpeg_base64
         assert sent["target_language"] == "ko"
         assert server.requests[0][3]["authorization"] == "Bearer synthetic-puri-token"
+        assert server.requests[0][3]["user-agent"] == first_party_user_agent()
 
 
 @pytest.mark.parametrize(
@@ -762,6 +765,95 @@ async def test_relay_allowance_exhaustion_is_distinct_from_transient_rate_limits
         assert 0 < error.retry_after <= (3600 if headers else 86400)
     else:
         assert error.retry_after is None
+
+
+@pytest.mark.parametrize(
+    ("status", "kwargs", "expected", "invalidates", "shape"),
+    [
+        (
+            401,
+            {"json": {"error": {"code": "service_authentication_failed", "message": "private"}}},
+            "photo_authentication_failed",
+            True,
+            "public_error_envelope",
+        ),
+        (403, {"text": "<html>private</html>"}, "photo_stream_invalid", False, "html"),
+        (
+            401,
+            {
+                "headers": {"CF-Mitigated": "challenge"},
+                "json": {"error": {"code": "service_authentication_failed", "message": "private"}},
+            },
+            "photo_stream_invalid",
+            False,
+            "edge_challenge",
+        ),
+        (
+            401,
+            {"headers": {"CF-Ray": "1234567890abcdef-ICN"}, "text": "private"},
+            "photo_request_rejected",
+            False,
+            "unknown",
+        ),
+    ],
+)
+async def test_photo_relay_does_not_replay_or_invalidate_unverified_requests(
+    tmp_path, photo_runtime_diagnostics, status, kwargs, expected, invalidates, shape
+):
+    photo = await synthetic_photo(tmp_path)
+    rejected = []
+    requests = []
+
+    async def token():
+        return "replacement-token" if rejected else "synthetic-puri-token"
+
+    def relay(request):
+        requests.append(request.headers["authorization"])
+        if len(requests) == 1:
+            return httpx.Response(status, **kwargs)
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            content=(
+                b'data: {"type":"completed","response":{"status":"completed",'
+                b'"model":"gpt-6-luna"}}\n\n'
+            ),
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(relay)) as client:
+        endpoint = "https://puripuly-relay.salee.sarl/v1/photo"
+        connection = RelayPhotoConnection(
+            endpoint, token, client=client, invalidate=rejected.append
+        )
+        events = []
+        with pytest.raises(PhotoProviderError) as failure:
+            async for event in connection.stream(photo, "ko"):
+                events.append(event)
+        assert not any(isinstance(event, PhotoStreamCompleted) for event in events)
+        assert failure.value.code == expected
+        assert not failure.value.retryable
+        assert rejected == (["synthetic-puri-token"] if invalidates else [])
+        assert len(requests) == 1
+        next_connection = RelayPhotoConnection(
+            endpoint, token, client=client, invalidate=rejected.append
+        )
+        result = [event async for event in next_connection.stream(photo, "ko")]
+        assert result == [PhotoStreamCompleted({}, "gpt-6-luna")]
+        assert requests[-1] == (
+            "Bearer replacement-token" if invalidates else "Bearer synthetic-puri-token"
+        )
+    (record,) = photo_runtime_diagnostics.diagnostic_history({})["records"]
+    assert record["operation"] == "photo_relay"
+    assert record["code"] == expected
+    assert record["category"] == ("auth" if invalidates else "invalid_response")
+    assert record["status_code"] == status
+    assert record["fields"]["response_shape"] == shape
+    if shape == "unknown":
+        assert record["fields"]["cf_ray"] == "1234567890abcdef-ICN"
+    persisted = photo_runtime_diagnostics.log_file.read_text(encoding="utf-8")
+    assert record["diagnostic_id"] in persisted
+    for value in ("private", "synthetic-puri-token", photo.jpeg_base64):
+        assert value not in repr(record) + persisted
 
 
 async def test_api_completion_drains_sse_terminator_and_reuses_the_connection(tmp_path):
@@ -909,6 +1001,7 @@ async def test_openrouter_one_bbox_translation_request_reaches_consumer_without_
         mapped = photo.map_box(blocks[0].bbox, google=False)
         assert not mapped.corrected
         assert len(server.requests) == len(credentials) == 1
+        assert server.requests[0][3]["user-agent"] != first_party_user_agent()
         sent = server.requests[0][2]
         assert sent["provider"] == {
             "only": ["openai"],

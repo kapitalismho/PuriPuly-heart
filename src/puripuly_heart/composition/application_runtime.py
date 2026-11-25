@@ -161,7 +161,6 @@ from puripuly_heart.app.wiring import (
     runtime_pipeline_inputs_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_agent_chat import (
-    AGENT_RELAY_URL,
     compose_agent_transport,
     compose_relay_token_owner,
 )
@@ -237,6 +236,7 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.resolved import OVERLAY_TARGET_STEAMVR
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
+from puripuly_heart.config.service_endpoints import DEFAULT_PHOTO_RELAY_ENDPOINT
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.chatgpt.session import ChatGptSession
@@ -1838,6 +1838,7 @@ def compose_application_runtime(
 
     relay_token_owner = compose_relay_token_owner(settings=settings, config_path=config_path)
     photo_source = current_runtime_layout().host_kind == "source"
+    relay_override = os.environ.get("PURIPULY_AGENT_RELAY_URL")
     photo_provider = PhotoProviderAdapter(
         session=chatgpt_session,
         secret_store=create_settings_secret_store,
@@ -1847,10 +1848,11 @@ def compose_application_runtime(
             os.environ.get("PURIPULY_AGENT_BROKER_URL")
             or settings.require_canonical().intent.translation.openrouter_broker_base_url
         ),
-        relay_endpoint=os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL).removesuffix(
-            "/respond"
-        )
-        + "/photo",
+        relay_endpoint=(
+            DEFAULT_PHOTO_RELAY_ENDPOINT
+            if relay_override is None
+            else relay_override.removesuffix("/respond") + "/photo"
+        ),
         allow_loopback_http=photo_source,
         benchmark_route=os.environ.get("PURIPULY_PHOTO_BENCHMARK_ROUTE") if photo_source else None,
         selected_route=lambda: (

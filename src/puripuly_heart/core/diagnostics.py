@@ -29,6 +29,7 @@ from puripuly_heart.core.diagnostic_validation import (
     QWEN_FAILURE_NUMERIC_FIELDS,
     stt_startup_failure_code,
 )
+from puripuly_heart.core.first_party_http import is_cf_ray
 from puripuly_heart.core.lifecycle import LIFECYCLE_SHUTDOWN_PHASE_ORDER
 from puripuly_heart.core.local_asr.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
@@ -196,6 +197,20 @@ _ENUM_FIELDS = {
     **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "retry_outcome": frozenset({"succeeded", "failed", "cancelled"}),
+    "agent_endpoint": frozenset(
+        {"broker_token", "relay_classify", "relay_response", "relay_support"}
+    ),
+    "agent_failure": frozenset(
+        {
+            "edge_challenge",
+            "unexpected_html",
+            "unexpected_http_status",
+            "invalid_response",
+            "invalid_support_receipt",
+            "stream_interrupted",
+            "stream_invalid",
+        }
+    ),
     "service_code": frozenset(
         {
             "service_authentication_failed",
@@ -450,6 +465,7 @@ _COMPONENTS = frozenset(
         "application_runtime_logging",
         "provider.stt",
         "provider.llm",
+        "provider.photo",
         "provider.openrouter.auth",
         "provider.runtime",
         "capture.self",
@@ -808,6 +824,10 @@ _BOUNDARIES = (
             "persist_qq_pending_delivery_ack",
             "persist_recovered_managed_claim_source",
             "preflight_managed_identity",
+            "photo_broker_access",
+            "photo_broker_token",
+            "photo_relay",
+            "photo_relay_allowance",
             "qq_assert",
             "recover_managed_operation",
             "recover_qq_managed_key_delivery",
@@ -1351,6 +1371,8 @@ def sanitize_diagnostic_fields(
             )
         elif key == "managed_operation_id":
             accepted = is_valid_operation_id(value)
+        elif key == "cf_ray":
+            accepted = is_cf_ray(value)
         elif key in _ENUM_FIELDS:
             accepted = type(value) is str and value in _ENUM_FIELDS[key]
         elif key == "recognition_cause" and type(value) is str:

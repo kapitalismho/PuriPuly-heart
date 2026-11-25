@@ -36,7 +36,6 @@ class HeldWire(httpx.AsyncByteStream):
 async def test_held_http_stream_presents_sentence_before_terminal_without_committing_output():
     wire = HeldWire()
     transport = AgentRelayTransport("https://relay.example/v1/respond", Tokens())
-    await transport._client.aclose()
 
     def handle(request):
         assert json.loads(request.content)["agent_protocol"] == AGENT_CHAT_PROTOCOL
@@ -196,20 +195,29 @@ def test_sentence_boundaries_preserve_structured_text(text, expected):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "events",
+    ("events", "code"),
     [
-        [{"type": "text_delta", "text": "Not committed."}],
-        [{"type": "completed", "response": answer()}, {"type": "completed", "response": answer()}],
-        [
-            {"type": "text_delta", "text": "Not committed."},
-            {"type": "error", "error": {"code": "upstream_unavailable"}},
-        ],
-        [{"type": "reasoning_delta", "text": "NEVER-PRESENT"}],
+        ([{"type": "text_delta", "text": "Not committed."}], "stream_interrupted"),
+        (
+            [
+                {"type": "completed", "response": answer()},
+                {"type": "completed", "response": answer()},
+            ],
+            "stream_invalid",
+        ),
+        (
+            [
+                {"type": "text_delta", "text": "Not committed."},
+                {"type": "error", "error": {"code": "upstream_unavailable"}},
+            ],
+            "stream_interrupted",
+        ),
+        ([{"type": "reasoning_delta", "text": "NEVER-PRESENT"}], "stream_invalid"),
+        ([{"type": "completed", "response": {}}], "stream_invalid"),
     ],
 )
-async def test_transport_rejects_missing_duplicate_and_unsafe_terminal_streams(events):
+async def test_transport_rejects_missing_duplicate_and_unsafe_terminal_streams(events, code):
     transport = AgentRelayTransport("https://relay.example/v1/respond", Tokens())
-    await transport._client.aclose()
     transport._client = httpx.AsyncClient(
         transport=httpx.MockTransport(
             lambda request: httpx.Response(
@@ -220,20 +228,22 @@ async def test_transport_rejects_missing_duplicate_and_unsafe_terminal_streams(e
         )
     )
     try:
-        with pytest.raises(AgentTransportError):
-            [
-                event
-                async for event in transport.respond(
-                    input=[
-                        {"type": "configuration_update", "reasoning": {"effort": "high"}},
-                        {"role": "user", "content": "Inspect the current app state."},
-                    ],
-                    turn_id="0123456789abcdef0123456789abcdef",
-                    effort="high",
-                    route="work",
-                    allow_tools=True,
-                )
-            ]
+        observed = []
+        with pytest.raises(AgentTransportError, match=code) as caught:
+            async for event in transport.respond(
+                input=[
+                    {"type": "configuration_update", "reasoning": {"effort": "high"}},
+                    {"role": "user", "content": "Inspect the current app state."},
+                ],
+                turn_id="0123456789abcdef0123456789abcdef",
+                effort="high",
+                route="work",
+                allow_tools=True,
+            ):
+                observed.append(event)
+        assert all(event["type"] == "text_delta" for event in observed)
+        assert caught.value.evidence.fields["agent_failure"] == code
+        assert caught.value.evidence.status_code == 200
     finally:
         await transport.close()
 

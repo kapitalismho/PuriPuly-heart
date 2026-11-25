@@ -13,6 +13,7 @@ from puripuly_heart.app.ports.broker_client import (
     QqManagedAssertionRequest,
 )
 from puripuly_heart.core.diagnostics import sanitize_diagnostics
+from puripuly_heart.core.network_clients import first_party_user_agent
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterChallengeSuccess,
     ManagedOpenRouterDiscordStartSuccess,
@@ -95,6 +96,7 @@ async def test_challenge_parses_fingerprint_salt() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == "/v1/trial/challenge"
+        assert request.headers["user-agent"] == first_party_user_agent()
         assert json.loads(request.content) == {
             "installation_id": "install-123",
             "device_public_key": "device-public-key-123",
@@ -1665,8 +1667,8 @@ async def test_resume_managed_operation_falls_back_to_request_source() -> None:
 @pytest.mark.parametrize(
     ("status", "payload", "expected_code", "expected_class", "shape"),
     [
-        (403, b"<html>private-denial</html>", "invalid_request", "terminal", "non_json"),
-        (429, b"<html>private-limit</html>", "rate_limited", "retryable", "non_json"),
+        (403, b"<html>private-denial</html>", "trial_unavailable", "retryable", "html"),
+        (429, b"<html>private-limit</html>", "rate_limited", "retryable", "html"),
         (
             429,
             {"ok": False, "code": "rate_limited", "message": "limited"},
@@ -1882,6 +1884,62 @@ async def test_removed_referral_input_is_rejected_without_dispatch():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "headers", "is_auth", "shape"),
+    [
+        (401, {}, True, "public_error_envelope"),
+        (401, {"CF-Mitigated": "challenge"}, False, "edge_challenge"),
+        (403, {}, False, "public_error_envelope"),
+    ],
+)
+async def test_managed_broker_requires_its_auth_envelope_without_challenge_evidence(
+    status, headers, is_auth, shape
+):
+    def handler(request):
+        assert str(request.url) == "https://puripuly-broker.salee.sarl/v1/trial/challenge/verify"
+        assert request.headers["user-agent"] == first_party_user_agent()
+        return httpx.Response(
+            status,
+            headers={"CF-Ray": "1234567890abcdef-ICN", **headers},
+            json={
+                "error": {
+                    "code": "challenge_invalid",
+                    "class": "security_fail",
+                    "subcode": "signature_mismatch",
+                    "message": "signature verification failed for the registered device_public_key",
+                }
+            },
+        )
+
+    client, _ = _build_client(handler, base_url="https://puripuly-broker.salee.sarl")
+    try:
+        with pytest.raises(ManagedOpenRouterReleaseError) as failure:
+            await client.verify({"signature": "private-signature"})
+        error = failure.value
+        if is_auth:
+            assert (error.code, error.error_class, error.subcode) == (
+                "challenge_invalid",
+                "security_fail",
+                "signature_mismatch",
+            )
+        else:
+            assert (error.code, error.error_class, error.subcode) == (
+                "trial_unavailable",
+                "retryable",
+                None,
+            )
+        diagnostics = sanitize_diagnostics(error.failure_diagnostics)
+        assert diagnostics.category == ("auth" if is_auth else "invalid_response")
+        assert diagnostics.status_code == status
+        assert diagnostics.fields["response_shape"] == shape
+        assert diagnostics.fields["cf_ray"] == "1234567890abcdef-ICN"
+        assert "private-signature" not in repr(diagnostics)
+        assert "signature verification failed" not in repr(diagnostics)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
 async def test_denied_status_observation_does_not_invent_terminal_remote_state():
     from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
 
@@ -1892,8 +1950,10 @@ async def test_denied_status_observation_does_not_invent_terminal_remote_state()
         )
         assert not result.succeeded
         assert result.operation_status == "CREATE_UNKNOWN"
-        assert result.client_action == "action_required"
+        assert result.client_action == "wait"
         assert result.diagnostics.status_code == 403
+        assert result.diagnostics.category == "invalid_response"
+        assert result.diagnostics.fields["response_shape"] == "html"
         assert result.diagnostics.fields["dispatch_certainty"] == "response_received"
     finally:
         await client.close()
@@ -1937,7 +1997,7 @@ def test_safe_transport_metadata_and_identity_survive_diagnostic_projection():
     assert record["fields"]["proxy_source"] == "system"
     assert record["fields"]["tls_source"] == "windows"
     assert record["fields"]["dispatch_certainty"] == "response_received"
-    assert record["fields"]["response_shape"] == "non_json"
+    assert record["fields"]["response_shape"] == "html"
     assert "private-" not in repr(record)
 
 

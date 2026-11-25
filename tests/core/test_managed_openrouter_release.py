@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import pytest
 
 from puripuly_heart.app.ports.broker_client import ManagedKeyDeliveryAckResult
@@ -31,6 +32,9 @@ from puripuly_heart.core.managed_credential import (
     credential_binding_secret,
 )
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
+from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
+    HttpManagedOpenRouterBrokerClient,
+)
 from puripuly_heart.core.openrouter.managed_openrouter_release import (
     ManagedOpenRouterDiscordStartSuccess,
     ManagedOpenRouterFingerprintSalt,
@@ -218,7 +222,7 @@ class FailingAckTokenSetSecretStore(InMemorySecretStore):
 
 def _make_service(
     *,
-    client: FakeManagedReleaseClient,
+    client: FakeManagedReleaseClient | HttpManagedOpenRouterBrokerClient,
     settings: ReleaseSettings | None = None,
     secrets: InMemorySecretStore | None = None,
     persist_calls: list[tuple[str | None, str | None]] | None = None,
@@ -1792,6 +1796,57 @@ async def test_issue_restart_clears_release_state_without_switching_sources() ->
     assert settings.managed_identity.release_token_expires_at is None
     assert settings.managed_identity.verified_hardware_hash is None
     assert settings.managed_identity.verified_hardware_hash_salt_version is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cf_mitigated", [None, "challenge"])
+async def test_http_issue_recovers_genuine_rejection_without_resetting_on_edge_challenge(
+    cf_mitigated,
+):
+    settings = ReleaseSettings()
+    secrets = InMemorySecretStore()
+    ensure_managed_identity_bundle(
+        ManagedIdentityStateAdapter(settings, lambda _updated: None), secrets
+    )
+    settings.managed_identity.release_token = "release-token-1"
+    settings.managed_identity.release_token_expires_at = "2026-04-08T06:15:00.000Z"
+    _set_verified_snapshot(settings)
+    before = settings.managed_identity.verified_hardware_hash
+    requests = []
+
+    def issue(request):
+        requests.append(request.url.path)
+        headers = {} if cf_mitigated is None else {"CF-Mitigated": cf_mitigated}
+        return httpx.Response(
+            401,
+            headers=headers,
+            json={
+                "error": {
+                    "code": "challenge_invalid",
+                    "class": "security_fail",
+                    "subcode": "release_token_invalid",
+                    "message": "release_token does not match the active release session",
+                }
+            },
+        )
+
+    client = HttpManagedOpenRouterBrokerClient(
+        base_url="https://puripuly-broker.salee.sarl", transport=httpx.MockTransport(issue)
+    )
+    service, _, _ = _make_service(client=client, settings=settings, secrets=secrets)
+    try:
+        result = await service.ensure_key_for_llm_start()
+        assert len(requests) == 1 and requests[0].endswith("/issue")
+        if cf_mitigated is None:
+            assert result.behavior == ManagedOpenRouterReleaseBehavior.RESTART
+            assert settings.managed_identity.release_token is None
+            assert settings.managed_identity.verified_hardware_hash is None
+        else:
+            assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+            assert settings.managed_identity.release_token == "release-token-1"
+            assert settings.managed_identity.verified_hardware_hash == before
+    finally:
+        await client.close()
 
 
 @pytest.mark.asyncio

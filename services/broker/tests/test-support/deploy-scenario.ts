@@ -41,6 +41,7 @@ export function createDeployScenario(options: {
   mkdirSync(join(broker, 'src'));
   copyFileSync(join(brokerRoot, 'src/trial-policy.ts'), join(broker, 'src/trial-policy.ts'));
   copyFileSync(join(brokerRoot, 'scripts/render-production-wrangler-config.mjs'), join(broker, 'scripts/render-production-wrangler-config.mjs'));
+  copyFileSync(join(brokerRoot, '../worker-deployment.mjs'), join(root, 'services', 'worker-deployment.mjs'));
   copyFileSync(join(brokerRoot, 'wrangler.jsonc'), join(broker, 'wrangler.jsonc'));
   for (const name of readdirSync(join(brokerRoot, 'migrations'))) {
     copyFileSync(join(brokerRoot, 'migrations', name), join(broker, 'migrations', name));
@@ -93,13 +94,14 @@ export function createDeployScenario(options: {
     issuedKeys: [],
   }));
   writeFileSync(join(root, 'ports.mjs'), cloudflarePort);
-  writeFileSync(join(root, 'bash-env.sh'), `node() { '${shellPath(process.execPath)}' "$@"; }
+  writeFileSync(join(root, 'bash-env.sh'), `node() { '${shellPath(process.execPath)}' --import "$SCENARIO_PRELOAD" "$@"; }
 ${process.platform === 'win32' ? 'python3() { python "$@"; }\n' : ''}pnpm() { node "$SCENARIO_ROOT/ports.mjs" "$@"; }
 curl() {
   local args=()
   for arg in "$@"; do
-    if [[ "$arg" == https://puripuly-heart-broker.synthetic.workers.dev* ]]; then
-      args+=("$LOCAL_HTTP_URL\${arg#https://puripuly-heart-broker.synthetic.workers.dev}")
+    if [[ "$arg" == https://puripuly-broker.salee.sarl/* || "$arg" == https://puripuly-heart-broker.kapitalismho.workers.dev/* ]]; then
+      local rest="\${arg#https://}"
+      args+=(--header "X-Deployment-Probe-Origin: https://\${rest%%/*}" "$LOCAL_HTTP_URL/\${rest#*/}")
     elif [[ "$arg" == http://* || "$arg" == https://* ]]; then
       return 97
     else
@@ -122,14 +124,15 @@ sleep() { :; }
       HOME: shellPath(root),
       BASH_ENV: shellPath(join(root, 'bash-env.sh')),
       SCENARIO_ROOT: shellPath(root),
+      SCENARIO_PRELOAD: new URL('./deploy-preload.mjs', import.meta.url).href,
       MODE: options.mode ?? '',
       GITHUB_REF: 'refs/heads/dev',
       CONFIRM_PRODUCTION_DEPLOY: 'deploy puripuly-heart-broker from dev',
       CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare-token',
-      CLOUDFLARE_ACCOUNT_ID: 'synthetic-cloudflare-account',
+      CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
       BROKER_D1_DATABASE_ID_PRODUCTION: '22222222-2222-4222-8222-222222222222',
       AGENT_USAGE_D1_DATABASE_ID_PRODUCTION: '11111111-1111-4111-8111-111111111111',
-      BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.synthetic.workers.dev',
+      BROKER_CANONICAL_WORKERS_DEV_URL: 'https://puripuly-heart-broker.kapitalismho.workers.dev',
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: '7',
       NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: '',
       ...options.env,
@@ -137,21 +140,29 @@ sleep() { :; }
   };
 }
 
-export type PublicResponse = { status?: number; body?: unknown };
+export type PublicResponse = { status?: number; body?: unknown; redirectToHealthyTarget?: boolean };
 
 export async function runDeployWorkflow(scenario: DeployScenario, responses: Partial<Record<string, PublicResponse>> = {}) {
   const requests: string[] = [];
+  const redirectRequests: string[] = [];
   const server = createServer(async (request, response) => {
-    const path = request.url!;
-    requests.push(`${request.method} ${path}`);
+    const url = request.url!;
+    const redirectTarget = url.startsWith('/redirect-target/');
+    const path = redirectTarget ? url.slice('/redirect-target'.length) : url;
+    const target = `${request.headers['x-deployment-probe-origin']}${path}`;
+    if (redirectTarget) redirectRequests.push(`${request.method} ${url}`);
+    else requests.push(`${request.method} ${target}`);
     if (!['/healthz', '/v1/foundation'].includes(path) || request.method !== 'GET') {
       response.writeHead(500).end('Unexpected request');
       return;
     }
     const effective = JSON.parse(readFileSync(scenario.workerPath, 'utf8'));
     const actual = await app.request(`http://synthetic.local${path}`);
-    const override = responses[path];
-    response.writeHead(override?.status ?? (effective.deployments ? actual.status : 503), { 'Content-Type': 'application/json' });
+    const override = redirectTarget ? undefined : responses[target] ?? responses[path];
+    response.writeHead(override?.status ?? (redirectTarget || effective.deployments ? actual.status : 503), {
+      'Content-Type': 'application/json',
+      ...(override?.redirectToHealthyTarget ? { Location: `/redirect-target${path}` } : {}),
+    });
     response.end(override && 'body' in override ? (typeof override.body === 'string' ? override.body : JSON.stringify(override.body)) : await actual.text());
   });
   const listening = once(server, 'listening');
@@ -167,6 +178,17 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
   let stdout = '';
   let stderr = '';
   try {
+    for (const [path, response] of Object.entries(responses)) {
+      if (!response?.redirectToHealthyTarget) continue;
+      const destination = new URL(path, 'http://synthetic.local').pathname;
+      const healthy = await fetch(`${env.LOCAL_HTTP_URL}/redirect-target${destination}`, { redirect: 'error' });
+      const payload = await healthy.json();
+      if (healthy.status !== 200 || !payload || typeof payload !== 'object'
+        || !('service' in payload) || payload.service !== 'puripuly-heart-broker') {
+        throw new Error('Controlled redirect target is not healthy.');
+      }
+    }
+    redirectRequests.length = 0;
     for (const block of workflow.split(/(?=^      - name: )/mu).slice(1)) {
       const name = block.match(/^      - name: (.+)/u)![1];
       if (block.includes('\n        uses:') || name === 'Install workspace dependencies') continue;
@@ -190,9 +212,9 @@ export async function runDeployWorkflow(scenario: DeployScenario, responses: Par
       child.stdout.on('data', (data) => { stdout += String(data); });
       child.stderr.on('data', (data) => { stderr += String(data); });
       const [status] = await once(child, 'close');
-      if (status !== 0) return { status, stdout, stderr, executed, requests };
+      if (status !== 0) return { status, stdout, stderr, executed, requests, redirectRequests };
     }
-    return { status: 0, stdout, stderr, executed, requests };
+    return { status: 0, stdout, stderr, executed, requests, redirectRequests };
   } finally {
     await promisify(server.close.bind(server))();
   }
@@ -223,6 +245,9 @@ assert.deepEqual(args.slice(0, 2), ['exec', 'wrangler']);
 const configPath = args[args.indexOf('--config') + 1];
 const config = JSON.parse(readFileSync(configPath, 'utf8').replace(/^\\s*\\/\\/.*$/gm, ''));
 assert.equal(config.name, 'puripuly-heart-broker');
+assert.equal(config.account_id, process.env.CLOUDFLARE_ACCOUNT_ID);
+assert.equal(config.workers_dev, true);
+assert.deepEqual(config.routes, [{ pattern: 'puripuly-broker.salee.sarl', zone_name: 'salee.sarl', custom_domain: true }]);
 const brokerBinding = config.d1_databases.find((database) => database.binding === 'BROKER_DB');
 assert.equal(brokerBinding.database_name, 'puripuly-heart-broker');
 assert.equal(brokerBinding.database_id, process.env.BROKER_D1_DATABASE_ID_PRODUCTION);

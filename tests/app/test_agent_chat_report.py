@@ -555,7 +555,6 @@ async def test_transport_requires_matching_receipt_and_preserves_binary_wire(rec
     transport = AgentRelayTransport(
         "http://127.0.0.1:8788/v1/respond", Tokens(), allow_loopback_http=True
     )
-    await transport._client.aclose()
     transport._client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     try:
         with pytest.raises(AgentTransportError, match="invalid_support_receipt"):

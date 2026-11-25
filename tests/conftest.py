@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 import sys
 from pathlib import Path
@@ -130,3 +131,27 @@ def _restore_global_logging_and_locale():
         for handler in tuple(logger.handlers):
             if handler not in original:
                 logger.removeHandler(handler)
+
+
+@pytest.fixture
+def photo_runtime_diagnostics(tmp_path):
+    from puripuly_heart.core.runtime_logging import (
+        RuntimeLoggingSinks,
+        SessionRuntimeLoggingService,
+    )
+
+    logger = logging.getLogger("puripuly_heart")
+    log_file = tmp_path / "photo-diagnostics.log"
+    live = logging.StreamHandler(io.StringIO())
+    persisted = logging.FileHandler(log_file, encoding="utf-8")
+    runtime = SessionRuntimeLoggingService(
+        root_logger=logger, sinks=RuntimeLoggingSinks(live, persisted, log_file)
+    )
+    runtime.configure_diagnostics(instance_id="photo-diagnostics-test")
+    try:
+        yield runtime
+    finally:
+        runtime.close()
+        for handler in (live, persisted):
+            logger.removeHandler(handler)
+            handler.close()

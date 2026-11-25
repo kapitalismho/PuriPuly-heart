@@ -450,8 +450,10 @@ function dailyCapWorkflowScript(): string {
 }
 
 function createDailyCapScenario(overrides: Record<string, string | undefined>) {
-  const tempDir = createRepoTempDir();
-  mkdirSync(join(tempDir, 'scripts'));
+  const tempServices = join(createRepoTempDir(), 'services');
+  const tempDir = join(tempServices, 'broker');
+  mkdirSync(join(tempDir, 'scripts'), { recursive: true });
+  writeFileSync(join(tempServices, 'worker-deployment.mjs'), readFileSync(new URL('../../worker-deployment.mjs', import.meta.url)));
   writeFileSync(
     join(tempDir, 'scripts', 'render-production-wrangler-config.mjs'),
     readFileSync(renderWranglerConfigScript),

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Final
 
 from puripuly_heart import __version__
 from puripuly_heart.app.adapters.agent_relay_auth import AgentRelayTokenOwner
@@ -12,14 +11,13 @@ from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
     managed_identity_state_port_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
+from puripuly_heart.config.service_endpoints import DEFAULT_AGENT_RELAY_ENDPOINT
 from puripuly_heart.core.managed_identity import (
     ManagedIdentityBundle,
     ensure_managed_identity_bundle,
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.runtime_layout import current_runtime_layout
-
-AGENT_RELAY_URL: Final = "https://puripuly-heart-agent-relay.kapitalismho.workers.dev/v1/respond"
 
 
 def compose_relay_token_owner(
@@ -54,7 +52,7 @@ def compose_agent_transport(
     config_path: Path,
     token_owner: AgentRelayTokenOwner | None = None,
 ) -> AgentRelayTransport | None:
-    endpoint = os.environ.get("PURIPULY_AGENT_RELAY_URL", AGENT_RELAY_URL)
+    endpoint = os.environ.get("PURIPULY_AGENT_RELAY_URL", DEFAULT_AGENT_RELAY_ENDPOINT)
     if not endpoint:
         return None
     token_owner = token_owner or compose_relay_token_owner(

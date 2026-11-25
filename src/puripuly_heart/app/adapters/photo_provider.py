@@ -8,15 +8,14 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from puripuly_heart.app.adapters.photo_access import PhotoManagedCredentialOwner
-from puripuly_heart.app.ports.agent_chat import (
-    AgentServiceError,
-    AgentTokenPort,
-    AgentTransportError,
-)
+from puripuly_heart.app.adapters.photo_access import PhotoManagedCredentialOwner, photo_token_error
+from puripuly_heart.app.ports.agent_chat import AgentTokenPort, AgentTransportError
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
+from puripuly_heart.config.service_endpoints import DEFAULT_PHOTO_RELAY_ENDPOINT
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.session import ChatGptSession
+from puripuly_heart.core.external_network import NetworkConfigurationError
+from puripuly_heart.core.first_party_http import response_evidence
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.photo.lifecycle import PhotoRoute
 from puripuly_heart.core.photo.protocol import PhotoProviderError
@@ -24,7 +23,9 @@ from puripuly_heart.providers.photo import (
     OpenAIPhotoConnection,
     OpenRouterPhotoConnection,
     RelayPhotoConnection,
+    first_party_photo_http_error,
     make_photo_connection,
+    report_first_party_photo_transport_failure,
 )
 
 
@@ -45,7 +46,7 @@ class PhotoProviderAdapter:
     session: ChatGptSession
     secret_store: Callable[[], SettingsSecretStorePort]
     token_owner: AgentTokenPort | None = None
-    relay_endpoint: str = "https://puripuly-heart-agent-relay.kapitalismho.workers.dev/v1/photo"
+    relay_endpoint: str = DEFAULT_PHOTO_RELAY_ENDPOINT
     allow_loopback_http: bool = False
     benchmark_route: str | None = None
     broker_base_url: Callable[[], str] = lambda: ""
@@ -108,13 +109,27 @@ class PhotoProviderAdapter:
                 response = await client.post(
                     self.relay_endpoint + "/allowance",
                     json={},
-                    headers={"Authorization": f"Bearer {token}"},
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "User-Agent": network_clients.first_party_user_agent(),
+                    },
                 )
-            if response.status_code == 401:
-                self.token_owner.invalidate(token)
-            if response.status_code != 200:
+            if response.status_code != 200 or "response_shape" in response_evidence(
+                response, body=response.content
+            ):
+                error = first_party_photo_http_error(
+                    response, operation="photo_relay_allowance", body=response.content
+                )
+                if error.code == "photo_authentication_failed":
+                    self.token_owner.invalidate(token)
                 return None
             body = response.json()
+        except AgentTransportError as error:
+            photo_token_error(error)
+            return None
+        except (httpx.RequestError, OSError) as error:
+            report_first_party_photo_transport_failure(error, operation="photo_relay_allowance")
+            return None
         except Exception:
             return None
         if not isinstance(body, dict):
@@ -153,25 +168,21 @@ class PhotoProviderAdapter:
             raise PhotoProviderError("photo_authentication_failed", retryable=False)
         try:
             return await self.token_owner.get_token()
-        except AgentServiceError as error:
-            raise PhotoProviderError(
-                (
-                    "photo_quota_exhausted"
-                    if error.code == "service_rate_limited"
-                    else "photo_authentication_failed"
-                ),
-                retryable=False,
-            ) from None
-        except AgentTransportError:
-            raise PhotoProviderError("photo_transport_failed", retryable=False) from None
+        except AgentTransportError as error:
+            raise photo_token_error(error) from None
 
     def _managed(self, model: str | None):
         if model not in (None, "gpt-6-luna"):
             raise PhotoProviderError("photo_request_rejected", retryable=False)
+        try:
+            client = self._client()
+        except NetworkConfigurationError as error:
+            report_first_party_photo_transport_failure(error, operation="photo_relay")
+            raise PhotoProviderError("photo_transport_failed", retryable=False) from None
         return RelayPhotoConnection(
             self.relay_endpoint,
             self._token,
-            client=self._client(),
+            client=client,
             allow_loopback_http=self.allow_loopback_http,
             invalidate=self.token_owner.invalidate if self.token_owner is not None else None,
         )

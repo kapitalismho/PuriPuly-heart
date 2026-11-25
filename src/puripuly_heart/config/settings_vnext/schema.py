@@ -19,19 +19,19 @@ from puripuly_heart.config.provider_values import (
     normalize_stt_provider,
 )
 from puripuly_heart.config.resolved import normalize_legacy_vad_onset_threshold
+from puripuly_heart.config.service_endpoints import DEFAULT_OPENROUTER_BROKER_BASE_URL
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 58
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 59
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
 OSC_CONNECTION_MODES: Final = ("automatic", "manual", "off")
 PHOTO_ROUTES: Final = ("managed", "chatgpt", "openai", "gemini")
 
-DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD: Final = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ: Final = "qq"
