@@ -1111,7 +1111,7 @@ async def test_actual_broker_oauth_start_retains_proxy_tls_rate_limit_and_valid_
                 assert diagnostics.fields["proxy_source"] == "env"
                 assert diagnostics.fields["tls_source"] == "explicit_file"
                 assert diagnostics.fields["tls_backend"] == "openssl"
-                assert diagnostics.fields["response_shape"] == "non_json"
+                assert diagnostics.fields["response_shape"] == "html"
                 assert diagnostics.fields["dispatch_certainty"] == "response_received"
                 result = await client.start_discord_oauth(**kwargs)
                 assert result.authorization_url == success["authorization_url"]
