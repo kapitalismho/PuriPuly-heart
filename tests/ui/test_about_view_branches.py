@@ -317,6 +317,8 @@ def test_about_view_special_thanks_bundled_entries_use_avatars_and_https_links(
     expected_bundled = {
         "SUI_32C": ("sui_32c.png", "https://x.com/SUI32C"),
         "Nagikokoro": ("nagikokoro.png", "https://github.com/RICHARDwuxiaofei"),
+        "motoka96": ("motoka96.png", None),
+        "_Ykol魚": ("ykol.png", None),
         "Han โชเล่ย์": ("han_chole.png", None),
         "EA_PE": ("ea_pe.png", "https://discord.com/users/859837257917136918"),
         "Ephedrine": ("ephedrine.png", "https://x.com/NUN1EL"),
