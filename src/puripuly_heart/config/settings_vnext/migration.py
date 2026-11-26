@@ -424,7 +424,7 @@ def _consolidate_cloud_gemma_translation(
     history = translation.get("connection_history")
     if not isinstance(history, dict):
         history = {}
-    valid_connections = {"managed", "openrouter"}
+    valid_connections = {"managed", "openrouter", "openrouter_korea"}
     current = translation.get("connection")
     if (
         model in (combined, *retired)
@@ -459,8 +459,13 @@ def _consolidate_cloud_gemma_translation(
         translation["openrouter_selection_alias"] = "gemma4_26b_31b_byok"
     if translation.get("model") == combined and current in valid_connections:
         source = "managed" if current == "managed" else "byok"
-        translation["openrouter_model"] = "google/gemma-4-26b-a4b-it"
-        translation["openrouter_provider_routing"] = "gemma4_26b_31b_latency"
+        is_korea = current == "openrouter_korea"
+        translation["openrouter_model"] = (
+            "google/gemma-4-31b-it" if is_korea else "google/gemma-4-26b-a4b-it"
+        )
+        translation["openrouter_provider_routing"] = (
+            "gemma4_31b_korea" if is_korea else "gemma4_26b_31b_latency"
+        )
         translation["openrouter_selected_source"] = source
         translation["openrouter_selection_alias"] = f"gemma4_26b_31b_{source}"
 

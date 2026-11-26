@@ -24,6 +24,7 @@ class TranslationConnection(str, Enum):
     MANAGED_CHINA = "managed_china"
     CHATGPT = "chatgpt"
     OPENROUTER = "openrouter"
+    OPENROUTER_KOREA = "openrouter_korea"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
     CPU = "cpu"
@@ -39,6 +40,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
     TranslationModel.GEMMA4_26B_31B: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
+        TranslationConnection.OPENROUTER_KOREA,
     ),
     TranslationModel.DEEPSEEK_V4_FLASH_41: (
         TranslationConnection.MANAGED,

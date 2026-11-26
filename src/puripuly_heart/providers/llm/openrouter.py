@@ -194,11 +194,17 @@ def _build_provider_preferences(
         return {
             "only": [
                 "makora",
-                "coreweave/bf16",
+                "deepinfra/fp8",
                 "kt",
             ],
+            "max_price": {"prompt": 0.19, "completion": 0.39},
             "sort": {"by": "latency", "partition": "none"},
             "allow_fallbacks": True,
+        }
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_KOREA:
+        return {
+            "only": ["kt"],
+            "allow_fallbacks": False,
         }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY:
         return {
@@ -213,7 +219,7 @@ def _build_provider_preferences(
     if model == "google/gemma-4-26b-a4b-it" and len(models) <= 1:
         return {
             "sort": {"by": "latency"},
-            "only": ["makora", "coreweave/bf16"],
+            "only": ["makora", "deepinfra/fp8"],
             "allow_fallbacks": True,
         }
     return {

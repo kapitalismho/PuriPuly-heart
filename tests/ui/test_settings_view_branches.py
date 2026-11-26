@@ -2549,6 +2549,33 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
     assert view.has_provider_changes is True
 
 
+def test_settings_view_selects_openrouter_korea_for_gemma(
+    monkeypatch,
+    settings_events,
+) -> None:
+    settings = _vnext(
+        AppSettingsVNext(),
+        llm="openai",
+        model=TranslationModel.GPT_6_LUNA.value,
+        connection=TranslationConnection.OFFICIAL_BYOK.value,
+    )
+    view, _ = _make_settings_view(monkeypatch, settings_events, settings=settings)
+
+    view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
+    view._on_translation_connection_selected(TranslationConnection.OPENROUTER_KOREA.value)
+
+    pending = view.build_provider_apply_settings()
+    assert pending is not None
+    applied = apply_provider_intent(settings_events.settings, pending)
+    translation = applied.intent.translation
+    assert translation.model == TranslationModel.GEMMA4_26B_31B.value
+    assert translation.connection == TranslationConnection.OPENROUTER_KOREA.value
+    assert translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_31B_IT.value
+    assert translation.openrouter_provider_routing == OpenRouterProviderRouting.GEMMA4_31B_KOREA.value
+    assert translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
+    assert translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+
+
 def test_translation_selection_preserves_all_staged_history_and_unrelated_latest_entry(
     monkeypatch: pytest.MonkeyPatch, settings_events
 ) -> None:

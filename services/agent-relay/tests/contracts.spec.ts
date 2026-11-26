@@ -66,6 +66,23 @@ describe('app protocol contracts', () => {
     );
   });
 
+  it.each([
+    [6, 'propose_app', false],
+    [7, 'manage_proposal', false],
+    [8, 'manage_proposal', true],
+  ] as const)('offers OpenRouter Korea only in compatible settings proposals (protocol %i)', (protocol, settingsTool, supportsKorea) => {
+    const parameters = contracts.get(protocol)!.tools.find(({ name }) => name === settingsTool)?.parameters;
+    const changes = ['properties', 'changes', 'properties'];
+    const koreaChoice = supportsKorea
+      ? expect.arrayContaining(['openrouter_korea'])
+      : expect.not.arrayContaining(['openrouter_korea']);
+    expect(parameters).toHaveProperty([...changes, 'translation.connection', 'enum'], koreaChoice);
+    expect(parameters).toHaveProperty(
+      [...changes, 'translation.connection_history', 'properties', 'gemma4_26b_31b', 'enum'],
+      koreaChoice,
+    );
+  });
+
   it('offers the VR compatibility setting only to apps that accept it', () => {
     const offered = (protocol: number) => contracts.get(protocol)!.tools
       .find(({ name }) => name === 'manage_proposal')?.parameters as { properties: { changes: { properties: Record<string, unknown> } } };

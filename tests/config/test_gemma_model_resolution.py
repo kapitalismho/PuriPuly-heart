@@ -156,3 +156,48 @@ def test_vnext_gemma_migration_is_idempotent_after_round_trip() -> None:
     assert once == twice
     assert once["intent"]["translation"]["model"] == "gemma4_26b_31b"
     assert once["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
+
+
+def test_openrouter_korea_resolves_korea_primary_with_global_pool_fallback() -> None:
+    config = runtime_resolution.resolve_llm_config(
+        _runtime_input(
+            model=runtime_resolution.TRANSLATION_MODEL_GEMMA4_26B_31B,
+            connection=runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER_KOREA,
+        )
+    )
+
+    assert len(config.attempts) == 3
+    assert config.primary.model == llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT
+    assert config.primary.models == (llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT,)
+    assert config.primary.provider_routing == "gemma4_31b_korea"
+    assert config.primary.credential.reference == "openrouter:byok"
+
+    assert config.fallback is not None
+    assert config.fallback.target == config.attempts[1].target
+    assert config.attempts[1].start_after_ms == 1300
+    assert config.attempts[1].start_on_primary_error is True
+    assert config.attempts[1].target.model == llm_profiles.OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT
+    assert config.attempts[1].target.models == (
+        llm_profiles.OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+        llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT,
+    )
+    assert config.attempts[1].target.provider_routing == "gemma4_26b_31b_latency"
+    assert config.attempts[1].target.credential.reference == "openrouter:byok"
+
+    assert config.attempts[2].start_after_ms == 4400
+    assert config.attempts[2].start_on_primary_error is False
+    assert config.attempts[2].target.model == llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT
+    assert config.attempts[2].target.provider_routing == "gemma4_31b_modelrun_only"
+    assert config.attempts[2].target.credential.reference == "openrouter:byok"
+
+
+def test_compatibility_derives_openrouter_korea_from_korea_routing() -> None:
+    translation = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
+        provider_llm="openrouter",
+        openrouter_model=llm_profiles.OPENROUTER_MODEL_GEMMA_4_31B_IT,
+        openrouter_selected_source="byok",
+        openrouter_provider_routing="gemma4_31b_korea",
+    )
+
+    assert translation.model == runtime_resolution.TRANSLATION_MODEL_GEMMA4_26B_31B
+    assert translation.connection == runtime_resolution.TRANSLATION_CONNECTION_OPENROUTER_KOREA

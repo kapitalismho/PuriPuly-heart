@@ -1965,7 +1965,7 @@ def compose_application_runtime(
                     "deepseek": "deepseek",
                 }.get(provider)
             elif (
-                translation.connection == "openrouter"
+                translation.connection in {"openrouter", "openrouter_korea"}
                 and translation.openrouter_selected_source == "byok"
             ):
                 verification_provider = "openrouter"

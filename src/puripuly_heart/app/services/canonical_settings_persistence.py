@@ -902,9 +902,14 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     updates: dict[str, object] = {}
     if model == "gemma4_26b_31b":
         selected_source = "managed" if connection == "managed" else "byok"
+        is_korea = connection == "openrouter_korea"
         updates = {
-            "openrouter_model": "google/gemma-4-26b-a4b-it",
-            "openrouter_provider_routing": "gemma4_26b_31b_latency",
+            "openrouter_model": (
+                "google/gemma-4-31b-it" if is_korea else "google/gemma-4-26b-a4b-it"
+            ),
+            "openrouter_provider_routing": (
+                "gemma4_31b_korea" if is_korea else "gemma4_26b_31b_latency"
+            ),
             "openrouter_selected_source": selected_source,
             "openrouter_selection_alias": (
                 OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED

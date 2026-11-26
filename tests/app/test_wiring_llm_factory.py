@@ -394,6 +394,40 @@ def test_combined_gemma_composes_pooled_attempts_and_single_model_emergency(
     assert first.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
 
 
+def test_openrouter_korea_composes_korea_primary_global_hedge_and_modelrun_emergency() -> None:
+    secrets = InMemorySecretStore()
+    secrets.set("openrouter_api_key", "fixture-byok-key")
+    config = resolve_llm_config(
+        RuntimeResolutionInput(
+            translation=TranslationRuntimeIntent(
+                model="gemma4_26b_31b",
+                connection="openrouter_korea",
+            )
+        )
+    )
+    provider = create_llm_provider_from_resolved_config(config, secrets=secrets)
+
+    assert isinstance(provider.inner, FallbackRacingLLMProvider)
+    attempts = provider.inner.attempts
+    assert [attempt.start_after_ms for attempt in attempts] == [0, 1300, 4400]
+    assert [attempt.start_on_primary_error for attempt in attempts] == [False, True, False]
+
+    first = attempts[0].provider
+    assert isinstance(first, OpenRouterLLMProvider)
+    assert first.models == ("google/gemma-4-31b-it",)
+    assert first.provider_routing == OpenRouterProviderRouting.GEMMA4_31B_KOREA
+
+    second = attempts[1].provider.factory()
+    assert isinstance(second, OpenRouterLLMProvider)
+    assert second.models == ("google/gemma-4-26b-a4b-it", "google/gemma-4-31b-it")
+    assert second.provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY
+
+    third = attempts[2].provider.factory()
+    assert isinstance(third, OpenRouterLLMProvider)
+    assert third.models == ("google/gemma-4-31b-it",)
+    assert third.provider_routing == OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("connection", "expected_api_key", "expected_source"),

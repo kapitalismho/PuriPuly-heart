@@ -131,6 +131,8 @@
   "settings.translation_connection.managed": "Управляемый",
   "settings.translation_connection.managed_china": "Управляемый (Китай)",
   "settings.translation_connection.openrouter": "OpenRouter",
+  "settings.translation_connection.openrouter_korea": "OpenRouter (Корея)",
+  "settings.translation_connection.openrouter_korea.description": "Очень быстро в Корее и вероятно в Японии",
   "settings.translation_connection.official_byok": "Официальный API",
   "settings.translation_connection.ollama": "OpenAI-совместимый API",
   "settings.translation_connection.custom_http": "Custom HTTP API",

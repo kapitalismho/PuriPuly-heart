@@ -306,7 +306,7 @@ async def test_httpx_openrouter_client_builds_reasoning_disabled_request_with_la
     assert body["user"] == "managed-user-123"
     assert body["provider"] == {
         "sort": {"by": "latency"},
-        "only": ["makora", "coreweave/bf16"],
+        "only": ["makora", "deepinfra/fp8"],
         "allow_fallbacks": True,
     }
     assert body["messages"][0] == {"role": "system", "content": "SYSTEM"}
@@ -560,7 +560,7 @@ async def test_httpx_openrouter_client_gemma_pool_ignores_explicit_latency_routi
     body = fake_client.last_request["json"]
     assert body["provider"] == {
         "sort": {"by": "latency"},
-        "only": ["makora", "coreweave/bf16"],
+        "only": ["makora", "deepinfra/fp8"],
         "allow_fallbacks": True,
     }
 

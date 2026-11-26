@@ -3238,7 +3238,7 @@ class ApplicationControlOwner:
             )
             or (
                 provider == "openrouter"
-                and connection == "openrouter"
+                and connection in {"openrouter", "openrouter_korea"}
                 and translation.openrouter_selected_source == "byok"
             )
         )

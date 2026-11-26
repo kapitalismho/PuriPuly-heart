@@ -68,6 +68,7 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     assert supported_translation_connections(TranslationModel.GEMMA4_26B_31B) == (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
+        TranslationConnection.OPENROUTER_KOREA,
     )
     assert supported_translation_connections(TranslationModel.DEEPSEEK_V4_FLASH_41) == (
         TranslationConnection.MANAGED,

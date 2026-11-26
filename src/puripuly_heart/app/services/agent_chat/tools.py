@@ -1062,6 +1062,7 @@ class AgentTools:
                 )
             elif connection in {
                 TranslationConnection.OPENROUTER.value,
+                TranslationConnection.OPENROUTER_KOREA.value,
                 TranslationConnection.OFFICIAL_BYOK.value,
             }:
                 secret = (

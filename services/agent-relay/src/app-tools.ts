@@ -400,6 +400,7 @@ export const appTools = [
                 "public_api",
                 "managed",
                 "openrouter",
+                "openrouter_korea",
                 "managed_china",
                 "official_byok",
                 "chatgpt",
@@ -422,7 +423,8 @@ export const appTools = [
                   "type": "string",
                   "enum": [
                     "managed",
-                    "openrouter"
+                    "openrouter",
+                    "openrouter_korea"
                   ]
                 },
                 "deepseek_v4_flash_41": {

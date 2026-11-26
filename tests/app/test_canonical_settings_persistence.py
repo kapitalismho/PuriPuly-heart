@@ -1038,3 +1038,41 @@ def test_load_failure_survives_unavailable_logging_sink(tmp_path, monkeypatch):
     assert result.error.diagnostics.fields["exception_class"] == "PermissionError"
     assert result.error.diagnostics.fields["errno"] == 13
     assert "synthetic" not in str(result.error)
+
+
+@pytest.mark.parametrize(
+    ("model", "connection"),
+    [("gemma4_26b_31b", "openrouter_korea"), ("gpt_6_luna", "official_byok")],
+)
+def test_canonical_persistence_round_trips_openrouter_korea_selection(
+    tmp_path: Path, model: str, connection: str
+) -> None:
+    base = AppSettingsVNext()
+    candidate = replace(
+        base,
+        intent=replace(
+            base.intent,
+            translation=replace(
+                base.intent.translation,
+                model=model,
+                connection=connection,
+                connection_history={"gemma4_26b_31b": "openrouter_korea", model: connection},
+            ),
+        ),
+    )
+
+    persistence = SettingsVNextCanonicalPersistenceAdapter()
+    path = tmp_path / "settings.json"
+    persistence.persist(path, materialize_canonical_translation_settings(candidate))
+
+    reloaded = persistence.load_active(path, startup=True)
+    assert not reloaded.migrated
+    translation = reloaded.canonical_settings.intent.translation
+    assert translation.model == model
+    assert translation.connection == connection
+    assert translation.connection_history == candidate.intent.translation.connection_history
+    if model == "gemma4_26b_31b":
+        assert translation.openrouter_model == "google/gemma-4-31b-it"
+        assert translation.openrouter_provider_routing == "gemma4_31b_korea"
+        assert translation.openrouter_selected_source == "byok"
+        assert translation.openrouter_selection_alias == "gemma4_26b_31b_byok"

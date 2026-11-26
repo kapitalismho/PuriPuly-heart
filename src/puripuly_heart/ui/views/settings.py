@@ -363,12 +363,16 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.CHATGPT: "settings.translation_connection.chatgpt",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
+    TranslationConnection.OPENROUTER_KOREA: "settings.translation_connection.openrouter_korea",
     TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok",
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama",
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
 _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
     TranslationConnection.CHATGPT: "settings.translation_connection.chatgpt.description",
+    TranslationConnection.OPENROUTER_KOREA: (
+        "settings.translation_connection.openrouter_korea.description"
+    ),
 }
 _TRANSLATION_MODELS = (
     TranslationModel.INDEX_TRANSLATE_35B,
@@ -5036,7 +5040,11 @@ class SettingsView(ft.Column):
                 openrouter_alias = OpenRouterSelectionAlias.GPT_6_LUNA_BYOK
         elif model == TranslationModel.GEMMA4_26B_31B:
             llm_provider = LLMProviderName.OPENROUTER
-            openrouter_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+            openrouter_model = (
+                OpenRouterLLMModel.GEMMA_4_31B_IT
+                if connection == TranslationConnection.OPENROUTER_KOREA
+                else OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
+            )
             openrouter_source = (
                 OpenRouterCredentialSource.MANAGED
                 if connection == TranslationConnection.MANAGED

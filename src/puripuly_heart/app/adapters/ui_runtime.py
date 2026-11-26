@@ -724,7 +724,7 @@ class UiProviderRuntimeAdapter:
                     "deepseek": "deepseek_api_key",
                 }.get(provider_llm_for_translation(translation.model, translation.connection))
             elif (
-                translation.connection == "openrouter"
+                translation.connection in {"openrouter", "openrouter_korea"}
                 and translation.openrouter_selected_source == "byok"
             ):
                 active_secret = "openrouter_api_key"

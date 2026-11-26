@@ -92,6 +92,7 @@ TRANSLATION_CONNECTION_MANAGED: Final = "managed"
 TRANSLATION_CONNECTION_MANAGED_CHINA: Final = "managed_china"
 TRANSLATION_CONNECTION_CHATGPT: Final = "chatgpt"
 TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
+TRANSLATION_CONNECTION_OPENROUTER_KOREA: Final = "openrouter_korea"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
 TRANSLATION_CONNECTION_CPU: Final = "cpu"
@@ -104,6 +105,7 @@ TranslationConnectionName: TypeAlias = Literal[
     "managed_china",
     "chatgpt",
     "openrouter",
+    "openrouter_korea",
     "official_byok",
     "ollama",
     "cpu",
@@ -116,6 +118,7 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_MANAGED_CHINA,
     TRANSLATION_CONNECTION_CHATGPT,
     TRANSLATION_CONNECTION_OPENROUTER,
+    TRANSLATION_CONNECTION_OPENROUTER_KOREA,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
     TRANSLATION_CONNECTION_CPU,
@@ -130,6 +133,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
         TRANSLATION_MODEL_GEMMA4_26B_31B: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
+            TRANSLATION_CONNECTION_OPENROUTER_KOREA,
         ),
         TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: (
             TRANSLATION_CONNECTION_MANAGED,
@@ -314,6 +318,7 @@ _OPENROUTER_ROUTING_MODES: Final[tuple[str, ...]] = ("latency",)
 _OPENROUTER_PROVIDER_ROUTINGS: Final[tuple[str, ...]] = (
     "default",
     "gemma4_26b_31b_latency",
+    "gemma4_31b_korea",
     "deepseek_v4_flash_41_strict",
     "gemma4_31b_modelrun_only",
 )
@@ -1043,6 +1048,12 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
     if provider == PROVIDER_OPENROUTER:
+        if provider_routing == "gemma4_31b_korea":
+            return TranslationRuntimeIntent(
+                model=TRANSLATION_MODEL_GEMMA4_26B_31B,
+                connection=TRANSLATION_CONNECTION_OPENROUTER_KOREA,
+                concurrency_limit=concurrency,
+            )
         if provider_routing == "gemma4_26b_31b_latency":
             return TranslationRuntimeIntent(
                 model=TRANSLATION_MODEL_GEMMA4_26B_31B,
@@ -1447,6 +1458,14 @@ def _resolve_translation_target(
         )
 
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
+        if translation.connection == TRANSLATION_CONNECTION_OPENROUTER_KOREA:
+            return _resolved_openrouter_target(
+                model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
+                source=OPENROUTER_SOURCE_BYOK,
+                openrouter=openrouter,
+                provider_routing="gemma4_31b_korea",
+                managed_credential_kind=OPENROUTER_MANAGED_CREDENTIAL_STANDARD,
+            )
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
             models=(
@@ -1547,15 +1566,36 @@ def _resolve_translation_target(
 
 def _fallback_plan_for_target(
     target: ResolvedLLMTarget,
+    *,
+    translation: TranslationRuntimeIntent | None = None,
+    openrouter: OpenRouterRuntimeIntent | None = None,
 ) -> ResolvedLLMFallbackPlan:
+    fallback_target = target
+    if (
+        translation is not None
+        and openrouter is not None
+        and translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B
+        and translation.connection == TRANSLATION_CONNECTION_OPENROUTER_KOREA
+    ):
+        fallback_target = _resolved_openrouter_target(
+            model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+            models=(
+                OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
+                OPENROUTER_MODEL_GEMMA_4_31B_IT,
+            ),
+            source=OPENROUTER_SOURCE_BYOK,
+            openrouter=openrouter,
+            provider_routing="gemma4_26b_31b_latency",
+            managed_credential_kind=OPENROUTER_MANAGED_CREDENTIAL_STANDARD,
+        )
     return ResolvedLLMFallbackPlan(
-        target=target,
-        timeout_ms=0 if target.provider == PROVIDER_CHATGPT else _FIRST_HEDGE_DELAY_MS,
+        target=fallback_target,
+        timeout_ms=0 if fallback_target.provider == PROVIDER_CHATGPT else _FIRST_HEDGE_DELAY_MS,
         force_managed_wrapper=(
-            target.provider == PROVIDER_OPENROUTER
-            and target.credential.source == CREDENTIAL_SOURCE_MANAGED
+            fallback_target.provider == PROVIDER_OPENROUTER
+            and fallback_target.credential.source == CREDENTIAL_SOURCE_MANAGED
         ),
-        start_on_primary_error=target.provider != PROVIDER_INDEX_TRANSLATE,
+        start_on_primary_error=fallback_target.provider != PROVIDER_INDEX_TRANSLATE,
     )
 
 
@@ -1603,10 +1643,14 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
         TRANSLATION_MODEL_MANAGED_GEMMA_26B,
         TRANSLATION_MODEL_LOCAL_LLM,
     ):
-        fallback_plan = _fallback_plan_for_target(primary)
+        fallback_plan = _fallback_plan_for_target(
+            primary,
+            translation=translation,
+            openrouter=openrouter,
+        )
         attempts.append(
             ResolvedLLMAttemptPlan(
-                target=primary,
+                target=fallback_plan.target,
                 start_after_ms=fallback_plan.start_after_ms,
                 start_on_primary_error=fallback_plan.start_on_primary_error,
             )
@@ -1727,6 +1771,7 @@ __all__ = [
     "TRANSLATION_CONNECTION_OLLAMA",
     "TRANSLATION_CONNECTION_CUSTOM_HTTP",
     "TRANSLATION_CONNECTION_OPENROUTER",
+    "TRANSLATION_CONNECTION_OPENROUTER_KOREA",
     "TRANSLATION_CONNECTIONS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41",

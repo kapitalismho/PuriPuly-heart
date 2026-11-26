@@ -131,6 +131,8 @@
   "settings.translation_connection.managed": "托管",
   "settings.translation_connection.managed_china": "托管（中国）",
   "settings.translation_connection.openrouter": "OpenRouter",
+  "settings.translation_connection.openrouter_korea": "OpenRouter（韩国）",
+  "settings.translation_connection.openrouter_korea.description": "在韩国非常快 在日本大概也是",
   "settings.translation_connection.official_byok": "官方 API",
   "settings.translation_connection.ollama": "OpenAI 兼容 API",
   "settings.translation_connection.custom_http": "Custom HTTP API",
