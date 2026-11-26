@@ -331,6 +331,7 @@ def _is_photo_metadata_text(message: str) -> bool:
                 "photo_child_start_failed",
                 "photo_child_disconnected",
                 "photo_child_exited",
+                "photo_child_termination_unconfirmed",
                 "photo_child_unavailable",
                 "photo_capture_unavailable",
             }

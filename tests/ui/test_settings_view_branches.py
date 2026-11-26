@@ -2571,9 +2571,13 @@ def test_settings_view_selects_openrouter_korea_for_gemma(
     assert translation.model == TranslationModel.GEMMA4_26B_31B.value
     assert translation.connection == TranslationConnection.OPENROUTER_KOREA.value
     assert translation.openrouter_model == OpenRouterLLMModel.GEMMA_4_31B_IT.value
-    assert translation.openrouter_provider_routing == OpenRouterProviderRouting.GEMMA4_31B_KOREA.value
+    assert (
+        translation.openrouter_provider_routing == OpenRouterProviderRouting.GEMMA4_31B_KOREA.value
+    )
     assert translation.openrouter_selected_source == OpenRouterCredentialSource.BYOK.value
-    assert translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    assert (
+        translation.openrouter_selection_alias == OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK.value
+    )
 
 
 def test_translation_selection_preserves_all_staged_history_and_unrelated_latest_entry(

@@ -2119,6 +2119,7 @@ def test_photo_stage_timings_and_failures_survive_without_content_or_live_ui(tmp
         f"[Photo] failed {identity} failure_code=photo_authentication_failed",
         f"[Photo] cleanup_failed {identity} failure_code=photo_connection_close_failed",
         "[Photo] process_failed generation=2 failure_code=photo_child_exited",
+        "[Photo] process_failed generation=2 failure_code=photo_child_termination_unconfirmed",
         f"[Photo] interaction {identity} distance_m=0.131 facing_deg=12.500 forward_deg=30.000"
         " interaction=grip_ignored reason=out_of_range",
         f"[Photo] interaction {identity} hand=right interaction=photo_regrab",

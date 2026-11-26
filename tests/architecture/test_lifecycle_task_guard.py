@@ -79,6 +79,11 @@ TASK_CREATION_REVIEWS = (
         "ApplicationShutdownCoordinator owns bounded callback and diagnostic tasks, cancels them on deadlines, and awaits terminal cleanup",
     ),
     *_reviews(
+        "app/services/photo_application.py",
+        {"PhotoApplicationOwner.close": 1},
+        "PhotoApplicationOwner retains one drain task and waits for it to settle even if the close caller is cancelled",
+    ),
+    *_reviews(
         "app/services/canonical_settings_persistence.py",
         {"SettingsOwner.persist_async": 1},
         "SettingsOwner locally shield-awaits the thread persistence task, including after cancellation, before releasing the call boundary",

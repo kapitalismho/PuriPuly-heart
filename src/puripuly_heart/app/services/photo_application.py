@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from puripuly_heart.core.lifecycle import LifecycleScope
+from puripuly_heart.core.owned_thread import wait_for_owned_future
 from puripuly_heart.core.photo.bridge import PhotoBridge, valid_wrist_calibration
 from puripuly_heart.core.photo.capture import PhotoCapture, PhotoCaptureWatcher
 from puripuly_heart.core.photo.image import PreparedPhoto, load_prepared_photo
@@ -50,6 +51,7 @@ class PhotoApplicationOwner:
         self._capture_task: asyncio.Task | None = None
         self._route: PhotoRoute | None = None
         self._scope = LifecycleScope("PhotoApplicationOwner")
+        self._close_task: asyncio.Task[None] | None = None
         self._started = False
         self._frozen = False
         self.bridge = PhotoBridge(control=self._control)
@@ -330,10 +332,22 @@ class PhotoApplicationOwner:
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._policy_changed.set)
         self.lifecycle.stop_ingress()
+        self.supervisor.request_shutdown()
         self._policy_settled.set()
 
     async def close(self) -> None:
         self.stop_ingress()
+        if self._close_task is None:
+            self._close_task = asyncio.create_task(
+                self._close(), name="PhotoApplicationOwner:close"
+            )
+        try:
+            await wait_for_owned_future(self._close_task)
+        except asyncio.CancelledError:
+            self._close_task.result()
+            raise
+
+    async def _close(self) -> None:
         try:
             await self._scope.close()
         finally:
