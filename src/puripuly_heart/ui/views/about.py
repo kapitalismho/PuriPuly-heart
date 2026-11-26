@@ -80,13 +80,21 @@ SPECIAL_THANKS_ENTRIES: tuple[SpecialThanksEntry, ...] = (
     SpecialThanksEntry(
         "about.special_thanks.name.nagikokoro",
         "nagikokoro.png",
-        "https://github.com/RICHARDwuxiaofei",
+        "https://www.nagikokoro.best/",
     ),
     SpecialThanksEntry("about.special_thanks.name.motoka96", "motoka96.png"),
     SpecialThanksEntry("about.special_thanks.name.ykol", "ykol.png"),
-    SpecialThanksEntry("about.special_thanks.name.kascr", "kascr.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.kascr",
+        "kascr.png",
+        "https://github.com/kascr",
+    ),
     SpecialThanksEntry("about.special_thanks.name.just_monika_v", "just_monika_v.png"),
-    SpecialThanksEntry("about.special_thanks.name.fluvia", "fluvia.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.fluvia",
+        "fluvia.png",
+        "https://vrchat.com/home/user/usr_250dc79b-edbe-4d1d-be71-c7f2cd207ea6",
+    ),
     SpecialThanksEntry("about.special_thanks.name.han_chole", "han_chole.png"),
     SpecialThanksEntry(
         "about.special_thanks.name.ea_pe",
@@ -115,7 +123,11 @@ SPECIAL_THANKS_ENTRIES: tuple[SpecialThanksEntry, ...] = (
     ),
     SpecialThanksEntry("about.special_thanks.name.nunu299", "nunu299.png"),
     SpecialThanksEntry("about.special_thanks.name.tsuyu_shiro", "tsuyu_shiro.png"),
-    SpecialThanksEntry("about.special_thanks.name.garanshiro", "garanshiro.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.xxxxxshiro",
+        "xxxxxshiro.png",
+        "https://vrchat.com/home/user/usr_39788233-af01-47a4-92da-c5ee39b20e06",
+    ),
     SpecialThanksEntry(
         "about.special_thanks.name.koz39",
         "koz39.png",

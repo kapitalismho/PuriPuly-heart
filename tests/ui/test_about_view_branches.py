@@ -92,12 +92,15 @@ def test_about_view_link_actions_handle_missing_page_gracefully(
     assert "https://github.com/naeruru/mimiuchi" in opened
     assert "https://github.com/febilly/Yakutan" in opened
     assert "https://x.com/SUI32C" in opened
-    assert "https://github.com/RICHARDwuxiaofei" in opened
+    assert "https://www.nagikokoro.best/" in opened
+    assert "https://github.com/kascr" in opened
+    assert "https://vrchat.com/home/user/usr_250dc79b-edbe-4d1d-be71-c7f2cd207ea6" in opened
     assert "https://discord.com/users/859837257917136918" in opened
     assert "https://x.com/NUN1EL" in opened
     assert "https://x.com/39eri_vr" in opened
     assert "https://github.com/fzcfweasdferttgg-png" in opened
     assert "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57" in opened
+    assert "https://vrchat.com/home/user/usr_39788233-af01-47a4-92da-c5ee39b20e06" in opened
     assert "https://github.com/KOZ39" in opened
 
 
@@ -120,7 +123,7 @@ def test_about_view_special_thanks_names_render_from_i18n(
         "about.special_thanks.name.ephedrine": "localized:Ephedrine",
         "about.special_thanks.name.eri": "localized:~ eri ~",
         "about.special_thanks.name.tsuyu_shiro": "localized:梅雨Shiro",
-        "about.special_thanks.name.garanshiro": "localized:garanshiro",
+        "about.special_thanks.name.xxxxxshiro": "localized:xxxxxShiro",
         "about.special_thanks.name.koz39": "localized:KOZ39",
     }
 
@@ -154,7 +157,7 @@ def test_about_view_special_thanks_name_keys_exist_in_locale_bundles(locale: str
         "about.special_thanks.name.eri": "~ eri ~",
         "about.special_thanks.name.fzcfweasdferttgg_png": "fzcfweasdferttgg-png",
         "about.special_thanks.name.tsuyu_shiro": "梅雨Shiro",
-        "about.special_thanks.name.garanshiro": "garanshiro",
+        "about.special_thanks.name.xxxxxshiro": "xxxxxShiro",
         "about.special_thanks.name.koz39": "KOZ39",
     }
 
@@ -316,9 +319,15 @@ def test_about_view_special_thanks_bundled_entries_use_avatars_and_https_links(
 
     expected_bundled = {
         "SUI_32C": ("sui_32c.png", "https://x.com/SUI32C"),
-        "Nagikokoro": ("nagikokoro.png", "https://github.com/RICHARDwuxiaofei"),
+        "Nagikokoro": ("nagikokoro.png", "https://www.nagikokoro.best/"),
         "motoka96": ("motoka96.png", None),
         "_Ykol魚": ("ykol.png", None),
+        "kascr_": ("kascr.png", "https://github.com/kascr"),
+        "Just Monika V": ("just_monika_v.png", None),
+        "FLUVIA": (
+            "fluvia.png",
+            "https://vrchat.com/home/user/usr_250dc79b-edbe-4d1d-be71-c7f2cd207ea6",
+        ),
         "Han โชเล่ย์": ("han_chole.png", None),
         "EA_PE": ("ea_pe.png", "https://discord.com/users/859837257917136918"),
         "Ephedrine": ("ephedrine.png", "https://x.com/NUN1EL"),
@@ -330,6 +339,10 @@ def test_about_view_special_thanks_bundled_entries_use_avatars_and_https_links(
         "Welcius": (
             "welcius.png",
             "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57",
+        ),
+        "xxxxxShiro": (
+            "xxxxxshiro.png",
+            "https://vrchat.com/home/user/usr_39788233-af01-47a4-92da-c5ee39b20e06",
         ),
         "KOZ39": ("koz39.png", "https://github.com/KOZ39"),
     }
