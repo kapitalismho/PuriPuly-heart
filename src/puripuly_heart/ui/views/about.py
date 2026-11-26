@@ -122,7 +122,11 @@ SPECIAL_THANKS_ENTRIES: tuple[SpecialThanksEntry, ...] = (
         "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57",
     ),
     SpecialThanksEntry("about.special_thanks.name.nunu299", "nunu299.png"),
-    SpecialThanksEntry("about.special_thanks.name.tsuyu_shiro", "tsuyu_shiro.png"),
+    SpecialThanksEntry(
+        "about.special_thanks.name.tsuyu_shiro",
+        "tsuyu_shiro.png",
+        "https://www.instagram.com/moena1213?fqnt=MWNnMnJzemRsZ3o2MQ%3D%3D",
+    ),
     SpecialThanksEntry(
         "about.special_thanks.name.xxxxxshiro",
         "xxxxxshiro.png",

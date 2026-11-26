@@ -100,6 +100,7 @@ def test_about_view_link_actions_handle_missing_page_gracefully(
     assert "https://x.com/39eri_vr" in opened
     assert "https://github.com/fzcfweasdferttgg-png" in opened
     assert "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57" in opened
+    assert "https://www.instagram.com/moena1213?fqnt=MWNnMnJzemRsZ3o2MQ%3D%3D" in opened
     assert "https://vrchat.com/home/user/usr_39788233-af01-47a4-92da-c5ee39b20e06" in opened
     assert "https://github.com/KOZ39" in opened
 
@@ -339,6 +340,10 @@ def test_about_view_special_thanks_bundled_entries_use_avatars_and_https_links(
         "Welcius": (
             "welcius.png",
             "https://vrchat.com/home/user/usr_7d77c22e-bc62-472f-acf3-33a3ab71ec57",
+        ),
+        "梅雨Shiro": (
+            "tsuyu_shiro.png",
+            "https://www.instagram.com/moena1213?fqnt=MWNnMnJzemRsZ3o2MQ%3D%3D",
         ),
         "xxxxxShiro": (
             "xxxxxshiro.png",
