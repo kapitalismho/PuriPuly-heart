@@ -460,6 +460,8 @@ class PhotoLifecycle:
                                 )
                             else:
                                 raise PhotoProviderError("photo_stream_contract", retryable=False)
+                    if not self._active(photo):
+                        return
                     if not completed:
                         raise PhotoProviderError("photo_incomplete")
                     if photo.excluded:

@@ -17,7 +17,7 @@ from puripuly_heart.core.overlay.process_adapter import (
     _AsyncioOverlayProcess,
 )
 from puripuly_heart.core.overlay.process_runners import DefaultOverlayProcessRunner
-from puripuly_heart.core.owned_thread import run_owned_thread_call
+from puripuly_heart.core.owned_thread import run_owned_thread_call, wait_for_owned_future
 from puripuly_heart.runtime_layout import current_runtime_layout
 
 from .bridge import PhotoBridge
@@ -89,7 +89,7 @@ class PhotoProcessSupervisor:
         self._scope = LifecycleScope("PhotoProcessSupervisor")
         self._stop = asyncio.Event()
         self._restart = asyncio.Event()
-        self._generation_stopped = asyncio.Event()
+        self._generation_stopped: asyncio.Future[None] | None = None
         self._task: asyncio.Task | None = None
         self.process: OverlayManagedProcess | None = None
         self.generation = 0
@@ -107,6 +107,8 @@ class PhotoProcessSupervisor:
         if self._stop.is_set() or self._task is not None and not self._task.done():
             return
         await self.bridge.start()
+        if self._stop.is_set():
+            return
         self._task = self._scope.create_task(self._run(), name="supervise")
 
     def _reader_task(self, coroutine, *, task_name: str):
@@ -114,11 +116,12 @@ class PhotoProcessSupervisor:
         return self._scope.create_task(coroutine, name=f"{task_name}-{self._reader_sequence}")
 
     async def abort_preparation(self, generation: int) -> None:
-        if generation != self.generation or self.process is None:
+        stopped = self._generation_stopped
+        if generation != self.generation or stopped is None:
             self.bridge.renderer_stopped(generation)
             return
         self._restart.set()
-        await self._generation_stopped.wait()
+        await wait_for_owned_future(stopped)
 
     async def _run(self) -> None:
         for recovery in range(self._restart_limit + 1):
@@ -126,7 +129,6 @@ class PhotoProcessSupervisor:
                 return
             self.generation += 1
             self._restart.clear()
-            self._generation_stopped.clear()
             self._renderer_changed(self.generation)
             manifest = await self.bridge.activate(self.generation, backend=self.backend)
             self.instance_id = manifest["instance_id"]
@@ -138,12 +140,14 @@ class PhotoProcessSupervisor:
             )
             waiters: list[asyncio.Task] = []
             process: OverlayManagedProcess | None = None
+            stopped: asyncio.Future[None] | None = None
             try:
                 manifest_path = Path(directory.name) / "launch.json"
                 executable = await run_owned_thread_call(lambda: self._runner.prepare(manifest))
                 await run_owned_thread_call(lambda: self._write_manifest(manifest_path, manifest))
                 if self._stop.is_set():
                     return
+                stopped = self._generation_stopped = asyncio.get_running_loop().create_future()
                 process = await self._runner.spawn(
                     executable, manifest_path, task_factory=self._reader_task
                 )
@@ -200,10 +204,11 @@ class PhotoProcessSupervisor:
                 )
             finally:
                 try:
-                    if process is not None:
-                        await self._stop_child(process)
-                    self.bridge.renderer_stopped(self.generation)
-                    self._generation_stopped.set()
+                    if stopped is not None:
+                        if process is None:
+                            self._settle_generation(stopped)
+                        else:
+                            await self._stop_child(process, stopped)
                 finally:
                     for task in waiters:
                         task.cancel()
@@ -223,27 +228,51 @@ class PhotoProcessSupervisor:
         if os.name != "nt":
             path.chmod(0o600)
 
-    async def _stop_child(self, process: OverlayManagedProcess) -> None:
+    def _settle_generation(self, stopped: asyncio.Future[None]) -> None:
+        self.bridge.renderer_stopped(self.generation)
+        stopped.set_result(None)
+
+    async def _stop_child(
+        self, process: OverlayManagedProcess, stopped: asyncio.Future[None]
+    ) -> None:
         self.last_shutdown_acknowledged = False
-        if getattr(process, "returncode", None) is None:
-            self.bridge.send({"type": "shutdown"})
-            try:
-                self.last_exit_code = await asyncio.wait_for(
-                    process.wait_for_exit(), timeout=self._shutdown_timeout
+        try:
+            if getattr(process, "returncode", None) is None:
+                self.bridge.request_shutdown()
+                try:
+                    await asyncio.wait_for(process.wait_for_exit(), timeout=self._shutdown_timeout)
+                except TimeoutError:
+                    await process.terminate()
+        except Exception:
+            if getattr(process, "returncode", None) is None:
+                self.failure_code = "photo_child_termination_unconfirmed"
+                self._diagnostic(
+                    "process_failed",
+                    {"generation": self.generation, "failure_code": self.failure_code},
                 )
-            except TimeoutError:
-                await process.terminate()
-                self.last_exit_code = await process.wait_for_exit()
-        else:
+            raise
+        finally:
             self.last_exit_code = await process.wait_for_exit()
-        self.last_shutdown_acknowledged = self.bridge.shutdown_complete.is_set()
-        await process.finish_readers()
-        if self.process is process:
-            self.process = None
+            self.last_shutdown_acknowledged = self.bridge.shutdown_complete.is_set()
+            self._settle_generation(stopped)
+            try:
+                await process.finish_readers()
+            finally:
+                self.process = None
+
+    def request_shutdown(self) -> None:
+        self._stop.set()
+        stopped = self._generation_stopped
+        if stopped is not None and not stopped.done():
+            self.bridge.request_shutdown()
 
     async def close(self) -> None:
-        self._stop.set()
-        if self._task is not None:
-            await asyncio.shield(self._task)
-        await self._scope.close()
-        await self.bridge.close()
+        self.request_shutdown()
+        try:
+            if self._task is not None:
+                await wait_for_owned_future(self._task)
+        finally:
+            try:
+                await self._scope.close()
+            finally:
+                await self.bridge.close()

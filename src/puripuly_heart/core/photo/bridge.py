@@ -120,6 +120,7 @@ class PhotoBridge:
         self._snapshot = {"type": "photo_snapshot", "revision": 0, "photo": None}
         self._changed = asyncio.Event()
         self._commands: deque[dict] = deque()
+        self._shutdown_requested = False
         self._generation = 0
         self._instance_id = ""
         self._token = ""
@@ -167,6 +168,7 @@ class PhotoBridge:
         self.disconnected.clear()
         self.shutdown_complete.clear()
         self._commands.clear()
+        self._shutdown_requested = False
         return {
             "protocol_version": 3,
             "role": "photo",
@@ -192,6 +194,13 @@ class PhotoBridge:
         self._commands.append(command)
         self._changed.set()
         return True
+
+    def request_shutdown(self) -> None:
+        if self._shutdown_requested:
+            return
+        self._shutdown_requested = True
+        self._commands.append({"type": "shutdown"})
+        self._changed.set()
 
     async def prepare(
         self,
@@ -233,7 +242,10 @@ class PhotoBridge:
                     cancelled = True
                 except TimeoutError:
                     if self.abort_preparation is not None:
-                        await self.abort_preparation(generation)
+                        try:
+                            await self.abort_preparation(generation)
+                        except asyncio.CancelledError:
+                            cancelled = True
                     if not future.done():
                         future.set_exception(
                             PhotoProviderError("photo_preparation_failed", retryable=False)
