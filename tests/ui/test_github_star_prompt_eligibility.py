@@ -97,6 +97,7 @@ def _settings_for_connection(connection: str) -> AppSettingsVNext:
         "managed_china": "deepseek_v4_flash_41",
         "chatgpt": "gpt_6_luna",
         "openrouter": "gemma4_26b_31b",
+        "openrouter_korea": "gemma4_26b_31b",
         "official_byok": "deepseek_v4_flash_41",
         "ollama": "local_llm",
         "cpu": "managed_gemma",
@@ -150,6 +151,7 @@ def test_github_star_prompt_eligibility_depends_only_on_translation_success(
         settings = _with_star_success(settings)
     controller = _prompt_backend_for(settings)
 
+    assert controller.settings.intent.translation.connection == connection
     assert controller.is_github_star_prompt_eligible() is success_observed
 
 
@@ -157,13 +159,17 @@ def test_github_star_prompt_eligibility_depends_only_on_translation_success(
 def test_translation_success_observation_persists_through_settings(
     connection: str,
 ) -> None:
-    controller = _prompt_backend_for(_settings_for_connection(connection))
+    settings = _settings_for_connection(connection)
+    controller = _prompt_backend_for(settings)
 
     assert controller.owner.record_translation_success_observed() is True
 
     restarted = _prompt_backend_for(_persisted_settings(controller))
     assert restarted.is_github_star_prompt_eligible() is True
     assert restarted.settings.state.github_star_prompt.translation_success_observed is True
+    translation = restarted.settings.intent.translation
+    assert translation.model == settings.intent.translation.model
+    assert translation.connection == connection
 
 
 @pytest.mark.asyncio
