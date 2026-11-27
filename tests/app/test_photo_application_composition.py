@@ -5,13 +5,23 @@ import json
 import logging
 import os
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from puripuly_heart.app.adapters import photo_provider
+from puripuly_heart.app.adapters.agent_relay_auth import AgentRelayTokenOwner
+from puripuly_heart.app.adapters.peer_capture.peer_capture_inventory import (
+    WindowsLoopbackDeviceInventoryAdapter,
+    WindowsProcessCaptureInventoryAdapter,
+)
 from puripuly_heart.app.ports.settings_view import PhotoStatusSnapshot
+from puripuly_heart.app.services import application_audio_devices
+from puripuly_heart.app.services.agent_chat.context import AgentActivity, collect_agent_context
+from puripuly_heart.app.services.agent_chat.modules import model_context
 from puripuly_heart.app.services.photo_application import PhotoApplicationOwner
 from puripuly_heart.app.wiring import wiring_runtime_pipeline
 from puripuly_heart.composition import application_runtime
@@ -507,5 +517,89 @@ async def test_composed_photo_status_query_names_why_photos_are_unavailable(tmp_
         apply_photo(enabled=False)
         assert (await status())["availability"] == "off"
         assert fetches == [True]
+    finally:
+        await app.stop()
+
+
+async def test_composed_puri_photo_allowance_expires_at_utc_midnight(tmp_path, monkeypatch):
+    before_midnight = datetime(2026, 11, 25, 23, 59, 59, tzinfo=UTC)
+    now = before_midnight
+    monkeypatch.setattr(
+        photo_provider, "datetime", SimpleNamespace(now=lambda tz: now.astimezone(tz))
+    )
+    monkeypatch.delenv("PURIPULY_PHOTO_BENCHMARK_ROUTE", raising=False)
+    monkeypatch.setenv("PURIPULY_AGENT_RELAY_URL", "https://relay.invalid/v1/respond")
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "synthetic-photo-test")
+    monkeypatch.setattr(
+        application_runtime, "default_http_extensions_dir", lambda: tmp_path / "extensions"
+    )
+    monkeypatch.setattr(
+        application_audio_devices,
+        "enumerate_audio_devices",
+        lambda _: {"host_apis": [], "microphones": [], "loopback_outputs": [], "errors": {}},
+    )
+    monkeypatch.setattr(WindowsProcessCaptureInventoryAdapter, "candidates", lambda self: ())
+    monkeypatch.setattr(WindowsLoopbackDeviceInventoryAdapter, "names", lambda self: ())
+
+    async def get_token(self):
+        return "synthetic-token"
+
+    monkeypatch.setattr(AgentRelayTokenOwner, "get_token", get_token)
+    requests = []
+
+    def relay_response(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        remaining = 0 if now == before_midnight else 50
+        return httpx.Response(200, json={"remaining": remaining, "allowance": 50})
+
+    monkeypatch.setattr(
+        network_clients,
+        "external_async_client",
+        lambda **kwargs: httpx.AsyncClient(transport=httpx.MockTransport(relay_response), **kwargs),
+    )
+    app = application_runtime.compose_application_runtime(
+        presentation=HeadlessApplicationPresentation(), config_path=tmp_path / "settings.json"
+    )
+    control = app.control()
+    activity = AgentActivity()
+
+    async def photo_context(topic="overview"):
+        snapshot = await collect_agent_context(control, activity=activity, topic=topic)
+        return model_context(snapshot, topic)["general"]["photo"]
+
+    try:
+        base = AppSettingsVNext()
+        canonical = replace(
+            base,
+            intent=replace(
+                base.intent,
+                photo=PhotoIntent(enabled=True, route="managed"),
+                secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
+            ),
+        )
+        app._settings.settings.canonical = canonical
+        control.settings.committed_settings = canonical
+        managed = {"enabled": True, "route": "managed"}
+        exhausted = {
+            **managed,
+            "availability": "allowance_exhausted",
+            "remaining": 0,
+            "allowance": 50,
+        }
+
+        assert await photo_context("general") == exhausted
+        assert len(requests) == 1
+        assert await photo_context() == exhausted
+        assert len(requests) == 1
+
+        now = before_midnight + timedelta(seconds=2)
+        assert await photo_context() == {**managed, "availability": "allowance_unknown"}
+        assert len(requests) == 1
+
+        ready = {**managed, "availability": "ready", "remaining": 50, "allowance": 50}
+        assert await photo_context("general") == ready
+        assert len(requests) == 2
+        assert await photo_context() == ready
+        assert len(requests) == 2
     finally:
         await app.stop()
