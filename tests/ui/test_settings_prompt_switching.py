@@ -363,14 +363,15 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
     ]
 
 
-def test_combined_gemma_connection_modal_lists_managed_and_openrouter(
-    monkeypatch, settings_events
+@pytest.mark.parametrize(
+    "connection",
+    [TranslationConnection.OPENROUTER.value, TranslationConnection.OPENROUTER_KOREA.value],
+)
+def test_combined_gemma_connection_modal_lists_supported_connections(
+    monkeypatch, selection_locale, settings_events, connection
 ) -> None:
-    settings = _settings(
-        model="gemma4_26b_31b",
-        connection="openrouter",
-        history={"gemma4_26b_31b": "openrouter"},
-    )
+    model = TranslationModel.GEMMA4_26B_31B.value
+    settings = _settings(model=model, connection=connection, history={model: connection})
     view = _make_settings_view(monkeypatch)
     settings_events.load(view, settings, config_path=Path("settings.json"))
     attach_dummy_page(monkeypatch, view)
@@ -388,12 +389,24 @@ def test_combined_gemma_connection_modal_lists_managed_and_openrouter(
 
     view._on_translation_connection_click(None)
 
-    assert [option.value for option in captured["options"]] == [
+    options = captured["options"]
+    assert [option.value for option in options] == [
         TranslationConnection.MANAGED.value,
         TranslationConnection.OPENROUTER.value,
+        TranslationConnection.OPENROUTER_KOREA.value,
     ]
-    assert captured["current"] == TranslationConnection.OPENROUTER.value
-    assert all(option.description == "" for option in captured["options"])
+    assert [option.label for option in options] == [
+        t("settings.translation_connection.managed"),
+        t("settings.translation_connection.openrouter"),
+        t("settings.translation_connection.openrouter_korea"),
+    ]
+    assert captured["current"] == connection
+    assert captured["show_description"] is True
+    korea_description = t(
+        "settings.translation_connection.openrouter_korea.description", default=""
+    )
+    assert korea_description
+    assert [option.description for option in options] == ["", "", korea_description]
 
 
 def test_luna_connection_modal_describes_chatgpt_connection(monkeypatch, settings_events) -> None:
