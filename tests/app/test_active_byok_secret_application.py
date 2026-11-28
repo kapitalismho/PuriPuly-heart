@@ -89,6 +89,7 @@ OLD_CREDENTIAL = "synthetic-active-byok-before"
 NEW_CREDENTIAL = "synthetic-active-byok-after"
 REJECTED_CREDENTIAL = "synthetic-active-byok-rejected"
 STT_CREDENTIAL = "synthetic-inactive-soniox"
+KOREA_TEXT = "translated via Korea primary"
 
 
 def _fingerprint(value: str | None) -> str | None:
@@ -178,9 +179,17 @@ async def _verify_explicitly(app, route, credential):
     assert _presentation(app).projections["translation_needs_key"] is False
 
 
+def _is_korea_request(body: object) -> bool:
+    return (
+        isinstance(body, dict)
+        and body.get("model") == "google/gemma-4-31b-it"
+        and "models" not in body
+        and body.get("provider") == {"only": ["kt"], "allow_fallbacks": False}
+    )
+
+
 async def _assert_live_request(app, route, credential, requests):
     concrete = _concrete(app, route)
-    _assert_credential(concrete.api_key, credential)
     start = len(requests)
     translated = await _runtime(app).provider.translate(
         TranslationBackendRequest(
@@ -191,23 +200,23 @@ async def _assert_live_request(app, route, credential, requests):
             target_language="ko",
         )
     )
-    assert translated.text == "translated locally"
+    assert translated.text == (KOREA_TEXT if route == KOREA_ROUTE else "translated locally")
     sent = requests[start:]
     assert sent
     assert all(host == route.host for host, _method, _path, _credential, _body in sent)
     expected_fingerprint = _fingerprint(credential)
-    assert all(
-        fingerprint == expected_fingerprint for _host, _method, _path, fingerprint, _body in sent
-    )
+    if any(
+        fingerprint != expected_fingerprint for _host, _method, _path, fingerprint, _body in sent
+    ):
+        pytest.fail("translation request used the wrong credential")
+    _assert_credential(concrete.api_key, credential)
     if route == KOREA_ROUTE:
         primary = next(
             body
             for _, method, path, _, body in sent
             if method == "POST" and path.endswith("/chat/completions")
         )
-        assert primary["model"] == "google/gemma-4-31b-it"
-        assert "models" not in primary
-        assert primary["provider"] == {"only": ["kt"], "allow_fallbacks": False}
+        assert _is_korea_request(primary)
 
 
 def _assert_openrouter_verification_request(requests, credential):
@@ -274,12 +283,13 @@ async def composed(tmp_path, monkeypatch):
         requests.append((host, request.method, request.url.path, _fingerprint(credential), body))
         if host in {"api.deepseek.com", "api.openai.com", "openrouter.ai"}:
             if request.method == "POST" and request.url.path.endswith("/chat/completions"):
+                text = KOREA_TEXT if _is_korea_request(body) else "translated locally"
                 return httpx.Response(
                     200,
                     json={
                         "choices": [
                             {
-                                "message": {"content": "translated locally"},
+                                "message": {"content": text},
                                 "finish_reason": "stop",
                             }
                         ]
@@ -420,15 +430,19 @@ async def test_active_byok_save_reaches_live_concrete_request_without_restart(
         )
 
         assert result["status"] == "applied"
-        assert _runtime(app) is runtime
-        _assert_backend_identity(runtime, before, changed=True)
+        if _runtime(app) is not runtime:
+            pytest.fail("saving the key changed the live translation runtime")
         _assert_saved_credential(app, route.secret_key, NEW_CREDENTIAL)
-        assert _verification(app, route).status == "unknown"
-        assert _presentation(app).projections["translation_needs_key"] is True
+        verification_status = _verification(app, route).status
+        assert verification_status == "unknown"
         assert len(requests) == start
         await _assert_disabled(app)
         await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
-        assert _verification(app, route).status == "unknown"
+        _assert_backend_identity(runtime, before, changed=True)
+        verification_status = _verification(app, route).status
+        assert verification_status == "unknown"
+        needs_key = _presentation(app).projections["translation_needs_key"]
+        assert needs_key is True
         await _verify_explicitly(app, route, NEW_CREDENTIAL)
         await _assert_disabled(app)
 
