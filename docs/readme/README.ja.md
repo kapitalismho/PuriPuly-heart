@@ -84,7 +84,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 ## 翻訳比較
 ![文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はPuriPulyで使用できるモデル：GPT 6 Luna (0.189)、DeepSeek V4.1 Flash (0.452)、Gemma 4 26B A4B (0.639)、Index-Translate 35B (1.090)、Gemma 4 E4B QAT Q4 (1.927)。オレンジの棒は外部の比較対象：Qwen 3.8 Live Translate (1.168)、Papago (2.784)、Gemini 3.5 Translate (2.969)、Soniox Translate (3.501)、DeepL (3.938)、Google Translation (4.477)。Qwen 3.8、Gemini 3.5、Sonioxは文字誤り率（CER）が5%以下の結果のみを選別。評価モデル：GPT-6 Astra (high reasoning effort)。](../images/performance/1.png)
 
-![音声認識と翻訳を組み合わせた全体パイプラインの文あたり平均エラーペナルティチャート。韓国語→英語/日本語/中国語（簡体）、216マルチターンサンプル、Gemba MQM評価、低いほど良い。青い棒はベンチマーク時のPuriPuly構成：Gemini Transcribe → Luna (0.608)、Gemini Transcribe → Gemma 26B (1.083)、Soniox STT → Gemma 26B (1.317)、Qwen ASR 1.7B → Gemma 26B (1.320)、Fun ASR Nano MLT → Gemma 26B (1.494)、Gemini Transcribe → Index (1.567)、Fun ASR Nano MLT → Index (2.154)。オレンジの棒は外部の比較対象：Qwen 3.8 Translate (1.858)、Gemini 3.5 Live Translate (3.526)、Soniox Translate (4.665)。評価モデル：GPT-6 Astra (high reasoning effort)。](../images/performance/2.png)
+![無料オプションの文あたり平均エラーペナルティ。韓国語から英語、日本語、中国語（簡体字）への翻訳。216件のマルチターンサンプルをGemba MQMで評価。低いほど良い。PuriPulyのIndex-Translate 35B (1.103)、VRCLS (2.694)、KiKitanのGemini 3.5 Live Translate (2.969)、VRCSのPLaMo 3 Translate 0.8B Q4 (3.932)、VRCTのDeepL (3.974)、KiKitanとVRCTのGoogle Translation (4.503)、OVR Overlay TranslatorのHy-MT2 1.8B Q4 (5.048)。Gemini 3.5 Live Translateは文字誤り率5%以下の224セルで集計。評価モデルはGPT-6 Astra（high reasoning effort）。](../images/performance/2.png)
 
 - 青い棒はベンチマーク時のPuriPuly構成です。
 - マイクロソフトのGemba MQMフレームワークを使って実験しました。

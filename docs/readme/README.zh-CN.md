@@ -85,7 +85,7 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 ## 翻译比较
 ![每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是 PuriPuly 中可用的模型：GPT 6 Luna (0.189)、DeepSeek V4.1 Flash (0.452)、Gemma 4 26B A4B (0.639)、Index-Translate 35B (1.090)、Gemma 4 E4B QAT Q4 (1.927)。橙色柱状图是外部基线：Qwen 3.8 Live Translate (1.168)、Papago (2.784)、Gemini 3.5 Translate (2.969)、Soniox Translate (3.501)、DeepL (3.938)、Google Translation (4.477)。Qwen 3.8、Gemini 3.5 和 Soniox 仅选取字符错误率（CER）不超过 5% 的结果。评估模型：GPT-6 Astra (high reasoning effort)。](../images/performance/1.png)
 
-![语音识别与翻译完整流程的每句平均错误惩罚图表。韩语→英语/日语/中文（简体），216 个多轮样本，Gemba MQM 评估，越低越好。蓝色柱状图是基准测试时的 PuriPuly 配置：Gemini Transcribe → Luna (0.608)、Gemini Transcribe → Gemma 26B (1.083)、Soniox STT → Gemma 26B (1.317)、Qwen ASR 1.7B → Gemma 26B (1.320)、Fun ASR Nano MLT → Gemma 26B (1.494)、Gemini Transcribe → Index (1.567)、Fun ASR Nano MLT → Index (2.154)。橙色柱状图是外部基线：Qwen 3.8 Translate (1.858)、Gemini 3.5 Live Translate (3.526)、Soniox Translate (4.665)。评估模型：GPT-6 Astra (high reasoning effort)。](../images/performance/2.png)
+![免费选项的每句平均错误惩罚。韩语译为英语、日语和简体中文。使用 Gemba MQM 评估 216 个多轮样本，分数越低越好。PuriPuly 的 Index-Translate 35B (1.103)、VRCLS (2.694)、KiKitan 的 Gemini 3.5 Live Translate (2.969)、VRCS 的 PLaMo 3 Translate 0.8B Q4 (3.932)、VRCT 的 DeepL (3.974)、KiKitan 和 VRCT 的 Google Translation (4.503)、OVR Overlay Translator 的 Hy-MT2 1.8B Q4 (5.048)。Gemini 3.5 Live Translate 的得分根据字符错误率不超过 5% 的 224 个单元计算。评估模型为 GPT-6 Astra，采用高推理强度。](../images/performance/2.png)
 
 - 蓝色柱状图代表基准测试时的 PuriPuly 配置。
 - 我们使用微软的 Gemba MQM 框架进行实验。

@@ -82,7 +82,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 ![문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 PuriPuly에서 사용할 수 있는 모델: GPT 6 Luna (0.189), DeepSeek V4.1 Flash (0.452), Gemma 4 26B A4B (0.639), Index-Translate 35B (1.090), Gemma 4 E4B QAT Q4 (1.927). 주황색 막대는 외부 비교 대상: Qwen 3.8 Live Translate (1.168), Papago (2.784), Gemini 3.5 Translate (2.969), Soniox Translate (3.501), DeepL (3.938), Google Translation (4.477). Qwen 3.8, Gemini 3.5, Soniox는 문자 오류율(CER) 5% 이하인 결과만 선별. 평가 모델: GPT-6 Astra (high reasoning effort).](../images/performance/1.png)
 
-![음성 인식과 번역을 결합한 전체 파이프라인의 문장당 평균 에러 페널티 차트. 한국어 → 영어/일본어/중국어(간체), 216개 멀티턴 샘플, Gemba MQM 평가, 낮을수록 좋음. 파란색 막대는 벤치마크 당시 PuriPuly의 구성: Gemini Transcribe → Luna (0.608), Gemini Transcribe → Gemma 26B (1.083), Soniox STT → Gemma 26B (1.317), Qwen ASR 1.7B → Gemma 26B (1.320), Fun ASR Nano MLT → Gemma 26B (1.494), Gemini Transcribe → Index (1.567), Fun ASR Nano MLT → Index (2.154). 주황색 막대는 외부 비교 대상: Qwen 3.8 Translate (1.858), Gemini 3.5 Live Translate (3.526), Soniox Translate (4.665). 평가 모델: GPT-6 Astra (high reasoning effort).](../images/performance/2.png)
+![무료 옵션의 문장당 평균 오류 페널티. 한국어에서 영어, 일본어, 중국어 간체로 번역한 216개 멀티턴 샘플을 Gemba MQM으로 평가했으며 낮을수록 좋음. PuriPuly의 Index-Translate 35B (1.103), VRCLS (2.694), KiKitan의 Gemini 3.5 Live Translate (2.969), VRCS의 PLaMo 3 Translate 0.8B Q4 (3.932), VRCT의 DeepL (3.974), KiKitan과 VRCT의 Google Translation (4.503), OVR Overlay Translator의 Hy-MT2 1.8B Q4 (5.048). Gemini 3.5 Live Translate 점수는 문자 오류율이 5% 이하인 224개 셀로 산출. 평가 모델은 GPT-6 Astra이며 추론 강도는 높음.](../images/performance/2.png)
 
 - 파란색 막대는 벤치마크 당시 PuriPuly의 구성이에요.
 - 마이크로소프트의 Gemba MQM 프레임워크를 사용해서 실험했어요.
