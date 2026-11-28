@@ -6,7 +6,14 @@ import flet as ft
 
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
-from puripuly_heart.ui.theme import text_style
+from puripuly_heart.ui.theme import (
+    COLOR_NEUTRAL,
+    COLOR_ON_BACKGROUND,
+    COLOR_ON_PRIMARY_CONTAINER,
+    COLOR_PRIMARY,
+    COLOR_PRIMARY_CONTAINER,
+    text_style,
+)
 
 
 class FoundationCard(SharedCardWrapper):
@@ -26,7 +33,7 @@ class FoundationSectionTitle(ft.Text):
             value,
             size=FOUNDATION_DESIGN_TOKENS.typography.title,
             weight=ft.FontWeight.BOLD,
-            color=FOUNDATION_DESIGN_TOKENS.palette.neutral,
+            color=COLOR_NEUTRAL,
         )
 
 
@@ -44,9 +51,9 @@ class FoundationActionButton(ft.TextButton):
             disabled=disabled,
             style=ft.ButtonStyle(
                 color={
-                    ft.ControlState.DEFAULT: FOUNDATION_DESIGN_TOKENS.palette.on_background,
-                    ft.ControlState.HOVERED: FOUNDATION_DESIGN_TOKENS.palette.primary,
-                    ft.ControlState.DISABLED: FOUNDATION_DESIGN_TOKENS.palette.neutral,
+                    ft.ControlState.DEFAULT: COLOR_ON_BACKGROUND,
+                    ft.ControlState.HOVERED: COLOR_PRIMARY,
+                    ft.ControlState.DISABLED: COLOR_NEUTRAL,
                 },
                 bgcolor=ft.Colors.TRANSPARENT,
                 text_style=text_style(
@@ -60,7 +67,7 @@ class FoundationActionButton(ft.TextButton):
                 shape=ft.RoundedRectangleBorder(radius=FOUNDATION_DESIGN_TOKENS.radius.control),
                 overlay_color=ft.Colors.with_opacity(
                     0.08,
-                    FOUNDATION_DESIGN_TOKENS.palette.primary,
+                    COLOR_PRIMARY,
                 ),
                 animation_duration=0,
             ),
@@ -74,9 +81,9 @@ class FoundationStatusPill(ft.Container):
                 label,
                 size=FOUNDATION_DESIGN_TOKENS.typography.label,
                 weight=ft.FontWeight.W_600,
-                color=FOUNDATION_DESIGN_TOKENS.palette.on_primary_container,
+                color=COLOR_ON_PRIMARY_CONTAINER,
             ),
-            bgcolor=FOUNDATION_DESIGN_TOKENS.palette.primary_container,
+            bgcolor=COLOR_PRIMARY_CONTAINER,
             border_radius=FOUNDATION_DESIGN_TOKENS.radius.control,
             padding=ft.Padding.symmetric(
                 horizontal=FOUNDATION_DESIGN_TOKENS.spacing.inline,

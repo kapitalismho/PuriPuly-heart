@@ -18,6 +18,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_SURFACE_BRIGHT,
 )
 
 _CENTER_ALIGNMENT = ft.Alignment(0, 0)
@@ -361,7 +362,7 @@ class AboutView(ft.Column):
             width=_SPECIAL_THANKS_AVATAR_SIZE,
             height=_SPECIAL_THANKS_AVATAR_SIZE,
             border_radius=_SPECIAL_THANKS_AVATAR_SIZE,
-            bgcolor=ft.Colors.WHITE,
+            bgcolor=COLOR_SURFACE_BRIGHT,
             alignment=_CENTER_ALIGNMENT,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         )

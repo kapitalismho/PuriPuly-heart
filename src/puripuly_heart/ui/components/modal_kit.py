@@ -7,11 +7,13 @@ import flet as ft
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.motion import PRESS, press
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
+    COLOR_ACTIVE_CONTROL,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACTIVE_CONTROL,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 MODAL_WIDTH = 600
@@ -163,13 +165,13 @@ class ModalCard(ft.Container):
     def _paint(self) -> None:
         self.disabled = not self._enabled
         if self._selected and self._enabled:
-            self.bgcolor = COLOR_PRIMARY
-            self.label_text.color = ft.Colors.WHITE
+            self.bgcolor = COLOR_ACTIVE_CONTROL
+            self.label_text.color = COLOR_ON_ACTIVE_CONTROL
             self.detail_text.color = ft.Colors.with_opacity(
-                _SELECTED_DETAIL_OPACITY, ft.Colors.WHITE
+                _SELECTED_DETAIL_OPACITY, COLOR_ON_ACTIVE_CONTROL
             )
             return
-        self.bgcolor = COLOR_BACKGROUND
+        self.bgcolor = COLOR_WINDOW_BACKGROUND
         if not self._enabled:
             muted = ft.Colors.with_opacity(_DISABLED_OPACITY, COLOR_NEUTRAL_DARK)
             self.label_text.color = muted

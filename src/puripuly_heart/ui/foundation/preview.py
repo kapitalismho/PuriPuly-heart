@@ -12,6 +12,7 @@ from puripuly_heart.ui.foundation.primitives import (
 )
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
 from puripuly_heart.ui.i18n import t_for_locale
+from puripuly_heart.ui.theme import COLOR_ON_BACKGROUND
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ class FoundationPreviewSurface(ft.Column):
                     ft.Text(
                         copy.body,
                         size=FOUNDATION_DESIGN_TOKENS.typography.body,
-                        color=FOUNDATION_DESIGN_TOKENS.palette.on_background,
+                        color=COLOR_ON_BACKGROUND,
                     ),
                     ft.Row(
                         controls=[

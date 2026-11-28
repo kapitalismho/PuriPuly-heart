@@ -3357,6 +3357,9 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
+    app.page.theme_mode = ft.ThemeMode.DARK
+    app.title_bar = SimpleNamespace(apply_theme=lambda mode: theme_calls.append(mode))
+    theme_calls: list[ft.ThemeMode] = []
     view_calls: list[str] = []
     app.view_dashboard = SimpleNamespace(apply_locale=lambda: view_calls.append("dash"))
     app.view_settings = SimpleNamespace(apply_locale=lambda: view_calls.append("settings"))
@@ -3367,6 +3370,8 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     app.apply_locale()
 
     assert app.page.title == app_module.t("app.title")
+    assert app.page.theme_mode == ft.ThemeMode.DARK
+    assert theme_calls == [ft.ThemeMode.DARK]
     assert view_calls == ["dash", "settings"]
     assert app.page.updated == 1
 

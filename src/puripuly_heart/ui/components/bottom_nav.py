@@ -4,10 +4,10 @@ import flet as ft
 
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
     COLOR_DIVIDER,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 
@@ -37,7 +37,7 @@ class BottomNavBar(ft.Container):
 
         super().__init__(
             content=tabs_row,
-            bgcolor=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
             height=80,
             border=ft.Border.only(top=ft.BorderSide(1, COLOR_DIVIDER)),
         )

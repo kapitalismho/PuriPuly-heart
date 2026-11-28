@@ -14,11 +14,13 @@ from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
+    COLOR_ACTIVE_CONTROL,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACTIVE_CONTROL,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,12 +55,12 @@ def build_recent_language_chip(
             label,
             size=RECENT_CHIP_TEXT_SIZE,
             weight=ft.FontWeight.BOLD,
-            color=ft.Colors.WHITE if selected else COLOR_NEUTRAL_DARK,
+            color=COLOR_ON_ACTIVE_CONTROL if selected else COLOR_NEUTRAL_DARK,
             text_align=ft.TextAlign.CENTER,
             max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,
         ),
-        bgcolor=COLOR_PRIMARY if selected else COLOR_BACKGROUND,
+        bgcolor=COLOR_ACTIVE_CONTROL if selected else COLOR_WINDOW_BACKGROUND,
         border_radius=RECENT_CHIP_RADIUS,
         padding=ft.Padding.symmetric(horizontal=8, vertical=16),
         alignment=ft.Alignment.CENTER,
@@ -74,7 +76,7 @@ def apply_recent_language_chip_hover(event: ft.ControlEvent) -> None:
     """Match the language-modal hover: primary text, leaving a selected chip alone."""
     container = event.control
     text_control = container.content
-    if getattr(text_control, "color", None) == ft.Colors.WHITE:
+    if getattr(text_control, "color", None) == COLOR_ON_ACTIVE_CONTROL:
         return
     text_control.color = COLOR_PRIMARY if is_hover_active(event) else COLOR_NEUTRAL_DARK
     container.update()
@@ -224,15 +226,15 @@ class LanguageModal:
 
             # Colors
             if is_disabled:
-                bg_color = COLOR_BACKGROUND
+                bg_color = COLOR_WINDOW_BACKGROUND
                 text_color = ft.Colors.with_opacity(0.35, COLOR_NEUTRAL_DARK)
                 desc_color = ft.Colors.with_opacity(0.35, COLOR_NEUTRAL_DARK)
                 border = None
             else:
-                bg_color = COLOR_PRIMARY if is_selected else COLOR_BACKGROUND
-                text_color = ft.Colors.WHITE if is_selected else COLOR_NEUTRAL_DARK
+                bg_color = COLOR_ACTIVE_CONTROL if is_selected else COLOR_WINDOW_BACKGROUND
+                text_color = COLOR_ON_ACTIVE_CONTROL if is_selected else COLOR_NEUTRAL_DARK
                 desc_color = (
-                    ft.Colors.with_opacity(0.8, ft.Colors.WHITE)
+                    ft.Colors.with_opacity(0.8, COLOR_ON_ACTIVE_CONTROL)
                     if is_selected
                     else COLOR_NEUTRAL_DARK
                 )
@@ -314,7 +316,7 @@ class LanguageModal:
             text_control = content
             desc_control = None
 
-        is_selected = getattr(text_control, "color", None) == ft.Colors.WHITE
+        is_selected = getattr(text_control, "color", None) == COLOR_ON_ACTIVE_CONTROL
 
         if not is_selected:
             if is_hovering:

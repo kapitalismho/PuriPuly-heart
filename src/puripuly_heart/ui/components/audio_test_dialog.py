@@ -25,11 +25,11 @@ from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.motion import close_modal, show_modal
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_WARNING,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 AUDIO_TEST_CHANNELS = ("self", "peer")
@@ -96,7 +96,7 @@ class _ChannelPanel:
             bottom=0,
             padding=ft.Padding.all(CARD_PADDING),
             alignment=ft.Alignment.CENTER,
-            bgcolor=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
             border_radius=CARD_RADIUS,
             visible=False,
         )
@@ -140,7 +140,7 @@ class _ChannelPanel:
             controls=[
                 ft.Container(
                     content=self.canvas,
-                    bgcolor=COLOR_BACKGROUND,
+                    bgcolor=COLOR_WINDOW_BACKGROUND,
                     border_radius=CARD_RADIUS,
                     padding=ft.Padding.all(_GRAPH_PADDING),
                     alignment=ft.Alignment.CENTER,
@@ -160,7 +160,7 @@ class _ChannelPanel:
             ),
             height=CARD_HEIGHT,
             padding=ft.Padding.symmetric(horizontal=CARD_PADDING),
-            bgcolor=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
             border_radius=CARD_RADIUS,
         )
         return ft.Column(

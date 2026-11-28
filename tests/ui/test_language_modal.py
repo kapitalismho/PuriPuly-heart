@@ -64,7 +64,7 @@ def test_language_modal_builds_list_and_handles_hover_callbacks() -> None:
     assert chip_text.color == modal_module.COLOR_NEUTRAL_DARK
 
     # Selected list item hover: should be ignored.
-    selected_text = SimpleNamespace(color=ft.Colors.WHITE)
+    selected_text = SimpleNamespace(color=modal_module.COLOR_ON_ACTIVE_CONTROL)
     selected_item = SimpleNamespace(
         content=selected_text, update=lambda: setattr(selected_item, "updated", True)
     )

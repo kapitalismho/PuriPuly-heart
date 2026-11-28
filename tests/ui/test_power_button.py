@@ -8,11 +8,14 @@ ft = pytest.importorskip("flet")
 
 from puripuly_heart.ui.components.power_button import PowerButton
 from puripuly_heart.ui.theme import (
+    COLOR_ACTIVE_CONTROL,
+    COLOR_ON_ACTIVE_CONTROL,
+    COLOR_ON_WARNING_CONTROL,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
     COLOR_TRANS_TONAL,
-    COLOR_WARNING,
+    COLOR_WARNING_CONTROL,
 )
 
 HOVER_ENTER = SimpleNamespace(data="true")
@@ -46,15 +49,15 @@ def test_power_button_set_state_transitions_and_renders_icon_and_label_only() ->
     assert btn._label_control.color == COLOR_PRIMARY
 
     btn.set_state(True, needs_key=False, status_text="On", helper_text="Ready now")
-    assert btn.bgcolor == COLOR_PRIMARY
-    assert btn._icon_control.color == ft.Colors.WHITE
-    assert btn._label_control.color == ft.Colors.WHITE
+    assert btn.bgcolor == COLOR_ACTIVE_CONTROL
+    assert btn._icon_control.color == COLOR_ON_ACTIVE_CONTROL
+    assert btn._label_control.color == COLOR_ON_ACTIVE_CONTROL
     assert btn._icon_control.visible is True
     assert btn._progress_control.visible is False
 
     btn.set_state(False, needs_key=True, status_text="Needs key", helper_text="Enter API key")
-    assert btn.bgcolor == COLOR_WARNING
-    assert btn._icon_control.color == btn._label_control.color == ft.Colors.WHITE
+    assert btn.bgcolor == COLOR_WARNING_CONTROL
+    assert btn._icon_control.color == btn._label_control.color == COLOR_ON_WARNING_CONTROL
 
     btn.set_label("NEW")
     assert btn._label_control.value == "NEW"
@@ -77,9 +80,9 @@ def test_power_button_hover_on_state_scales_only() -> None:
     btn.set_state(True)
     btn._on_hover(HOVER_ENTER)
     assert btn.scale == 1.02
-    assert btn.bgcolor == COLOR_PRIMARY
-    assert btn._icon_control.color == ft.Colors.WHITE
-    assert btn._label_control.color == ft.Colors.WHITE
+    assert btn.bgcolor == COLOR_ACTIVE_CONTROL
+    assert btn._icon_control.color == COLOR_ON_ACTIVE_CONTROL
+    assert btn._label_control.color == COLOR_ON_ACTIVE_CONTROL
     btn._on_hover(HOVER_LEAVE)
     assert btn.scale == 1.0
 
@@ -89,9 +92,9 @@ def test_power_button_hover_warning_state_scales_only() -> None:
     btn.set_state(False, needs_key=True)
     btn._on_hover(HOVER_ENTER)
     assert btn.scale == 1.02
-    assert btn.bgcolor == COLOR_WARNING
-    assert btn._icon_control.color == ft.Colors.WHITE
-    assert btn._label_control.color == ft.Colors.WHITE
+    assert btn.bgcolor == COLOR_WARNING_CONTROL
+    assert btn._icon_control.color == COLOR_ON_WARNING_CONTROL
+    assert btn._label_control.color == COLOR_ON_WARNING_CONTROL
     btn._on_hover(HOVER_LEAVE)
     assert btn.scale == 1.0
 
@@ -112,7 +115,7 @@ def test_power_button_state_change_keeps_scale_while_hovering() -> None:
     btn._on_hover(HOVER_ENTER)
     assert btn.scale == 1.02
     btn.set_state(True)
-    assert btn.bgcolor == COLOR_PRIMARY
+    assert btn.bgcolor == COLOR_ACTIVE_CONTROL
     assert btn.scale == 1.02
     btn._on_hover(HOVER_LEAVE)
     assert btn.scale == 1.0

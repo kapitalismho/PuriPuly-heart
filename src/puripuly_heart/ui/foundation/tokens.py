@@ -119,9 +119,33 @@ FOUNDATION_DESIGN_TOKENS = FoundationDesignTokens(
     accepted_production_revision="3fb5ce83e4840ef1fd49f2b5480952a09af66527",
 )
 
+WINDOWS_DARK_PALETTE = FoundationPaletteTokens(
+    background="#2C2836",
+    surface="#373243",
+    on_background="#F2EEF7",
+    primary="#F396A8",
+    error="#FF7392",
+    success="#88D49C",
+    warning="#BEA2FF",
+    divider="#59526C",
+    primary_container="#623C4D",
+    on_primary_container="#FCDFE6",
+    on_surface_variant="#B0AABE",
+    surface_dim="#24212E",
+    secondary="#D5B0BE",
+    tertiary="#E6CC8E",
+    translation_tonal="#473646",
+    translation_on="#F8B2C0",
+    display_source="#E4C7D1",
+    neutral="#B0AABE",
+    neutral_dark="#F2EEF7",
+    surface_tonal="#433E52",
+)
+
 
 __all__ = [
     "FOUNDATION_DESIGN_TOKENS",
+    "WINDOWS_DARK_PALETTE",
     "FoundationDesignTokens",
     "FoundationPaletteTokens",
     "FoundationRadiusTokens",

@@ -6,11 +6,15 @@ from puripuly_heart.ui.components.loading_spinner import create_button_spinner
 from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
 from puripuly_heart.ui.motion import press
 from puripuly_heart.ui.theme import (
+    COLOR_ACTIVE_CONTROL,
+    COLOR_ON_ACCENT,
+    COLOR_ON_ACTIVE_CONTROL,
+    COLOR_ON_WARNING_CONTROL,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
     COLOR_TRANS_TONAL,
-    COLOR_WARNING,
+    COLOR_WARNING_CONTROL,
 )
 
 _HOVER_SCALE = 1.02
@@ -36,7 +40,8 @@ class PowerButton(ft.Container):
         self._needs_key = False
         self._is_starting = False
         self._hovered = False
-        self._color_on = color_on if color_on is not None else COLOR_PRIMARY
+        self._color_on = color_on if color_on is not None else COLOR_ACTIVE_CONTROL
+        self._on_color = COLOR_ON_ACCENT if color_on is not None else COLOR_ON_ACTIVE_CONTROL
 
         self._icon_control = ft.Icon(icon=icon, size=icon_size, color=COLOR_SECONDARY)
         self._progress_control = create_button_spinner(
@@ -100,17 +105,17 @@ class PowerButton(ft.Container):
         self._progress_control.visible = is_starting
 
         if needs_key:
-            self.bgcolor = COLOR_WARNING
-            self._icon_control.color = ft.Colors.WHITE
-            self._label_control.color = ft.Colors.WHITE
+            self.bgcolor = COLOR_WARNING_CONTROL
+            self._icon_control.color = COLOR_ON_WARNING_CONTROL
+            self._label_control.color = COLOR_ON_WARNING_CONTROL
         elif is_starting:
             self.bgcolor = COLOR_SURFACE
             self._icon_control.color = COLOR_SECONDARY
             self._label_control.color = COLOR_PRIMARY
         elif is_on:
             self.bgcolor = self._color_on
-            self._icon_control.color = ft.Colors.WHITE
-            self._label_control.color = ft.Colors.WHITE
+            self._icon_control.color = self._on_color
+            self._label_control.color = self._on_color
         else:
             self.bgcolor = COLOR_TRANS_TONAL
             self._icon_control.color = COLOR_SECONDARY

@@ -14,12 +14,14 @@ from puripuly_heart.app.ports.ui_models import OptionItem
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
+    COLOR_ACTIVE_CONTROL,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACTIVE_CONTROL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 
@@ -277,15 +279,17 @@ class SettingsModal:
         ) and not option.disabled
 
         if option.disabled:
-            bg_color = COLOR_BACKGROUND
+            bg_color = COLOR_WINDOW_BACKGROUND
             text_color = ft.Colors.with_opacity(0.35, COLOR_NEUTRAL_DARK)
             desc_color = ft.Colors.with_opacity(0.35, COLOR_NEUTRAL_DARK)
             border = None
         else:
-            bg_color = COLOR_PRIMARY if is_selected else COLOR_BACKGROUND
-            text_color = ft.Colors.WHITE if is_selected else COLOR_ON_BACKGROUND
+            bg_color = COLOR_ACTIVE_CONTROL if is_selected else COLOR_WINDOW_BACKGROUND
+            text_color = COLOR_ON_ACTIVE_CONTROL if is_selected else COLOR_ON_BACKGROUND
             desc_color = (
-                ft.Colors.with_opacity(0.8, ft.Colors.WHITE) if is_selected else COLOR_NEUTRAL_DARK
+                ft.Colors.with_opacity(0.8, COLOR_ON_ACTIVE_CONTROL)
+                if is_selected
+                else COLOR_NEUTRAL_DARK
             )
             border = None
 
@@ -345,7 +349,7 @@ class SettingsModal:
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
-            bgcolor=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
             border_radius=16,
             padding=ft.Padding.all(24),
             height=110,
@@ -386,8 +390,7 @@ class SettingsModal:
         else:
             return
 
-        # If text is white, it's selected. Don't hover.
-        is_selected = text_control.color == ft.Colors.WHITE
+        is_selected = text_control.color == COLOR_ON_ACTIVE_CONTROL
 
         if not is_selected:
             if is_hovering:
