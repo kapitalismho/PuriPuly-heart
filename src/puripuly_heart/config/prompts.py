@@ -48,7 +48,7 @@ _PROMPT_CACHE: PromptAssemblyCache | None = None
 
 _ENGLISH_KEY = "english"
 _FALLBACK_EXAMPLES_KEY = "fallback"
-_TARGET_LANGUAGE_RULE_KEYS = {"english", "japanese", "korean"}
+_TARGET_LANGUAGE_RULE_KEYS = {"english", "japanese", "korean", "spanish"}
 _CHINESE_SIMPLIFIED_KEYS = {
     "chinese-simplified",
     "simplified-chinese",

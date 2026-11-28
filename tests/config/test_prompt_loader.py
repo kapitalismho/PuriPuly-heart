@@ -111,6 +111,13 @@ def test_chinese_target_variants_use_shared_chinese_rules() -> None:
     assert "Prefer natural softeners" in variables["targetLanguageRules"]
 
 
+def test_spanish_target_uses_spanish_rules() -> None:
+    variables = build_translation_prompt_variables("English", "Spanish")
+
+    assert '"tú" or "usted"' in variables["targetLanguageRules"]
+    assert variables["targetLanguageRulesSection"].startswith("### Target language Rules\n")
+
+
 def test_warm_prompt_cache_prevents_request_time_file_reads(monkeypatch) -> None:
     warm_prompt_cache()
 
