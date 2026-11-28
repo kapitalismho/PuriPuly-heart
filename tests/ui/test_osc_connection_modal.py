@@ -11,7 +11,12 @@ from puripuly_heart.ui.components.settings.osc_connection_modal import (
     _PORT_LABEL_HEIGHT,
     OscConnectionModal,
 )
-from puripuly_heart.ui.theme import COLOR_BACKGROUND, COLOR_NEUTRAL_DARK, COLOR_PRIMARY
+from puripuly_heart.ui.theme import (
+    COLOR_ACTIVE_CONTROL,
+    COLOR_NEUTRAL_DARK,
+    COLOR_PRIMARY,
+    COLOR_WINDOW_BACKGROUND,
+)
 
 
 class DummyPage:
@@ -110,7 +115,7 @@ def test_mode_change_repaints_a_mounted_dialog() -> None:
     )
 
     assert modal.selected_mode == "automatic"
-    assert modal.mode_cards["automatic"].bgcolor == COLOR_PRIMARY
+    assert modal.mode_cards["automatic"].bgcolor == COLOR_ACTIVE_CONTROL
     modal._select_mode("manual")
 
     assert modal.send_port_field is not None
@@ -118,8 +123,8 @@ def test_mode_change_repaints_a_mounted_dialog() -> None:
     assert modal.selected_mode == "manual"
     assert modal.send_port_field.read_only is False
     assert modal.receive_port_field.read_only is False
-    assert modal.mode_cards["manual"].bgcolor == COLOR_PRIMARY
-    assert modal.mode_cards["automatic"].bgcolor == COLOR_BACKGROUND
+    assert modal.mode_cards["manual"].bgcolor == COLOR_ACTIVE_CONTROL
+    assert modal.mode_cards["automatic"].bgcolor == COLOR_WINDOW_BACKGROUND
     assert updates == ["dialog"]
 
 
@@ -155,8 +160,8 @@ def test_modal_uses_two_columns_with_ports_left_and_mode_cards_right() -> None:
     assert len(mode_cards) == 3
     assert not any(isinstance(control, ft.TextField) for control in mode_cards)
     assert {card.bgcolor for card in mode_cards} == {
-        COLOR_PRIMARY,
-        COLOR_BACKGROUND,
+        COLOR_ACTIVE_CONTROL,
+        COLOR_WINDOW_BACKGROUND,
     }
 
 

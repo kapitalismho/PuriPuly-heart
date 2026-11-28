@@ -86,7 +86,8 @@ from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
 from puripuly_heart.ui.foundation.resources import DEFAULT_FOUNDATION_RESOURCES
 from puripuly_heart.ui.foundation.runtime import FletFoundationRuntime
-from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
+from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS, WINDOWS_DARK_PALETTE
+from puripuly_heart.ui.foundation.window_appearance import load_dark_mode, save_dark_mode
 from puripuly_heart.ui.gpu_device import GpuDeviceOption
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.i18n import (
@@ -109,9 +110,13 @@ from puripuly_heart.ui.shell.contract import AppShellSlots
 from puripuly_heart.ui.shell.renderer import compose_app_shell
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
+    COLOR_ERROR,
+    COLOR_ON_ACCENT,
     COLOR_PRIMARY,
     COLOR_SUCCESS,
     COLOR_WARNING,
+    COLOR_WINDOW_BACKGROUND,
+    WINDOWS_THEME_SUPPORTED,
     get_app_theme,
     text_style,
 )
@@ -237,6 +242,8 @@ class TranslatorApp:
         vrchat_osc_presence=None,
     ):
         self.page = page
+        self._theme_config_path = Path(config_path)
+        self._theme_preference_lock = asyncio.Lock()
         self._presentation_adapter = FletUiPresentationAdapter(self)
         application = application_factory(
             presentation=self._presentation_adapter,
@@ -542,10 +549,11 @@ class TranslatorApp:
 
     def _setup_page(self):
         self.page.title = t("app.title")
-        self.page.theme_mode = ft.ThemeMode.LIGHT
         register_ui_fonts(self.page)
-        self.page.theme = get_app_theme(face=typeface_for_language(get_locale()))
-        self.page.bgcolor = COLOR_BACKGROUND
+        self._configure_page_themes()
+        if WINDOWS_THEME_SUPPORTED:
+            self.page.theme_animation_style = ft.AnimationStyle.no_animation()
+        self._set_window_theme(WINDOWS_THEME_SUPPORTED and load_dark_mode(self._theme_config_path))
         self.page.padding = 0
         self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
         self.page.window.resizable = FOUNDATION_DESIGN_TOKENS.window.resizable
@@ -562,6 +570,31 @@ class TranslatorApp:
             DEFAULT_FOUNDATION_RESOURCES.require_file(FOUNDATION_DESIGN_TOKENS.icon_asset)
         )
         self.page.on_keyboard_event = self._on_keyboard_event
+
+    def _configure_page_themes(self) -> None:
+        face = typeface_for_language(get_locale())
+        self.page.theme = get_app_theme(face=face)
+        if WINDOWS_THEME_SUPPORTED:
+            self.page.dark_theme = get_app_theme(face=face, dark=True)
+
+    def _set_window_theme(self, dark: bool) -> None:
+        self.page.theme_mode = ft.ThemeMode.DARK if dark else ft.ThemeMode.LIGHT
+        self.page.bgcolor = WINDOWS_DARK_PALETTE.background if dark else COLOR_BACKGROUND
+
+    def _on_window_theme_toggle(self) -> None:
+        self._run_page_task(self._toggle_window_theme)
+
+    async def _toggle_window_theme(self) -> None:
+        async with self._theme_preference_lock:
+            dark = self.page.theme_mode != ft.ThemeMode.DARK
+            self._set_window_theme(dark)
+            self.title_bar.apply_theme(self.page.theme_mode)
+            self.page.update()
+            try:
+                await asyncio.to_thread(save_dark_mode, self._theme_config_path, dark)
+            except OSError as error:
+                self._retain_ui_failure("save_window_theme", error)
+                self._show_snackbar(t("theme.save_failed"), COLOR_ERROR)
 
     def _build_layout(self):
         self.view_dashboard = DashboardView()
@@ -587,7 +620,11 @@ class TranslatorApp:
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
 
         # Custom title bar
-        self.title_bar = TitleBar(self.page, on_close=self._request_window_close)
+        self.title_bar = TitleBar(
+            self.page,
+            on_close=self._request_window_close,
+            on_toggle_theme=self._on_window_theme_toggle if WINDOWS_THEME_SUPPORTED else None,
+        )
 
         # Bottom navigation: Home, Agent Chat, Settings, About
         self.bottom_nav = BottomNavBar(on_change=self._on_nav_change)
@@ -891,7 +928,7 @@ class TranslatorApp:
                     ft.Text(
                         t("github_star.snackbar.message"),
                         size=18,
-                        color=ft.Colors.WHITE,
+                        color=COLOR_ON_ACCENT,
                         font_family=font_for_language(get_locale()),
                         expand=True,
                     ),
@@ -899,7 +936,7 @@ class TranslatorApp:
                         content=t("github_star.snackbar.action"),
                         on_click=on_click,
                         style=ft.ButtonStyle(
-                            color=ft.Colors.WHITE,
+                            color=COLOR_ON_ACCENT,
                             text_style=text_style(size=18),
                             overlay_color=COLOR_PRIMARY,
                         ),
@@ -1017,7 +1054,7 @@ class TranslatorApp:
         dialog = ft.AlertDialog(
             modal=False,
             content=FoundationPreviewSurface(get_locale()),
-            bgcolor=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
         )
         self._foundation_preview_dialog = dialog
         self.page.show_dialog(dialog)
@@ -1313,7 +1350,8 @@ class TranslatorApp:
 
     def apply_locale(self) -> None:
         self.page.title = t("app.title")
-        self.page.theme = get_app_theme(face=typeface_for_language(get_locale()))
+        self._configure_page_themes()
+        self.title_bar.apply_theme(self.page.theme_mode)
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
         self.refresh_overlay_peer_contract()
@@ -2581,7 +2619,7 @@ class TranslatorApp:
     def _show_snackbar(self, message: str, bgcolor, duration: int = 4000) -> None:
         """Show a snackbar above the bottom nav."""
         snackbar = ft.SnackBar(
-            ft.Text(message, size=18, color=ft.Colors.WHITE),
+            ft.Text(message, size=18, color=COLOR_ON_ACCENT),
             bgcolor=bgcolor,
             duration=duration,
             behavior=ft.SnackBarBehavior.FLOATING,
@@ -2622,7 +2660,7 @@ class TranslatorApp:
                     ft.Text(
                         text,
                         size=18,
-                        color=ft.Colors.WHITE,
+                        color=COLOR_ON_ACCENT,
                         font_family=font_for_language(get_locale()),
                         expand=True,
                     ),
@@ -2630,7 +2668,7 @@ class TranslatorApp:
                         content=t("agent_chat.ask_puri"),
                         on_click=on_click,
                         style=ft.ButtonStyle(
-                            color=ft.Colors.WHITE,
+                            color=COLOR_ON_ACCENT,
                             text_style=text_style(size=18),
                             overlay_color=COLOR_PRIMARY,
                         ),
@@ -2768,12 +2806,12 @@ async def _check_and_notify_update(
                 controls=[
                     ft.Icon(
                         icon=ft.Icons.SYSTEM_UPDATE,
-                        color=ft.Colors.WHITE,
+                        color=COLOR_ON_ACCENT,
                         size=28,
                     ),
                     ft.Text(
                         t("update.available", version=update_info.version),
-                        color=ft.Colors.WHITE,
+                        color=COLOR_ON_ACCENT,
                         size=18,
                         font_family=font_for_language(get_locale()),
                         expand=True,
@@ -2782,7 +2820,7 @@ async def _check_and_notify_update(
                         content=t("update.download"),
                         on_click=_open_download,
                         style=ft.ButtonStyle(
-                            color=ft.Colors.WHITE,
+                            color=COLOR_ON_ACCENT,
                             text_style=text_style(size=18),
                             overlay_color=COLOR_PRIMARY,
                         ),
@@ -2799,7 +2837,7 @@ async def _check_and_notify_update(
             padding=20,
             duration=30000,  # 30초
             show_close_icon=True,
-            close_icon_color=ft.Colors.WHITE,
+            close_icon_color=COLOR_ON_ACCENT,
         )
         page.show_dialog(snackbar)
         if callable(on_launch_snackbar_shown):

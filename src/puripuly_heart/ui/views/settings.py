@@ -197,6 +197,7 @@ from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_ERROR,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACCENT,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
@@ -4917,7 +4918,7 @@ class SettingsView(ft.Column):
         elif is_control_mounted(self):
             self.page.show_dialog(
                 ft.SnackBar(
-                    ft.Text(message, color=ft.Colors.WHITE),
+                    ft.Text(message, color=COLOR_ON_ACCENT),
                     bgcolor=COLOR_WARNING,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,

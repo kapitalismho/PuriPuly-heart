@@ -25,7 +25,7 @@ from puripuly_heart.ui.components.modal_kit import (
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.motion import close_modal, show_modal
-from puripuly_heart.ui.theme import COLOR_BACKGROUND, COLOR_PRIMARY, COLOR_WARNING
+from puripuly_heart.ui.theme import COLOR_PRIMARY, COLOR_WARNING, COLOR_WINDOW_BACKGROUND
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +216,7 @@ class ModelAssetsDialog:
                     height=CARD_HEIGHT,
                     padding=ft.Padding.symmetric(horizontal=CARD_PADDING),
                     alignment=ft.Alignment.CENTER,
-                    bgcolor=COLOR_BACKGROUND,
+                    bgcolor=COLOR_WINDOW_BACKGROUND,
                     border_radius=CARD_RADIUS,
                 )
             )

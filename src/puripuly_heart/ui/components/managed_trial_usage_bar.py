@@ -5,6 +5,7 @@ import flet as ft
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
+    COLOR_ON_ACCENT,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_TRANS_TONAL,
@@ -25,7 +26,7 @@ def _text_shader(percent: int | None) -> ft.LinearGradient:
     return ft.LinearGradient(
         begin=ft.Alignment.CENTER_LEFT,
         end=ft.Alignment.CENTER_RIGHT,
-        colors=[ft.Colors.WHITE, ft.Colors.WHITE, COLOR_SECONDARY, COLOR_SECONDARY],
+        colors=[COLOR_ON_ACCENT, COLOR_ON_ACCENT, COLOR_SECONDARY, COLOR_SECONDARY],
         stops=[0.0, split, split, 1.0],
     )
 
@@ -53,7 +54,7 @@ class ManagedTrialUsageBar(ft.Row):
             "",
             size=_TEXT_SIZE,
             weight=ft.FontWeight.BOLD,
-            color=ft.Colors.WHITE,
+            color=COLOR_ON_ACCENT,
             text_align=ft.TextAlign.RIGHT,
             max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,

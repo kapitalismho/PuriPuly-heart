@@ -42,6 +42,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SUCCESS,
     COLOR_SURFACE,
     COLOR_WARNING,
+    get_app_theme,
 )
 from tests.helpers.paths import REPO_ROOT
 
@@ -117,7 +118,7 @@ def test_foundation_tokens_match_approved_light_palette() -> None:
         "surface_tonal": "#F8EEED",
     }
 
-    assert (
+    colors = (
         COLOR_BACKGROUND,
         COLOR_SURFACE,
         COLOR_ON_BACKGROUND,
@@ -128,6 +129,11 @@ def test_foundation_tokens_match_approved_light_palette() -> None:
         COLOR_DIVIDER,
         COLOR_SECONDARY,
         COLOR_NEUTRAL,
+    )
+    scheme = get_app_theme().color_scheme
+    assert tuple(
+        getattr(scheme, color.name.lower()) if isinstance(color, ft.Colors) else color
+        for color in colors
     ) == (
         "#FDF9F8",
         "#FDF1F0",

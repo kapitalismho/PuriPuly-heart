@@ -12,12 +12,14 @@ from puripuly_heart.ui.flet_runtime import (
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.motion import PRESS, close_modal, press_event, show_modal
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
+    COLOR_ACTIVE_CONTROL,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACTIVE_CONTROL,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_WINDOW_BACKGROUND,
     text_style,
 )
 
@@ -231,7 +233,7 @@ class OscConnectionModal:
             )
             card = ft.Container(
                 content=text,
-                bgcolor=COLOR_BACKGROUND,
+                bgcolor=COLOR_WINDOW_BACKGROUND,
                 border_radius=_OPTION_CARD_RADIUS,
                 padding=ft.Padding.all(_OPTION_CARD_PADDING),
                 alignment=ft.Alignment.CENTER,
@@ -282,15 +284,15 @@ class OscConnectionModal:
             if text is None:
                 continue
             selected = value == self._selected_mode
-            card.bgcolor = COLOR_PRIMARY if selected else COLOR_BACKGROUND
-            text.color = ft.Colors.WHITE if selected else COLOR_ON_BACKGROUND
+            card.bgcolor = COLOR_ACTIVE_CONTROL if selected else COLOR_WINDOW_BACKGROUND
+            text.color = COLOR_ON_ACTIVE_CONTROL if selected else COLOR_ON_BACKGROUND
 
     def _on_mode_hover(self, e: ft.ControlEvent) -> None:
         container = e.control
         text_control = container.content
         if not isinstance(text_control, ft.Text):
             return
-        if text_control.color == ft.Colors.WHITE:
+        if text_control.color == COLOR_ON_ACTIVE_CONTROL:
             return
         next_color = COLOR_PRIMARY if is_hover_active(e) else COLOR_ON_BACKGROUND
         if text_control.color == next_color:

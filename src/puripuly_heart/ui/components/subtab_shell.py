@@ -15,7 +15,6 @@ from puripuly_heart.ui.flet_runtime import (
 from puripuly_heart.ui.fonts import TypeFace, locale_body_letter_spacing
 from puripuly_heart.ui.i18n import get_locale
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
     COLOR_DIVIDER,
     COLOR_ON_BACKGROUND,
     COLOR_ON_PRIMARY_CONTAINER,
@@ -23,6 +22,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY_CONTAINER,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    COLOR_WINDOW_BACKGROUND,
     text_style,
 )
 
@@ -168,7 +168,7 @@ class TextSubtabShell(ft.Column):
         )
         self.subtab_bar = ft.Container(
             content=self.subtab_row,
-            bgcolor=COLOR_BACKGROUND if self._is_bottom_docked else COLOR_SURFACE,
+            bgcolor=COLOR_WINDOW_BACKGROUND if self._is_bottom_docked else COLOR_SURFACE,
             border=self._build_subtab_bar_border(),
             border_radius=None if self._is_bottom_docked else 24,
             height=64 if self._is_bottom_docked else None,

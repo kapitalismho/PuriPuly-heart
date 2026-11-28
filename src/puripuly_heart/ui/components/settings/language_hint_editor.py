@@ -13,7 +13,9 @@ from puripuly_heart.ui.flet_runtime import (
 )
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
+    COLOR_ACTIVE_CONTROL,
     COLOR_DIVIDER,
+    COLOR_ON_ACTIVE_CONTROL,
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
@@ -152,9 +154,9 @@ class LanguageHintEditor(ft.Column):
         chip = event.control
         term_text = chip.content
         hovered = is_hover_active(event)
-        chip.bgcolor = COLOR_PRIMARY if hovered else COLOR_PRIMARY_CONTAINER
+        chip.bgcolor = COLOR_ACTIVE_CONTROL if hovered else COLOR_PRIMARY_CONTAINER
         chip.border = ft.Border.all(1, COLOR_PRIMARY if hovered else COLOR_DIVIDER)
-        term_text.color = ft.Colors.WHITE if hovered else COLOR_ON_PRIMARY_CONTAINER
+        term_text.color = COLOR_ON_ACTIVE_CONTROL if hovered else COLOR_ON_PRIMARY_CONTAINER
         _update_control_if_mounted(chip)
 
     def _open_modal(self, _event: ft.ControlEvent | None = None) -> None:

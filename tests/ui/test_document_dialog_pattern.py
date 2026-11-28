@@ -20,9 +20,9 @@ from puripuly_heart.ui.components.warm_document_dialog import (  # noqa: E402
     open_warm_document_dialog,
 )
 from puripuly_heart.ui.theme import (  # noqa: E402
-    COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 
@@ -202,7 +202,7 @@ def test_document_dialogs_use_large_standalone_action_buttons(
         assert _button_color(button, ft.ControlState.HOVERED) == COLOR_PRIMARY
         assert button.style.bgcolor == ft.Colors.TRANSPARENT
         assert button.style.animation_duration == 0
-    assert getattr(action_row, "bgcolor", None) != COLOR_BACKGROUND
+    assert getattr(action_row, "bgcolor", None) != COLOR_WINDOW_BACKGROUND
 
 
 def test_warm_document_dialog_supports_three_ordered_actions_with_close_policy() -> None:

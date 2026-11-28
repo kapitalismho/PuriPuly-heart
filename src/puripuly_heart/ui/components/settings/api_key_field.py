@@ -22,6 +22,7 @@ from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_NEUTRAL_DARK,
+    COLOR_ON_ACCENT,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_WARNING,
@@ -242,7 +243,7 @@ class ApiKeyField(ft.Row):
                 return
             page.show_dialog(
                 ft.SnackBar(
-                    ft.Text(message, size=18, color=ft.Colors.WHITE),
+                    ft.Text(message, size=18, color=COLOR_ON_ACCENT),
                     bgcolor=bgcolor,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,

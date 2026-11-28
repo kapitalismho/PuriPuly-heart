@@ -34,7 +34,6 @@ from puripuly_heart.ui.fonts import font_for_language
 from puripuly_heart.ui.i18n import provider_label, t
 from puripuly_heart.ui.motion import press
 from puripuly_heart.ui.theme import (
-    COLOR_BACKGROUND,
     COLOR_DISPLAY_SOURCE,
     COLOR_DIVIDER,
     COLOR_ERROR,
@@ -47,6 +46,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SURFACE,
     COLOR_TRANS_ON,
     COLOR_TRANS_TONAL,
+    COLOR_WINDOW_BACKGROUND,
 )
 
 LEFT_WIDTH = 491
@@ -236,8 +236,8 @@ class AgentChatView(ft.Row):
             border_radius=16,
             border_color=COLOR_DIVIDER,
             focused_border_color=COLOR_PRIMARY,
-            bgcolor=COLOR_BACKGROUND,
-            hover_color=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
+            hover_color=COLOR_WINDOW_BACKGROUND,
             text_size=20,
             content_padding=ft.Padding.symmetric(horizontal=18, vertical=18),
             expand=True,
@@ -371,7 +371,7 @@ class AgentChatView(ft.Row):
                 bubbles.append(
                     ft.Container(
                         content=ft.Text(line, size=19, color=COLOR_ON_BACKGROUND),
-                        bgcolor=COLOR_BACKGROUND,
+                        bgcolor=COLOR_WINDOW_BACKGROUND,
                         padding=ft.Padding.symmetric(horizontal=18, vertical=13),
                         border_radius=ft.BorderRadius.only(
                             top_left=22 if position == 0 else 8,
@@ -670,8 +670,8 @@ class AgentChatView(ft.Row):
             border_width=2,
             border_color=COLOR_ERROR if failed else COLOR_DIVIDER,
             focused_border_color=COLOR_ERROR if failed else COLOR_PRIMARY,
-            bgcolor=COLOR_BACKGROUND,
-            hover_color=COLOR_BACKGROUND,
+            bgcolor=COLOR_WINDOW_BACKGROUND,
+            hover_color=COLOR_WINDOW_BACKGROUND,
             text_size=24,
             height=80,
             content_padding=ft.Padding.symmetric(horizontal=20, vertical=22),
@@ -951,7 +951,7 @@ class AgentChatView(ft.Row):
             )
         bubble = ft.Container(
             content=ft.Column(texts, spacing=4, tight=True),
-            bgcolor=COLOR_TRANS_TONAL if row.mine else COLOR_BACKGROUND,
+            bgcolor=COLOR_TRANS_TONAL if row.mine else COLOR_WINDOW_BACKGROUND,
             padding=ft.Padding.symmetric(horizontal=16, vertical=12),
             border_radius=ft.BorderRadius.only(
                 top_left=20,

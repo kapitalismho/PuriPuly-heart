@@ -174,9 +174,9 @@ def test_chip_hover_matches_dashboard_active_button_colors() -> None:
 
     chip.on_hover(SimpleNamespace(data="true", control=chip))
 
-    assert chip.bgcolor == module.COLOR_PRIMARY
+    assert chip.bgcolor == module.COLOR_ACTIVE_CONTROL
     assert chip.border.top.color == module.COLOR_PRIMARY
-    assert term_text.color == ft.Colors.WHITE
+    assert term_text.color == module.COLOR_ON_ACTIVE_CONTROL
 
     chip.on_hover(SimpleNamespace(data="false", control=chip))
 
