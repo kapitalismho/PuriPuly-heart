@@ -44,7 +44,8 @@ def test_native_themes_resolve_the_main_window_colors() -> None:
     assert dark.surface_container_lowest == WINDOWS_DARK_PALETTE.background
     assert light.surface == FOUNDATION_DESIGN_TOKENS.palette.surface
     assert dark.surface == WINDOWS_DARK_PALETTE.surface
-    assert light.primary == dark.primary == FOUNDATION_DESIGN_TOKENS.palette.primary
+    assert light.primary == FOUNDATION_DESIGN_TOKENS.palette.primary
+    assert dark.primary == WINDOWS_DARK_PALETTE.primary
     assert dark.on_primary != light.on_primary
     assert dark.surface_container_highest != light.surface_container_highest
 

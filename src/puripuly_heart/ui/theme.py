@@ -175,11 +175,11 @@ def _app_color_scheme(palette: FoundationPaletteTokens, *, dark: bool) -> ft.Col
         scheme.on_secondary_fixed = palette.display_source
         scheme.on_secondary_fixed_variant = palette.neutral
         scheme.surface_bright = palette.surface_tonal if dark else ft.Colors.WHITE
-        scheme.on_primary = "#221619" if dark else ft.Colors.WHITE
+        scheme.on_primary = "#2A161C" if dark else ft.Colors.WHITE
         scheme.primary_fixed = palette.primary_container if dark else palette.primary
         scheme.on_primary_fixed = palette.on_primary_container if dark else ft.Colors.WHITE
-        scheme.error_container = "#50342A" if dark else palette.warning
-        scheme.on_error_container = "#FFD1B8" if dark else ft.Colors.WHITE
+        scheme.error_container = "#4D3E72" if dark else palette.warning
+        scheme.on_error_container = "#E8DFFF" if dark else ft.Colors.WHITE
     if dark:
         scheme.on_secondary = scheme.on_primary
         scheme.on_tertiary = scheme.on_primary
@@ -189,7 +189,7 @@ def _app_color_scheme(palette: FoundationPaletteTokens, *, dark: bool) -> ft.Col
         scheme.surface_container_low = palette.surface
         scheme.surface_container = palette.surface_tonal
         scheme.surface_container_high = palette.surface_tonal
-        scheme.surface_container_highest = "#303030"
+        scheme.surface_container_highest = "#504960"
         scheme.outline_variant = palette.divider
         scheme.secondary_container = palette.surface_tonal
         scheme.on_secondary_container = palette.on_background
