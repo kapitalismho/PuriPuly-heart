@@ -27,7 +27,7 @@ from puripuly_heart.ui.dashboard.capture import (
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
-from puripuly_heart.ui.theme import COLOR_PRIMARY, COLOR_SURFACE, COLOR_WARNING
+from puripuly_heart.ui.theme import COLOR_ACTIVE_CONTROL, COLOR_SURFACE, COLOR_WARNING_CONTROL
 
 
 async def _noop_async() -> None:
@@ -156,7 +156,7 @@ async def test_enable_from_off_first_draws_starting_spinner_without_warning(harn
     assert first.starting is True
     assert first.enabled is True
     assert first.bgcolor == COLOR_SURFACE
-    assert first.bgcolor != COLOR_WARNING
+    assert first.bgcolor != COLOR_WARNING_CONTROL
     assert first.spinner_visible is True
     assert first.icon_visible is False
 
@@ -168,7 +168,7 @@ async def test_enable_from_off_first_draws_starting_spinner_without_warning(harn
     assert final.warning is False
     assert final.starting is False
     assert final.enabled is True
-    assert final.bgcolor == COLOR_PRIMARY
+    assert final.bgcolor == COLOR_ACTIVE_CONTROL
     assert final.spinner_visible is False
     assert final.icon_visible is True
 
@@ -184,7 +184,7 @@ async def test_blocked_start_stays_warning_actionable(harness) -> None:
     only = draws[-1]
     assert only.warning is True
     assert only.starting is False
-    assert only.bgcolor == COLOR_WARNING
+    assert only.bgcolor == COLOR_WARNING_CONTROL
     assert only.spinner_visible is False
 
 
@@ -198,7 +198,7 @@ async def test_start_exception_still_publishes_intent_truth(harness) -> None:
 
     assert harness.intent_enabled is True
     assert draws[-1].warning is True
-    assert draws[-1].bgcolor == COLOR_WARNING
+    assert draws[-1].bgcolor == COLOR_WARNING_CONTROL
 
 
 async def test_reopen_from_failure_draws_spinner_before_any_warning(harness) -> None:
@@ -231,7 +231,7 @@ async def test_disable_while_starting_clears_spinner_immediately(harness) -> Non
     assert draws[0].starting is False
     assert draws[0].warning is False
     assert draws[0].spinner_visible is False
-    assert draws[0].bgcolor != COLOR_WARNING
+    assert draws[0].bgcolor != COLOR_WARNING_CONTROL
     assert all(draw.warning is False for draw in draws)
     assert all(draw.starting is False for draw in draws)
 
@@ -248,7 +248,7 @@ async def test_redundant_enable_while_connected_keeps_connected_without_warning(
     assert harness.owner.state == "connected"
     assert draws[0].warning is False
     assert draws[0].enabled is True
-    assert draws[0].bgcolor == COLOR_PRIMARY
+    assert draws[0].bgcolor == COLOR_ACTIVE_CONTROL
 
 
 @pytest.mark.parametrize("latest_enabled", [False, True])
