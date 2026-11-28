@@ -7,22 +7,34 @@ import logging
 import socket
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
 import pytest
 
 from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeApplyPlan
+from puripuly_heart.app.services.settings.settings_application import (
+    settings_view_surface_snapshots,
+)
 from puripuly_heart.app.wiring import wiring_provider_runtime
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
+from puripuly_heart.cli import main as cli
+from puripuly_heart.cli.transport import ControlServer
 from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.headless_application import compose_headless_application
+from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
 from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
+from puripuly_heart.core.openrouter.openrouter_pkce import (
+    OpenRouterPKCEClient,
+    OpenRouterPKCEExchangeResult,
+)
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackendRequest
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
@@ -31,6 +43,7 @@ from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.ui.components.settings.api_key_verification_controller import (
     ApiKeyVerificationController,
 )
+from puripuly_heart.ui.views.settings import SettingsView
 
 
 @dataclass(frozen=True)
@@ -70,8 +83,11 @@ ROUTES = (
     ),
 )
 ROUTE_IDS = tuple(route.provider for route in ROUTES)
+KOREA_ROUTE = replace(ROUTES[-1], connection="openrouter_korea")
+INSTANCE_ID = "active-byok-regression"
 OLD_CREDENTIAL = "synthetic-active-byok-before"
 NEW_CREDENTIAL = "synthetic-active-byok-after"
+REJECTED_CREDENTIAL = "synthetic-active-byok-rejected"
 STT_CREDENTIAL = "synthetic-inactive-soniox"
 
 
@@ -100,7 +116,10 @@ def _assert_backend_identity(runtime, expected, *, changed=False) -> None:
 
 def _assert_private(value: object) -> None:
     rendered = repr(value)
-    if any(secret in rendered for secret in (OLD_CREDENTIAL, NEW_CREDENTIAL, STT_CREDENTIAL)):
+    if any(
+        secret in rendered
+        for secret in (OLD_CREDENTIAL, NEW_CREDENTIAL, REJECTED_CREDENTIAL, STT_CREDENTIAL)
+    ):
         pytest.fail("consumer-visible result exposed a synthetic credential")
 
 
@@ -175,9 +194,61 @@ async def _assert_live_request(app, route, credential, requests):
     assert translated.text == "translated locally"
     sent = requests[start:]
     assert sent
-    assert all(host == route.host for host, _method, _path, _credential in sent)
+    assert all(host == route.host for host, _method, _path, _credential, _body in sent)
     expected_fingerprint = _fingerprint(credential)
-    assert all(fingerprint == expected_fingerprint for _host, _method, _path, fingerprint in sent)
+    assert all(
+        fingerprint == expected_fingerprint for _host, _method, _path, fingerprint, _body in sent
+    )
+    if route == KOREA_ROUTE:
+        primary = next(
+            body
+            for _, method, path, _, body in sent
+            if method == "POST" and path.endswith("/chat/completions")
+        )
+        assert primary["model"] == "google/gemma-4-31b-it"
+        assert "models" not in primary
+        assert primary["provider"] == {"only": ["kt"], "allow_fallbacks": False}
+
+
+def _assert_openrouter_verification_request(requests, credential):
+    assert ("openrouter.ai", "GET", "/api/v1/key", _fingerprint(credential), None) in requests
+
+
+async def _cli_openrouter_login(path, app, control_addresses, monkeypatch, capsys):
+    token = uuid4().hex
+    server = ControlServer(app.control(), instance_id=INSTANCE_ID, token=token)
+    port = await server.start()
+    address = ("127.0.0.1", port)
+    control_addresses.add(address)
+    try:
+        with monkeypatch.context() as discovery:
+            record = SimpleNamespace(instance_id=INSTANCE_ID, port=port, token=token)
+            discovery.setattr(cli, "_instance", lambda _path: record)
+            args = cli.build_parser().parse_args(
+                ["--config", str(path), "--timeout", "5", "auth", "login", "openrouter"]
+            )
+            capsys.readouterr()
+            code = await cli._run(args)
+            output = capsys.readouterr()
+        _assert_private(output)
+        result = json.loads(output.out)
+        assert result["instance_id"] == INSTANCE_ID
+        assert result["terminal"] is True
+        return code, result
+    finally:
+        control_addresses.remove(address)
+        await server.close()
+
+
+@pytest.fixture
+def pkce_exchange(monkeypatch):
+    def install(credential):
+        async def exchange(_self):
+            return OpenRouterPKCEExchangeResult(api_key=credential, user_id=None)
+
+        monkeypatch.setattr(OpenRouterPKCEClient, "run_desktop_flow", exchange)
+
+    return install
 
 
 @pytest.fixture
@@ -199,7 +270,8 @@ async def composed(tmp_path, monkeypatch):
     def local_response(request):
         host = request.url.host
         credential = request.headers.get("authorization", "").removeprefix("Bearer ")
-        requests.append((host, request.method, request.url.path, _fingerprint(credential)))
+        body = json.loads(request.content) if host == "openrouter.ai" and request.content else None
+        requests.append((host, request.method, request.url.path, _fingerprint(credential), body))
         if host in {"api.deepseek.com", "api.openai.com", "openrouter.ai"}:
             if request.method == "POST" and request.url.path.endswith("/chat/completions"):
                 return httpx.Response(
@@ -218,6 +290,8 @@ async def composed(tmp_path, monkeypatch):
                 and request.method == "GET"
                 and request.url.path.endswith("/key")
             ):
+                if credential == REJECTED_CREDENTIAL:
+                    return httpx.Response(401)
                 return httpx.Response(
                     200, json={"data": {"limit": 10, "usage": 0, "is_free_tier": False}}
                 )
@@ -238,14 +312,27 @@ async def composed(tmp_path, monkeypatch):
     def forbidden_network(*_args, **_kwargs):
         pytest.fail("isolated BYOK regression attempted a real network connection")
 
+    def only_control(connect, control_addresses):
+        def guarded(sock, address):
+            if address not in control_addresses:
+                forbidden_network()
+            return connect(sock, address)
+
+        return guarded
+
     monkeypatch.setattr(network_clients, "external_async_client", async_client)
     monkeypatch.setattr(network_clients, "external_client", sync_client)
     monkeypatch.setattr(network_clients, "external_websocket_connect", forbidden_network)
-    monkeypatch.setattr(socket.socket, "connect", forbidden_network)
-    monkeypatch.setattr(socket.socket, "connect_ex", forbidden_network)
+    connect, connect_ex = socket.socket.connect, socket.socket.connect_ex
 
     @asynccontextmanager
-    async def open_application(route, *, initial=None, connection=None, translation=None):
+    async def open_application(
+        route, *, initial=None, connection=None, translation=None, control_addresses=()
+    ):
+        monkeypatch.setattr(socket.socket, "connect", only_control(connect, control_addresses))
+        monkeypatch.setattr(
+            socket.socket, "connect_ex", only_control(connect_ex, control_addresses)
+        )
         path = tmp_path / "settings.json"
         settings = AppSettingsVNext()
         settings = replace(
@@ -286,7 +373,7 @@ async def composed(tmp_path, monkeypatch):
         try:
             app = compose_headless_application(path, runtime_logging_sinks=sinks)
             await app.start()
-            app.control().bind_instance("active-byok-regression")
+            app.control().bind_instance(INSTANCE_ID)
             await _assert_disabled(app)
             yield app, store, requests, path
         finally:
@@ -305,7 +392,7 @@ async def composed(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("route", ROUTES, ids=ROUTE_IDS)
+@pytest.mark.parametrize("route", (*ROUTES, KOREA_ROUTE), ids=(*ROUTE_IDS, "openrouter-korea"))
 @pytest.mark.parametrize(
     "initial", (None, OLD_CREDENTIAL), ids=("first-registration", "replacement")
 )
@@ -344,6 +431,151 @@ async def test_active_byok_save_reaches_live_concrete_request_without_restart(
         assert _verification(app, route).status == "unknown"
         await _verify_explicitly(app, route, NEW_CREDENTIAL)
         await _assert_disabled(app)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("route", "source_connection", "entry", "initial"),
+    [
+        pytest.param(KOREA_ROUTE, "openrouter_korea", "cli", None, id="korea-cli-first"),
+        pytest.param(
+            KOREA_ROUTE, "openrouter_korea", "cli", OLD_CREDENTIAL, id="korea-cli-replace"
+        ),
+        pytest.param(KOREA_ROUTE, "openrouter", "settings", None, id="korea-settings-draft"),
+        pytest.param(ROUTES[-1], "openrouter", "cli", None, id="global-cli"),
+        pytest.param(ROUTES[-1], "managed", "cli", None, id="managed-to-global-cli"),
+    ],
+)
+async def test_browser_login_commits_route_and_applies_verified_key(
+    composed,
+    pkce_exchange,
+    monkeypatch,
+    capsys,
+    route,
+    source_connection,
+    entry,
+    initial,
+):
+    pkce_exchange(NEW_CREDENTIAL)
+    history = {route.model: source_connection, "qwen38_flash": "official_byok"}
+    translation = replace(
+        AppSettingsVNext().intent.translation,
+        model=route.model,
+        connection=source_connection,
+        openrouter_selected_source="managed" if source_connection == "managed" else "byok",
+        connection_history=history,
+    )
+    expected_history = history | {route.model: route.connection}
+    control_addresses = set()
+    async with composed(
+        route, initial=initial, translation=translation, control_addresses=control_addresses
+    ) as (app, _store, requests, path):
+        if initial is not None:
+            await _verify_explicitly(app, route, initial)
+            await _assert_live_request(app, route, initial, requests)
+        start = len(requests)
+        if entry == "settings":
+            provider, general, prompt, overlay = settings_view_surface_snapshots(
+                app.compatibility_settings()
+            )
+            view = SettingsView()
+            view.load_from_settings(
+                provider=provider, general=general, prompt=prompt, overlay=overlay, config_path=path
+            )
+            targets = []
+            view.on_request_openrouter_pkce = targets.append
+            view._on_llm_selected("gpt_6_luna")
+            view._on_translation_connection_selected("official_byok")
+            view._on_llm_selected(route.model)
+            view._on_translation_connection_selected(route.connection)
+            view._openrouter_pkce_button.on_click(None)
+            (target,) = targets
+            assert app.compatibility_settings().intent.translation.connection == source_connection
+            assert await app.connect_openrouter_via_pkce(target=target, launch_source="settings")
+            expected_history["gpt_6_luna"] = "official_byok"
+        else:
+            code, result = await _cli_openrouter_login(
+                path, app, control_addresses, monkeypatch, capsys
+            )
+            assert result["status"] == "applied"
+            assert result["authorization"] == "complete"
+            assert code == 0
+
+        selected = app.compatibility_settings().intent.translation
+        assert (selected.model, selected.connection) == (route.model, route.connection)
+        assert selected.openrouter_selected_source == "byok"
+        assert selected.connection_history == expected_history
+        if route == KOREA_ROUTE:
+            assert selected.openrouter_model == "google/gemma-4-31b-it"
+            assert selected.openrouter_provider_routing == "gemma4_31b_korea"
+        else:
+            assert selected.openrouter_model == "google/gemma-4-26b-a4b-it"
+            assert selected.openrouter_provider_routing == "gemma4_26b_31b_latency"
+        assert _verification(app, route).status == "verified"
+        _assert_openrouter_verification_request(requests[start:], NEW_CREDENTIAL)
+        _assert_saved_credential(app, route.secret_key, NEW_CREDENTIAL)
+        await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
+        saved = path.read_bytes()
+
+    reloaded = load_vnext_settings(path)
+    assert reloaded.ok and reloaded.settings is not None
+    assert reloaded.settings.intent.translation == selected
+    assert reloaded.migrated is False
+    assert path.read_bytes() == saved
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ("verification", "settings-replace"))
+async def test_failed_korea_browser_login_keeps_previous_key_and_settings(
+    composed, pkce_exchange, monkeypatch, capsys, failure
+):
+    route = KOREA_ROUTE
+    credential = REJECTED_CREDENTIAL if failure == "verification" else NEW_CREDENTIAL
+    pkce_exchange(credential)
+    control_addresses = set()
+    async with composed(route, initial=OLD_CREDENTIAL, control_addresses=control_addresses) as (
+        app,
+        _store,
+        requests,
+        path,
+    ):
+        await _verify_explicitly(app, route, OLD_CREDENTIAL)
+        original = path.read_bytes()
+        selected = app.compatibility_settings().intent.translation
+        verification = _verification(app, route)
+        backend = _runtime(app).provider
+        replaced_settings = []
+        replace_path = Path.replace
+
+        def fail_replace(source, destination):
+            if destination == path:
+                _assert_saved_credential(app, route.secret_key, NEW_CREDENTIAL)
+                replaced_settings.append(destination)
+                raise OSError("isolated settings replacement failure")
+            return replace_path(source, destination)
+
+        if failure == "settings-replace":
+            monkeypatch.setattr(Path, "replace", fail_replace)
+        start = len(requests)
+        code, result = await _cli_openrouter_login(
+            path, app, control_addresses, monkeypatch, capsys
+        )
+
+        assert code == 4
+        _assert_openrouter_verification_request(requests[start:], credential)
+        if failure == "settings-replace":
+            assert replaced_settings == [path]
+            assert result["status"] == "persistence_failed"
+            assert result["transaction"]["status"] == "settings_commit_failed_secret_restored"
+        else:
+            assert result["status"] == "failed"
+            assert "transaction" not in result
+        assert path.read_bytes() == original
+        assert app.compatibility_settings().intent.translation == selected
+        assert _verification(app, route) == verification
+        _assert_backend_identity(_runtime(app), backend)
+        _assert_saved_credential(app, route.secret_key, OLD_CREDENTIAL)
+        await _assert_live_request(app, route, OLD_CREDENTIAL, requests)
 
 
 @pytest.mark.asyncio
@@ -559,7 +791,7 @@ async def test_gui_key_flow_verifies_persisted_key_after_runtime_degradation(com
         assert requests
         assert all(
             fingerprint == _fingerprint(NEW_CREDENTIAL)
-            for _host, _method, _path, fingerprint in requests
+            for _host, _method, _path, fingerprint, _body in requests
         )
         await _assert_disabled(app)
 

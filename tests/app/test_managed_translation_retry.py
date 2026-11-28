@@ -162,10 +162,10 @@ async def test_one_native_enable_retries_failed_runtime_with_retained_managed_cr
         assert dialogs == []
         await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
         _assert_retained(app, path, source, expected)
-        assert all(host == route.host for host, _method, _path, _credential in requests)
+        assert all(host == route.host for host, *_ in requests)
         assert all(
             path.endswith("/key") or path.endswith("/chat/completions")
-            for _host, _method, path, _credential in requests
+            for _host, _method, path, *_ in requests
         )
 
 
@@ -226,7 +226,7 @@ async def test_native_retry_retains_managed_credential_admission_guards(
             assert dashboard.is_translation_on is False
             assert _runtime(app).provider is None
             assert constructed == []
-            assert not any(method == "POST" for _host, method, _path, _credential in requests)
+            assert not any(method == "POST" for _host, method, *_ in requests)
 
 
 @pytest.mark.asyncio
@@ -247,6 +247,4 @@ async def test_native_retry_preserves_selected_byok_verification_gate(
         await _assert_disabled(app)
         assert dashboard.is_translation_on is False
         assert dialogs == []
-        assert not any(
-            method == "POST" for _host, method, _path, _credential in requests[request_count:]
-        )
+        assert not any(method == "POST" for _host, method, *_ in requests[request_count:])

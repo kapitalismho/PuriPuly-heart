@@ -192,15 +192,20 @@ class OpenRouterPkceApplicationOwner:
                 next_prompts,
                 system_prompt_override=normalize_system_prompt_override(target.system_prompt),
             )
+        translation = updated.intent.translation
         updated = replace(
             updated,
             intent=replace(
                 updated.intent,
                 translation=replace(
-                    updated.intent.translation,
+                    translation,
                     openrouter_selection_alias=profile.alias,
                     openrouter_selected_source="byok",
-                    openrouter_model=profile.openrouter_model,
+                    openrouter_model=(
+                        translation.openrouter_model
+                        if translation.connection == "openrouter_korea"
+                        else profile.openrouter_model
+                    ),
                 ),
                 prompts=next_prompts,
             ),
@@ -231,7 +236,6 @@ class OpenRouterPkceApplicationOwner:
             surface="openrouter_pkce",
             operation="openrouter_pkce_runtime_apply",
         )
-        values = self.settings.snapshot_values(updated)
         scope = LifecycleScope("openrouter-pkce-commit")
 
         async def commit_and_apply() -> bool:
@@ -239,7 +243,7 @@ class OpenRouterPkceApplicationOwner:
                 SecretSetRequest(
                     secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
                     secret_value=result.api_key,
-                    settings_values=values,
+                    settings_values={},
                     expected_settings_revision=None,
                     reason="openrouter_pkce",
                     correlation_id=None,
