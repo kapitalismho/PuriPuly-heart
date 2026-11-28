@@ -25,9 +25,9 @@
 
 ## 데모
 
-<video src="https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3" controls width="100%"></video>
+https://github.com/user-attachments/assets/c667f44d-b91d-42a9-b24a-e6a993b392d3
 
-<video src="https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6" controls width="100%"></video>
+https://github.com/user-attachments/assets/74e46802-95b4-41e6-bed0-4405fd01c8d6
 
 PuriPuly를 통해 다른 외국인 친구들과 실제로 소통하는 모습을 더 보고 싶다면:
 
